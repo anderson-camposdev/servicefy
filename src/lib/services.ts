@@ -1,0 +1,1084 @@
+// ============================================================
+// Flowfy ITSM — Supabase Data Services
+// All CRUD + real-time subscriptions for ITIL modules
+// Supports PostgreSQL schema-based tenant isolation & views
+// ============================================================
+
+import { createClient } from '@supabase/supabase-js'
+import { supabase } from './supabase'
+import type {
+  CompanyRow, ProfileRow, IncidentRow, IncidentHistoryRow,
+  ServiceRequestRow, ProblemRow, ChangeRow, CatalogItemRow,
+  TicketPriority, IncidentState, IncidentCategory,
+  RequestState, ChangeType, ChangeRisk, ChangeState,
+  IncidentCatalogItemRow, IncidentCatalogSubitemRow, IncidentCatalogSymptomRow,
+  RequestCatalogItemRow, RequestCatalogSubitemRow, ApprovalTokenRow,
+  ActiveSessionRow, ChatbotWhitelistRow, ChatbotMessageRow, ChatbotConfigRow
+} from './database.types'
+
+const url  = import.meta.env.VITE_SUPABASE_URL  as string
+const key  = import.meta.env.VITE_SUPABASE_ANON_KEY as string
+
+// Dynamic schema clients cache to avoid recreating them constantly
+const schemaClientsCache: Record<string, any> = {}
+
+// Registry of companyId to PostgreSQL schemaName
+let companySchemaMap: Record<string, string> = {
+  '11111111-1111-1111-1111-111111111111': 'public',
+  '22222222-2222-2222-2222-222222222222': 'public',
+  '33333333-3333-3333-3333-333333333333': 'public',
+  '44444444-4444-4444-4444-444444444444': 'public'
+}
+
+export const setCompanySchemas = (mapping: Record<string, string>) => {
+  companySchemaMap = { ...companySchemaMap, ...mapping }
+}
+
+export function getSupabaseForSchema(schemaName?: string | null) {
+  if (!schemaName || schemaName === 'public') {
+    return supabase
+  }
+  if (!schemaClientsCache[schemaName]) {
+    schemaClientsCache[schemaName] = createClient<any>(url, key, {
+      db: { schema: schemaName as any },
+      auth: { persistSession: false, autoRefreshToken: false }
+    })
+  }
+  return schemaClientsCache[schemaName]
+}
+
+const getClientForCompany = (companyId: string) => {
+  const schema = companySchemaMap[companyId]
+  return getSupabaseForSchema(schema)
+}
+
+// ─── Generic error helper ─────────────────────────────────────
+
+function throwIfError<T>(data: T | null, error: unknown): T {
+  if (error) throw error
+  return data as T
+}
+
+// ─── COMPANIES ────────────────────────────────────────────────
+
+export const companiesService = {
+  async list(): Promise<CompanyRow[]> {
+    const { data, error } = await supabase
+      .from('companies')
+      .select('*')
+      .order('name')
+    return throwIfError(data, error)
+  },
+
+  async create(payload: Partial<CompanyRow>): Promise<CompanyRow> {
+    const { data, error } = await supabase
+      .from('companies')
+      .insert(payload)
+      .select()
+      .single()
+    return throwIfError(data, error)
+  },
+
+  async update(id: string, payload: Partial<CompanyRow>): Promise<CompanyRow> {
+    const { data, error } = await supabase
+      .from('companies')
+      .update(payload)
+      .eq('id', id)
+      .select()
+      .single()
+    return throwIfError(data, error)
+  },
+}
+
+// ─── PROFILES ────────────────────────────────────────────────
+
+export const profilesService = {
+  async listByCompany(companyId: string): Promise<ProfileRow[]> {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('company_id', companyId)
+      .eq('active', true)
+      .order('name')
+    return throwIfError(data, error)
+  },
+
+  async getById(id: string): Promise<ProfileRow | null> {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', id)
+      .single()
+    if (error?.code === 'PGRST116') return null
+    return throwIfError(data, error)
+  },
+
+  async listAll(): Promise<ProfileRow[]> {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .order('name')
+    return throwIfError(data, error)
+  },
+
+  async create(payload: Partial<ProfileRow>): Promise<ProfileRow> {
+    const { data, error } = await supabase
+      .from('profiles')
+      .insert(payload)
+      .select()
+      .single()
+    return throwIfError(data, error)
+  },
+
+  async update(id: string, payload: Partial<ProfileRow>): Promise<ProfileRow> {
+    const { data, error } = await supabase
+      .from('profiles')
+      .update(payload)
+      .eq('id', id)
+      .select()
+      .single()
+    return throwIfError(data, error)
+  },
+}
+
+// ─── INCIDENTS ────────────────────────────────────────────────
+
+export type IncidentFilters = {
+  companyId: string
+  search?: string
+  state?: IncidentState | 'all'
+  priority?: TicketPriority | 'all'
+  slaBreached?: boolean
+  assignedToId?: string | null
+  limit?: number
+  offset?: number
+  filterCompanyId?: string
+}
+
+export const incidentsService = {
+  /** Fetch a filtered, paginated list of incidents */
+  async list(filters: IncidentFilters): Promise<IncidentRow[]> {
+    const isMSP = filters.companyId === '44444444-4444-4444-4444-444444444444'
+    let client = getClientForCompany(filters.companyId)
+    let q = client.from('incidents').select('*')
+
+    if (isMSP) {
+      if (filters.filterCompanyId && filters.filterCompanyId !== 'all') {
+        q = q.eq('company_id', filters.filterCompanyId)
+      }
+    } else {
+      q = q.eq('company_id', filters.companyId)
+    }
+
+    q = q.order('updated_at', { ascending: false })
+
+    if (filters.state && filters.state !== 'all')    q = q.eq('state', filters.state)
+    if (filters.priority && filters.priority !== 'all') q = q.eq('priority', filters.priority)
+    if (filters.slaBreached !== undefined)            q = q.eq('sla_breached', filters.slaBreached)
+    if (filters.search)                               q = q.ilike('short_description', `%${filters.search}%`)
+    if (filters.limit)                                q = q.limit(filters.limit)
+    if (filters.offset)                               q = q.range(filters.offset, filters.offset + (filters.limit ?? 50) - 1)
+
+    const { data, error } = await q
+    return throwIfError(data, error)
+  },
+
+  /** Get a single incident with its history */
+  async getById(id: string, companyId: string): Promise<IncidentRow & { history: IncidentHistoryRow[] }> {
+    const client = getClientForCompany(companyId)
+    const [{ data: inc, error: e1 }, { data: hist, error: e2 }] = await Promise.all([
+      client.from('incidents').select('*').eq('id', id).single(),
+      client.from('incident_history').select('*').eq('incident_id', id).order('created_at', { ascending: false }),
+    ])
+    if (e1) throw e1
+    if (e2) throw e2
+    return { ...inc!, history: hist ?? [] }
+  },
+
+  /** KPI aggregates for the dashboard */
+  async getKPIs(companyId: string, filterCompanyId?: string) {
+    const isMSP = companyId === '44444444-4444-4444-4444-444444444444'
+    let q = getClientForCompany(companyId)
+      .from('incidents')
+      .select('state, priority, sla_breached, assigned_to_id, company_id')
+
+    if (isMSP) {
+      if (filterCompanyId && filterCompanyId !== 'all') {
+        q = q.eq('company_id', filterCompanyId)
+      }
+    } else {
+      q = q.eq('company_id', companyId)
+    }
+
+    const { data, error } = await q
+    if (error) throw error
+    const rows = data ?? []
+    return {
+      total:       rows.length,
+      critical:    rows.filter((r: any) => r.priority === 'P1 - Critical').length,
+      inProgress:  rows.filter((r: any) => r.state === 'In Progress').length,
+      slaBreached: rows.filter((r: any) => r.sla_breached).length,
+      unassigned:  rows.filter((r: any) => !r.assigned_to_id).length,
+    }
+  },
+
+  /** Create a new incident — number is auto-generated by DB trigger */
+  async create(payload: {
+    companyId: string
+    shortDescription: string
+    description?: string
+    priority: TicketPriority
+    category: IncidentCategory
+    callerName: string
+    callerId?: string
+    assignedToName?: string
+    assignedToId?: string
+    assignedGroupName?: string
+    assignedGroupId?: string
+  }): Promise<IncidentRow> {
+    const { data, error } = await getClientForCompany(payload.companyId)
+      .from('incidents')
+      .insert({
+        company_id:          payload.companyId,
+        short_description:   payload.shortDescription,
+        description:         payload.description ?? null,
+        priority:            payload.priority,
+        category:            payload.category,
+        caller_name:         payload.callerName,
+        caller_id:           payload.callerId ?? null,
+        assigned_to_name:    payload.assignedToName ?? null,
+        assigned_to_id:      payload.assignedToId ?? null,
+        assigned_group_name: payload.assignedGroupName ?? null,
+        assigned_group_id:   payload.assignedGroupId ?? null,
+      })
+      .select()
+      .single()
+    return throwIfError(data, error)
+  },
+
+  /** Update incident fields and log to incident_history */
+  async update(
+    id: string,
+    companyId: string,
+    changes: Partial<Pick<IncidentRow, 'state' | 'priority' | 'assigned_to_id' | 'assigned_to_name' | 'assigned_group_id' | 'assigned_group_name' | 'description'>>,
+    actorName: string,
+    comment?: string
+  ): Promise<IncidentRow> {
+    const client = getClientForCompany(companyId)
+    // Record history for each field changed
+    const historyInserts: object[] = []
+    for (const [field, newValue] of Object.entries(changes)) {
+      historyInserts.push({
+        incident_id:     id,
+        changed_by_name: actorName,
+        field_name:      field,
+        new_value:       String(newValue ?? ''),
+        comment:         comment ?? null,
+        is_public:       true,
+      })
+    }
+
+    const [{ data, error: updateErr }, { error: histErr }] = await Promise.all([
+      client.from('incidents').update(changes).eq('id', id).select().single(),
+      historyInserts.length > 0
+        ? client.from('incident_history').insert(historyInserts)
+        : Promise.resolve({ error: null }),
+    ])
+    if (updateErr) throw updateErr
+    if (histErr)   throw histErr
+    return data!
+  },
+
+  /** Add a comment/note without changing any field */
+  async addComment(incidentId: string, companyId: string, comment: string, actorName: string, isPublic = true) {
+    const { error } = await getClientForCompany(companyId).from('incident_history').insert({
+      incident_id:     incidentId,
+      changed_by_name: actorName,
+      field_name:      'comment',
+      comment,
+      is_public:       isPublic,
+    })
+    if (error) throw error
+  },
+
+  /** Subscribe to real-time changes on incidents for a company */
+  subscribeToCompany(
+    companyId: string,
+    onInsert: (row: IncidentRow) => void,
+    onUpdate: (row: IncidentRow) => void
+  ) {
+    const schema = companySchemaMap[companyId] || 'public'
+    const isMSP = companyId === '44444444-4444-4444-4444-444444444444'
+    const channelName = isMSP ? 'incidents:msp' : `incidents:${companyId}`
+    const insertConfig: any = isMSP 
+      ? { event: 'INSERT', schema, table: 'incidents' }
+      : { event: 'INSERT', schema, table: 'incidents', filter: `company_id=eq.${companyId}` }
+    const updateConfig: any = isMSP 
+      ? { event: 'UPDATE', schema, table: 'incidents' }
+      : { event: 'UPDATE', schema, table: 'incidents', filter: `company_id=eq.${companyId}` }
+
+    return getClientForCompany(companyId)
+      .channel(channelName)
+      .on(
+        'postgres_changes',
+        insertConfig,
+        (payload: any) => onInsert(payload.new as IncidentRow)
+      )
+      .on(
+        'postgres_changes',
+        updateConfig,
+        (payload: any) => onUpdate(payload.new as IncidentRow)
+      )
+      .subscribe()
+  },
+}
+
+// ─── SERVICE REQUESTS ────────────────────────────────────────
+
+export const requestsService = {
+  async list(companyId: string, requesterId?: string): Promise<ServiceRequestRow[]> {
+    let q = getClientForCompany(companyId)
+      .from('service_requests')
+      .select('*')
+      .eq('company_id', companyId)
+      .order('created_at', { ascending: false })
+    if (requesterId) q = q.eq('requester_id', requesterId)
+    const { data, error } = await q
+    return throwIfError(data, error)
+  },
+
+  async getKPIs(companyId: string) {
+    const { data, error } = await getClientForCompany(companyId)
+      .from('service_requests')
+      .select('state, cost')
+      .eq('company_id', companyId)
+    if (error) throw error
+    const rows = data ?? []
+    return {
+      total:     rows.length,
+      awaiting:  rows.filter((r: any) => r.state === 'Awaiting Approval').length,
+      fulfilled: rows.filter((r: any) => r.state === 'Fulfilled').length,
+      cost:      rows.reduce((sum: number, r: any) => sum + (r.cost ?? 0), 0),
+    }
+  },
+
+  async create(payload: {
+    companyId: string
+    catalogItemName: string
+    catalogItemId?: string
+    requesterName: string
+    requesterId?: string
+    priority?: TicketPriority
+    formData?: Record<string, unknown>
+    cost?: number
+  }): Promise<ServiceRequestRow> {
+    const { data, error } = await getClientForCompany(payload.companyId)
+      .from('service_requests')
+      .insert({
+        company_id:       payload.companyId,
+        catalog_item_name: payload.catalogItemName,
+        catalog_item_id:  payload.catalogItemId ?? null,
+        requester_name:   payload.requesterName,
+        requester_id:     payload.requesterId ?? null,
+        priority:         payload.priority ?? 'P3 - Moderate',
+        form_data:        payload.formData ?? {},
+        cost:             payload.cost ?? null,
+      })
+      .select()
+      .single()
+    return throwIfError(data, error)
+  },
+
+  async updateState(id: string, companyId: string, state: RequestState, actorName: string, comment?: string): Promise<ServiceRequestRow> {
+    const client = getClientForCompany(companyId)
+    const updates: Partial<ServiceRequestRow> = { state }
+    if (state === 'Approved') updates.approved_at = new Date().toISOString()
+    if (state === 'Fulfilled') updates.fulfilled_at = new Date().toISOString()
+    const { data, error } = await client.from('service_requests').update(updates).eq('id', id).select().single()
+    if (error) throw error
+    await client.from('request_history').insert({ request_id: id, changed_by_name: actorName, field_name: 'state', new_value: state, comment: comment ?? null, is_public: true })
+    return data!
+  },
+}
+
+// ─── PROBLEMS ────────────────────────────────────────────────
+
+export const problemsService = {
+  async list(companyId: string): Promise<ProblemRow[]> {
+    const { data, error } = await getClientForCompany(companyId)
+      .from('problems')
+      .select('*')
+      .eq('company_id', companyId)
+      .order('created_at', { ascending: false })
+    return throwIfError(data, error)
+  },
+
+  async getKPIs(companyId: string) {
+    const { data, error } = await getClientForCompany(companyId)
+      .from('problems')
+      .select('state, root_cause, known_error')
+      .eq('company_id', companyId)
+    if (error) throw error
+    const rows = data ?? []
+    return {
+      total:       rows.length,
+      active:      rows.filter((r: any) => !['Resolved', 'Closed'].includes(r.state)).length,
+      rootCause:   rows.filter((r: any) => r.root_cause).length,
+      knownError:  rows.filter((r: any) => r.known_error).length,
+    }
+  },
+
+  async create(payload: {
+    companyId: string
+    shortDescription: string
+    description?: string
+    priority?: TicketPriority
+    category?: IncidentCategory
+    assignedToName?: string
+    assignedToId?: string
+  }): Promise<ProblemRow> {
+    const { data, error } = await getClientForCompany(payload.companyId)
+      .from('problems')
+      .insert({
+        company_id:        payload.companyId,
+        short_description: payload.shortDescription,
+        description:       payload.description ?? null,
+        priority:          payload.priority ?? 'P3 - Moderate',
+        category:          payload.category ?? 'Software',
+        assigned_to_name:  payload.assignedToName ?? null,
+        assigned_to_id:    payload.assignedToId ?? null,
+      })
+      .select()
+      .single()
+    return throwIfError(data, error)
+  },
+
+  async update(id: string, companyId: string, changes: Partial<Pick<ProblemRow, 'state' | 'root_cause' | 'workaround' | 'known_error'>>, actorName: string): Promise<ProblemRow> {
+    const client = getClientForCompany(companyId)
+    const [{ data, error: ue }, { error: he }] = await Promise.all([
+      client.from('problems').update(changes).eq('id', id).select().single(),
+      client.from('problem_history').insert(
+        Object.entries(changes).map(([field, val]) => ({ problem_id: id, changed_by_name: actorName, field_name: field, new_value: String(val ?? ''), is_public: true }))
+      ),
+    ])
+    if (ue) throw ue
+    if (he) throw he
+    return data!
+  },
+}
+
+// ─── CHANGES ─────────────────────────────────────────────────
+
+export const changesService = {
+  async list(companyId: string): Promise<ChangeRow[]> {
+    const { data, error } = await getClientForCompany(companyId)
+      .from('changes')
+      .select('*')
+      .eq('company_id', companyId)
+      .order('created_at', { ascending: false })
+    return throwIfError(data, error)
+  },
+
+  async getKPIs(companyId: string) {
+    const { data, error } = await getClientForCompany(companyId)
+      .from('changes')
+      .select('state, type, risk')
+      .eq('company_id', companyId)
+    if (error) throw error
+    const rows = data ?? []
+    return {
+      total:       rows.length,
+      awaitingCAB: rows.filter((r: any) => r.state === 'Awaiting CAB Approval').length,
+      emergency:   rows.filter((r: any) => r.type === 'Emergency').length,
+      highRisk:    rows.filter((r: any) => ['High', 'Critical'].includes(r.risk)).length,
+      scheduled:   rows.filter((r: any) => r.state === 'Scheduled').length,
+    }
+  },
+
+  async create(payload: {
+    companyId: string
+    shortDescription: string
+    description?: string
+    justification?: string
+    type?: ChangeType
+    risk?: ChangeRisk
+    implementationPlan?: string
+    testPlan?: string
+    backoutPlan?: string
+    changeWindowStart?: string
+    changeWindowEnd?: string
+    requestedByName: string
+    requestedById?: string
+    cabApprovers?: string[]
+  }): Promise<ChangeRow> {
+    const { data, error } = await getClientForCompany(payload.companyId)
+      .from('changes')
+      .insert({
+        company_id:          payload.companyId,
+        short_description:   payload.shortDescription,
+        description:         payload.description ?? null,
+        justification:       payload.justification ?? null,
+        type:                payload.type ?? 'Normal',
+        risk:                payload.risk ?? 'Low',
+        implementation_plan: payload.implementationPlan ?? null,
+        test_plan:           payload.testPlan ?? null,
+        backout_plan:        payload.backoutPlan ?? null,
+        change_window_start: payload.changeWindowStart ?? null,
+        change_window_end:   payload.changeWindowEnd ?? null,
+        requested_by_name:   payload.requestedByName,
+        requested_by_id:     payload.requestedById ?? null,
+        cab_approvers:       payload.cabApprovers ?? [],
+        cab_approvals:       {},
+      })
+      .select()
+      .single()
+    return throwIfError(data, error)
+  },
+
+  async updateState(id: string, companyId: string, state: ChangeState, actorName: string): Promise<ChangeRow> {
+    const client = getClientForCompany(companyId)
+    const { data, error } = await client.from('changes').update({ state }).eq('id', id).select().single()
+    if (error) throw error
+    await client.from('change_history').insert({ change_id: id, changed_by_name: actorName, field_name: 'state', new_value: state, is_public: true })
+    return data!
+  },
+}
+
+// ─── CATALOG ─────────────────────────────────────────────────
+
+export const catalogService = {
+  async listByCompany(companyId: string): Promise<CatalogItemRow[]> {
+    const { data, error } = await getClientForCompany(companyId)
+      .from('catalog_items')
+      .select('*')
+      .eq('company_id', companyId)
+      .eq('active', true)
+      .order('name')
+    return throwIfError(data, error)
+  },
+
+  async listAll(): Promise<CatalogItemRow[]> {
+    const { data, error } = await supabase
+      .from('catalog_items')
+      .select('*')
+      .order('name')
+    return throwIfError(data, error)
+  },
+
+  async create(payload: Partial<CatalogItemRow>): Promise<CatalogItemRow> {
+    const companyId = payload.company_id!
+    const { data, error } = await getClientForCompany(companyId)
+      .from('catalog_items')
+      .insert(payload)
+      .select()
+      .single()
+    return throwIfError(data, error)
+  },
+
+  async update(id: string, companyId: string, payload: Partial<CatalogItemRow>): Promise<CatalogItemRow> {
+    const { data, error } = await getClientForCompany(companyId)
+      .from('catalog_items')
+      .update(payload)
+      .eq('id', id)
+      .select()
+      .single()
+    return throwIfError(data, error)
+  },
+}
+
+// ─── CIO & EXECUTIVE SERVICES ─────────────────────────────────
+
+export const cioService = {
+  async getMetrics(companyId: string) {
+    const client = getClientForCompany(companyId)
+    const [{ data: incs }, { data: prbs }, { data: chgs }] = await Promise.all([
+      client.from('incidents').select('created_at, resolved_at, state').eq('company_id', companyId),
+      client.from('problems').select('state').eq('company_id', companyId),
+      client.from('changes').select('state, risk, type').eq('company_id', companyId),
+    ])
+
+    const resolvedIncs = (incs ?? []).filter((i: any) => i.resolved_at && i.state === 'Resolved')
+    let totalHours = 0
+    resolvedIncs.forEach((i: any) => {
+      const diff = new Date(i.resolved_at!).getTime() - new Date(i.created_at).getTime()
+      totalHours += diff / (1000 * 60 * 60)
+    })
+    const mttr = resolvedIncs.length > 0 ? Number((totalHours / resolvedIncs.length).toFixed(1)) : 2.4
+
+    const activeProblems = (prbs ?? []).filter((p: any) => !['Resolved', 'Closed'].includes(p.state)).length
+    const cabRiskCount = (chgs ?? []).filter((c: any) => ['High', 'Critical'].includes(c.risk) && c.state === 'Awaiting CAB Approval').length
+
+    return {
+      availability: 99.85,
+      mttr,
+      activeProblems,
+      cabRiskCount,
+      totalIncidents: (incs ?? []).length,
+    }
+  }
+}
+
+// ─── NOTIFICATIONS ────────────────────────────────────────────
+
+export const notificationsService = {
+  async listForUser(userId: string, limit = 20) {
+    const { data, error } = await supabase
+      .from('notifications')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(limit)
+    return throwIfError(data, error)
+  },
+
+  async markRead(id: string) {
+    const { error } = await supabase.from('notifications').update({ read: true }).eq('id', id)
+    if (error) throw error
+  },
+}
+
+// ============================================================
+// REGRA 1 — CATÁLOGO HIERÁRQUICO DE INCIDENTES (3 NÍVEIS + SLA)
+// Item → Sub-item → Sintoma (com SLA de resposta e solução)
+// ============================================================
+
+export const incidentCatalogService = {
+
+  // ─ Itens (Nível 1) ────────────────────────────────────────
+  async listItems(companyId: string): Promise<IncidentCatalogItemRow[]> {
+    const { data, error } = await supabase
+      .from('incident_catalog_items')
+      .select('*')
+      .eq('company_id', companyId)
+      .eq('active', true)
+      .order('sort_order')
+    return throwIfError(data, error)
+  },
+
+  async createItem(payload: Partial<IncidentCatalogItemRow>): Promise<IncidentCatalogItemRow> {
+    const { data, error } = await supabase
+      .from('incident_catalog_items')
+      .insert(payload)
+      .select()
+      .single()
+    return throwIfError(data, error)
+  },
+
+  async updateItem(id: string, payload: Partial<IncidentCatalogItemRow>): Promise<IncidentCatalogItemRow> {
+    const { data, error } = await supabase
+      .from('incident_catalog_items')
+      .update({ ...payload, updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .select()
+      .single()
+    return throwIfError(data, error)
+  },
+
+  // ─ Sub-itens (Nível 2) ───────────────────────────────────
+  async listSubitems(itemId: string): Promise<IncidentCatalogSubitemRow[]> {
+    const { data, error } = await supabase
+      .from('incident_catalog_subitems')
+      .select('*')
+      .eq('item_id', itemId)
+      .eq('active', true)
+      .order('sort_order')
+    return throwIfError(data, error)
+  },
+
+  async createSubitem(payload: Partial<IncidentCatalogSubitemRow>): Promise<IncidentCatalogSubitemRow> {
+    const { data, error } = await supabase
+      .from('incident_catalog_subitems')
+      .insert(payload)
+      .select()
+      .single()
+    return throwIfError(data, error)
+  },
+
+  // ─ Sintomas (Nível 3 + SLA) ──────────────────────────────
+  async listSymptoms(subitemId: string): Promise<IncidentCatalogSymptomRow[]> {
+    const { data, error } = await supabase
+      .from('incident_catalog_symptoms')
+      .select('*')
+      .eq('subitem_id', subitemId)
+      .eq('active', true)
+      .order('sort_order')
+    return throwIfError(data, error)
+  },
+
+  async createSymptom(payload: Partial<IncidentCatalogSymptomRow>): Promise<IncidentCatalogSymptomRow> {
+    const { data, error } = await supabase
+      .from('incident_catalog_symptoms')
+      .insert(payload)
+      .select()
+      .single()
+    return throwIfError(data, error)
+  },
+
+  async updateSymptom(id: string, payload: Partial<IncidentCatalogSymptomRow>): Promise<IncidentCatalogSymptomRow> {
+    const { data, error } = await supabase
+      .from('incident_catalog_symptoms')
+      .update({ ...payload, updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .select()
+      .single()
+    return throwIfError(data, error)
+  },
+
+  // ─ Carga completa em cascata para o seletor de incidente ─
+  async loadCascade(companyId: string) {
+    const items = await this.listItems(companyId)
+    const result = []
+    for (const item of items) {
+      const subitems = await this.listSubitems(item.id)
+      const subitemsWithSymptoms = []
+      for (const subitem of subitems) {
+        const symptoms = await this.listSymptoms(subitem.id)
+        subitemsWithSymptoms.push({ ...subitem, symptoms })
+      }
+      result.push({ item, subitems: subitemsWithSymptoms })
+    }
+    return result
+  },
+}
+
+// ============================================================
+// REGRA 2 — CATÁLOGO HIERÁRQUICO DE REQUISIÇÕES (2 NÍVEIS)
+// Item → Sub-item (com flag 'exige_aprovacao_gestor')
+// ============================================================
+
+export const requestCatalogService = {
+
+  // ─ Itens (Nível 1) ────────────────────────────────────────
+  async listItems(companyId: string): Promise<RequestCatalogItemRow[]> {
+    const { data, error } = await supabase
+      .from('request_catalog_items')
+      .select('*')
+      .eq('company_id', companyId)
+      .eq('active', true)
+      .order('sort_order')
+    return throwIfError(data, error)
+  },
+
+  async createItem(payload: Partial<RequestCatalogItemRow>): Promise<RequestCatalogItemRow> {
+    const { data, error } = await supabase
+      .from('request_catalog_items')
+      .insert(payload)
+      .select()
+      .single()
+    return throwIfError(data, error)
+  },
+
+  // ─ Sub-itens (Nível 2 + Aprovação do Gestor) ────────────
+  async listSubitems(itemId: string, role?: string): Promise<RequestCatalogSubitemRow[]> {
+    let query = supabase
+      .from('request_catalog_subitems')
+      .select('*')
+      .eq('item_id', itemId)
+      .eq('active', true)
+      .order('sort_order')
+
+    // Filtra por visibilidade de papel se fornecido
+    if (role) {
+      query = query.contains('visible_to_roles', [role])
+    }
+
+    const { data, error } = await query
+    return throwIfError(data, error)
+  },
+
+  async createSubitem(payload: Partial<RequestCatalogSubitemRow>): Promise<RequestCatalogSubitemRow> {
+    const { data, error } = await supabase
+      .from('request_catalog_subitems')
+      .insert(payload)
+      .select()
+      .single()
+    return throwIfError(data, error)
+  },
+
+  async updateSubitem(id: string, payload: Partial<RequestCatalogSubitemRow>): Promise<RequestCatalogSubitemRow> {
+    const { data, error } = await supabase
+      .from('request_catalog_subitems')
+      .update({ ...payload, updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .select()
+      .single()
+    return throwIfError(data, error)
+  },
+
+  // ─ Carga completa em cascata para o seletor de requisição ─
+  async loadCascade(companyId: string, role?: string) {
+    const items = await this.listItems(companyId)
+    const result = []
+    for (const item of items) {
+      const subitems = await this.listSubitems(item.id, role)
+      result.push({ item, subitems })
+    }
+    return result
+  },
+}
+
+// ============================================================
+// SERVIÇO DE TOKENS DE APROVAÇÃO POR E-MAIL
+// Gera link único de aprovação (72h) para o gestor do solicitante
+// ============================================================
+
+export const approvalTokenService = {
+
+  async create(requestId: string, companyId: string, approverEmail: string, approverName?: string): Promise<ApprovalTokenRow> {
+    const { data, error } = await supabase
+      .from('approval_tokens')
+      .insert({
+        request_id:     requestId,
+        company_id:     companyId,
+        approver_email: approverEmail,
+        approver_name:  approverName,
+      })
+      .select()
+      .single()
+    return throwIfError(data, error)
+  },
+
+  async findByToken(token: string): Promise<ApprovalTokenRow | null> {
+    const { data, error } = await supabase
+      .from('approval_tokens')
+      .select('*')
+      .eq('token', token)
+      .single()
+    if (error) return null
+    return data
+  },
+
+  async listByRequest(requestId: string): Promise<ApprovalTokenRow[]> {
+    const { data, error } = await supabase
+      .from('approval_tokens')
+      .select('*')
+      .eq('request_id', requestId)
+      .order('created_at', { ascending: false })
+    return throwIfError(data, error)
+  },
+
+  // Gera URL de aprovação/rejeição para incluir no e-mail
+  buildApprovalUrl(token: string, decision: 'approved' | 'rejected'): string {
+    const base = import.meta.env.VITE_APP_URL || window.location.origin
+    return `${base}/approve?token=${token}&decision=${decision}`
+  },
+}
+
+// ============================================================
+// REGRA 3 — CONTROLE DE LICENÇAS CONCORRENTES (WebSocket)
+// Gerencia sessões ativas com heartbeat e liberação automática
+// ============================================================
+
+export const licenseService = {
+
+  // Verificar disponibilidade antes do login
+  async checkAvailability(companyId: string): Promise<{ available: boolean; used: number; total: number; status: string }> {
+    const { data, error } = await supabase
+      .from('v_license_usage')
+      .select('active_connections, license_limit, available_slots, license_status')
+      .eq('company_id', companyId)
+      .single()
+
+    if (error || !data) {
+      // Se a view não existir ainda (antes da migration), assume disponível
+      return { available: true, used: 0, total: 10, status: 'OK' }
+    }
+
+    return {
+      available: (data as any).license_status !== 'FULL',
+      used:      (data as any).active_connections ?? 0,
+      total:     (data as any).license_limit ?? 10,
+      status:    (data as any).license_status ?? 'OK',
+    }
+  },
+
+  // Registrar nova sessão após login bem-sucedido
+  async registerSession(
+    companyId: string,
+    userId: string,
+    sessionToken: string,
+    deviceInfo?: { ip?: string; userAgent?: string; deviceType?: string }
+  ): Promise<{ success: boolean; error?: string }> {
+    const { data, error } = await supabase
+      .rpc('register_session', {
+        p_company_id:    companyId,
+        p_user_id:       userId,
+        p_session_token: sessionToken,
+        p_ip:            deviceInfo?.ip,
+        p_user_agent:    deviceInfo?.userAgent,
+        p_device_type:   deviceInfo?.deviceType ?? 'unknown',
+      })
+
+    if (error) return { success: false, error: error.message }
+    return data as { success: boolean; error?: string }
+  },
+
+  // Heartbeat: mantém a sessão viva (chamar a cada 30s)
+  async heartbeat(sessionToken: string): Promise<boolean> {
+    const { data, error } = await supabase
+      .rpc('session_heartbeat', { p_session_token: sessionToken })
+    return !error && Boolean(data)
+  },
+
+  // Liberar sessão no logout ou unmount
+  async releaseSession(sessionToken: string, reason = 'logout'): Promise<void> {
+    await supabase.rpc('release_session', {
+      p_session_token: sessionToken,
+      p_reason:        reason,
+    })
+  },
+
+  // Listar todas as sessões ativas de uma empresa (para admin)
+  async listActiveSessions(companyId: string): Promise<ActiveSessionRow[]> {
+    const { data, error } = await supabase
+      .from('active_sessions')
+      .select('*')
+      .eq('company_id', companyId)
+      .is('disconnected_at', null)
+      .order('connected_at', { ascending: false })
+    return throwIfError(data, error)
+  },
+
+  // Forçar encerramento de sessão (expulsar usuário — para admin)
+  async kickSession(sessionToken: string): Promise<void> {
+    await supabase.rpc('release_session', {
+      p_session_token: sessionToken,
+      p_reason:        'kicked',
+    })
+  },
+
+  // Gerar token de sessão único
+  generateSessionToken(): string {
+    return `${Date.now()}-${Math.random().toString(36).substr(2, 16)}-${Math.random().toString(36).substr(2, 16)}`
+  },
+}
+
+// ============================================================
+// REGRA 4 — CHATBOT COM WHITELIST DE TELEFONE
+// WhatsApp / Microsoft Teams — seguranca baseada em número E.164
+// ============================================================
+
+export const chatbotService = {
+
+  // Verificar se número está autorizado
+  async isWhitelisted(
+    phoneE164: string,
+    companyId: string,
+    channel: 'whatsapp' | 'teams' | 'web' = 'whatsapp'
+  ): Promise<{ authorized: boolean; reason?: string; userId?: string }> {
+    const { data, error } = await supabase
+      .rpc('is_chatbot_authorized', {
+        p_phone_e164: phoneE164,
+        p_company_id: companyId,
+        p_channel:    channel,
+      })
+
+    if (error) return { authorized: false, reason: 'error' }
+    return data as { authorized: boolean; reason?: string; userId?: string }
+  },
+
+  // Buscar whitelist completa de uma empresa
+  async listWhitelist(companyId: string): Promise<ChatbotWhitelistRow[]> {
+    const { data, error } = await supabase
+      .from('chatbot_whitelist')
+      .select('*')
+      .eq('company_id', companyId)
+      .order('created_at', { ascending: false })
+    return throwIfError(data, error)
+  },
+
+  // Adicionar número à whitelist
+  async addToWhitelist(payload: Partial<ChatbotWhitelistRow>): Promise<ChatbotWhitelistRow> {
+    const { data, error } = await supabase
+      .from('chatbot_whitelist')
+      .insert(payload)
+      .select()
+      .single()
+    return throwIfError(data, error)
+  },
+
+  // Revogar autorização de um número
+  async revokeEntry(id: string, reason: string): Promise<void> {
+    const { error } = await supabase
+      .from('chatbot_whitelist')
+      .update({
+        active:         false,
+        revoked_at:     new Date().toISOString(),
+        revoked_reason: reason,
+        updated_at:     new Date().toISOString(),
+      })
+      .eq('id', id)
+    if (error) throw error
+  },
+
+  // Registrar mensagem no log
+  async logMessage(payload: Partial<ChatbotMessageRow>): Promise<ChatbotMessageRow> {
+    const { data, error } = await supabase
+      .from('chatbot_messages')
+      .insert(payload)
+      .select()
+      .single()
+    return throwIfError(data, error)
+  },
+
+  // Registrar tentativa bloqueada
+  async logBlockedAttempt(payload: {
+    phoneE164?: string
+    teamsUser?: string
+    channel: 'whatsapp' | 'teams' | 'web'
+    message?: string
+    reason: string
+    rawPayload?: unknown
+  }): Promise<void> {
+    await supabase.rpc('log_blocked_attempt', {
+      p_phone:      payload.phoneE164,
+      p_channel:    payload.channel,
+      p_message:    payload.message,
+      p_reason:     payload.reason,
+      p_payload:    payload.rawPayload ? JSON.stringify(payload.rawPayload) : null,
+      p_teams_user: payload.teamsUser,
+    })
+  },
+
+  // Buscar histórico de mensagens de um usuário
+  async listMessages(companyId: string, userId?: string, limit = 50): Promise<ChatbotMessageRow[]> {
+    let query = supabase
+      .from('chatbot_messages')
+      .select('*')
+      .eq('company_id', companyId)
+      .order('created_at', { ascending: false })
+      .limit(limit)
+
+    if (userId) query = query.eq('user_id', userId)
+
+    const { data, error } = await query
+    return throwIfError(data, error)
+  },
+
+  // Buscar/criar configuração do chatbot para empresa
+  async getConfig(companyId: string): Promise<ChatbotConfigRow | null> {
+    const { data } = await supabase
+      .from('chatbot_config')
+      .select('*')
+      .eq('company_id', companyId)
+      .single()
+    return data ?? null
+  },
+
+  async upsertConfig(companyId: string, payload: Partial<ChatbotConfigRow>): Promise<ChatbotConfigRow> {
+    const { data, error } = await supabase
+      .from('chatbot_config')
+      .upsert({ ...payload, company_id: companyId, updated_at: new Date().toISOString() })
+      .select()
+      .single()
+    return throwIfError(data, error)
+  },
+
+  // Normalizar número para E.164 (Brasil)
+  normalizePhoneBR(phone: string): string {
+    const digits = phone.replace(/\D/g, '')
+    if (digits.startsWith('55') && digits.length >= 12) return `+${digits}`
+    if (digits.length === 11 || digits.length === 10) return `+55${digits}`
+    return `+${digits}`
+  },
+}
