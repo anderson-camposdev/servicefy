@@ -6,8 +6,11 @@ import {
 } from './services'
 import { useIncidents } from './hooks/useIncidents'
 import { useAppData, useRequests, useProblems, useChanges, useCatalog } from './hooks/useDbData'
-import type { IncidentRow, ServiceRequestRow, ProblemRow, ChangeRow, CompanyRow, ProfileRow } from './lib/database.types'
-import { incidentsService, requestsService, companiesService, profilesService, catalogService, cioService } from './lib/services'
+import type { ServiceRequestRow, ProblemRow, ChangeRow, CompanyRow, ProfileRow } from './lib/database.types'
+import { incidentsService, companiesService, profilesService, catalogService, cioService } from './lib/services'
+import { useTenant } from './tenant'
+import { useAuth } from './auth'
+import { UserPortalLayout, AdminPortalSettings, AnalystCockpit, TicketManagementDashboard, WorkspaceLayout, TicketChat, ServiceCatalog } from './pages'
 
 const mapCompany = (row: CompanyRow): Company => {
   let providers: any[] = []
@@ -34,6 +37,8 @@ const mapCompany = (row: CompanyRow): Company => {
     branding: {
       logoUrl: row.logo_url ?? undefined,
       primaryColor: row.primary_color,
+      secondaryColor: row.secondary_color ?? row.accent_color,
+      brandName: row.brand_name ?? row.name,
       accentColor: row.accent_color,
       backgroundColor: row.bg_color,
       welcomeTitle: row.welcome_title,
@@ -146,12 +151,6 @@ function StatCard({ label, value, accent, icon }: { label: string; value: number
   )
 }
 
-function SLABadge({ breached }: { breached: boolean }) {
-  return breached
-    ? <span className="inline-flex items-center gap-1 text-[10px] font-bold text-red-600 bg-red-50 border border-red-200 px-1.5 py-0.5 rounded uppercase tracking-wider"><span className="h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse" />SLA</span>
-    : null
-}
-
 function StateBadge({ state }: { state: string }) {
   return (
     <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-semibold border ${stateText[state] ?? 'text-slate-500 bg-slate-100 border-slate-200'}`}>
@@ -191,70 +190,42 @@ function Modal({ title, subtitle, onClose, children }: { title: string; subtitle
 
 // ─── LOGIN SCREEN ─────────────────────────────────────────────
 
-function LoginScreen({
-  companies,
-  users,
-  onLogin,
-}: {
-  companies: Company[]
-  users: User[]
-  onLogin: (user: User, company: Company) => void
-}) {
+function LoginScreen() {
+  const { branding, tenant, status: tenantStatus } = useTenant()
+  const { signIn, status: authStatus, error: authError } = useAuth()
+
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [loginError, setLoginError] = useState('')
-  const [showDemo, setShowDemo] = useState(true)
+  const [localError, setLocalError] = useState('')
+  const [submitting, setSubmitting] = useState(false)
 
-  const typedDomain = useMemo(() => {
-    const parts = email.split('@')
-    return parts.length > 1 ? parts[parts.length - 1].toLowerCase().trim() : ''
-  }, [email])
+  const brandColor = branding.primaryColor
+  const brandLogo =
+    branding.logoUrl ||
+    'https://ui-avatars.com/api/?name=Flowfy&background=10b981&color=fff&size=64&bold=true'
+  const brandName = tenant?.name || branding.name
+  const welcomeTitle = branding.welcomeTitle
+  const welcomeSubtitle = branding.welcomeSubtitle
 
-  const company = useMemo(() => {
-    if (!typedDomain) return null
-    return companies.find(c => c.domain.toLowerCase() === typedDomain) || null
-  }, [typedDomain, companies])
-
-  const ssoProviders = useMemo(() => {
-    if (!company) return []
-    const parsed = (typeof company.authConfig?.providers === 'string'
-      ? JSON.parse(company.authConfig.providers)
-      : company.authConfig?.providers) as any[] || []
-    return parsed.filter(p => p.enabled)
-  }, [company])
-
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
-    setLoginError('')
-    if (!company) {
-      setLoginError('Por favor, insira um e-mail com domínio corporativo cadastrado.')
+    setLocalError('')
+    if (!email.trim() || !password) {
+      setLocalError('Informe e-mail e senha.')
       return
     }
-    const companyUsers = users.filter(u => u.companyId === company.id)
-    const user = companyUsers.find(u => u.email.toLowerCase() === email.toLowerCase())
-    if (!user) {
-      setLoginError('E-mail corporativo não encontrado.')
-      return
-    }
-    onLogin(user, company)
-  }
-
-  const handleSSOLogin = (_providerType: string) => {
-    if (!company) return
-    const companyUsers = users.filter(u => u.companyId === company.id)
-    // Map default user for the provider type or role
-    const user = companyUsers.find(u => u.role !== 'end_user') || companyUsers[0]
-    if (user) {
-      onLogin(user, company)
-    } else {
-      setLoginError('Nenhum usuário cadastrado neste tenant.')
+    setSubmitting(true)
+    try {
+      await signIn(email.trim(), password)
+      // onAuthStateChange assume a navegação a partir daqui.
+    } catch {
+      // authError é populado pelo AuthContext.
+    } finally {
+      setSubmitting(false)
     }
   }
 
-  const brandColor = company?.branding?.primaryColor || '#10b981'
-  const brandLogo = company?.branding?.logoUrl || 'https://ui-avatars.com/api/?name=Flowfy&background=10b981&color=fff&size=64&bold=true'
-  const welcomeTitle = company?.branding?.welcomeTitle || 'Flowfy ITSM Enterprise'
-  const welcomeSubtitle = company?.branding?.welcomeSubtitle || 'Plataforma ITSM multi-tenant baseada no ITIL v4'
+  const errorMessage = localError || authError
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-100 via-white to-slate-50 flex items-center justify-center p-6 relative">
@@ -262,11 +233,11 @@ function LoginScreen({
       <div className="absolute inset-0 bg-gradient-to-br from-slate-900/5 via-transparent to-slate-100/50" />
 
       <div className="relative w-full max-w-md">
-        {/* Logo and Brand */}
+        {/* Logo and Brand (white-label via tenant) */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center gap-2.5 mb-4">
             <div className="w-11 h-11 rounded-2xl flex items-center justify-center shadow-lg transition-all" style={{ backgroundColor: brandColor }}>
-              {company ? (
+              {branding.logoUrl ? (
                 <img src={brandLogo} alt="Logo" className="w-8 h-8 rounded-xl object-contain" />
               ) : (
                 <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
@@ -274,125 +245,60 @@ function LoginScreen({
                 </svg>
               )}
             </div>
-            <span className="text-2xl font-black tracking-tight text-slate-800">
-              {company ? company.name : 'Flowfy'}
-            </span>
+            <span className="text-2xl font-black tracking-tight text-slate-800">{brandName}</span>
           </div>
           <h1 className="text-slate-800 font-extrabold text-lg transition-all">{welcomeTitle}</h1>
           <p className="text-slate-500 text-xs mt-1 transition-all">{welcomeSubtitle}</p>
         </div>
 
         {/* Form Card */}
-        <div className="bg-white border border-slate-200 rounded-3xl p-7 shadow-xl shadow-slate-200/80 space-y-5">
+        <form onSubmit={handleLogin} className="bg-white border border-slate-200 rounded-3xl p-7 shadow-xl shadow-slate-200/80 space-y-5">
           <div className="space-y-3">
             <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest">Login Corporativo</label>
             <input
               type="email"
-              placeholder="Digite seu e-mail (ex: carlos.mendez@acme.com)"
+              autoComplete="email"
+              placeholder="Digite seu e-mail corporativo"
               value={email}
-              onChange={e => { setEmail(e.target.value); setLoginError('') }}
+              onChange={e => { setEmail(e.target.value); setLocalError('') }}
               className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-700 placeholder-slate-400 outline-none transition-all shadow-sm"
-              style={company ? { borderColor: brandColor, borderWidth: '1px' } : {}}
+              style={{ borderColor: brandColor }}
+            />
+            <input
+              type="password"
+              autoComplete="current-password"
+              placeholder="Digite sua senha"
+              value={password}
+              onChange={e => { setPassword(e.target.value); setLocalError('') }}
+              className="w-full bg-white border border-slate-200 focus:ring-2 focus:ring-slate-400/20 rounded-xl px-4 py-2.5 text-sm text-slate-700 outline-none transition-all shadow-sm"
             />
           </div>
 
-          {loginError && (
+          {errorMessage && (
             <div className="text-xs text-red-500 font-semibold bg-red-50 border border-red-100 rounded-xl p-3">
-              {loginError}
+              {errorMessage}
             </div>
           )}
 
-          {company ? (
-            <div className="space-y-4 animate-fade-in">
-              {ssoProviders.length > 0 && (
-                <div className="space-y-2">
-                  <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Provedores SSO Ativos</div>
-                  {ssoProviders.map((provider: any) => (
-                    <button
-                      key={provider.id}
-                      type="button"
-                      onClick={() => handleSSOLogin(provider.type)}
-                      className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 hover:border-slate-300 hover:shadow-sm text-sm font-medium text-slate-700 transition-all cursor-pointer group"
-                    >
-                      {provider.type === 'microsoft' && (
-                        <svg className="w-5 h-5 shrink-0" viewBox="0 0 23 23" fill="none">
-                          <rect width="11" height="11" fill="#f25022" /><rect x="12" width="11" height="11" fill="#7fba00" />
-                          <rect y="12" width="11" height="11" fill="#00a4ef" /><rect x="12" y="12" width="11" height="11" fill="#ffb900" />
-                        </svg>
-                      )}
-                      {provider.type === 'google' && (
-                        <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24">
-                          <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
-                          <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-                          <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
-                          <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
-                        </svg>
-                      )}
-                      {provider.type === 'active_directory' && (
-                        <svg className="w-5 h-5 shrink-0 text-sky-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                        </svg>
-                      )}
-                      <span>{provider.label}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              {company.authConfig.allowLocalLogin && (
-                <form onSubmit={handleLogin} className="space-y-3 pt-2">
-                  <div className="h-px bg-slate-100 my-2" />
-                  <input
-                    type="password"
-                    placeholder="Digite sua senha corporativa"
-                    value={password}
-                    onChange={e => setPassword(e.target.value)}
-                    className="w-full bg-white border border-slate-200 focus:border-slate-400 focus:ring-2 focus:ring-slate-400/20 rounded-xl px-4 py-2.5 text-sm text-slate-700 outline-none transition-all shadow-sm"
-                  />
-                  <button
-                    type="submit"
-                    className="w-full py-2.5 rounded-xl text-white font-bold text-sm transition-all hover:opacity-90 active:scale-[0.99] cursor-pointer shadow-lg"
-                    style={{ backgroundColor: brandColor }}
-                  >
-                    Entrar com Senha
-                  </button>
-                </form>
-              )}
-            </div>
-          ) : (
-            <div className="bg-slate-50 border border-dashed border-slate-200 rounded-2xl p-6 text-center text-xs text-slate-400">
-              Digite seu e-mail corporativo para identificar sua empresa e carregar os métodos de login.
+          {tenantStatus === 'not-found' && (
+            <div className="text-[11px] text-amber-600 font-semibold bg-amber-50 border border-amber-100 rounded-xl p-3">
+              Subdomínio não corresponde a nenhum cliente ativo. Verifique o endereço de acesso.
             </div>
           )}
 
-          <div className="pt-2 border-t border-slate-100 text-center">
-            <button
-              type="button"
-              onClick={() => setShowDemo(d => !d)}
-              className="text-[10px] font-bold text-slate-400 uppercase tracking-widest hover:text-slate-600 transition-colors"
-            >
-              {showDemo ? 'Ocultar Atalhos de Demonstração' : 'Ver Atalhos de Demonstração (Acesso Rápido)'}
-            </button>
+          <button
+            type="submit"
+            disabled={submitting || authStatus === 'loading'}
+            className="w-full py-2.5 rounded-xl text-white font-bold text-sm transition-all hover:opacity-90 active:scale-[0.99] cursor-pointer shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+            style={{ backgroundColor: brandColor }}
+          >
+            {submitting || authStatus === 'loading' ? 'Autenticando…' : 'Entrar'}
+          </button>
 
-            {showDemo && (
-              <div className="flex flex-wrap gap-1.5 justify-center mt-3 animate-fade-in">
-                {users.map(u => {
-                  const comp = companies.find(c => c.id === u.companyId)
-                  return (
-                    <button
-                      key={u.id}
-                      type="button"
-                      onClick={() => onLogin(u, comp!)}
-                      className="px-2 py-1 rounded-lg text-[9px] bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-800 transition-all cursor-pointer font-semibold border border-slate-200"
-                    >
-                      {u.name.split(' ')[0]} ({u.role.replace('_', ' ')})
-                    </button>
-                  )
-                })}
-              </div>
-            )}
-          </div>
-        </div>
+          <p className="text-center text-[10px] text-slate-400 pt-1">
+            Autenticação segura via Supabase Auth · ITIL v4 · Multi-Tenant
+          </p>
+        </form>
       </div>
     </div>
   )
@@ -430,428 +336,6 @@ function TableHead({ cols }: { cols: string[] }) {
   )
 }
 
-// ─── INCIDENT DASHBOARD ───────────────────────────────────────
-
-function IncidentDashboard({ companyId, currentUserName }: { companyId: string; currentUserName: string }) {
-  const {
-    incidents, kpis, loading, error,
-    search, stateFilter, priorityFilter,
-    setSearch, setStateFilter,
-    updateState, addComment,
-  } = useIncidents(companyId)
-
-  const [detail, setDetail] = useState<IncidentRow | null>(null)
-  const [commentText, setCommentText] = useState('')
-  const [submittingComment, setSubmittingComment] = useState(false)
-  const [detailHistory, setDetailHistory] = useState<import('./hooks/useIncidents').IncidentHistoryRow[]>([])
-  const [loadingHistory, setLoadingHistory] = useState(false)
-
-  const filtered = useMemo(() => {
-    return incidents.filter(i => {
-      const q = search.toLowerCase()
-      const matchSearch = !q || i.number.toLowerCase().includes(q) || i.short_description.toLowerCase().includes(q) || i.caller_name.toLowerCase().includes(q)
-      const matchState = stateFilter === 'all' || i.state === stateFilter
-      const matchPriority = priorityFilter === 'all' || i.priority === priorityFilter
-      return matchSearch && matchState && matchPriority
-    })
-  }, [incidents, search, stateFilter, priorityFilter])
-
-  const openDetail = async (inc: IncidentRow) => {
-    setDetail(inc)
-    setLoadingHistory(true)
-    try {
-      const full = await incidentsService.getById(inc.id, companyId)
-      setDetailHistory(full.history)
-    } catch { /* noop */ } finally { setLoadingHistory(false) }
-  }
-
-  const handleAddComment = async () => {
-    if (!detail || !commentText.trim()) return
-    setSubmittingComment(true)
-    try {
-      await addComment(detail.id, commentText, currentUserName)
-      setCommentText('')
-      const full = await incidentsService.getById(detail.id, companyId)
-      setDetailHistory(full.history)
-    } finally { setSubmittingComment(false) }
-  }
-
-  if (error) return (
-    <div className="flex items-center justify-center h-64 text-red-500 text-sm">
-      <div className="bg-red-50 border border-red-200 rounded-2xl p-6 text-center">
-        <div className="text-2xl mb-2">⚠️</div>
-        <div className="font-semibold">Erro ao carregar incidentes</div>
-        <div className="text-red-400 mt-1 text-xs font-mono">{error}</div>
-      </div>
-    </div>
-  )
-
-  return (
-    <div>
-      <PageHeader title="Gerenciamento de Incidentes" subtitle="Rastreamento de falhas não planejadas — ITIL v4" />
-
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
-        <StatCard label="Total" value={loading ? '…' : kpis.total} accent="bg-slate-100 text-slate-500" icon={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>} />
-        <StatCard label="P1 — Crítico" value={loading ? '…' : kpis.critical} accent="bg-red-50 text-red-500" icon={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>} />
-        <StatCard label="Em Andamento" value={loading ? '…' : kpis.inProgress} accent="bg-violet-50 text-violet-500" icon={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>} />
-        <StatCard label="SLA Violado" value={loading ? '…' : kpis.slaBreached} accent="bg-red-50 text-red-500" icon={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>} />
-        <StatCard label="Sem Atribuição" value={loading ? '…' : kpis.unassigned} accent="bg-amber-50 text-amber-500" icon={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>} />
-      </div>
-
-      <TableCard header={
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-          <div className="flex gap-1.5 flex-wrap">
-            {([['all', 'Todos'], ['In Progress', 'Em Andamento'], ['New', 'Novos'], ['On Hold', 'Aguardando'], ['Resolved', 'Resolvidos']] as const).map(([v, l]) => (
-              <button key={v} onClick={() => setStateFilter(v as typeof stateFilter)} className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${stateFilter === v ? 'bg-slate-800 text-white shadow-sm' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100'}`}>{l}</button>
-            ))}
-          </div>
-          <div className="flex items-center gap-2 sm:ml-auto">
-            {loading && <span className="text-xs text-slate-400 animate-pulse">● atualizando…</span>}
-            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar número, descrição..." className="bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-xs text-slate-600 placeholder-slate-400 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/20 transition-all w-56 shadow-sm" />
-          </div>
-        </div>
-      }>
-        <table className="w-full text-left text-sm min-w-[820px]">
-          <TableHead cols={['Número', 'Descrição', 'Prioridade', 'Estado', 'Categoria', 'Solicitante', 'Atribuído a', 'Criado']} />
-          <tbody className="divide-y divide-slate-50">
-            {loading && incidents.length === 0 && (
-              <tr><td colSpan={8} className="py-12 text-center">
-                <div className="flex items-center justify-center gap-2 text-slate-400 text-sm">
-                  <span className="inline-block w-4 h-4 border-2 border-slate-300 border-t-emerald-500 rounded-full animate-spin" />
-                  Carregando incidentes do banco de dados…
-                </div>
-              </td></tr>
-            )}
-            {!loading && filtered.length === 0 && <tr><td colSpan={8} className="py-12 text-center text-slate-400 text-sm">Nenhum incidente encontrado.</td></tr>}
-            {filtered.map(inc => (
-              <tr key={inc.id} onClick={() => openDetail(inc)} className="hover:bg-slate-50 cursor-pointer transition-colors group">
-                <td className="px-5 py-3.5 font-mono text-emerald-600 text-xs font-bold whitespace-nowrap">
-                  <span className="group-hover:underline">{inc.number}</span>{' '}
-                  <SLABadge breached={inc.sla_breached} />
-                </td>
-                <td className="px-5 py-3.5 max-w-[200px] truncate text-slate-700 font-medium text-sm">{inc.short_description}</td>
-                <td className="px-5 py-3.5"><span className={`px-2 py-0.5 rounded-md text-[10px] uppercase tracking-wide ${priorityBadge[inc.priority]}`}>{inc.priority}</span></td>
-                <td className="px-5 py-3.5"><StateBadge state={inc.state} /></td>
-                <td className="px-5 py-3.5 text-slate-500 text-xs">{inc.category}</td>
-                <td className="px-5 py-3.5 text-slate-600 text-xs">{inc.caller_name}</td>
-                <td className="px-5 py-3.5 text-slate-500 text-xs">{inc.assigned_to_name ?? <span className="italic text-slate-300">Não atribuído</span>}</td>
-                <td className="px-5 py-3.5 text-slate-400 text-xs whitespace-nowrap">{relativeTime(inc.created_at)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </TableCard>
-
-      {detail && (
-        <Modal title={detail.number} subtitle="Detalhes do Incidente" onClose={() => { setDetail(null); setDetailHistory([]) }}>
-          <div className="space-y-4">
-            <div className="flex flex-wrap gap-2">
-              <span className={`px-2.5 py-1 rounded-md text-xs uppercase tracking-wide ${priorityBadge[detail.priority]}`}>{detail.priority}</span>
-              <StateBadge state={detail.state} />
-              <span className="px-2.5 py-1 rounded-md bg-slate-100 text-slate-600 text-xs border border-slate-200">{detail.category}</span>
-              {detail.sla_breached && <SLABadge breached />}
-            </div>
-            {/* Quick state transition */}
-            <div>
-              <div className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-1.5">Alterar Estado</div>
-              <div className="flex flex-wrap gap-1.5">
-                {(['New','In Progress','On Hold','Pending User','Resolved','Closed'] as const).map(s => (
-                  <button key={s} onClick={() => { updateState(detail.id, s, currentUserName); setDetail(prev => prev ? {...prev, state: s} : null) }}
-                    className={`px-2.5 py-1 rounded-lg text-[10px] font-semibold border transition-all cursor-pointer ${detail.state === s ? 'bg-slate-800 text-white border-slate-800' : 'text-slate-500 border-slate-200 hover:border-slate-300 hover:text-slate-700'}`}>
-                    {s}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <InfoBlock label="Descrição Curta" value={detail.short_description} />
-            {detail.description && <InfoBlock label="Descrição Detalhada" value={detail.description} mono />}
-            <div className="grid grid-cols-2 gap-4 pt-3 border-t border-slate-100">
-              <InfoBlock label="Solicitante" value={detail.caller_name} />
-              <InfoBlock label="Atribuído a" value={detail.assigned_to_name ?? 'Não atribuído'} />
-              <InfoBlock label="Grupo" value={detail.assigned_group_name ?? '—'} />
-              <InfoBlock label="Criado" value={new Date(detail.created_at).toLocaleString('pt-BR')} />
-            </div>
-            {/* History / Comments */}
-            <div className="pt-3 border-t border-slate-100">
-              <div className="text-xs text-slate-400 font-bold uppercase tracking-widest mb-2">Histórico de Atividades</div>
-              {loadingHistory && <div className="text-xs text-slate-400 text-center py-4 animate-pulse">Carregando histórico…</div>}
-              {!loadingHistory && detailHistory.length === 0 && <div className="text-xs text-slate-400">Nenhuma atividade registrada.</div>}
-              <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
-                {detailHistory.map(h => (
-                  <div key={h.id} className="text-xs text-slate-600 bg-slate-50 p-2.5 rounded-xl border border-slate-100">
-                    <div className="flex items-center gap-1.5 mb-1">
-                      <span className="font-bold text-slate-700">{h.changed_by_name}</span>
-                      {h.field_name !== 'comment' && <>
-                        <span className="text-slate-400">alterou</span>
-                        <span className="font-mono text-slate-500">{h.field_name}</span>
-                        {h.old_value && <><span className="text-slate-400">de</span><span className="text-red-500 line-through">{h.old_value}</span></>}
-                        <span className="text-slate-400">para</span>
-                        <span className="text-emerald-600 font-semibold">{h.new_value}</span>
-                      </>}
-                      <span className="ml-auto text-slate-400 text-[10px]">{relativeTime(h.created_at)}</span>
-                    </div>
-                    {h.comment && <div className="text-slate-500 italic">{h.comment}</div>}
-                  </div>
-                ))}
-              </div>
-              {/* Add comment */}
-              <div className="flex gap-2 mt-3">
-                <input value={commentText} onChange={e => setCommentText(e.target.value)} placeholder="Adicionar comentário..." className="flex-1 border border-slate-200 rounded-xl px-3 py-1.5 text-xs text-slate-700 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/20 transition-all" />
-                <button onClick={handleAddComment} disabled={submittingComment || !commentText.trim()} className="px-3 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-white text-xs font-bold transition-all disabled:opacity-40 cursor-pointer">
-                  {submittingComment ? '…' : 'Enviar'}
-                </button>
-              </div>
-            </div>
-          </div>
-        </Modal>
-      )}
-    </div>
-  )
-}
-
-// ─── PORTAL DO PROVEDOR MSP (ALLIED IT) ───────────────────────
-
-function MspProviderPortal({
-  companyId,
-  currentUserName,
-  companies,
-}: {
-  companyId: string
-  currentUserName: string
-  companies: Company[]
-}) {
-  const {
-    incidents,
-    kpis,
-    loading,
-    error,
-    search,
-    stateFilter,
-    priorityFilter,
-    filterCompanyId,
-    setSearch,
-    setStateFilter,
-    setFilterCompanyId,
-    updateState,
-    addComment,
-  } = useIncidents(companyId)
-
-  const [detail, setDetail] = useState<IncidentRow | null>(null)
-  const [commentText, setCommentText] = useState('')
-  const [submittingComment, setSubmittingComment] = useState(false)
-  const [detailHistory, setDetailHistory] = useState<import('./hooks/useIncidents').IncidentHistoryRow[]>([])
-  const [loadingHistory, setLoadingHistory] = useState(false)
-
-  const filtered = useMemo(() => {
-    return incidents.filter(i => {
-      const q = search.toLowerCase()
-      const matchSearch =
-        !q ||
-        i.number.toLowerCase().includes(q) ||
-        i.short_description.toLowerCase().includes(q) ||
-        i.caller_name.toLowerCase().includes(q)
-      const matchState = stateFilter === 'all' || i.state === stateFilter
-      const matchPriority = priorityFilter === 'all' || i.priority === priorityFilter
-      return matchSearch && matchState && matchPriority
-    })
-  }, [incidents, search, stateFilter, priorityFilter])
-
-  const openDetail = async (inc: IncidentRow) => {
-    setDetail(inc)
-    setLoadingHistory(true)
-    try {
-      const full = await incidentsService.getById(inc.id, companyId)
-      setDetailHistory(full.history)
-    } catch {
-      /* noop */
-    } finally {
-      setLoadingHistory(false)
-    }
-  }
-
-  const handleAddComment = async () => {
-    if (!detail || !commentText.trim()) return
-    setSubmittingComment(true)
-    try {
-      await addComment(detail.id, commentText, currentUserName)
-      setCommentText('')
-      const full = await incidentsService.getById(detail.id, companyId)
-      setDetailHistory(full.history)
-    } finally {
-      setSubmittingComment(false)
-    }
-  }
-
-  if (error) return (
-    <div className="flex items-center justify-center h-64 text-red-500 text-sm">
-      <div className="bg-red-50 border border-red-200 rounded-2xl p-6 text-center">
-        <div className="text-2xl mb-2">⚠️</div>
-        <div className="font-semibold text-slate-800">Erro ao carregar o portal MSP</div>
-        <div className="text-red-400 mt-1 text-xs font-mono">{error}</div>
-      </div>
-    </div>
-  )
-
-  return (
-    <div>
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-800 tracking-tight flex items-center gap-2">
-            <span className="p-1.5 bg-sky-100 text-sky-600 rounded-xl">
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-              </svg>
-            </span>
-            Portal do Provedor MSP — Allied IT
-          </h1>
-          <p className="text-slate-400 text-sm mt-1">Console centralizado de atendimento multi-cliente</p>
-        </div>
-
-        {/* Multi-Tenant Filter */}
-        <div className="flex items-center gap-2 border border-slate-200 bg-white rounded-xl px-3 py-1.5 shadow-sm shrink-0">
-          <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Cliente/Empresa:</span>
-          <select
-            value={filterCompanyId}
-            onChange={e => setFilterCompanyId(e.target.value)}
-            className="text-xs font-semibold text-slate-700 bg-white border-none outline-none cursor-pointer focus:ring-0"
-          >
-            <option value="all">Todos os Clientes (Fila Global)</option>
-            {companies.filter(c => c.id !== '44444444-4444-4444-4444-444444444444').map(c => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
-        <StatCard label="Total Geral" value={loading ? '…' : kpis.total} accent="bg-slate-100 text-slate-500" icon={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>} />
-        <StatCard label="P1 — Crítico" value={loading ? '…' : kpis.critical} accent="bg-red-50 text-red-500" icon={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>} />
-        <StatCard label="Em Andamento" value={loading ? '…' : kpis.inProgress} accent="bg-violet-50 text-violet-500" icon={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>} />
-        <StatCard label="SLA Violado" value={loading ? '…' : kpis.slaBreached} accent="bg-red-50 text-red-500" icon={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>} />
-        <StatCard label="Sem Atribuição" value={loading ? '…' : kpis.unassigned} accent="bg-amber-50 text-amber-500" icon={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>} />
-      </div>
-
-      <TableCard header={
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-          <div className="flex gap-1.5 flex-wrap">
-            {([['all', 'Todos'], ['In Progress', 'Em Andamento'], ['New', 'Novos'], ['On Hold', 'Aguardando'], ['Resolved', 'Resolvidos']] as const).map(([v, l]) => (
-              <button key={v} onClick={() => setStateFilter(v as typeof stateFilter)} className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${stateFilter === v ? 'bg-slate-800 text-white shadow-sm' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100'}`}>{l}</button>
-            ))}
-          </div>
-          <div className="flex items-center gap-2 sm:ml-auto">
-            {loading && <span className="text-xs text-slate-400 animate-pulse">● atualizando…</span>}
-            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar número, descrição..." className="bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-xs text-slate-600 placeholder-slate-400 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/20 transition-all w-56 shadow-sm" />
-          </div>
-        </div>
-      }>
-        <table className="w-full text-left text-sm min-w-[920px]">
-          <TableHead cols={['Número', 'Cliente', 'Descrição', 'Prioridade', 'Estado', 'Categoria', 'Solicitante', 'Atribuído a', 'Criado']} />
-          <tbody className="divide-y divide-slate-50">
-            {loading && incidents.length === 0 && (
-              <tr><td colSpan={9} className="py-12 text-center">
-                <div className="flex items-center justify-center gap-2 text-slate-400 text-sm">
-                  <span className="inline-block w-4 h-4 border-2 border-slate-300 border-t-emerald-500 rounded-full animate-spin" />
-                  Carregando fila multi-cliente do banco de dados…
-                </div>
-              </td></tr>
-            )}
-            {!loading && filtered.length === 0 && <tr><td colSpan={9} className="py-12 text-center text-slate-400 text-sm">Nenhum incidente encontrado.</td></tr>}
-            {filtered.map(inc => {
-              const compName = companies.find(c => c.id === inc.company_id)?.name || 'Allied IT'
-              return (
-                <tr key={inc.id} onClick={() => openDetail(inc)} className="hover:bg-slate-50 cursor-pointer transition-colors group">
-                  <td className="px-5 py-3.5 font-mono text-emerald-600 text-xs font-bold whitespace-nowrap">
-                    <span className="group-hover:underline">{inc.number}</span>{' '}
-                    <SLABadge breached={inc.sla_breached} />
-                  </td>
-                  <td className="px-5 py-3.5 whitespace-nowrap">
-                    <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-sky-50 text-sky-700 border border-sky-100">
-                      {compName}
-                    </span>
-                  </td>
-                  <td className="px-5 py-3.5 max-w-[200px] truncate text-slate-700 font-medium text-sm">{inc.short_description}</td>
-                  <td className="px-5 py-3.5"><span className={`px-2 py-0.5 rounded-md text-[10px] uppercase tracking-wide ${priorityBadge[inc.priority]}`}>{inc.priority}</span></td>
-                  <td className="px-5 py-3.5"><StateBadge state={inc.state} /></td>
-                  <td className="px-5 py-3.5 text-slate-500 text-xs">{inc.category}</td>
-                  <td className="px-5 py-3.5 text-slate-600 text-xs">{inc.caller_name}</td>
-                  <td className="px-5 py-3.5 text-slate-500 text-xs">{inc.assigned_to_name ?? <span className="italic text-slate-300">Não atribuído</span>}</td>
-                  <td className="px-5 py-3.5 text-slate-400 text-xs whitespace-nowrap">{relativeTime(inc.created_at)}</td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
-      </TableCard>
-
-      {detail && (
-        <Modal title={detail.number} subtitle={`Detalhes do Incidente · ${companies.find(c => c.id === detail.company_id)?.name || 'Allied IT'}`} onClose={() => { setDetail(null); setDetailHistory([]) }}>
-          <div className="space-y-4">
-            <div className="flex flex-wrap gap-2">
-              <span className={`px-2.5 py-1 rounded-md text-xs uppercase tracking-wide ${priorityBadge[detail.priority]}`}>{detail.priority}</span>
-              <StateBadge state={detail.state} />
-              <span className="px-2.5 py-1 rounded-md bg-slate-100 text-slate-600 text-xs border border-slate-200">{detail.category}</span>
-              {detail.sla_breached && <SLABadge breached />}
-            </div>
-            {/* Quick state transition */}
-            <div>
-              <div className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-1.5">Alterar Estado</div>
-              <div className="flex flex-wrap gap-1.5">
-                {(['New','In Progress','On Hold','Pending User','Resolved','Closed'] as const).map(s => (
-                  <button key={s} onClick={() => { updateState(detail.id, s, currentUserName); setDetail(prev => prev ? {...prev, state: s} : null) }}
-                    className={`px-2.5 py-1 rounded-lg text-[10px] font-semibold border transition-all cursor-pointer ${detail.state === s ? 'bg-slate-800 text-white border-slate-800' : 'text-slate-500 border-slate-200 hover:border-slate-300 hover:text-slate-700'}`}>
-                    {s}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <InfoBlock label="Cliente" value={companies.find(c => c.id === detail.company_id)?.name || 'Allied IT'} />
-            <InfoBlock label="Descrição Curta" value={detail.short_description} />
-            {detail.description && <InfoBlock label="Descrição Detalhada" value={detail.description} mono />}
-            <div className="grid grid-cols-2 gap-4 pt-3 border-t border-slate-100">
-              <InfoBlock label="Solicitante" value={detail.caller_name} />
-              <InfoBlock label="Atribuído a" value={detail.assigned_to_name ?? 'Não atribuído'} />
-              <InfoBlock label="Grupo" value={detail.assigned_group_name ?? '—'} />
-              <InfoBlock label="Criado" value={new Date(detail.created_at).toLocaleString('pt-BR')} />
-            </div>
-            {/* History / Comments */}
-            <div className="pt-3 border-t border-slate-100">
-              <div className="text-xs text-slate-400 font-bold uppercase tracking-widest mb-2">Histórico de Atividades</div>
-              {loadingHistory && <div className="text-xs text-slate-400 text-center py-4 animate-pulse">Carregando histórico…</div>}
-              {!loadingHistory && detailHistory.length === 0 && <div className="text-xs text-slate-400">Nenhuma atividade registrada.</div>}
-              <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
-                {detailHistory.map(h => (
-                  <div key={h.id} className="text-xs text-slate-600 bg-slate-50 p-2.5 rounded-xl border border-slate-100">
-                    <div className="flex items-center gap-1.5 mb-1">
-                      <span className="font-bold text-slate-700">{h.changed_by_name}</span>
-                      {h.field_name !== 'comment' && <>
-                        <span className="text-slate-400">alterou</span>
-                        <span className="font-mono text-slate-500">{h.field_name}</span>
-                        {h.old_value && <><span className="text-slate-400">de</span><span className="text-red-500 line-through">{h.old_value}</span></>}
-                        <span className="text-slate-400">para</span>
-                        <span className="text-emerald-600 font-semibold">{h.new_value}</span>
-                      </>}
-                      <span className="ml-auto text-slate-400 text-[10px]">{relativeTime(h.created_at)}</span>
-                    </div>
-                    {h.comment && <div className="text-slate-500 italic">{h.comment}</div>}
-                  </div>
-                ))}
-              </div>
-              {/* Add comment */}
-              <div className="flex gap-2 mt-3">
-                <input value={commentText} onChange={e => setCommentText(e.target.value)} placeholder="Adicionar comentário..." className="flex-1 border border-slate-200 rounded-xl px-3 py-1.5 text-xs text-slate-700 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/20 transition-all" />
-                <button onClick={handleAddComment} disabled={submittingComment || !commentText.trim()} className="px-3 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-white text-xs font-bold transition-all disabled:opacity-40 cursor-pointer">
-                  {submittingComment ? '…' : 'Enviar'}
-                </button>
-              </div>
-            </div>
-          </div>
-        </Modal>
-      )}
-    </div>
-  )
-}
 
 // ─── SERVICE REQUEST DASHBOARD ────────────────────────────────
 
@@ -1072,34 +556,10 @@ function ChangeDashboard({ companyId }: { companyId: string }) {
 
 function UserPortal({ currentUser, company }: { currentUser: User; company: Company }) {
   const [activeTab, setActiveTab] = useState<'catalog' | 'my_tickets'>('catalog')
-  const [selectedCatalogItem, setSelectedCatalogItem] = useState<string | null>(null)
-  const [submittedForm, setSubmittedForm] = useState(false)
-  const [formData, setFormData] = useState<Record<string, any>>({})
-  const [submitting, setSubmitting] = useState(false)
+  const [chatIncident, setChatIncident] = useState<{ id: string; number: string; shortDescription: string; state: string } | null>(null)
 
-  const { items: dbCatalog, loading: catalogLoading } = useCatalog(company.id)
   const { requests: dbRequests, loading: requestsLoading } = useRequests(company.id)
   const { incidents: dbIncidents, loading: incidentsLoading } = useIncidents(company.id)
-
-  const catalog = useMemo(() => {
-    return dbCatalog
-      .filter(i => (i.visible_to_roles as any[]).includes(currentUser.role))
-      .map(i => ({
-        id: i.id,
-        companyId: i.company_id,
-        name: i.name,
-        description: i.description ?? '',
-        category: i.category,
-        icon: i.icon,
-        estimatedDeliveryDays: i.estimated_delivery_days,
-        cost: i.cost ? Number(i.cost) : undefined,
-        currency: i.currency ?? undefined,
-        requiresApproval: i.requires_approval,
-        visibleToRoles: i.visible_to_roles,
-        formFields: (typeof i.form_fields === 'string' ? JSON.parse(i.form_fields) : i.form_fields) as any[],
-        active: i.active,
-      }))
-  }, [dbCatalog, currentUser.role])
 
   const myRequests = useMemo(() => {
     return dbRequests
@@ -1126,42 +586,25 @@ function UserPortal({ currentUser, company }: { currentUser: User; company: Comp
       }))
   }, [dbIncidents, currentUser.id])
 
-  const catalogItem = catalog.find(c => c.id === selectedCatalogItem)
   const { primaryColor, accentColor, backgroundColor } = company.branding
+  const brandName = company.branding.brandName || company.name
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!catalogItem) return
-    setSubmitting(true)
-    try {
-      await requestsService.create({
-        companyId: company.id,
-        catalogItemId: catalogItem.id,
-        catalogItemName: catalogItem.name,
-        requesterId: currentUser.id,
-        requesterName: currentUser.name,
-        formData,
-        cost: catalogItem.cost,
-      })
-      setSubmittedForm(true)
-      setFormData({})
-    } catch (err) {
-      alert('Erro ao enviar solicitação: ' + (err instanceof Error ? err.message : String(err)))
-    } finally {
-      setSubmitting(false)
-    }
-  }
-
-  const loading = catalogLoading || requestsLoading || incidentsLoading
+  const loading = requestsLoading || incidentsLoading
 
   return (
     <div className="min-h-screen" style={{ backgroundColor, fontFamily: 'system-ui, sans-serif' }}>
       {/* Branded Header */}
       <header className="px-6 py-4 flex items-center justify-between shadow-sm" style={{ backgroundColor: primaryColor }}>
         <div className="flex items-center gap-3">
-          <img src={company.branding.logoUrl} alt={company.name} className="w-9 h-9 rounded-xl shadow-sm" />
+          {company.branding.logoUrl ? (
+            <img src={company.branding.logoUrl} alt={brandName} className="w-9 h-9 rounded-xl shadow-sm bg-white/90 object-contain" />
+          ) : (
+            <div className="w-9 h-9 rounded-xl shadow-sm bg-white/20 flex items-center justify-center text-white font-black text-lg">
+              {brandName.charAt(0)}
+            </div>
+          )}
           <div>
-            <div className="text-white font-bold text-base leading-tight">{company.name}</div>
+            <div className="text-white font-bold text-base leading-tight">{brandName}</div>
             <div className="text-white/60 text-[10px] uppercase tracking-widest font-semibold">Portal de Atendimento</div>
           </div>
         </div>
@@ -1170,7 +613,11 @@ function UserPortal({ currentUser, company }: { currentUser: User; company: Comp
             <div className="text-white font-semibold text-sm">{currentUser.name}</div>
             <div className="text-white/60 text-[10px]">{currentUser.department}</div>
           </div>
-          <img src={currentUser.avatarUrl} className="w-9 h-9 rounded-full border-2 border-white/30 object-cover" alt={currentUser.name} />
+          <img
+            src={currentUser.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(currentUser.name)}&background=fff&color=${primaryColor.replace('#', '')}&bold=true`}
+            className="w-9 h-9 rounded-full border-2 border-white/30 object-cover"
+            alt={currentUser.name}
+          />
         </div>
       </header>
 
@@ -1193,77 +640,14 @@ function UserPortal({ currentUser, company }: { currentUser: User; company: Comp
           ))}
         </div>
 
-        {/* Catalog */}
+        {/* Catalog (vitrine de serviços → abre requisição como incident) */}
         {activeTab === 'catalog' && (
-          <div className="space-y-4">
-            {submittedForm ? (
-              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm text-center py-16 space-y-3">
-                <div className="text-5xl">✅</div>
-                <h2 className="text-xl font-bold text-slate-800">Solicitação Enviada!</h2>
-                <p className="text-slate-500 text-sm">Sua solicitação foi registrada e será processada em breve.</p>
-                <button onClick={() => { setSubmittedForm(false); setSelectedCatalogItem(null) }} className="px-5 py-2 rounded-xl text-sm font-bold text-white cursor-pointer transition-all hover:opacity-90 shadow-md" style={{ backgroundColor: primaryColor }}>
-                  Nova Solicitação
-                </button>
-              </div>
-            ) : selectedCatalogItem && catalogItem ? (
-              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-5">
-                <div className="flex items-start gap-4">
-                  <span className="text-4xl">{catalogItem.icon}</span>
-                  <div>
-                    <h2 className="text-xl font-bold text-slate-800">{catalogItem.name}</h2>
-                    <p className="text-slate-500 text-sm mt-1">{catalogItem.description}</p>
-                    <div className="flex flex-wrap gap-3 mt-2 text-xs text-slate-400">
-                      <span>⏱ {catalogItem.estimatedDeliveryDays} dias úteis</span>
-                      {catalogItem.cost && <span>💰 R$ {catalogItem.cost.toLocaleString('pt-BR')}</span>}
-                      {catalogItem.requiresApproval && <span>✅ Requer aprovação</span>}
-                    </div>
-                  </div>
-                </div>
-                <form onSubmit={handleSubmit} className="space-y-4 pt-4 border-t border-slate-100">
-                  {catalogItem.formFields.map(field => (
-                    <div key={field.id}>
-                      <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">
-                        {field.label}{field.required && <span className="text-red-500 ml-1">*</span>}
-                      </label>
-                      {field.type === 'textarea' ? (
-                        <textarea required={field.required} rows={3} value={formData[field.label] || ''} onChange={e => setFormData(prev => ({ ...prev, [field.label]: e.target.value }))} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-700 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/20 transition-all resize-none bg-white shadow-sm" />
-                      ) : field.type === 'select' ? (
-                        <select required={field.required} value={formData[field.label] || ''} onChange={e => setFormData(prev => ({ ...prev, [field.label]: e.target.value }))} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-700 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/20 transition-all bg-white shadow-sm">
-                          <option value="">Selecione...</option>
-                          {field.options?.map((opt: string) => <option key={opt}>{opt}</option>)}
-                        </select>
-                      ) : (
-                        <input type={field.type} required={field.required} value={formData[field.label] || ''} onChange={e => setFormData(prev => ({ ...prev, [field.label]: e.target.value }))} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-700 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/20 transition-all bg-white shadow-sm" />
-                      )}
-                    </div>
-                  ))}
-                  <div className="flex gap-3 pt-2">
-                    <button type="button" onClick={() => setSelectedCatalogItem(null)} className="px-4 py-2.5 rounded-xl text-sm text-slate-500 border border-slate-200 hover:bg-slate-50 cursor-pointer transition-all">Cancelar</button>
-                    <button type="submit" disabled={submitting} className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white cursor-pointer transition-all hover:opacity-90 shadow-md disabled:opacity-50" style={{ backgroundColor: primaryColor }}>
-                      {submitting ? 'Enviando...' : 'Enviar Solicitação'}
-                    </button>
-                  </div>
-                </form>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {catalog.map(item => (
-                  <button key={item.id} onClick={() => setSelectedCatalogItem(item.id)} className="text-left bg-white rounded-2xl border border-slate-200 shadow-sm p-5 hover:shadow-md hover:border-slate-300 hover:-translate-y-0.5 transition-all cursor-pointer group">
-                    <div className="text-3xl mb-3">{item.icon}</div>
-                    <div className="font-bold text-slate-800 text-sm">{item.name}</div>
-                    <div className="text-slate-400 text-xs mt-1 line-clamp-2">{item.description}</div>
-                    <div className="flex items-center gap-2 mt-3 pt-3 border-t border-slate-100">
-                      <span className="text-[10px] font-semibold uppercase text-slate-400">{item.category}</span>
-                      {item.cost && <span className="ml-auto text-[10px] font-bold text-slate-500">R$ {item.cost.toLocaleString('pt-BR')}</span>}
-                    </div>
-                    <span className="mt-2 inline-flex items-center text-xs font-semibold transition-opacity group-hover:opacity-80" style={{ color: primaryColor }}>Solicitar →</span>
-                  </button>
-                ))}
-                {loading && <div className="col-span-3 text-center py-12 text-slate-400 animate-pulse">Carregando catálogo do banco de dados...</div>}
-                {!loading && catalog.length === 0 && <div className="col-span-3 text-center py-12 text-slate-400">Nenhum item disponível no catálogo.</div>}
-              </div>
-            )}
-          </div>
+          <ServiceCatalog
+            companyId={company.id}
+            currentUserId={currentUser.id}
+            currentUserName={currentUser.name}
+            primaryColor={primaryColor}
+          />
         )}
 
         {/* My Tickets */}
@@ -1302,7 +686,11 @@ function UserPortal({ currentUser, company }: { currentUser: User; company: Comp
                     <h2 className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-3">Meus Incidentes</h2>
                     <div className="space-y-2">
                       {myIncidents.map(inc => (
-                        <div key={inc.id} className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 flex items-center gap-4 hover:border-slate-300 transition-all">
+                        <div
+                          key={inc.id}
+                          onClick={() => setChatIncident({ id: inc.id, number: inc.number, shortDescription: inc.shortDescription, state: inc.state })}
+                          className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 flex items-center gap-4 hover:border-indigo-300 hover:shadow-md transition-all cursor-pointer"
+                        >
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
                               <span className="font-mono text-xs font-bold text-red-500">{inc.number}</span>
@@ -1311,7 +699,10 @@ function UserPortal({ currentUser, company }: { currentUser: User; company: Comp
                             </div>
                             <div className="text-sm font-semibold text-slate-700 mt-0.5 truncate">{inc.shortDescription}</div>
                           </div>
-                          <div className="text-xs text-slate-400 shrink-0">{relativeTime(inc.createdAt)}</div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <span className="text-xs text-slate-400">{relativeTime(inc.createdAt)}</span>
+                            <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 border border-indigo-100 px-2 py-1 rounded-lg">💬 Abrir</span>
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -1322,6 +713,25 @@ function UserPortal({ currentUser, company }: { currentUser: User; company: Comp
           </div>
         )}
       </div>
+
+      {chatIncident && (
+        <Modal title={chatIncident.number} subtitle="Acompanhamento do Chamado" onClose={() => setChatIncident(null)}>
+          <div className="space-y-4">
+            <InfoBlock label="Assunto" value={chatIncident.shortDescription} />
+            <div className="flex items-center gap-2"><StateBadge state={chatIncident.state} /></div>
+            <div>
+              <div className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-1.5">Conversa com o Suporte</div>
+              <TicketChat
+                incidentId={chatIncident.id}
+                companyId={company.id}
+                senderId={currentUser.id}
+                senderName={currentUser.name}
+                locked={chatIncident.state === 'Closed'}
+              />
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   )
 }
@@ -2061,41 +1471,52 @@ function TechnicianDashboard({ companyId, currentUser }: { companyId: string; cu
 // ─── MAIN APP ─────────────────────────────────────────────────
 
 export default function App() {
-  const { companies: dbCompanies, profiles: dbProfiles, loading: dbLoading, error: dbError } = useAppData()
+  const { companies: dbCompanies, loading: dbLoading, error: dbError } = useAppData()
+  const { status: authStatus, profile, company: authCompany, isProvider, signOut } = useAuth()
 
-  const companies = useMemo(() => {
-    return dbCompanies.map(mapCompany)
-  }, [dbCompanies])
+  // Lista de empresas (leitura pública) — usada pelo Portal do Provedor MSP.
+  const companies = useMemo(() => dbCompanies.map(mapCompany), [dbCompanies])
 
-  const users = useMemo(() => {
-    return dbProfiles.map(mapUser)
-  }, [dbProfiles])
+  // Identidade derivada da sessão real do Supabase Auth (não mais de listas públicas).
+  const currentUser = useMemo(() => (profile ? mapUser(profile) : null), [profile])
+  const currentCompany = useMemo(() => (authCompany ? mapCompany(authCompany) : null), [authCompany])
 
-  const [currentUser, setCurrentUser] = useState<User | null>(null)
-  const [currentCompany, setCurrentCompany] = useState<Company | null>(null)
   const [activeView, setActiveView] = useState<AppView>('dashboard_incidents')
-  const [isCompanySwitcherOpen, setIsCompanySwitcherOpen] = useState(false)
-  const [isUserSwitcherOpen, setIsUserSwitcherOpen] = useState(false)
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
   const [simulatedRole, setSimulatedRole] = useState<Role | null>(null)
 
   const activeRole = simulatedRole || (currentUser ? currentUser.role : 'end_user')
 
-  const handleLogin = (user: User, company: Company) => {
-    setCurrentUser(user)
-    setCurrentCompany(company)
-    setSimulatedRole(user.role)
-    setActiveView(user.role === 'end_user' ? 'user_portal' : 'dashboard_incidents')
-  }
-  
-  const handleLogout = () => {
-    setCurrentUser(null)
-    setCurrentCompany(null)
+  // Define a view inicial assim que o perfil autenticado é carregado.
+  useEffect(() => {
+    if (profile) {
+      setActiveView(profile.role === 'end_user' ? 'user_portal' : 'dashboard_incidents')
+    }
+  }, [profile])
+
+  const handleLogout = async () => {
     setSimulatedRole(null)
+    setActiveView('dashboard_incidents')
+    setIsUserMenuOpen(false)
+    await signOut()
   }
 
   const unreadNotifs = useMemo(() => mockNotifications.filter(n => !n.read).length, [])
 
-  if (dbLoading) {
+  // Atalho TEMPORÁRIO de preview: /?preview=portal | admin renderiza os
+  // novos layouts (mocks) sem exigir login. Remover quando os componentes
+  // forem para a fiação com dados reais.
+  const previewMode = useMemo(
+    () => (typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('preview') : null),
+    [],
+  )
+  if (previewMode === 'portal') return <UserPortalLayout />
+  if (previewMode === 'admin') return <AdminPortalSettings />
+  if (previewMode === 'cockpit') return <AnalystCockpit />
+  if (previewMode === 'tickets') return <TicketManagementDashboard />
+  if (previewMode === 'workspace') return <div className="h-screen"><WorkspaceLayout /></div>
+
+  if (dbLoading || authStatus === 'loading') {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6 text-slate-500">
         <div className="flex items-center gap-3">
@@ -2118,7 +1539,26 @@ export default function App() {
     )
   }
 
-  if (!currentUser || !currentCompany) return <LoginScreen companies={companies} users={users} onLogin={handleLogin} />
+  // Sessão válida porém sem profile vinculado (aguardando provisionamento/linkagem).
+  if (authStatus === 'unlinked') {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6 text-sm">
+        <div className="bg-white border border-slate-200 rounded-2xl p-8 text-center max-w-md shadow-sm">
+          <div className="text-2xl mb-2">🔒</div>
+          <div className="font-semibold text-slate-800">Conta sem perfil vinculado</div>
+          <p className="text-slate-500 mt-1 text-xs">
+            Sua autenticação foi bem-sucedida, mas ainda não há um perfil associado a este usuário.
+            Contate o administrador do seu tenant ou o provedor MSP.
+          </p>
+          <button onClick={handleLogout} className="mt-4 px-4 py-2 rounded-xl bg-slate-800 text-white text-xs font-bold hover:bg-slate-700 transition-all cursor-pointer">
+            Encerrar Sessão
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  if (!currentUser || !currentCompany) return <LoginScreen />
 
   // User Portal — full page, no sidebar
   if (activeView === 'user_portal' || activeRole === 'end_user') {
@@ -2180,6 +1620,11 @@ export default function App() {
     navItems.push({ view: 'admin_dashboard', label: 'Governança Admin', icon: <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0m-5 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" /></svg> })
   }
 
+  // O Workspace (abas internas) substitui MspProviderPortal/IncidentDashboard.
+  // Ocupa a altura total do <main> (sem o wrapper limitado/padding).
+  const customDashRoles: Role[] = ['cio', 'client_manager', 'it_manager', 'area_manager', 'technician']
+  const showWorkspace = activeView === 'dashboard_incidents' && (isProvider || !customDashRoles.includes(activeRole))
+
   const renderActiveDashboard = () => {
     if (activeView === 'admin_dashboard' && activeRole === 'sysadmin') {
       return <AdminDashboard refetchAppData={async () => {}} currentCompany={currentCompany} />
@@ -2187,8 +1632,8 @@ export default function App() {
     
     // Customize layout if viewing the default dashboard view based on active role
     if (activeView === 'dashboard_incidents') {
-      if (currentCompany.id === '44444444-4444-4444-4444-444444444444') {
-        return <MspProviderPortal companyId={currentCompany.id} currentUserName={currentUser.name} companies={companies} />
+      if (isProvider) {
+        return <WorkspaceLayout companyId={currentCompany.id} isProvider companies={companies} />
       }
       switch (activeRole) {
         case 'cio':
@@ -2202,7 +1647,7 @@ export default function App() {
         case 'technician':
           return <TechnicianDashboard companyId={currentCompany.id} currentUser={currentUser} />
         default:
-          return <IncidentDashboard companyId={currentCompany.id} currentUserName={currentUser.name} />
+          return <WorkspaceLayout companyId={currentCompany.id} isProvider={isProvider} companies={companies} />
       }
     }
 
@@ -2210,8 +1655,8 @@ export default function App() {
     if (activeView === 'dashboard_problems') return <ProblemDashboard companyId={currentCompany.id} />
     if (activeView === 'dashboard_changes') return <ChangeDashboard companyId={currentCompany.id} />
     if (activeView === 'api_docs') return <ApiDocs />
-    
-    return <IncidentDashboard companyId={currentCompany.id} currentUserName={currentUser.name} />
+
+    return <WorkspaceLayout companyId={currentCompany.id} isProvider={isProvider} companies={companies} />
   }
 
   return (
@@ -2229,25 +1674,16 @@ export default function App() {
 
         <div className="w-px h-6 bg-slate-200 mx-1 hidden sm:block" />
 
-        {/* Company Switcher */}
-        <div className="relative">
-          <button onClick={() => { setIsCompanySwitcherOpen(v => !v); setIsUserSwitcherOpen(false) }} className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 hover:border-slate-300 transition-all cursor-pointer text-xs font-semibold text-slate-700 shadow-sm">
+        {/* Tenant Indicator (+ selo de Provedor MSP) */}
+        <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-700 shadow-sm shrink-0">
+          {currentCompany.branding.logoUrl && (
             <img src={currentCompany.branding.logoUrl} alt={currentCompany.name} className="w-5 h-5 rounded-md" />
-            <span className="hidden sm:block">{currentCompany.name}</span>
-            <svg className={`w-3.5 h-3.5 text-slate-400 transition-transform ${isCompanySwitcherOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
-          </button>
-          {isCompanySwitcherOpen && (
-            <div className="absolute top-full mt-1.5 left-0 bg-white border border-slate-200 rounded-2xl shadow-xl w-56 z-50 overflow-hidden">
-              <div className="px-3 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest border-b border-slate-100">Trocar Empresa</div>
-              {companies.map(c => (
-                <button key={c.id} onClick={() => { setCurrentCompany(c); setCurrentUser(users.find(u => u.companyId === c.id && u.role === (currentUser.role === 'sysadmin' ? 'sysadmin' : 'agent')) ?? users.find(u => u.companyId === c.id)!); setIsCompanySwitcherOpen(false) }}
-                  className={`w-full text-left flex items-center gap-2.5 px-3 py-2.5 text-xs transition-all cursor-pointer ${currentCompany.id === c.id ? 'bg-slate-50 text-slate-800' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700'}`}>
-                  <img src={c.branding.logoUrl} alt={c.name} className="w-7 h-7 rounded-lg" />
-                  <div><div className="font-semibold">{c.name}</div><div className="text-slate-400 text-[10px]">{c.domain}</div></div>
-                  {currentCompany.id === c.id && <svg className="ml-auto w-3.5 h-3.5 text-emerald-500" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>}
-                </button>
-              ))}
-            </div>
+          )}
+          <span className="hidden sm:block">{currentCompany.name}</span>
+          {isProvider && (
+            <span className="ml-1 px-1.5 py-0.5 rounded bg-sky-50 text-sky-700 border border-sky-100 text-[9px] uppercase tracking-wider font-bold">
+              Provedor MSP
+            </span>
           )}
         </div>
 
@@ -2283,28 +1719,28 @@ export default function App() {
         {/* Spacer */}
         <div className="flex-1" />
 
-        {/* User Switcher */}
+        {/* User Menu (perfil real autenticado) */}
         <div className="relative">
-          <button onClick={() => { setIsUserSwitcherOpen(v => !v); setIsCompanySwitcherOpen(false) }} className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 hover:border-slate-300 transition-all cursor-pointer shadow-sm">
-            <img src={currentUser.avatarUrl} alt={currentUser.name} className="w-6 h-6 rounded-full" />
+          <button onClick={() => setIsUserMenuOpen(v => !v)} className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 hover:border-slate-300 transition-all cursor-pointer shadow-sm">
+            <img src={currentUser.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(currentUser.name)}&size=48`} alt={currentUser.name} className="w-6 h-6 rounded-full" />
             <div className="hidden sm:block text-left">
               <div className="text-xs font-bold text-slate-700">{currentUser.name.split(' ')[0]}</div>
               <div className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">{currentUser.role.replace('_', ' ')}</div>
             </div>
-            <svg className={`w-3.5 h-3.5 text-slate-400 transition-transform ${isUserSwitcherOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
+            <svg className={`w-3.5 h-3.5 text-slate-400 transition-transform ${isUserMenuOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
           </button>
-          {isUserSwitcherOpen && (
-            <div className="absolute top-full mt-1.5 right-0 bg-white border border-slate-200 rounded-2xl shadow-xl w-68 z-50 overflow-hidden">
-              <div className="px-3 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest border-b border-slate-100">Simular Perfil RBAC</div>
-              {users.map(u => (
-                <button key={u.id} onClick={() => { setCurrentUser(u); setSimulatedRole(u.role); setCurrentCompany(companies.find(c => c.id === u.companyId)!); setActiveView(u.role === 'end_user' ? 'user_portal' : 'dashboard_incidents'); setIsUserSwitcherOpen(false) }}
-                  className={`w-full text-left flex items-center gap-2.5 px-3 py-2 text-xs transition-all cursor-pointer ${currentUser.id === u.id ? 'bg-slate-50 text-slate-800' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700'}`}>
-                  <img src={u.avatarUrl} alt={u.name} className="w-7 h-7 rounded-full shrink-0" />
-                  <div className="min-w-0"><div className="font-semibold truncate">{u.name}</div><div className="text-[10px] text-slate-400">{u.role.replace('_', ' ')} · {companies.find(c => c.id === u.companyId)?.name}</div></div>
-                  {currentUser.id === u.id && <svg className="ml-auto w-3.5 h-3.5 text-emerald-500 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>}
-                </button>
-              ))}
-              <div className="border-t border-slate-100 p-2">
+          {isUserMenuOpen && (
+            <div className="absolute top-full mt-1.5 right-0 bg-white border border-slate-200 rounded-2xl shadow-xl w-64 z-50 overflow-hidden">
+              <div className="px-4 py-3 border-b border-slate-100">
+                <div className="text-sm font-bold text-slate-800 truncate">{currentUser.name}</div>
+                <div className="text-[11px] text-slate-400 truncate">{currentUser.email}</div>
+                <div className="mt-1.5 flex items-center gap-1.5 flex-wrap">
+                  <span className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 text-[9px] uppercase tracking-wider font-bold">{currentUser.role.replace('_', ' ')}</span>
+                  <span className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 text-[9px] font-semibold">{currentCompany.name}</span>
+                  {isProvider && <span className="px-1.5 py-0.5 rounded bg-sky-50 text-sky-700 border border-sky-100 text-[9px] uppercase tracking-wider font-bold">Provedor MSP</span>}
+                </div>
+              </div>
+              <div className="p-2">
                 <button onClick={handleLogout} className="w-full text-left px-3 py-2 text-xs text-red-500 hover:bg-red-50 rounded-xl transition-all cursor-pointer font-semibold">Encerrar Sessão</button>
               </div>
             </div>
@@ -2354,10 +1790,14 @@ export default function App() {
         </aside>
 
         {/* Main Content */}
-        <main className="flex-1 overflow-y-auto p-6 lg:p-8 bg-slate-50" onClick={() => { setIsCompanySwitcherOpen(false); setIsUserSwitcherOpen(false) }}>
-          <div className="max-w-7xl mx-auto">
-            {renderActiveDashboard()}
-          </div>
+        <main className="flex-1 min-h-0 overflow-y-auto bg-slate-50" onClick={() => setIsUserMenuOpen(false)}>
+          {showWorkspace ? (
+            renderActiveDashboard()
+          ) : (
+            <div className="max-w-7xl mx-auto p-6 lg:p-8">
+              {renderActiveDashboard()}
+            </div>
+          )}
         </main>
       </div>
 

@@ -7,8 +7,8 @@
 import { createClient } from '@supabase/supabase-js'
 import { supabase } from './supabase'
 import type {
-  CompanyRow, ProfileRow, IncidentRow, IncidentHistoryRow,
-  ServiceRequestRow, ProblemRow, ChangeRow, CatalogItemRow,
+  CompanyRow, ProfileRow, IncidentRow, IncidentHistoryRow, TicketMessageRow,
+  ServiceRequestRow, ProblemRow, ChangeRow, CatalogItemRow, CatalogCategoryRow,
   TicketPriority, IncidentState, IncidentCategory,
   RequestState, ChangeType, ChangeRisk, ChangeState,
   IncidentCatalogItemRow, IncidentCatalogSubitemRow, IncidentCatalogSymptomRow,
@@ -22,13 +22,11 @@ const key  = import.meta.env.VITE_SUPABASE_ANON_KEY as string
 // Dynamic schema clients cache to avoid recreating them constantly
 const schemaClientsCache: Record<string, any> = {}
 
-// Registry of companyId to PostgreSQL schemaName
-let companySchemaMap: Record<string, string> = {
-  '11111111-1111-1111-1111-111111111111': 'public',
-  '22222222-2222-2222-2222-222222222222': 'public',
-  '33333333-3333-3333-3333-333333333333': 'public',
-  '44444444-4444-4444-4444-444444444444': 'public'
-}
+// Registro dinâmico companyId → schemaName do PostgreSQL.
+// Alimentado em runtime por setCompanySchemas() (ver useAppData).
+// Empresas ausentes do mapa usam o schema 'public' por padrão, de
+// modo que novos tenants provisionados funcionam automaticamente.
+let companySchemaMap: Record<string, string> = {}
 
 export const setCompanySchemas = (mapping: Record<string, string>) => {
   companySchemaMap = { ...companySchemaMap, ...mapping }
@@ -299,6 +297,40 @@ export const incidentsService = {
       is_public:       isPublic,
     })
     if (error) throw error
+  },
+
+  /** Assumir o chamado: vincula o técnico e move para "In Progress". */
+  async assign(id: string, companyId: string, technicianId: string, technicianName: string): Promise<IncidentRow> {
+    const client = getClientForCompany(companyId)
+    const { data, error } = await client
+      .from('incidents')
+      .update({ assigned_to_id: technicianId, assigned_to_name: technicianName, state: 'In Progress' })
+      .eq('id', id)
+      .select()
+      .single()
+    if (error) throw error
+    await client.from('incident_history').insert({
+      incident_id: id, changed_by_name: technicianName, field_name: 'state',
+      new_value: 'In Progress', comment: 'Analista assumiu o chamado.', is_public: true,
+    })
+    return data!
+  },
+
+  /** Encerramento padrão ServiceNow: grava close_code/close_notes e move para "Resolved". */
+  async resolve(id: string, companyId: string, closeCode: string, closeNotes: string, actorName: string): Promise<IncidentRow> {
+    const client = getClientForCompany(companyId)
+    const { data, error } = await client
+      .from('incidents')
+      .update({ state: 'Resolved', close_code: closeCode, close_notes: closeNotes, resolved_at: new Date().toISOString() })
+      .eq('id', id)
+      .select()
+      .single()
+    if (error) throw error
+    await client.from('incident_history').insert({
+      incident_id: id, changed_by_name: actorName, field_name: 'state',
+      new_value: 'Resolved', comment: `Encerrado (${closeCode}): ${closeNotes ?? ''}`.trim(), is_public: true,
+    })
+    return data!
   },
 
   /** Subscribe to real-time changes on incidents for a company */
@@ -1080,5 +1112,138 @@ export const chatbotService = {
     if (digits.startsWith('55') && digits.length >= 12) return `+${digits}`
     if (digits.length === 11 || digits.length === 10) return `+55${digits}`
     return `+${digits}`
+  },
+}
+
+// ============================================================
+// SERVICE CATALOG (categorias + itens) — migration 019
+// Modelo unificado: requisições viram incidents (ticket_type='request').
+// ============================================================
+
+export const serviceCatalogService = {
+  // ─ Categorias ─────────────────────────────────────────────
+  async listCategories(companyId: string, opts?: { activeOnly?: boolean }): Promise<CatalogCategoryRow[]> {
+    let q = supabase.from('catalog_categories').select('*').eq('company_id', companyId)
+    if (opts?.activeOnly) q = q.eq('is_active', true)
+    const { data, error } = await q.order('sort_order')
+    return throwIfError(data, error)
+  },
+  async createCategory(payload: Partial<CatalogCategoryRow>): Promise<CatalogCategoryRow> {
+    const { data, error } = await supabase.from('catalog_categories').insert(payload).select().single()
+    return throwIfError(data, error)
+  },
+  async updateCategory(id: string, payload: Partial<CatalogCategoryRow>): Promise<CatalogCategoryRow> {
+    const { data, error } = await supabase.from('catalog_categories').update(payload).eq('id', id).select().single()
+    return throwIfError(data, error)
+  },
+  async deleteCategory(id: string): Promise<void> {
+    const { error } = await supabase.from('catalog_categories').delete().eq('id', id)
+    if (error) throw error
+  },
+
+  // ─ Itens ──────────────────────────────────────────────────
+  async listItems(companyId: string, opts?: { categoryId?: string; activeOnly?: boolean }): Promise<CatalogItemRow[]> {
+    let q = supabase.from('catalog_items').select('*').eq('company_id', companyId)
+    if (opts?.categoryId) q = q.eq('category_id', opts.categoryId)
+    if (opts?.activeOnly) q = q.eq('active', true)
+    const { data, error } = await q.order('name')
+    return throwIfError(data, error)
+  },
+  async createItem(payload: Partial<CatalogItemRow>): Promise<CatalogItemRow> {
+    const { data, error } = await supabase.from('catalog_items').insert(payload).select().single()
+    return throwIfError(data, error)
+  },
+  async updateItem(id: string, payload: Partial<CatalogItemRow>): Promise<CatalogItemRow> {
+    const { data, error } = await supabase.from('catalog_items').update(payload).eq('id', id).select().single()
+    return throwIfError(data, error)
+  },
+
+  // ─ Abertura de Requisição (cria incident ticket_type='request') ─
+  async openRequest(payload: {
+    companyId: string
+    item: Pick<CatalogItemRow, 'id' | 'name' | 'category'>
+    description?: string
+    callerId?: string | null
+    callerName: string
+  }): Promise<IncidentRow> {
+    const { data, error } = await getClientForCompany(payload.companyId)
+      .from('incidents')
+      .insert({
+        company_id:        payload.companyId,
+        short_description: payload.item.name,
+        description:       payload.description ?? null,
+        priority:          'P3 - Moderate',
+        category:          'Inquiry',
+        caller_name:       payload.callerName,
+        caller_id:         payload.callerId ?? null,
+        ticket_type:       'request',
+        catalog_item_id:   payload.item.id,
+      })
+      .select()
+      .single()
+    return throwIfError(data, error)
+  },
+}
+
+// ============================================================
+// MENSAGENS DO CHAMADO (chat público + notas internas)
+// Tabela ticket_messages (migration 013) — com Supabase Realtime.
+// ============================================================
+
+export const messagesService = {
+  /** Lista as interações de um chamado em ordem cronológica. */
+  async list(incidentId: string): Promise<TicketMessageRow[]> {
+    const { data, error } = await supabase
+      .from('ticket_messages')
+      .select('*')
+      .eq('incident_id', incidentId)
+      .order('created_at', { ascending: true })
+    return throwIfError(data, error)
+  },
+
+  /**
+   * Insere uma interação (comentário público do analista ou nota interna).
+   * A gravação é SOBERANA: fazemos só o INSERT (sem .select()), pois o
+   * re-read pós-insert depende de o RLS conseguir reler a linha e pode
+   * lançar erro mesmo com a gravação já comitada. A mensagem aparece na
+   * timeline via Supabase Realtime. Falhas de notificação (trigger de
+   * e-mail) são assíncronas (pg_net) e não afetam este INSERT.
+   */
+  async send(payload: {
+    incidentId: string
+    companyId: string
+    body: string
+    isInternal: boolean
+    senderId?: string | null
+    senderName?: string | null
+    actorType?: 'analyst' | 'user' | 'system'
+  }): Promise<void> {
+    if (!payload.incidentId || !payload.companyId) {
+      throw new Error('incidentId e companyId são obrigatórios para enviar a mensagem.')
+    }
+    const { error } = await supabase
+      .from('ticket_messages')
+      .insert({
+        incident_id: payload.incidentId,
+        company_id:  payload.companyId,
+        body:        payload.body,
+        is_internal: payload.isInternal,
+        sender_id:   payload.senderId ?? null,
+        sender_name: payload.senderName ?? null,
+        actor_type:  payload.actorType ?? 'analyst',
+      })
+    if (error) throw error
+  },
+
+  /** Assina inserts em tempo real para um chamado (loop de e-mail/chat). */
+  subscribeToIncident(incidentId: string, onInsert: (row: TicketMessageRow) => void) {
+    return supabase
+      .channel(`ticket_messages:${incidentId}`)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'ticket_messages', filter: `incident_id=eq.${incidentId}` },
+        (payload: any) => onInsert(payload.new as TicketMessageRow),
+      )
+      .subscribe()
   },
 }

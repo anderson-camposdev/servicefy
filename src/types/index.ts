@@ -49,6 +49,8 @@ export interface AuthConfig {
 export interface CompanyBranding {
   logoUrl?: string;
   primaryColor: string;   // ex: '#0F4C81'
+  secondaryColor?: string;
+  brandName?: string;     // nome de exibição customizado da marca
   accentColor: string;    // ex: '#00A3E0'
   backgroundColor: string;
   welcomeTitle: string;

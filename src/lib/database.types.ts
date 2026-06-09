@@ -21,9 +21,13 @@ export interface CompanyRow {
   id: string
   name: string
   domain: string
+  slug: string
+  is_provider_tenant: boolean
   active: boolean
   logo_url: string | null
   primary_color: string
+  secondary_color: string | null
+  brand_name: string | null
   accent_color: string
   bg_color: string
   welcome_title: string
@@ -85,6 +89,27 @@ export interface IncidentRow {
   updated_at: string
   resolved_at: string | null
   closed_at: string | null
+  // Encerramento padrão ServiceNow (migration 013)
+  close_code: string | null
+  close_notes: string | null
+  // Service Catalog (migration 019)
+  ticket_type: 'incident' | 'request'
+  catalog_item_id: string | null
+}
+
+/** Interações do chamado (chat público + notas internas). Migration 013. */
+export type MessageActorType = 'analyst' | 'user' | 'system'
+
+export interface TicketMessageRow {
+  id: string
+  incident_id: string
+  company_id: string
+  sender_id: string | null
+  sender_name: string | null
+  actor_type: MessageActorType
+  body: string
+  is_internal: boolean
+  created_at: string
 }
 
 export interface IncidentHistoryRow {
@@ -178,6 +203,8 @@ export interface CatalogItemRow {
   name: string
   description: string | null
   category: string
+  category_id: string | null   // FK para catalog_categories (migration 019)
+  sla_hours: number            // SLA padrão do serviço (migration 019)
   icon: string
   estimated_delivery_days: number
   cost: number | null
@@ -186,6 +213,18 @@ export interface CatalogItemRow {
   visible_to_roles: UserRole[]
   form_fields: Json
   active: boolean
+  created_at: string
+}
+
+/** Categoria da vitrine do Service Catalog (migration 019). */
+export interface CatalogCategoryRow {
+  id: string
+  company_id: string
+  name: string
+  description: string | null
+  icon: string
+  sort_order: number
+  is_active: boolean
   created_at: string
 }
 

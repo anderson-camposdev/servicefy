@@ -1,1 +1,35 @@
 @import "tailwindcss";
+
+/* ============================================================
+   Multi-Tenant (White-Label) — Tokens de marca
+   As CSS variables --brand-* são definidas em runtime por
+   applyBranding(). Os defaults abaixo garantem render sem flash
+   antes do tenant carregar. Os tokens @theme expõem utilitários
+   Tailwind: bg-brand-primary, text-brand-accent, etc.
+   ============================================================ */
+
+:root {
+  --brand-primary: #10b981;
+  --brand-secondary: #00a3e0;
+  --brand-accent: #00a3e0;
+  --brand-bg: #f8fafc;
+}
+
+@theme inline {
+  /* Tokens dinâmicos → utilitários bg-primary / text-primary / border-primary
+     e bg-secondary etc. Apontam para as CSS vars runtime do ThemeProvider. */
+  --color-primary: var(--brand-primary);
+  --color-secondary: var(--brand-secondary);
+  --color-brand-primary: var(--brand-primary);
+  --color-brand-accent: var(--brand-accent);
+  --color-brand-bg: var(--brand-bg);
+}
+
+/* Oculta a barra de rolagem mantendo o scroll (fileiras de filtros, abas). */
+.hide-scrollbar {
+  -ms-overflow-style: none; /* IE/Edge */
+  scrollbar-width: none; /* Firefox */
+}
+.hide-scrollbar::-webkit-scrollbar {
+  display: none; /* Chrome/Safari */
+}
