@@ -1,16 +1,43 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useCallback } from 'react'
+import { Users, Plus, UserPlus, Settings, Clock } from 'lucide-react'
+import { useToast } from './context'
 import type { AppView, User, Company, Role } from './types'
 import {
   mockApiEndpoints,
   mockNotifications,
 } from './services'
 import { useIncidents } from './hooks/useIncidents'
-import { useAppData, useRequests, useProblems, useChanges, useCatalog } from './hooks/useDbData'
-import type { ServiceRequestRow, ProblemRow, ChangeRow, CompanyRow, ProfileRow } from './lib/database.types'
-import { incidentsService, companiesService, profilesService, catalogService, cioService } from './lib/services'
+import { useAppData, useProblems, useChanges } from './hooks/useDbData'
+import { usePersistentState } from './hooks/usePersistentState'
+import type { ProblemRow, ChangeRow, CompanyRow, ProfileRow, AssignmentGroupRow, IncidentRow, PortalTicketDetail } from './lib/database.types'
+import { incidentsService, companiesService, profilesService, cioService, assignmentGroupsService } from './lib/services'
+import { translateState } from './lib/statusLabels'
 import { useTenant } from './tenant'
 import { useAuth } from './auth'
-import { UserPortalLayout, AdminPortalSettings, AnalystCockpit, TicketManagementDashboard, WorkspaceLayout, TicketChat, ServiceCatalog } from './pages'
+import { UserPortalLayout, AdminPortalSettings, AnalystCockpit, TicketManagementDashboard, WorkspaceLayout, ServiceCatalog, TicketChat } from './pages'
+import CatalogManager from './pages/CatalogManager'
+
+const ADMIN_ACTIVE_TAB_STORAGE_KEY = 'flowfy_admin_active_tab'
+const ACTIVE_VIEW_STORAGE_KEY = 'flowfy_active_view'
+
+const ADMIN_TABS = ['tenants', 'users', 'groups', 'catalog_incidents', 'catalog_requests', 'form_templates'] as const
+type AdminTab = (typeof ADMIN_TABS)[number]
+
+const PERSISTED_APP_VIEWS: readonly AppView[] = [
+  'dashboard_incidents',
+  'dashboard_requests',
+  'dashboard_problems',
+  'dashboard_changes',
+  'user_portal',
+  'api_docs',
+  'admin_dashboard',
+]
+
+const isAdminTab = (value: unknown): value is AdminTab =>
+  typeof value === 'string' && ADMIN_TABS.includes(value as AdminTab)
+
+const isPersistedAppView = (value: unknown): value is AppView =>
+  typeof value === 'string' && PERSISTED_APP_VIEWS.includes(value as AppView)
 
 const mapCompany = (row: CompanyRow): Company => {
   let providers: any[] = []
@@ -137,6 +164,13 @@ const relativeTime = (iso: string) => {
   return `${Math.floor(hrs / 24)}d atrás`
 }
 
+const formatPortalValue = (value: unknown) => {
+  if (Array.isArray(value)) return value.join(', ') || 'Nenhuma opção selecionada'
+  if (typeof value === 'boolean') return value ? 'Sim' : 'Não'
+  if (value === null || value === undefined || value === '') return 'Não informado'
+  return String(value)
+}
+
 // ─── Shared Components ────────────────────────────────────────
 
 function StatCard({ label, value, accent, icon }: { label: string; value: number | string; accent: string; icon: React.ReactNode }) {
@@ -155,7 +189,7 @@ function StateBadge({ state }: { state: string }) {
   return (
     <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-semibold border ${stateText[state] ?? 'text-slate-500 bg-slate-100 border-slate-200'}`}>
       <span className={`h-1.5 w-1.5 rounded-full ${stateDot[state] ?? 'bg-slate-400'}`} />
-      {state}
+      {translateState(state)}
     </span>
   )
 }
@@ -169,10 +203,10 @@ function InfoBlock({ label, value, mono }: { label: string; value: string; mono?
   )
 }
 
-function Modal({ title, subtitle, onClose, children }: { title: string; subtitle: string; onClose: () => void; children: React.ReactNode }) {
+function Modal({ title, subtitle, onClose, children, wide = false }: { title: string; subtitle: string; onClose: () => void; children: React.ReactNode; wide?: boolean }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
-      <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
+      <div className={`bg-white border border-slate-200 rounded-2xl w-full ${wide ? 'max-w-5xl' : 'max-w-xl'} shadow-2xl overflow-hidden max-h-[90vh] flex flex-col`}>
         <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between shrink-0 bg-slate-50">
           <div>
             <h2 className="font-bold text-slate-800 text-base">{title}</h2>
@@ -337,70 +371,6 @@ function TableHead({ cols }: { cols: string[] }) {
 }
 
 
-// ─── SERVICE REQUEST DASHBOARD ────────────────────────────────
-
-function RequestDashboard({ companyId }: { companyId: string }) {
-  const { requests, kpis, loading, error } = useRequests(companyId)
-  const [detail, setDetail] = useState<ServiceRequestRow | null>(null)
-
-  if (error) return <div className="text-red-500 text-sm p-4">{error}</div>
-
-  return (
-    <div>
-      <PageHeader title="Gerenciamento de Requisições" subtitle="Solicitações formais de serviço ao Catálogo — ITIL v4" />
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <StatCard label="Total" value={loading ? '…' : kpis.total} accent="bg-slate-100 text-slate-500" icon={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>} />
-        <StatCard label="Aguardando Aprovação" value={loading ? '…' : kpis.awaiting} accent="bg-amber-50 text-amber-500" icon={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>} />
-        <StatCard label="Atendidas" value={loading ? '…' : kpis.fulfilled} accent="bg-emerald-50 text-emerald-500" icon={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" /></svg>} />
-        <StatCard label="Custo Acumulado" value={loading ? '…' : `R$ ${kpis.cost.toLocaleString('pt-BR')}`} accent="bg-sky-50 text-sky-500" icon={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>} />
-      </div>
-
-      <TableCard header={<span className="text-xs font-bold text-slate-500 uppercase tracking-widest">Requisições de Serviço</span>}>
-        <table className="w-full text-left text-sm min-w-[720px]">
-          <TableHead cols={['Número', 'Item Solicitado', 'Estado', 'Prioridade', 'Solicitante', 'Aprovador', 'Custo', 'Criado']} />
-          <tbody className="divide-y divide-slate-50">
-            {requests.length === 0 && !loading && <tr><td colSpan={8} className="py-12 text-center text-slate-400">Nenhuma requisição encontrada.</td></tr>}
-            {loading && requests.length === 0 && <tr><td colSpan={8} className="py-12 text-center"><span className="text-slate-400 animate-pulse text-sm">Carregando…</span></td></tr>}
-            {requests.map(req => (
-              <tr key={req.id} onClick={() => setDetail(req)} className="hover:bg-slate-50 cursor-pointer transition-colors">
-                <td className="px-5 py-3.5 font-mono text-sky-600 text-xs font-bold">{req.number}</td>
-                <td className="px-5 py-3.5 text-slate-700 font-medium max-w-[180px] truncate">{req.catalog_item_name}</td>
-                <td className="px-5 py-3.5"><StateBadge state={req.state} /></td>
-                <td className="px-5 py-3.5"><span className={`px-2 py-0.5 rounded-md text-[10px] uppercase tracking-wide ${priorityBadge[req.priority]}`}>{req.priority}</span></td>
-                <td className="px-5 py-3.5 text-slate-600 text-xs">{req.requester_name}</td>
-                <td className="px-5 py-3.5 text-slate-500 text-xs">{req.approver_name ?? <span className="italic text-slate-300">Pendente</span>}</td>
-                <td className="px-5 py-3.5 text-slate-600 text-xs">{req.cost ? `R$ ${req.cost.toLocaleString('pt-BR')}` : '—'}</td>
-                <td className="px-5 py-3.5 text-slate-400 text-xs">{relativeTime(req.created_at)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </TableCard>
-
-      {detail && (
-        <Modal title={detail.number} subtitle="Detalhes da Requisição de Serviço" onClose={() => setDetail(null)}>
-          <div className="space-y-4">
-            <div className="flex flex-wrap gap-2">
-              <span className={`px-2.5 py-1 rounded-md text-xs uppercase ${priorityBadge[detail.priority]}`}>{detail.priority}</span>
-              <StateBadge state={detail.state} />
-            </div>
-            <InfoBlock label="Item Solicitado" value={detail.catalog_item_name} />
-            <InfoBlock label="Solicitante" value={detail.requester_name} />
-            {detail.approver_name && <InfoBlock label="Aprovador" value={detail.approver_name} />}
-            {detail.cost && <InfoBlock label="Custo" value={`R$ ${detail.cost.toLocaleString('pt-BR')} ${detail.currency ?? ''}`} />}
-            {detail.form_data && Object.keys(detail.form_data as Record<string,unknown>).length > 0 && (
-              <div className="pt-3 border-t border-slate-100">
-                <div className="text-xs text-slate-400 font-bold uppercase tracking-widest mb-2">Dados do Formulário</div>
-                {Object.entries(detail.form_data as Record<string,unknown>).map(([k, v]) => <InfoBlock key={k} label={k} value={String(v)} />)}
-              </div>
-            )}
-          </div>
-        </Modal>
-      )}
-    </div>
-  )
-}
-
 // ─── PROBLEM DASHBOARD ────────────────────────────────────────
 
 function ProblemDashboard({ companyId }: { companyId: string }) {
@@ -555,41 +525,69 @@ function ChangeDashboard({ companyId }: { companyId: string }) {
 // ─── USER PORTAL ──────────────────────────────────────────────
 
 function UserPortal({ currentUser, company }: { currentUser: User; company: Company }) {
+  const { toast } = useToast()
   const [activeTab, setActiveTab] = useState<'catalog' | 'my_tickets'>('catalog')
-  const [chatIncident, setChatIncident] = useState<{ id: string; number: string; shortDescription: string; state: string } | null>(null)
+  const [chatIncident, setChatIncident] = useState<IncidentRow | null>(null)
+  const [ticketDetail, setTicketDetail] = useState<PortalTicketDetail | null>(null)
+  const [detailLoading, setDetailLoading] = useState(false)
 
-  const { requests: dbRequests, loading: requestsLoading } = useRequests(company.id)
-  const { incidents: dbIncidents, loading: incidentsLoading } = useIncidents(company.id)
+  const [detailTab, setDetailTab] = useState<'overview' | 'chat'>('overview')
+  const [showReopenModal, setShowReopenModal] = useState(false)
+  const [reopenJustification, setReopenJustification] = useState('')
+  const [submittingReopen, setSubmittingReopen] = useState(false)
+
+  // Relógio vivo para o cronômetro de SLA / tempo decorrido
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(t)
+  }, [])
+
+  useEffect(() => {
+    if (chatIncident) {
+      setDetailTab('overview')
+    }
+  }, [chatIncident?.id])
+
+  const { incidents: dbIncidents, loading, upsertIncident } = useIncidents(company.id, currentUser.id)
+
+  useEffect(() => {
+    if (!chatIncident) {
+      setTicketDetail(null)
+      return
+    }
+
+    let cancelled = false
+    setDetailLoading(true)
+    incidentsService.getPortalDetail(chatIncident.id, company.id)
+      .then(detail => { if (!cancelled) setTicketDetail(detail) })
+      .catch(error => { if (!cancelled) console.error('Falha ao carregar os detalhes do chamado.', error) })
+      .finally(() => { if (!cancelled) setDetailLoading(false) })
+
+    return () => {
+      cancelled = true
+    }
+  }, [chatIncident?.id, company.id])
+
+  useEffect(() => {
+    if (!chatIncident) return
+    const updated = dbIncidents.find(incident => incident.id === chatIncident.id)
+    if (updated) {
+      setChatIncident(updated)
+      setTicketDetail(previous => previous ? { ...previous, ...updated } : previous)
+    }
+  }, [dbIncidents, chatIncident?.id])
 
   const myRequests = useMemo(() => {
-    return dbRequests
-      .filter(r => r.requester_id === currentUser.id)
-      .map(r => ({
-        id: r.id,
-        number: r.number,
-        catalogItemName: r.catalog_item_name,
-        state: r.state,
-        createdAt: r.created_at,
-      }))
-  }, [dbRequests, currentUser.id])
+    return dbIncidents.filter(ticket => ticket.ticket_type === 'request')
+  }, [dbIncidents])
 
   const myIncidents = useMemo(() => {
-    return dbIncidents
-      .filter(i => i.caller_id === currentUser.id)
-      .map(i => ({
-        id: i.id,
-        number: i.number,
-        priority: i.priority,
-        state: i.state,
-        shortDescription: i.short_description,
-        createdAt: i.created_at,
-      }))
-  }, [dbIncidents, currentUser.id])
+    return dbIncidents.filter(ticket => ticket.ticket_type === 'incident')
+  }, [dbIncidents])
 
   const { primaryColor, accentColor, backgroundColor } = company.branding
   const brandName = company.branding.brandName || company.name
-
-  const loading = requestsLoading || incidentsLoading
 
   return (
     <div className="min-h-screen" style={{ backgroundColor, fontFamily: 'system-ui, sans-serif' }}>
@@ -647,6 +645,7 @@ function UserPortal({ currentUser, company }: { currentUser: User; company: Comp
             currentUserId={currentUser.id}
             currentUserName={currentUser.name}
             primaryColor={primaryColor}
+            onCreated={upsertIncident}
           />
         )}
 
@@ -667,15 +666,22 @@ function UserPortal({ currentUser, company }: { currentUser: User; company: Comp
                     <h2 className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-3">Minhas Requisições</h2>
                     <div className="space-y-2">
                       {myRequests.map(req => (
-                        <div key={req.id} className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 flex items-center gap-4 hover:border-slate-300 transition-all">
+                        <div
+                          key={req.id}
+                          onClick={() => setChatIncident(req)}
+                          className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 flex items-center gap-4 hover:border-sky-300 hover:shadow-md transition-all cursor-pointer"
+                        >
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
                               <span className="font-mono text-xs font-bold text-sky-600">{req.number}</span>
                               <StateBadge state={req.state} />
                             </div>
-                            <div className="text-sm font-semibold text-slate-700 mt-0.5 truncate">{req.catalogItemName}</div>
+                            <div className="text-sm font-semibold text-slate-700 mt-0.5 truncate">{req.short_description}</div>
                           </div>
-                          <div className="text-xs text-slate-400 shrink-0">{relativeTime(req.createdAt)}</div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <span className="text-xs text-slate-400">{relativeTime(req.created_at)}</span>
+                            <span className="text-[10px] font-bold text-sky-600 bg-sky-50 border border-sky-100 px-2 py-1 rounded-lg">Abrir</span>
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -688,7 +694,7 @@ function UserPortal({ currentUser, company }: { currentUser: User; company: Comp
                       {myIncidents.map(inc => (
                         <div
                           key={inc.id}
-                          onClick={() => setChatIncident({ id: inc.id, number: inc.number, shortDescription: inc.shortDescription, state: inc.state })}
+                          onClick={() => setChatIncident(inc)}
                           className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 flex items-center gap-4 hover:border-indigo-300 hover:shadow-md transition-all cursor-pointer"
                         >
                           <div className="flex-1 min-w-0">
@@ -697,10 +703,10 @@ function UserPortal({ currentUser, company }: { currentUser: User; company: Comp
                               <span className={`px-2 py-0.5 rounded-md text-[10px] uppercase tracking-wide ${priorityBadge[inc.priority]}`}>{inc.priority}</span>
                               <StateBadge state={inc.state} />
                             </div>
-                            <div className="text-sm font-semibold text-slate-700 mt-0.5 truncate">{inc.shortDescription}</div>
+                            <div className="text-sm font-semibold text-slate-700 mt-0.5 truncate">{inc.short_description}</div>
                           </div>
                           <div className="flex items-center gap-2 shrink-0">
-                            <span className="text-xs text-slate-400">{relativeTime(inc.createdAt)}</span>
+                            <span className="text-xs text-slate-400">{relativeTime(inc.created_at)}</span>
                             <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 border border-indigo-100 px-2 py-1 rounded-lg">💬 Abrir</span>
                           </div>
                         </div>
@@ -714,24 +720,251 @@ function UserPortal({ currentUser, company }: { currentUser: User; company: Comp
         )}
       </div>
 
-      {chatIncident && (
-        <Modal title={chatIncident.number} subtitle="Acompanhamento do Chamado" onClose={() => setChatIncident(null)}>
-          <div className="space-y-4">
-            <InfoBlock label="Assunto" value={chatIncident.shortDescription} />
-            <div className="flex items-center gap-2"><StateBadge state={chatIncident.state} /></div>
-            <div>
-              <div className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-1.5">Conversa com o Suporte</div>
-              <TicketChat
-                incidentId={chatIncident.id}
-                companyId={company.id}
-                senderId={currentUser.id}
-                senderName={currentUser.name}
-                locked={chatIncident.state === 'Closed'}
-              />
-            </div>
-          </div>
-        </Modal>
-      )}
+      {chatIncident && (() => {
+        const status = ticketDetail?.state ?? chatIncident.state ?? 'New'
+        const isResolved = status === 'Resolved' || status === 'Closed'
+        const openedAt = chatIncident.created_at ? new Date(chatIncident.created_at).getTime() : null
+        const frozenAt = isResolved
+          ? (ticketDetail?.resolved_at ? new Date(ticketDetail.resolved_at).getTime()
+             : ticketDetail?.closed_at ? new Date(ticketDetail.closed_at).getTime()
+             : now)
+          : now
+        const elapsedMs = openedAt !== null ? frozenAt - openedAt : null
+        const deadlineAt = ticketDetail?.sla_deadline ? new Date(ticketDetail.sla_deadline).getTime() : null
+        const remainingMs = deadlineAt !== null ? deadlineAt - frozenAt : null
+        const slaBreached = !isResolved && (Boolean(ticketDetail?.sla_breached) || (remainingMs !== null && remainingMs < 0))
+
+        const fmtDuration = (ms: number) => {
+          const abs = Math.abs(ms)
+          const s = Math.floor(abs / 1000)
+          const d = Math.floor(s / 86400)
+          const h = Math.floor((s % 86400) / 3600)
+          const m = Math.floor((s % 3600) / 60)
+          const sec = s % 60
+          if (d > 0) return `${d}d ${h}h`
+          if (h > 0) return `${h}h ${m}m`
+          if (m > 0) return `${m}m ${sec}s`
+          return `${sec}s`
+        }
+
+        return (
+          <>
+            <Modal wide title={chatIncident.number} subtitle="Detalhes do Chamado" onClose={() => { setChatIncident(null); setTicketDetail(null) }}>
+              <div className="space-y-6">
+                {/* Header com Status e SLA */}
+                <div className="flex flex-wrap items-center justify-between gap-4 p-4 rounded-2xl bg-white border border-slate-200/85 shadow-xs">
+                  <div className="space-y-1">
+                    <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Status do Chamado</div>
+                    <div className="flex items-center gap-2">
+                      <StateBadge state={ticketDetail?.state ?? chatIncident.state} />
+                      <span className="text-slate-400">·</span>
+                      <span className="text-xs text-slate-500 font-medium">Aberto em {new Date(chatIncident.created_at).toLocaleString('pt-BR')}</span>
+                    </div>
+                  </div>
+
+                  {/* Cronômetro do SLA */}
+                  {elapsedMs !== null && (
+                    <div className="text-right">
+                      <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400">SLA de Solução</div>
+                      <div className={`mt-1 inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold border transition-all ${
+                        isResolved
+                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                          : slaBreached
+                            ? 'bg-rose-50 text-rose-700 border-rose-200 animate-pulse'
+                            : 'bg-slate-50 text-slate-600 border-slate-200'
+                      }`}>
+                        <Clock className="w-3.5 h-3.5" />
+                        {isResolved
+                          ? `Encerrado em ${elapsedMs !== null ? fmtDuration(elapsedMs) : ''}`
+                          : remainingMs !== null
+                            ? (slaBreached ? `Estourado há ${fmtDuration(remainingMs)}` : `${fmtDuration(remainingMs)} restante`)
+                            : `${fmtDuration(elapsedMs ?? 0)} decorridos`}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Ações de Aceite / Reabertura se resolvido */}
+                {status === 'Resolved' && (
+                  <div className="p-4 rounded-2xl bg-amber-50/50 border border-amber-200 flex flex-wrap items-center justify-between gap-4">
+                    <div className="space-y-1">
+                      <div className="text-sm font-bold text-slate-800">O analista marcou este chamado como Resolvido</div>
+                      <p className="text-xs text-slate-600">Por favor, confirme se a solução atende às suas necessidades ou reabra o chamado se o problema persistir.</p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={async () => {
+                          if (confirm('Deseja aceitar a solução apresentada e fechar este chamado?')) {
+                            try {
+                              await incidentsService.acceptResolution(chatIncident.id, company.id, currentUser.name)
+                              toast.success('Chamado fechado com sucesso!')
+                              if (ticketDetail) {
+                                setTicketDetail({ ...ticketDetail, state: 'Closed', closed_at: new Date().toISOString() })
+                              }
+                              setChatIncident(prev => prev ? { ...prev, state: 'Closed' } : null)
+                            } catch (err: any) {
+                              toast.error(`Erro ao aceitar solução: ${err.message}`)
+                            }
+                          }
+                        }}
+                        className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-xs transition-all cursor-pointer"
+                      >
+                        Aceitar Solução
+                      </button>
+                      <button
+                        onClick={() => setShowReopenModal(true)}
+                        className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl shadow-xs transition-all cursor-pointer"
+                      >
+                        Reabrir Chamado
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Abas Internas */}
+                <div className="flex gap-2 border-b border-slate-200">
+                  <button
+                    onClick={() => setDetailTab('overview')}
+                    className={`px-4 py-2 text-xs font-bold border-b-2 transition-all cursor-pointer -mb-px ${
+                      detailTab === 'overview'
+                        ? 'border-indigo-600 text-indigo-600'
+                        : 'border-transparent text-slate-500 hover:text-slate-700'
+                    }`}
+                  >
+                    📋 Visão Geral / Solicitação
+                  </button>
+                  <button
+                    onClick={() => setDetailTab('chat')}
+                    className={`px-4 py-2 text-xs font-bold border-b-2 transition-all cursor-pointer -mb-px ${
+                      detailTab === 'chat'
+                        ? 'border-indigo-600 text-indigo-600'
+                        : 'border-transparent text-slate-500 hover:text-slate-700'
+                    }`}
+                  >
+                    💬 Acompanhamento / Chat
+                  </button>
+                </div>
+
+                {/* Aba 1: Visão Geral */}
+                {detailTab === 'overview' && (
+                  <div className="space-y-4">
+                    <div className="rounded-2xl border border-slate-200 bg-white p-5 space-y-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <InfoBlock label="Assunto" value={ticketDetail?.short_description ?? chatIncident.short_description} />
+                        <InfoBlock label="Tipo" value={(ticketDetail?.ticket_type ?? chatIncident.ticket_type) === 'request' ? 'Requisição' : 'Incidente'} />
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-3 border-t border-slate-100">
+                        <InfoBlock label="Categoria" value={ticketDetail?.catalog_category_name ?? 'Não identificada'} />
+                        <InfoBlock label="Serviço / Item" value={ticketDetail?.catalog_selection_name ?? chatIncident.short_description} />
+                      </div>
+                    </div>
+
+                    {detailLoading && (
+                      <div className="animate-pulse rounded-xl bg-slate-50 py-8 text-center text-sm text-slate-400">
+                        Carregando detalhes completos...
+                      </div>
+                    )}
+
+                    {!detailLoading && ticketDetail?.description && (
+                      <div className="rounded-2xl border border-slate-200 bg-white p-5">
+                        <InfoBlock label="Descrição informada" value={ticketDetail.description} mono />
+                      </div>
+                    )}
+
+                    {!detailLoading && ticketDetail?.form_data && Object.keys(ticketDetail.form_data as Record<string, unknown>).length > 0 && (
+                      <section className="space-y-2">
+                        <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400 px-1">Respostas do Formulário</div>
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                          {Object.entries(ticketDetail.form_data as Record<string, unknown>).map(([label, value]) => (
+                            <div key={label} className="rounded-xl border border-slate-200 bg-white p-3 shadow-xs">
+                              <InfoBlock label={label} value={formatPortalValue(value)} />
+                            </div>
+                          ))}
+                        </div>
+                      </section>
+                    )}
+                  </div>
+                )}
+
+                {/* Aba 2: Chat */}
+                {detailTab === 'chat' && (
+                  <div className="space-y-4">
+                    <TicketChat
+                      incidentId={chatIncident.id}
+                      companyId={company.id}
+                      senderId={currentUser.id}
+                      senderName={currentUser.name}
+                      actorType="user"
+                      hideInternal={true}
+                      locked={status === 'Closed'}
+                    />
+                  </div>
+                )}
+              </div>
+            </Modal>
+
+            {/* Modal de Justificativa de Reabertura */}
+            {showReopenModal && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/50 backdrop-blur-xs">
+                <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden">
+                  <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+                    <h3 className="font-extrabold text-slate-800 text-sm">Justificativa de Reabertura</h3>
+                    <button onClick={() => { setShowReopenModal(false); setReopenJustification('') }} className="p-1.5 rounded-lg hover:bg-slate-200 text-slate-400 hover:text-slate-600 transition-all cursor-pointer">
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                    </button>
+                  </div>
+                  <div className="p-6 space-y-4">
+                    <p className="text-xs text-slate-500">Por favor, descreva brevemente o motivo pelo qual você está reabrindo este chamado.</p>
+                    <textarea
+                      value={reopenJustification}
+                      onChange={e => setReopenJustification(e.target.value)}
+                      placeholder="Ex: O problema voltou a ocorrer..."
+                      rows={4}
+                      className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                  </div>
+                  <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex justify-end gap-3">
+                    <button
+                      onClick={() => { setShowReopenModal(false); setReopenJustification('') }}
+                      disabled={submittingReopen}
+                      className="px-4 py-2 border border-slate-200 hover:bg-slate-100 text-slate-600 text-xs font-bold rounded-xl transition-all cursor-pointer"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      onClick={async () => {
+                        if (!reopenJustification.trim()) {
+                          toast.error('A justificativa é obrigatória para reabrir o chamado.')
+                          return
+                        }
+                        setSubmittingReopen(true)
+                        try {
+                          await incidentsService.userReopen(chatIncident.id, company.id, reopenJustification, currentUser.id, currentUser.name)
+                          toast.success('Chamado reaberto com sucesso!')
+                          setShowReopenModal(false)
+                          setReopenJustification('')
+                          if (ticketDetail) {
+                            setTicketDetail({ ...ticketDetail, state: 'In Progress', resolved_at: null })
+                          }
+                          setChatIncident(prev => prev ? { ...prev, state: 'In Progress' } : null)
+                        } catch (err: any) {
+                          toast.error(`Erro ao reabrir chamado: ${err.message}`)
+                        } finally {
+                          setSubmittingReopen(false)
+                        }
+                      }}
+                      disabled={submittingReopen || !reopenJustification.trim()}
+                      className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-bold rounded-xl shadow-md transition-all cursor-pointer"
+                    >
+                      {submittingReopen ? 'Reabrindo...' : 'Reabrir Chamado'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </>
+        )
+      })()}
     </div>
   )
 }
@@ -827,10 +1060,321 @@ function ApiDocs() {
   )
 }
 
+// ─── ASSIGNMENT GROUPS ADMIN ──────────────────────────────────
+
+function AssignmentGroupsAdmin({ currentCompany, rawProfiles }: { currentCompany: Company; rawProfiles: ProfileRow[] }) {
+  const [groups, setGroups] = useState<AssignmentGroupRow[]>([])
+  const [loading, setLoading] = useState(true)
+  const [selectedGroup, setSelectedGroup] = useState<AssignmentGroupRow | null>(null)
+  const [members, setMembers] = useState<ProfileRow[]>([])
+  const [loadingMembers, setLoadingMembers] = useState(false)
+
+  // Form for new group
+  const [newGroupName, setNewGroupName] = useState('')
+  const [newGroupDesc, setNewGroupDesc] = useState('')
+  const [savingGroup, setSavingGroup] = useState(false)
+
+  // Select analyst to add
+  const [selectedAnalystId, setSelectedAnalystId] = useState('')
+  const [addingMember, setAddingMember] = useState(false)
+
+  // Fetch groups
+  const fetchGroups = useCallback(async () => {
+    setLoading(true)
+    try {
+      const data = await assignmentGroupsService.list(currentCompany.id)
+      setGroups(data)
+      // Se não houver grupo selecionado, seleciona o primeiro
+      if (data.length > 0 && !selectedGroup) {
+        setSelectedGroup(data[0])
+      } else if (selectedGroup) {
+        // Atualiza a referência do grupo selecionado com os dados frescos
+        const updated = data.find(g => g.id === selectedGroup.id)
+        if (updated) setSelectedGroup(updated)
+      }
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setLoading(false)
+    }
+  }, [currentCompany.id, selectedGroup])
+
+  useEffect(() => {
+    fetchGroups()
+  }, [])
+
+  // Fetch members when selectedGroup changes
+  useEffect(() => {
+    if (!selectedGroup) {
+      setMembers([])
+      return
+    }
+    let cancelled = false
+    setLoadingMembers(true)
+    assignmentGroupsService.listMembers(selectedGroup.id)
+      .then(res => {
+        if (!cancelled) setMembers(res)
+      })
+      .catch(console.error)
+      .finally(() => {
+        if (!cancelled) setLoadingMembers(false)
+      })
+    return () => { cancelled = true }
+  }, [selectedGroup?.id])
+
+  // Handle group creation
+  const handleCreateGroup = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!newGroupName.trim()) return
+    setSavingGroup(true)
+    try {
+      const newGrp = await assignmentGroupsService.create({
+        companyId: currentCompany.id,
+        name: newGroupName.trim(),
+        description: newGroupDesc.trim() || undefined
+      })
+      setNewGroupName('')
+      setNewGroupDesc('')
+      alert('Equipe solucionadora criada com sucesso!')
+
+      // We need to fetch groups first, then set selectedGroup to the new one
+      const data = await assignmentGroupsService.list(currentCompany.id)
+      setGroups(data)
+      const found = data.find(g => g.id === newGrp.id)
+      if (found) setSelectedGroup(found)
+    } catch (err: any) {
+      alert('Erro ao criar equipe: ' + err.message)
+    } finally {
+      setSavingGroup(false)
+    }
+  }
+
+  // Handle group toggle is_active
+  const handleToggleActive = async (group: AssignmentGroupRow) => {
+    try {
+      const updated = await assignmentGroupsService.update(group.id, { is_active: !group.is_active })
+      setGroups(prev => prev.map(g => g.id === group.id ? updated : g))
+      if (selectedGroup?.id === group.id) {
+        setSelectedGroup(updated)
+      }
+    } catch (err: any) {
+      alert('Erro ao atualizar status do grupo: ' + err.message)
+    }
+  }
+
+  // Handle member addition
+  const handleAddMember = async () => {
+    if (!selectedGroup || !selectedAnalystId) return
+    setAddingMember(true)
+    try {
+      await assignmentGroupsService.addMember(selectedGroup.id, selectedAnalystId)
+      const updatedMembers = await assignmentGroupsService.listMembers(selectedGroup.id)
+      setMembers(updatedMembers)
+      setSelectedAnalystId('')
+    } catch (err: any) {
+      alert('Erro ao vincular analista: ' + err.message)
+    } finally {
+      setAddingMember(false)
+    }
+  }
+
+  // Handle member removal
+  const handleRemoveMember = async (userId: string) => {
+    if (!selectedGroup) return
+    try {
+      await assignmentGroupsService.removeMember(selectedGroup.id, userId)
+      const updatedMembers = await assignmentGroupsService.listMembers(selectedGroup.id)
+      setMembers(updatedMembers)
+    } catch (err: any) {
+      alert('Erro ao desvincular analista: ' + err.message)
+    }
+  }
+
+  // Profiles of this company that are NOT currently members and not end-users
+  const companyProfiles = useMemo(() => {
+    return rawProfiles.filter(p => p.company_id === currentCompany.id && p.active && p.role !== 'end_user')
+  }, [rawProfiles, currentCompany.id])
+
+  const availableAnalysts = useMemo(() => {
+    const memberIds = new Set(members.map(m => m.id))
+    return companyProfiles.filter(p => !memberIds.has(p.id))
+  }, [companyProfiles, members])
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {/* Coluna 1: Lista de Equipes e Formulário de Criação */}
+      <div className="lg:col-span-2 space-y-6">
+        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-6 space-y-4">
+          <h3 className="text-slate-800 font-bold text-sm uppercase tracking-widest border-b border-slate-100 pb-3 flex items-center gap-2">
+            <Users className="w-4 h-4 text-indigo-600" /> Equipes Solucionadoras (Assignment Groups)
+          </h3>
+          {loading ? (
+            <div className="text-sm text-slate-400 animate-pulse text-center py-6">Carregando equipes...</div>
+          ) : groups.length === 0 ? (
+            <div className="text-sm text-slate-400 text-center py-6">Nenhuma equipe cadastrada.</div>
+          ) : (
+            <div className="divide-y divide-slate-100 overflow-y-auto max-h-[400px] space-y-1 pr-1">
+              {groups.map(g => (
+                <div
+                  key={g.id}
+                  onClick={() => setSelectedGroup(g)}
+                  className={`p-3 flex items-center justify-between gap-4 cursor-pointer transition-colors rounded-xl border ${selectedGroup?.id === g.id ? 'bg-indigo-50/50 border-indigo-200' : 'hover:bg-slate-50 border-slate-100 bg-white'}`}
+                >
+                  <div className="min-w-0">
+                    <div className="text-xs font-extrabold text-slate-800 flex items-center gap-2 flex-wrap">
+                      <span>{g.name}</span>
+                      {!g.is_active && (
+                        <span className="bg-red-50 text-red-600 border border-red-200 text-[9px] font-bold px-1.5 py-0.5 rounded">Inativo</span>
+                      )}
+                    </div>
+                    {g.description && <div className="text-[10px] text-slate-400 mt-1 truncate">{g.description}</div>}
+                  </div>
+                  <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
+                    <button
+                      onClick={() => handleToggleActive(g)}
+                      className={`text-[10px] px-2.5 py-1 rounded-md font-bold transition-all border shadow-xs cursor-pointer ${g.is_active ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100' : 'bg-red-50 text-red-700 border-red-200 hover:bg-red-100'}`}
+                    >
+                      {g.is_active ? 'Desativar' : 'Reativar'}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Cadastro de nova equipe */}
+        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-6">
+          <h3 className="text-slate-800 font-bold text-sm uppercase tracking-widest border-b border-slate-100 pb-3 mb-4 flex items-center gap-2">
+            <Plus className="w-4 h-4 text-indigo-600" /> Nova Equipe Solucionadora
+          </h3>
+          <form onSubmit={handleCreateGroup} className="space-y-4">
+            <div>
+              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Nome da Equipe</label>
+              <input
+                required
+                type="text"
+                value={newGroupName}
+                onChange={e => setNewGroupName(e.target.value)}
+                className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-xs text-slate-700 bg-white focus:ring-2 focus:ring-indigo-500 outline-none"
+                placeholder="Ex: Nível 1 - Suporte, Redes, Segurança"
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Descrição</label>
+              <textarea
+                value={newGroupDesc}
+                onChange={e => setNewGroupDesc(e.target.value)}
+                className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-xs text-slate-700 bg-white focus:ring-2 focus:ring-indigo-500 outline-none"
+                rows={2}
+                placeholder="Descrição resumida das responsabilidades do grupo..."
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={savingGroup || !newGroupName.trim()}
+              className="w-full py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs disabled:opacity-50 transition-colors cursor-pointer"
+            >
+              {savingGroup ? 'Criando...' : 'Criar Equipe'}
+            </button>
+          </form>
+        </div>
+      </div>
+
+      {/* Coluna 2: Membros da Equipe Selecionada */}
+      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-6 flex flex-col h-full min-h-[400px]">
+        {selectedGroup ? (
+          <>
+            <div className="border-b border-slate-100 pb-3 mb-4 flex items-center justify-between">
+              <div>
+                <h3 className="text-slate-800 font-bold text-sm uppercase tracking-widest">Membros de {selectedGroup.name}</h3>
+                <p className="text-[10px] text-slate-400 mt-0.5">Gerencie os analistas associados a esta equipe</p>
+              </div>
+              <Settings className="w-4 h-4 text-slate-400" />
+            </div>
+
+            {/* Vinculação de novos analistas */}
+            <div className="mb-6 bg-slate-50 border border-slate-100 rounded-xl p-3.5 space-y-3">
+              <h4 className="text-[10px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                <UserPlus className="w-3.5 h-3.5 text-indigo-600" /> Vincular Analista à Equipe
+              </h4>
+              <div className="flex gap-2">
+                <select
+                  value={selectedAnalystId}
+                  onChange={e => setSelectedAnalystId(e.target.value)}
+                  className="flex-1 border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-slate-700 bg-white focus:ring-2 focus:ring-indigo-500 outline-none"
+                >
+                  <option value="">Selecione um analista...</option>
+                  {availableAnalysts.map(p => (
+                    <option key={p.id} value={p.id}>{p.name} ({p.role})</option>
+                  ))}
+                </select>
+                <button
+                  onClick={handleAddMember}
+                  disabled={addingMember || !selectedAnalystId}
+                  className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-lg disabled:opacity-50 cursor-pointer transition-colors"
+                >
+                  {addingMember ? 'Vinculando...' : 'Vincular'}
+                </button>
+              </div>
+            </div>
+
+            {/* Lista de membros atuais */}
+            {loadingMembers ? (
+              <div className="text-xs text-slate-400 animate-pulse text-center py-6">Carregando analistas da equipe...</div>
+            ) : members.length === 0 ? (
+              <div className="text-xs text-slate-400 text-center py-8 italic bg-slate-50/50 rounded-xl border border-dashed border-slate-200">
+                Nenhum analista vinculado a esta equipe.
+              </div>
+            ) : (
+              <div className="space-y-2 overflow-y-auto max-h-[350px] pr-1">
+                {members.map(p => (
+                  <div key={p.id} className="flex items-center justify-between p-2.5 bg-slate-50 hover:bg-slate-100/50 border border-slate-100 rounded-xl text-xs transition-colors">
+                    <div className="flex items-center gap-2.5">
+                      <img src={p.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${p.name}`} className="w-6 h-6 rounded-full border border-slate-200 bg-white" alt={p.name} />
+                      <div>
+                        <div className="font-bold text-slate-800">{p.name}</div>
+                        <div className="text-[9px] text-slate-400 font-mono mt-0.5">{p.role}</div>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => handleRemoveMember(p.id)}
+                      className="text-red-600 hover:text-red-800 font-bold hover:underline cursor-pointer"
+                    >
+                      Remover
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="text-sm text-slate-400 text-center py-12 italic border border-dashed border-slate-200 rounded-2xl">
+            Selecione uma equipe na lista para gerenciar seus membros.
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ─── ADMIN DASHBOARD ──────────────────────────────────────────
 
 function AdminDashboard({ refetchAppData, currentCompany }: { refetchAppData?: () => Promise<void>; currentCompany: Company }) {
-  const [activeAdminTab, setActiveAdminTab] = useState<'tenants' | 'users' | 'catalog'>('tenants')
+  const [activeAdminTab, setActiveAdminTab] = usePersistentState<AdminTab>(
+    ADMIN_ACTIVE_TAB_STORAGE_KEY,
+    'tenants',
+    isAdminTab,
+  )
+
+  const handleAdminTabChange = (tab: AdminTab) => {
+    try {
+      localStorage.setItem(ADMIN_ACTIVE_TAB_STORAGE_KEY, JSON.stringify(tab))
+    } catch {
+      // The state change still keeps navigation working when storage is unavailable.
+    }
+    setActiveAdminTab(tab)
+  }
   
   // States for tenant onboarding
   const [tenantName, setTenantName] = useState('')
@@ -853,16 +1397,8 @@ function AdminDashboard({ refetchAppData, currentCompany }: { refetchAppData?: (
   const [usrCompanyId, setUsrCompanyId] = useState(currentCompany.id)
   const [usrSaving, setUsrSaving] = useState(false)
   
-  // States for catalog item onboarding
-  const [catName, setCatName] = useState('')
-  const [catDesc, setCatDesc] = useState('')
-  const [catCategory, setCatCategory] = useState('Equipamentos')
-  const [catCost, setCatCost] = useState(0)
-  const [catDelivery, setCatDelivery] = useState(3)
-  const [catApproval, _setCatApproval] = useState(true)
-  const [catIcon, setCatIcon] = useState('💻')
+  // Empresa-alvo do construtor de catálogo (Tree View)
   const [catCompanyId, setCatCompanyId] = useState(currentCompany.id)
-  const [catSaving, setCatSaving] = useState(false)
 
   // Fetch all companies and profiles for administration lists
   const { companies: rawCompanies, profiles: rawProfiles } = useAppData()
@@ -927,50 +1463,38 @@ function AdminDashboard({ refetchAppData, currentCompany }: { refetchAppData?: (
     }
   }
 
-  const handleSaveCatalog = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setCatSaving(true)
-    try {
-      const payload: any = {
-        name: catName,
-        description: catDesc || null,
-        category: catCategory,
-        cost: catCost || null,
-        estimated_delivery_days: catDelivery,
-        requires_approval: catApproval,
-        visible_to_roles: ['end_user', 'technician', 'company_admin'],
-        icon: catIcon,
-        company_id: catCompanyId,
-        active: true,
-        form_fields: [
-          { id: 'f1', label: 'Justificativa de Negócio', type: 'textarea', required: true }
-        ]
-      }
-      await catalogService.create(payload)
-      alert('Item do catálogo cadastrado com sucesso!')
-      setCatName('')
-      setCatDesc('')
-      setCatCost(0)
-    } catch (err: any) {
-      alert('Erro ao cadastrar item do catálogo: ' + err.message)
-    } finally {
-      setCatSaving(false)
-    }
-  }
-
   return (
     <div>
       <PageHeader title="Governança Global (Admin)" subtitle="Administração Central de Tenants, Usuários e Portais Flowfy" />
-      
-      {/* Tabs */}
-      <div className="flex gap-2 border-b border-slate-200 pb-0 mb-6">
-        {[['tenants', '🏢 Gestão de Clientes'], ['users', '👥 Usuários & RBAC'], ['catalog', '⚙️ Design de Serviços (Catálogo)']].map(([tab, label]) => (
-          <button key={tab} onClick={() => setActiveAdminTab(tab as any)}
-            className={`px-5 py-2.5 text-sm font-semibold rounded-t-xl border-b-2 transition-all cursor-pointer -mb-px ${activeAdminTab === tab ? 'border-b-2 text-slate-800 border-slate-800' : 'border-transparent text-slate-500 hover:text-slate-700 bg-transparent'}`}>
+
+      <div className="grid items-start gap-6 lg:grid-cols-[240px_minmax(0,1fr)]">
+        <aside className="sticky top-20 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+          <div className="px-3 pb-2 pt-1 text-[10px] font-bold uppercase tracking-widest text-slate-400">Governança</div>
+        {[
+          ['tenants', 'Gestão de Clientes'],
+          ['users', 'Usuários & RBAC'],
+          ['groups', 'Equipes Solucionadoras'],
+        ].map(([tab, label]) => (
+          <button key={tab} onClick={() => handleAdminTabChange(tab as AdminTab)}
+            className={`mb-1 w-full rounded-xl px-3 py-2.5 text-left text-sm font-semibold transition-all ${activeAdminTab === tab ? 'bg-slate-900 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'}`}>
             {label}
           </button>
         ))}
-      </div>
+          <div className="mx-2 my-3 border-t border-slate-100" />
+          <div className="px-3 pb-2 text-[10px] font-bold uppercase tracking-widest text-slate-400">Design de Serviços</div>
+          {[
+            ['catalog_incidents', 'Catálogo de Incidentes'],
+            ['catalog_requests', 'Catálogo de Requisições'],
+            ['form_templates', 'Biblioteca de Formulários'],
+          ].map(([tab, label]) => (
+            <button key={tab} onClick={() => handleAdminTabChange(tab as AdminTab)}
+              className={`mb-1 w-full rounded-xl px-3 py-2.5 text-left text-sm font-semibold transition-all ${activeAdminTab === tab ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-600 hover:bg-indigo-50 hover:text-indigo-700'}`}>
+              {label}
+            </button>
+          ))}
+        </aside>
+
+        <div className="min-w-0">
 
       {activeAdminTab === 'tenants' && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -1088,86 +1612,44 @@ function AdminDashboard({ refetchAppData, currentCompany }: { refetchAppData?: (
         </div>
       )}
 
-      {activeAdminTab === 'catalog' && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 bg-white border border-slate-200 rounded-2xl shadow-sm p-6 space-y-4">
-            <h3 className="text-slate-800 font-bold text-sm uppercase tracking-widest border-b border-slate-100 pb-3">Serviços Globais Publicados</h3>
-            <div className="divide-y divide-slate-100 overflow-y-auto max-h-[500px]">
-              {rawCompanies.map(c => (
-                <div key={c.id} className="pt-2">
-                  <h4 className="text-xs font-bold text-slate-400 bg-slate-50 px-3 py-1 rounded mb-2">{c.name} Catalog</h4>
-                  <CatalogList companyId={c.id} />
-                </div>
-              ))}
-            </div>
+      {activeAdminTab === 'groups' && (
+        <AssignmentGroupsAdmin currentCompany={currentCompany} rawProfiles={rawProfiles} />
+      )}
+
+      {(['catalog_incidents', 'catalog_requests', 'form_templates'] as AdminTab[]).includes(activeAdminTab) && (
+        <div className="space-y-4">
+          <div className="flex items-center gap-3 flex-wrap">
+            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Empresa</span>
+            <select value={catCompanyId} onChange={e => setCatCompanyId(e.target.value)} className="border border-slate-200 rounded-lg px-3 py-1.5 text-sm bg-white outline-none focus:ring-2 focus:ring-indigo-500">
+              {rawCompanies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+            <span className="text-xs text-slate-400">
+              {activeAdminTab === 'catalog_incidents' && 'Árvore exclusiva: Categoria › Serviço › Sintoma'}
+              {activeAdminTab === 'catalog_requests' && 'Árvore exclusiva: Categoria › Item de Requisição'}
+              {activeAdminTab === 'form_templates' && 'Formulários reutilizáveis para todas as esteiras'}
+            </span>
           </div>
-          <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-6">
-            <h3 className="text-slate-800 font-bold text-sm uppercase tracking-widest border-b border-slate-100 pb-3 mb-4">Design de Novo Serviço</h3>
-            <form onSubmit={handleSaveCatalog} className="space-y-3">
-              <div>
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Nome do Item</label>
-                <input required type="text" value={catName} onChange={e => setCatName(e.target.value)} className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-700 bg-white" placeholder="ex: iPhone 15 Pro Max" />
-              </div>
-              <div>
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Descrição do Serviço</label>
-                <textarea required value={catDesc} onChange={e => setCatDesc(e.target.value)} className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-700 bg-white" rows={2} placeholder="ex: Fornecimento de smartphone corporativo..." />
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Categoria</label>
-                  <input required type="text" value={catCategory} onChange={e => setCatCategory(e.target.value)} className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-700 bg-white" />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Custo (R$)</label>
-                  <input required type="number" value={catCost} onChange={e => setCatCost(Number(e.target.value))} className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-700 bg-white" />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">SLA Entrega (Dias)</label>
-                  <input required type="number" value={catDelivery} onChange={e => setCatDelivery(Number(e.target.value))} className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-700 bg-white" />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Ícone (Emoji)</label>
-                  <input required type="text" value={catIcon} onChange={e => setCatIcon(e.target.value)} className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-700 bg-white" />
-                </div>
-              </div>
-              <div>
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Empresa Destino</label>
-                <select value={catCompanyId} onChange={e => setCatCompanyId(e.target.value)} className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-700 bg-white">
-                  {rawCompanies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
-              </div>
-              <button type="submit" disabled={catSaving} className="w-full py-2.5 rounded-xl bg-slate-800 text-white font-bold text-xs mt-3 disabled:opacity-50">
-                {catSaving ? 'Salvando...' : 'Publish Service Item'}
-              </button>
-            </form>
-          </div>
+          <CatalogManager
+            companyId={catCompanyId}
+            section={
+              activeAdminTab === 'catalog_requests'
+                ? 'request'
+                : activeAdminTab === 'form_templates'
+                  ? 'templates'
+                  : 'incident'
+            }
+          />
         </div>
       )}
-    </div>
-  )
-}
-
-function CatalogList({ companyId }: { companyId: string }) {
-  const { items, loading } = useCatalog(companyId)
-  if (loading) return <div className="text-[10px] text-slate-400 animate-pulse px-3 py-2">Carregando catálogo...</div>
-  if (items.length === 0) return <div className="text-[10px] text-slate-300 italic px-3 py-2">Nenhum item publicado.</div>
-  return (
-    <div className="space-y-1 px-3 pb-3">
-      {items.map(item => (
-        <div key={item.id} className="text-[11px] text-slate-600 flex justify-between">
-          <span>{item.icon} {item.name}</span>
-          <span className="font-semibold text-slate-400">{item.cost ? `R$ ${item.cost}` : 'Sem custo'}</span>
         </div>
-      ))}
+      </div>
     </div>
   )
 }
 
 // ─── CIO DASHBOARD ───────────────────────────────────────────
 
-function CIODashboard({ companyId }: { companyId: string }) {
+function CIODashboard({ companyId, ticketType: _ticketType }: { companyId: string; ticketType?: 'incident' | 'request' }) {
   const [metrics, setMetrics] = useState<any>(null)
   const [loading, setLoading] = useState(true)
 
@@ -1218,24 +1700,30 @@ function CIODashboard({ companyId }: { companyId: string }) {
 
 // ─── CLIENT MANAGER DASHBOARD ────────────────────────────────
 
-function ClientManagerDashboard({ companyId }: { companyId: string }) {
-  const { requests, kpis: reqKPIs, loading: reqLoading } = useRequests(companyId)
-  const { incidents, kpis: incKPIs, loading: incLoading } = useIncidents(companyId)
+function ClientManagerDashboard({ companyId, ticketType }: { companyId: string; ticketType?: 'incident' | 'request' }) {
+  const { incidents, kpis: incKPIs, loading: incLoading } = useIncidents(companyId, undefined, ticketType)
 
-  if (reqLoading || incLoading) return <div className="text-center py-12 text-slate-400 animate-pulse">Carregando painel do cliente...</div>
+  if (incLoading) return <div className="text-center py-12 text-slate-400 animate-pulse">Carregando painel do cliente...</div>
+
+  const isReq = ticketType === 'request'
 
   return (
     <div>
-      <PageHeader title="Client Performance Panel" subtitle="Acompanhamento operacional de SLAs e consumo financeiro do catálogo da sua empresa" />
+      <PageHeader 
+        title={isReq ? "Painel de Performance de Requisições" : "Painel de Performance de Incidentes"} 
+        subtitle={isReq ? "Acompanhamento operacional de SLAs e requisições do catálogo da sua empresa" : "Acompanhamento operacional de incidentes e SLAs da sua empresa"} 
+      />
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <StatCard label="Total Chamados" value={incidents.length + requests.length} accent="bg-slate-100 text-slate-500" icon={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>} />
-        <StatCard label="Requisições Atendidas" value={reqKPIs.fulfilled} accent="bg-emerald-50 text-emerald-600" icon={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" /></svg>} />
-        <StatCard label="Custo Acumulado" value={`R$ ${reqKPIs.cost.toLocaleString('pt-BR')}`} accent="bg-sky-50 text-sky-600" icon={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>} />
+        <StatCard label="Total Chamados" value={incidents.length} accent="bg-slate-100 text-slate-500" icon={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>} />
+        <StatCard label="Em Andamento" value={incKPIs.inProgress} accent="bg-indigo-50 text-indigo-600" icon={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>} />
         <StatCard label="SLA Violado" value={incKPIs.slaBreached} accent="bg-red-50 text-red-600" icon={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>} />
+        <StatCard label="Críticos P1" value={incKPIs.critical} accent="bg-amber-50 text-amber-600" icon={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>} />
       </div>
 
       <div className="bg-white border border-slate-200 rounded-2xl p-6 overflow-hidden">
-        <h3 className="text-slate-800 font-bold text-xs uppercase tracking-widest border-b border-slate-100 pb-3 mb-4">Chamados Ativos da sua Empresa</h3>
+        <h3 className="text-slate-800 font-bold text-xs uppercase tracking-widest border-b border-slate-100 pb-3 mb-4">
+          {isReq ? "Requisições Ativas da sua Empresa" : "Incidentes Ativos da sua Empresa"}
+        </h3>
         <table className="w-full text-left text-xs">
           <thead>
             <tr className="text-slate-400 font-bold uppercase border-b border-slate-100">
@@ -1254,6 +1742,9 @@ function ClientManagerDashboard({ companyId }: { companyId: string }) {
                 <td className="py-2.5"><StateBadge state={i.state} /></td>
               </tr>
             ))}
+            {incidents.length === 0 && (
+              <tr><td colSpan={4} className="py-6 text-center text-slate-400">Nenhum chamado ativo encontrado.</td></tr>
+            )}
           </tbody>
         </table>
       </div>
@@ -1263,22 +1754,26 @@ function ClientManagerDashboard({ companyId }: { companyId: string }) {
 
 // ─── IT MANAGER DASHBOARD ────────────────────────────────────
 
-function ITManagerDashboard({ companyId }: { companyId: string }) {
-  const { kpis: incKPIs, loading: incLoading } = useIncidents(companyId)
-  const { kpis: reqKPIs, loading: reqLoading } = useRequests(companyId)
+function ITManagerDashboard({ companyId, ticketType }: { companyId: string; ticketType?: 'incident' | 'request' }) {
+  const { kpis: incKPIs, loading: incLoading } = useIncidents(companyId, undefined, ticketType)
   const { changes, kpis: chgKPIs, loading: chgLoading } = useChanges(companyId)
 
-  if (incLoading || reqLoading || chgLoading) return <div className="text-center py-12 text-slate-400 animate-pulse">Carregando painel do gerente de TI...</div>
+  if (incLoading || chgLoading) return <div className="text-center py-12 text-slate-400 animate-pulse">Carregando painel do gerente de TI...</div>
+
+  const isReq = ticketType === 'request'
 
   return (
     <div>
-      <PageHeader title="IT Operations Manager Panel" subtitle="Acompanhamento geral de SLAs operacionais, produtividade analistas e aprovações CAB" />
+      <PageHeader 
+        title={isReq ? "IT Operations Manager Panel - Requisições" : "IT Operations Manager Panel - Incidentes"} 
+        subtitle={isReq ? "Acompanhamento geral de SLAs operacionais e requisições" : "Acompanhamento geral de SLAs operacionais e incidentes"} 
+      />
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <StatCard label="Aprovação CAB" value={chgKPIs.awaitingCAB} accent="bg-amber-50 text-amber-600" icon={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" /></svg>} />
         <StatCard label="Mudanças Agendadas" value={chgKPIs.scheduled} accent="bg-sky-50 text-sky-600" icon={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>} />
-        <StatCard label="SLA Violado (Incidentes)" value={incKPIs.slaBreached} accent="bg-red-50 text-red-600" icon={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>} />
-        <StatCard label="Custo Geral Catálogo" value={`R$ ${reqKPIs.cost.toLocaleString('pt-BR')}`} accent="bg-emerald-50 text-emerald-600" icon={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>} />
+        <StatCard label={isReq ? "SLA Violado (Requisições)" : "SLA Violado (Incidentes)"} value={incKPIs.slaBreached} accent="bg-red-50 text-red-600" icon={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>} />
+        <StatCard label="Em Atendimento" value={incKPIs.inProgress} accent="bg-emerald-50 text-emerald-600" icon={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -1304,12 +1799,12 @@ function ITManagerDashboard({ companyId }: { companyId: string }) {
           <h3 className="text-slate-800 font-bold text-xs uppercase tracking-widest border-b border-slate-100 pb-3 mb-4">SLAs Operacionais Gerais</h3>
           <div className="space-y-3 text-xs">
             <div className="flex justify-between items-center bg-slate-50 p-2.5 rounded-xl">
-              <span>Incidentes P1 (Críticos) Ativos:</span>
+              <span>{isReq ? "Requisições P1 Críticas Ativas:" : "Incidentes P1 Críticos Ativos:"}</span>
               <span className="font-bold text-red-600">{incKPIs.critical}</span>
             </div>
             <div className="flex justify-between items-center bg-slate-50 p-2.5 rounded-xl">
-              <span>Média SLAs de Requisição Atendidos:</span>
-              <span className="font-bold text-emerald-600">97.8%</span>
+              <span>{isReq ? "Total Requisições em Andamento:" : "Total Incidentes em Andamento:"}</span>
+              <span className="font-bold text-emerald-600">{incKPIs.inProgress}</span>
             </div>
           </div>
         </div>
@@ -1320,8 +1815,8 @@ function ITManagerDashboard({ companyId }: { companyId: string }) {
 
 // ─── AREA MANAGER DASHBOARD ──────────────────────────────────
 
-function AreaManagerDashboard({ companyId }: { companyId: string }) {
-  const { incidents, loading: incLoading } = useIncidents(companyId)
+function AreaManagerDashboard({ companyId, ticketType }: { companyId: string; ticketType?: 'incident' | 'request' }) {
+  const { incidents, loading: incLoading } = useIncidents(companyId, undefined, ticketType)
   const [selectedTower, setSelectedTower] = useState<'Infrastructure' | 'Database'>('Infrastructure')
 
   const filteredIncidents = useMemo(() => {
@@ -1338,7 +1833,10 @@ function AreaManagerDashboard({ companyId }: { companyId: string }) {
 
   return (
     <div>
-      <PageHeader title="Area / Technical Tower Manager Panel" subtitle="Fila de incidentes e SLAs específicos por torre operacional (Infra vs Sistemas)" />
+      <PageHeader 
+        title={ticketType === 'request' ? "Area / Technical Tower Manager Panel - Requisições" : "Area / Technical Tower Manager Panel - Incidentes"} 
+        subtitle={ticketType === 'request' ? "Fila de requisições e SLAs específicos por torre operacional (Infra vs Sistemas)" : "Fila de incidentes e SLAs específicos por torre operacional (Infra vs Sistemas)"} 
+      />
       
       {/* Tower Toggle Buttons */}
       <div className="flex gap-2 mb-6">
@@ -1351,13 +1849,15 @@ function AreaManagerDashboard({ companyId }: { companyId: string }) {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <StatCard label="Incidentes Ativos Torre" value={filteredIncidents.length} accent="bg-slate-100 text-slate-600" icon={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>} />
+        <StatCard label="Chamados Ativos Torre" value={filteredIncidents.length} accent="bg-slate-100 text-slate-600" icon={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>} />
         <StatCard label="SLA Violado Torre" value={filteredIncidents.filter(i => i.sla_breached).length} accent="bg-red-50 text-red-600" icon={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>} />
         <StatCard label="Chamados Sem Analista" value={filteredIncidents.filter(i => !i.assigned_to_id).length} accent="bg-amber-50 text-amber-600" icon={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>} />
       </div>
 
       <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-6 overflow-hidden">
-        <h3 className="text-slate-800 font-bold text-xs uppercase tracking-widest border-b border-slate-100 pb-3 mb-4">Incidentes Ativos na Torre</h3>
+        <h3 className="text-slate-800 font-bold text-xs uppercase tracking-widest border-b border-slate-100 pb-3 mb-4">
+          {ticketType === 'request' ? "Requisições Ativas na Torre" : "Incidentes Ativos na Torre"}
+        </h3>
         <table className="w-full text-left text-xs">
           <thead>
             <tr className="text-slate-400 font-bold uppercase border-b border-slate-100">
@@ -1390,8 +1890,8 @@ function AreaManagerDashboard({ companyId }: { companyId: string }) {
 
 // ─── TECHNICIAN DASHBOARD ────────────────────────────────────
 
-function TechnicianDashboard({ companyId, currentUser }: { companyId: string; currentUser: User }) {
-  const { incidents, loading, refetch } = useIncidents(companyId)
+function TechnicianDashboard({ companyId, currentUser, ticketType }: { companyId: string; currentUser: User; ticketType?: 'incident' | 'request' }) {
+  const { incidents, loading, refetch } = useIncidents(companyId, undefined, ticketType)
   
   const handleAssignToMe = async (incId: string) => {
     try {
@@ -1417,9 +1917,12 @@ function TechnicianDashboard({ companyId, currentUser }: { companyId: string; cu
 
   return (
     <div>
-      <PageHeader title="Fila Operacional Analista" subtitle="Atendimento diário, triagem e execução de chamados técnicos" />
+      <PageHeader 
+        title={ticketType === 'request' ? "Fila Operacional Analista - Requisições" : "Fila Operacional Analista - Incidentes"} 
+        subtitle={ticketType === 'request' ? "Atendimento diário, triagem e execução de requisições do catálogo" : "Atendimento diário, triagem e execução de incidentes técnicos"} 
+      />
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <StatCard label="Total Incidentes" value={incidents.length} accent="bg-slate-100 text-slate-600" icon={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>} />
+        <StatCard label={ticketType === 'request' ? "Total Requisições" : "Total Incidentes"} value={incidents.length} accent="bg-slate-100 text-slate-600" icon={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>} />
         <StatCard label="Meus Chamados Atribuídos" value={incidents.filter(i => i.assigned_to_id === currentUser.id).length} accent="bg-blue-50 text-blue-600" icon={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>} />
         <StatCard label="Aguardando Triagem" value={incidents.filter(i => !i.assigned_to_id).length} accent="bg-amber-50 text-amber-600" icon={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>} />
       </div>
@@ -1481,18 +1984,33 @@ export default function App() {
   const currentUser = useMemo(() => (profile ? mapUser(profile) : null), [profile])
   const currentCompany = useMemo(() => (authCompany ? mapCompany(authCompany) : null), [authCompany])
 
-  const [activeView, setActiveView] = useState<AppView>('dashboard_incidents')
+  // View ativa e papel simulado PERSISTIDOS (imunes a reload/Tab Discarding).
+  const [activeView, setActiveView] = usePersistentState<AppView>(
+    ACTIVE_VIEW_STORAGE_KEY,
+    'dashboard_incidents',
+    isPersistedAppView,
+  )
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
-  const [simulatedRole, setSimulatedRole] = useState<Role | null>(null)
+  const [simulatedRole, setSimulatedRole] = usePersistentState<Role | null>('flowfy_sim_role', null)
 
   const activeRole = simulatedRole || (currentUser ? currentUser.role : 'end_user')
 
-  // Define a view inicial assim que o perfil autenticado é carregado.
-  useEffect(() => {
-    if (profile) {
-      setActiveView(profile.role === 'end_user' ? 'user_portal' : 'dashboard_incidents')
+  const handleViewChange = (view: AppView) => {
+    try {
+      localStorage.setItem(ACTIVE_VIEW_STORAGE_KEY, JSON.stringify(view))
+    } catch {
+      // The state change still keeps navigation working when storage is unavailable.
     }
-  }, [profile])
+    setActiveView(view)
+  }
+
+  // Usuário final SEMPRE no portal. Para staff, NÃO sobrescreve a view
+  // persistida (mantém o admin na mesma tela após um reload forçado).
+  useEffect(() => {
+    if (profile?.role === 'end_user') {
+      setActiveView('user_portal')
+    }
+  }, [profile, setActiveView])
 
   const handleLogout = async () => {
     setSimulatedRole(null)
@@ -1620,10 +2138,8 @@ export default function App() {
     navItems.push({ view: 'admin_dashboard', label: 'Governança Admin', icon: <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0m-5 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" /></svg> })
   }
 
-  // O Workspace (abas internas) substitui MspProviderPortal/IncidentDashboard.
-  // Ocupa a altura total do <main> (sem o wrapper limitado/padding).
   const customDashRoles: Role[] = ['cio', 'client_manager', 'it_manager', 'area_manager', 'technician']
-  const showWorkspace = activeView === 'dashboard_incidents' && (isProvider || !customDashRoles.includes(activeRole))
+  const showWorkspace = (activeView === 'dashboard_incidents' || activeView === 'dashboard_requests') && (isProvider || !customDashRoles.includes(activeRole))
 
   const renderActiveDashboard = () => {
     if (activeView === 'admin_dashboard' && activeRole === 'sysadmin') {
@@ -1631,27 +2147,27 @@ export default function App() {
     }
     
     // Customize layout if viewing the default dashboard view based on active role
-    if (activeView === 'dashboard_incidents') {
+    if (activeView === 'dashboard_incidents' || activeView === 'dashboard_requests') {
+      const ticketType = activeView === 'dashboard_incidents' ? 'incident' : 'request'
       if (isProvider) {
-        return <WorkspaceLayout companyId={currentCompany.id} isProvider companies={companies} />
+        return <WorkspaceLayout companyId={currentCompany.id} isProvider companies={companies} ticketType={ticketType} />
       }
       switch (activeRole) {
         case 'cio':
-          return <CIODashboard companyId={currentCompany.id} />
+          return <CIODashboard companyId={currentCompany.id} ticketType={ticketType} />
         case 'client_manager':
-          return <ClientManagerDashboard companyId={currentCompany.id} />
+          return <ClientManagerDashboard companyId={currentCompany.id} ticketType={ticketType} />
         case 'it_manager':
-          return <ITManagerDashboard companyId={currentCompany.id} />
+          return <ITManagerDashboard companyId={currentCompany.id} ticketType={ticketType} />
         case 'area_manager':
-          return <AreaManagerDashboard companyId={currentCompany.id} />
+          return <AreaManagerDashboard companyId={currentCompany.id} ticketType={ticketType} />
         case 'technician':
-          return <TechnicianDashboard companyId={currentCompany.id} currentUser={currentUser} />
+          return <TechnicianDashboard companyId={currentCompany.id} currentUser={currentUser} ticketType={ticketType} />
         default:
-          return <WorkspaceLayout companyId={currentCompany.id} isProvider={isProvider} companies={companies} />
+          return <WorkspaceLayout companyId={currentCompany.id} isProvider={isProvider} companies={companies} ticketType={ticketType} />
       }
     }
 
-    if (activeView === 'dashboard_requests') return <RequestDashboard companyId={currentCompany.id} />
     if (activeView === 'dashboard_problems') return <ProblemDashboard companyId={currentCompany.id} />
     if (activeView === 'dashboard_changes') return <ChangeDashboard companyId={currentCompany.id} />
     if (activeView === 'api_docs') return <ApiDocs />
@@ -1761,7 +2277,7 @@ export default function App() {
           <div className="px-3 space-y-0.5">
             <div className="text-[9px] text-slate-400 font-bold uppercase tracking-widest px-3 py-2">Módulos ITIL v4</div>
             {navItems.slice(0, 4).map(item => (
-              <button key={item.view} onClick={() => setActiveView(item.view)}
+              <button key={item.view} onClick={() => handleViewChange(item.view)}
                 className={`w-full text-left flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all cursor-pointer ${activeView === item.view ? 'bg-slate-800 text-white shadow-sm' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100'}`}>
                 <span className={activeView === item.view ? 'text-emerald-400' : 'text-slate-400'}>{item.icon}</span>
                 {item.label}
@@ -1771,7 +2287,7 @@ export default function App() {
           <div className="px-3 space-y-0.5 mt-4 pt-4 border-t border-slate-100">
             <div className="text-[9px] text-slate-400 font-bold uppercase tracking-widest px-3 py-2">Acesso</div>
             {navItems.slice(4).map(item => (
-              <button key={item.view} onClick={() => setActiveView(item.view)}
+              <button key={item.view} onClick={() => handleViewChange(item.view)}
                 className={`w-full text-left flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all cursor-pointer ${activeView === item.view ? 'bg-slate-800 text-white shadow-sm' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100'}`}>
                 <span className={activeView === item.view ? 'text-emerald-400' : 'text-slate-400'}>{item.icon}</span>
                 {item.label}

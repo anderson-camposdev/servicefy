@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Palette, Image as ImageIcon, LayoutGrid, Save } from 'lucide-react'
+import { Palette, Image as ImageIcon, LayoutGrid, Save, ShoppingCart, FileText } from 'lucide-react'
 import { useTenant } from '../tenant'
 import { useAuth } from '../auth'
 import { companiesService } from '../lib/services'
@@ -92,8 +92,14 @@ const AdminPortalSettings = () => {
           <button onClick={() => setActiveTab('branding')} className={`flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-semibold transition-all ${activeTab === 'branding' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}>
             <Palette className="w-4 h-4" /> Identidade Visual (White-Label)
           </button>
-          <button onClick={() => setActiveTab('catalog')} className={`flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-semibold transition-all ${activeTab === 'catalog' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}>
-            <LayoutGrid className="w-4 h-4" /> Catálogo de Serviços
+          <button onClick={() => setActiveTab('catalog_incidents')} className={`flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-semibold transition-all ${activeTab === 'catalog_incidents' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}>
+            <LayoutGrid className="w-4 h-4" /> Catálogo de Incidentes
+          </button>
+          <button onClick={() => setActiveTab('catalog_requests')} className={`flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-semibold transition-all ${activeTab === 'catalog_requests' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}>
+            <ShoppingCart className="w-4 h-4" /> Catálogo de Requisições
+          </button>
+          <button onClick={() => setActiveTab('form_templates')} className={`flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-semibold transition-all ${activeTab === 'form_templates' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}>
+            <FileText className="w-4 h-4" /> Formulários
           </button>
         </div>
 
@@ -160,9 +166,12 @@ const AdminPortalSettings = () => {
         )}
 
         {/* ABA: CATÁLOGO (CRUD real) */}
-        {activeTab === 'catalog' && (
+        {['catalog_incidents', 'catalog_requests', 'form_templates'].includes(activeTab) && (
           companyId
-            ? <CatalogManager companyId={companyId} />
+            ? <CatalogManager
+                companyId={companyId}
+                section={activeTab === 'catalog_requests' ? 'request' : activeTab === 'form_templates' ? 'templates' : 'incident'}
+              />
             : <div className="bg-white border border-slate-200 rounded-2xl p-8 text-center text-sm text-slate-400">Faça login como admin para gerenciar o catálogo.</div>
         )}
 

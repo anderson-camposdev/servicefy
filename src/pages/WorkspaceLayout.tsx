@@ -25,9 +25,10 @@ interface WorkspaceLayoutProps {
   companyId?: string
   isProvider?: boolean
   companies?: CompanyLite[]
+  ticketType?: 'incident' | 'request'
 }
 
-const WorkspaceLayout = ({ companyId, isProvider, companies }: WorkspaceLayoutProps) => {
+const WorkspaceLayout = ({ companyId, isProvider, companies, ticketType }: WorkspaceLayoutProps) => {
   const [tabs, setTabs] = useState<WorkspaceTab[]>([{ id: ROOT_ID, title: 'Gestão de Tickets' }])
   const [activeId, setActiveId] = useState<string>(ROOT_ID)
 
@@ -82,6 +83,7 @@ const WorkspaceLayout = ({ companyId, isProvider, companies }: WorkspaceLayoutPr
             companyId={companyId}
             isProvider={isProvider}
             companies={companies}
+            ticketType={ticketType}
           />
         </div>
         {tabs.filter(t => t.id !== ROOT_ID).map(tab => (

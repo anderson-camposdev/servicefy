@@ -1,27 +1,31 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import {
-  User, Building2, AlertTriangle, Clock, Tag, Users, Send, Paperclip,
-  BookOpen, CheckCircle, History, FileText, ListTree, Link2, Lock, Pause, Timer,
+  User, Building2, AlertTriangle, Tag, Users, Send,
+  BookOpen, CheckCircle, History, FileText, ListTree, Link2, Lock, Pause, Timer, Edit3,
 } from 'lucide-react'
-import { incidentsService, messagesService } from '../lib/services'
+import { incidentsService, messagesService, assignmentGroupsService } from '../lib/services'
+import { translateState, STATE_LABELS_PT, PENDING_REASONS } from '../lib/statusLabels'
 import { useAuth } from '../auth'
-import type { IncidentRow, IncidentHistoryRow, TicketMessageRow } from '../lib/database.types'
+import { useToast } from '../context'
+import type { IncidentRow, IncidentHistoryRow, TicketMessageRow, AssignmentGroupRow, ProfileRow } from '../lib/database.types'
 import type { WorkspaceTicket } from './workspace.types'
 
 /**
  * Cockpit do Analista — Single-Pane sob abas de contexto, com ciclo de
- * comunicação real (ticket_messages + Supabase Realtime), Assumir e
+ * comunicação real (ticket_messages + Supabase Realtime), início de atendimento e
  * Encerramento padrão ServiceNow (close_code/close_notes).
  */
 const FALLBACK_TICKET: WorkspaceTicket = {
-  id: 'INC-08722',
-  title: 'Sistema ERP Lento no Faturamento',
-  status: 'Em Atendimento',
-  priority: 'Alta',
-  requester: 'Adrianne Colombo',
+  id: 'INC0010003',
+  title: 'VPN lenta apos atualizacao',
+  status: 'New',
+  priority: 'P3 - Moderate',
+  requester: 'Juliana Costa',
   department: 'Financeiro',
-  client: 'Grupo Wish',
+  client: 'Acme Corp',
   date: '10 min atrás',
+  incidentId: 'c09d0ba8-971c-4544-8617-4aa0b2ed4174',
+  companyId: '11111111-1111-1111-1111-111111111111',
 }
 
 type IncidentDetail = IncidentRow & { history: IncidentHistoryRow[] }
@@ -29,6 +33,21 @@ type ContextTab = 'detalhes' | 'historico' | 'subchamados' | 'relacionamentos'
 
 const fmt = (iso: string) => {
   try { return new Date(iso).toLocaleString('pt-BR') } catch { return iso }
+}
+
+const formatFormValue = (value: unknown) => {
+  if (Array.isArray(value)) return value.join(', ')
+  if (typeof value === 'boolean') return value ? 'Sim' : 'Não'
+  if (value && typeof value === 'object') return JSON.stringify(value)
+  return String(value ?? '—')
+}
+
+const isOpeningHistory = (fieldName: string) => ['Criação', 'Abertura', 'created'].includes(fieldName)
+const historyTypeLabel = (fieldName: string) => {
+  if (isOpeningHistory(fieldName)) return 'Criação'
+  if (fieldName === 'comment') return 'Comentário'
+  if (fieldName === 'Início de Atendimento') return 'Atendimento'
+  return 'Alteração'
 }
 
 // Duração legível (cronômetro de SLA / tempo decorrido)
@@ -45,9 +64,7 @@ const fmtDuration = (ms: number) => {
   return `${sec}s`
 }
 
-// Estados OPERACIONAIS no select rápido. O encerramento (Resolved/Closed)
-// é governado pela seção de Resolução, que exige close_code + close_notes.
-const STATE_OPTIONS = ['New', 'In Progress', 'On Hold', 'Pending User']
+
 
 const CONTEXT_TABS: { id: ContextTab; label: string; icon: React.ReactNode }[] = [
   { id: 'detalhes', label: 'Detalhes', icon: <FileText className="w-4 h-4" /> },
@@ -115,9 +132,48 @@ function EmptyContext({ icon, title, desc }: { icon: React.ReactNode; title: str
   )
 }
 
+function calculatePriority(impact: string, urgency: string): 'P1 - Critical' | 'P2 - High' | 'P3 - Moderate' | 'P4 - Low' {
+  if (impact === 'Critical') {
+    return (urgency === 'High' || urgency === 'Medium') ? 'P1 - Critical' : 'P2 - High'
+  }
+  if (impact === 'High') {
+    if (urgency === 'High') return 'P1 - Critical'
+    if (urgency === 'Medium') return 'P2 - High'
+    return 'P3 - Moderate'
+  }
+  if (impact === 'Medium') {
+    if (urgency === 'High') return 'P2 - High'
+    if (urgency === 'Medium') return 'P3 - Moderate'
+    return 'P4 - Low'
+  }
+  if (impact === 'Low') {
+    if (urgency === 'High') return 'P3 - Moderate'
+    return 'P4 - Low'
+  }
+  return 'P3 - Moderate'
+}
+
+const translateImpact = (val: string | null | undefined) => {
+  if (val === 'Low') return 'Apenas eu (Low)'
+  if (val === 'Medium') return 'Meu departamento (Medium)'
+  if (val === 'High') return 'Toda a empresa (High)'
+  if (val === 'Critical') return 'O negócio / Clientes (Critical)'
+  return val || '—'
+}
+
+const translateUrgency = (val: string | null | undefined) => {
+  if (val === 'Low') return 'Consigo trabalhar, mas incomoda (Low)'
+  if (val === 'Medium') return 'Uma tarefa importante está parada (Medium)'
+  if (val === 'High') return 'Estou totalmente travado (High)'
+  return val || '—'
+}
+
 const AnalystCockpit = ({ ticket = FALLBACK_TICKET }: { ticket?: WorkspaceTicket }) => {
   const { profile } = useAuth()
+  const { toast } = useToast()
   const realMode = Boolean(ticket.incidentId && ticket.companyId)
+  // God Mode: admin/sysadmin têm passe livre nas travas de governança.
+  const isAdmin = Boolean(profile && ['sysadmin', 'company_admin', 'admin'].includes(profile.role))
 
   const [detail, setDetail] = useState<IncidentDetail | null>(null)
   const [loading, setLoading] = useState(false)
@@ -126,8 +182,6 @@ const AnalystCockpit = ({ ticket = FALLBACK_TICKET }: { ticket?: WorkspaceTicket
 
   // Chat / mensagens
   const [messages, setMessages] = useState<TicketMessageRow[]>([])
-  const [msgText, setMsgText] = useState('')
-  const [sending, setSending] = useState(false)
 
   // Ações de estado
   const [stateOverride, setStateOverride] = useState<string | null>(null)
@@ -135,9 +189,25 @@ const AnalystCockpit = ({ ticket = FALLBACK_TICKET }: { ticket?: WorkspaceTicket
   const [closeCode, setCloseCode] = useState('')
   const [closeNotes, setCloseNotes] = useState('')
   const [timeSpent, setTimeSpent] = useState('')
-  const [resolving, setResolving] = useState(false)
-  const [changingState, setChangingState] = useState(false)
   const [actionMsg, setActionMsg] = useState<string | null>(null)
+
+  // Assignment groups & members states
+  const [activeGroups, setActiveGroups] = useState<AssignmentGroupRow[]>([])
+  const [groupMembers, setGroupMembers] = useState<ProfileRow[]>([])
+  const [loadingGroups, setLoadingGroups] = useState(false)
+
+  // Form states for 'Condução do Chamado'
+  const [formComment, setFormComment] = useState('')
+  const [isInternal, setIsInternal] = useState(false)
+  const [formState, setFormState] = useState('')
+  const [formGroupId, setFormGroupId] = useState('')
+  const [formAssigneeId, setFormAssigneeId] = useState('')
+  const [formImpact, setFormImpact] = useState('Low')
+  const [formUrgency, setFormUrgency] = useState('Low')
+  const [formPendingReason, setFormPendingReason] = useState('')
+  const [savingConducao, setSavingConducao] = useState(false)
+  const [isEditing, setIsEditing] = useState(false)
+
   // Status atual acessível dentro de callbacks do Realtime (sempre fresco).
   const statusRef = useRef<string>('')
 
@@ -160,6 +230,61 @@ const AnalystCockpit = ({ ticket = FALLBACK_TICKET }: { ticket?: WorkspaceTicket
     return () => { cancelled = true }
   }, [ticket.incidentId, ticket.companyId])
 
+  // Sync form states when detail loads
+  useEffect(() => {
+    if (detail) {
+      setFormState(detail.state || '')
+      setFormGroupId(detail.assignment_group_id || detail.assigned_group_id || '')
+      setFormAssigneeId(detail.assigned_to_id || '')
+      setFormImpact(detail.impact || 'Low')
+      setFormUrgency(detail.urgency || 'Low')
+      setFormPendingReason(detail.pending_reason || '')
+      setIsEditing(false)
+    }
+  }, [detail])
+
+  // Sync form state when stateOverride changes
+  useEffect(() => {
+    if (stateOverride) {
+      setFormState(stateOverride)
+    }
+  }, [stateOverride])
+
+  // Load active assignment groups for this company
+  useEffect(() => {
+    const cid = detail?.company_id || ticket.companyId
+    if (!cid) {
+      setActiveGroups([])
+      return
+    }
+    let cancelled = false
+    setLoadingGroups(true)
+    assignmentGroupsService.listActive(cid)
+      .then(res => {
+        if (!cancelled) setActiveGroups(res)
+      })
+      .catch(console.error)
+      .finally(() => {
+        if (!cancelled) setLoadingGroups(false)
+      })
+    return () => { cancelled = true }
+  }, [detail?.company_id, ticket.companyId])
+
+  // Load group members when formGroupId changes
+  useEffect(() => {
+    if (!formGroupId) {
+      setGroupMembers([])
+      return
+    }
+    let cancelled = false
+    assignmentGroupsService.listMembers(formGroupId)
+      .then(res => {
+        if (!cancelled) setGroupMembers(res)
+      })
+      .catch(console.error)
+    return () => { cancelled = true }
+  }, [formGroupId])
+
   // Carrega mensagens + assina Realtime
   useEffect(() => {
     if (!ticket.incidentId) { setMessages(MOCK_MESSAGES); return }
@@ -180,80 +305,213 @@ const AnalystCockpit = ({ ticket = FALLBACK_TICKET }: { ticket?: WorkspaceTicket
     return () => { cancelled = true; channel.unsubscribe() }
   }, [ticket.incidentId])
 
-  const sendMessage = useCallback(async (isInternal: boolean) => {
-    if (!msgText.trim() || !ticket.incidentId || !ticket.companyId) return
-    setSending(true)
+  const refreshIncident = useCallback(async () => {
+    if (!ticket.incidentId || !ticket.companyId) return
     try {
-      await messagesService.send({
-        incidentId: ticket.incidentId,
-        companyId: ticket.companyId,
-        body: msgText.trim(),
-        isInternal,
-        senderId: profile?.id ?? null,
-        senderName: profile?.name ?? 'Analista',
-        actorType: 'analyst',
-      })
-      // Gravação soberana: a mensagem aparece na timeline via Realtime.
-      setMsgText('')
+      const data = await incidentsService.getById(ticket.incidentId, ticket.companyId)
+      setDetail(data)
     } catch (e) {
-      setActionMsg(e instanceof Error ? e.message : 'Falha ao enviar.')
-    } finally {
-      setSending(false)
+      console.error('Falha ao recarregar chamado:', e)
     }
-  }, [msgText, ticket.incidentId, ticket.companyId, profile])
+  }, [ticket.incidentId, ticket.companyId])
 
-  const handleAssumir = useCallback(async () => {
+  const refreshMessages = useCallback(async () => {
+    if (!ticket.incidentId) return
+    try {
+      const rows = await messagesService.list(ticket.incidentId)
+      setMessages(rows)
+    } catch (e) {
+      console.error('Falha ao recarregar mensagens:', e)
+    }
+  }, [ticket.incidentId])
+
+  // Assina Realtime para incident_history
+  useEffect(() => {
+    if (!ticket.incidentId || !ticket.companyId) return
+    const channel = incidentsService.subscribeToHistory(ticket.incidentId, ticket.companyId, (row) => {
+      setDetail(prev => {
+        if (!prev) return null
+        // Se a linha já existe no histórico local, não duplica
+        if (prev.history.some(h => h.id === row.id)) return prev
+        const newHistory = [row, ...prev.history].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+        return { ...prev, history: newHistory }
+      })
+    })
+    return () => { channel.unsubscribe() }
+  }, [ticket.incidentId, ticket.companyId])
+
+  const handleStartService = useCallback(async () => {
     if (!ticket.incidentId || !ticket.companyId || !profile) return
     setAssigning(true); setActionMsg(null)
     try {
-      await incidentsService.assign(ticket.incidentId, ticket.companyId, profile.id, profile.name)
+      const updated = await incidentsService.startService(ticket.incidentId, ticket.companyId)
+      setDetail(current => current ? { ...current, ...updated } : current)
       setStateOverride('In Progress')
-      setActionMsg('Você assumiu o chamado.')
+      setFormState('In Progress')
+      setFormAssigneeId(updated.assigned_to_id || profile.id)
+      setFormGroupId(updated.assignment_group_id || updated.assigned_group_id || '')
+      const msg = 'Atendimento iniciado e SLA de resposta registrado.'
+      setActionMsg(msg)
+      toast.success(msg)
+      refreshIncident()
+      refreshMessages()
     } catch (e) {
-      setActionMsg(e instanceof Error ? e.message : 'Falha ao assumir.')
+      const errMsg = e instanceof Error ? e.message : 'Falha ao iniciar atendimento.'
+      setActionMsg(errMsg)
+      toast.error(`Erro ao iniciar atendimento: ${errMsg}`)
     } finally {
       setAssigning(false)
     }
-  }, [ticket.incidentId, ticket.companyId, profile])
+  }, [ticket.incidentId, ticket.companyId, profile, toast, refreshIncident, refreshMessages])
 
-  const handleResolve = useCallback(async () => {
-    if (!ticket.incidentId || !ticket.companyId) return
-    // Trava de governança ServiceNow: código + notas obrigatórios.
-    if (!closeCode || !closeNotes.trim()) {
-      setActionMsg('Para resolver, selecione o Código de Encerramento e preencha as Notas de Resolução.')
+  const openEditForm = useCallback(() => {
+    if (detail) {
+      setFormState(detail.state || '')
+      setFormGroupId(detail.assignment_group_id || detail.assigned_group_id || '')
+      setFormAssigneeId(detail.assigned_to_id || '')
+      setFormImpact(detail.impact || 'Low')
+      setFormUrgency(detail.urgency || 'Low')
+      setFormPendingReason(detail.pending_reason || '')
+      setFormComment('')
+      setCloseCode(detail.close_code || '')
+      setCloseNotes(detail.close_notes || '')
+    }
+    setError(null)
+    setActionMsg(null)
+    setIsEditing(true)
+    setActiveContext('detalhes')
+  }, [detail])
+
+
+  // Atalho "Pendente": abre o formulário de condução já com o estado
+  // preenchido (Pendente exige Motivo + justificativa obrigatórios).
+  const openPendingForm = useCallback(() => {
+    setFormState('On Hold')
+    setIsEditing(true)
+    setActiveContext('detalhes')
+  }, [])
+
+  const handleGravarConducao = useCallback(async () => {
+    const cid = detail?.company_id || ticket.companyId
+    if (!ticket.incidentId || !cid) return
+
+    // Validations
+    if (!isAdmin && formState === 'Resolved' && (!closeCode || !closeNotes.trim())) {
+      const msg = 'Para resolver o chamado, preencha o Código de Encerramento e Notas de Resolução.'
+      setError(msg)
+      toast.error(msg)
       return
     }
-    setResolving(true); setActionMsg(null)
-    try {
-      const notes = timeSpent ? `${closeNotes}\n\n[Tempo gasto: ${timeSpent}]` : closeNotes
-      await incidentsService.resolve(ticket.incidentId, ticket.companyId, closeCode, notes, profile?.name ?? 'Analista')
-      setStateOverride('Resolved')
-      setActionMsg('Chamado resolvido.')
-    } catch (e) {
-      setActionMsg(e instanceof Error ? e.message : 'Falha ao resolver.')
-    } finally {
-      setResolving(false)
-    }
-  }, [ticket.incidentId, ticket.companyId, closeCode, closeNotes, timeSpent, profile])
 
-  const changeState = useCallback(async (newState: string) => {
-    if (!ticket.incidentId || !ticket.companyId || !profile) return
-    // Governança: encerrar exige passar pela seção de Resolução (close code).
-    if (newState === 'Resolved' || newState === 'Closed') {
-      setActionMsg('Para encerrar, use a seção "Resolução" e informe o Código de Encerramento + Notas.')
+    if (!isAdmin && formState === 'Closed' && !detail?.close_code && (!closeCode || !closeNotes.trim())) {
+      const msg = 'Para fechar o chamado, preencha o Código de Encerramento e Notas de Resolução.'
+      setError(msg)
+      toast.error(msg)
       return
     }
-    setChangingState(true); setActionMsg(null)
-    try {
-      await incidentsService.update(ticket.incidentId, ticket.companyId, { state: newState as IncidentRow['state'] }, profile.name)
-      setStateOverride(newState)
-      setActionMsg(`Estado alterado para "${newState}".`)
-    } catch (e) {
-      setActionMsg(e instanceof Error ? e.message : 'Falha ao alterar estado.')
-    } finally {
-      setChangingState(false)
+
+    // Se o grupo solucionador for alterado para diferente do atual, exige um comentário (nota de transferência)
+    const currentGroupId = detail?.assignment_group_id || ''
+    if (formGroupId && formGroupId !== currentGroupId && !formComment.trim()) {
+      const msg = 'Ao transferir o chamado de equipe, preencha o campo de Mensagem/Ação justificando a transferência.'
+      setError(msg)
+      toast.error(msg)
+      return
     }
-  }, [ticket.incidentId, ticket.companyId, profile])
+
+    // Pendência: exige Motivo da Pendência + comentário obrigatório
+    if (formState === 'On Hold') {
+      if (!formPendingReason) {
+        const msg = 'Para colocar o chamado como Pendente, selecione o Motivo da Pendência.'
+        setError(msg); toast.error(msg); return
+      }
+      if (!formComment.trim()) {
+        const msg = 'Para colocar o chamado como Pendente, preencha o campo de Mensagem/Ação com a justificativa.'
+        setError(msg); toast.error(msg); return
+      }
+    }
+
+    setSavingConducao(true)
+    setActionMsg(null)
+    setError(null)
+
+    try {
+      const selectedGroupName = activeGroups.find(g => g.id === formGroupId)?.name ?? null
+      const selectedAssigneeName = groupMembers.find(m => m.id === formAssigneeId)?.name
+        ?? (formAssigneeId === detail?.assigned_to_id ? detail.assigned_to_name : null)
+
+      const changes: any = {
+        state: formState as any,
+        assignment_group_id: formGroupId || null,
+        assigned_group_name: selectedGroupName,
+        assigned_to_id: formAssigneeId || null,
+        assigned_to_name: selectedAssigneeName,
+        impact: formImpact,
+        urgency: formUrgency,
+        priority: calculatePriority(formImpact, formUrgency),
+        pending_reason: formState === 'On Hold' ? formPendingReason : null,
+      }
+
+      // If resolving/closing and closeCode/closeNotes are filled, include them
+      if (formState === 'Resolved' || formState === 'Closed') {
+        changes.close_code = closeCode || null
+        changes.close_notes = closeNotes ? (timeSpent ? `${closeNotes}\n\n[Tempo gasto: ${timeSpent}]` : closeNotes) : null
+        if (formState === 'Resolved' && !detail?.resolved_at) {
+          changes.resolved_at = new Date().toISOString()
+        }
+        if (formState === 'Closed' && !detail?.closed_at) {
+          changes.closed_at = new Date().toISOString()
+        }
+      } else if (detail?.resolved_at || detail?.closed_at) {
+        // Reabertura (God Mode / fluxo): volta a um estado operacional →
+        // zera os carimbos de encerramento para o SLA voltar a correr.
+        changes.resolved_at = null
+        changes.closed_at = null
+      }
+
+      const updated = await incidentsService.conduct(ticket.incidentId, cid, {
+        changes,
+        comment: formComment.trim() || undefined,
+        isInternal,
+        senderId: profile?.id ?? null,
+        senderName: profile?.name ?? 'Analista',
+      })
+
+      // Update local states
+      setDetail(prev => prev ? { ...prev, ...updated } : null)
+      setStateOverride(updated.state)
+      setFormComment('')
+
+      const successMsg = 'Atualização gravada com sucesso!'
+      setActionMsg(successMsg)
+      toast.success(successMsg)
+      setIsEditing(false) // Close editing mode automatically
+      refreshIncident()
+      refreshMessages()
+    } catch (e) {
+      const errMsg = e instanceof Error ? e.message : 'Falha ao registrar condução.'
+      setError(errMsg)
+      toast.error(`Falha no banco de dados: ${errMsg}`)
+    } finally {
+      setSavingConducao(false)
+    }
+  }, [ticket.incidentId, ticket.companyId, detail?.company_id, formState, formGroupId, formAssigneeId, formImpact, formUrgency, formPendingReason, formComment, isInternal, activeGroups, groupMembers, closeCode, closeNotes, timeSpent, detail, profile, toast, refreshIncident, refreshMessages, isAdmin])
+
+  const handleCancelEdit = useCallback(() => {
+    setIsEditing(false)
+    setError(null)
+    setActionMsg(null)
+    if (detail) {
+      setFormState(detail.state || '')
+      setFormGroupId(detail.assignment_group_id || detail.assigned_group_id || '')
+      setFormAssigneeId(detail.assigned_to_id || '')
+      setFormImpact(detail.impact || 'Low')
+      setFormUrgency(detail.urgency || 'Low')
+      setFormComment('')
+      setCloseCode(detail.close_code || '')
+      setCloseNotes(detail.close_notes || '')
+    }
+  }, [detail])
 
   // Valores de exibição
   const number = ticket.id
@@ -272,14 +530,18 @@ const AnalystCockpit = ({ ticket = FALLBACK_TICKET }: { ticket?: WorkspaceTicket
   const description = realMode
     ? (detail?.description || detail?.short_description || 'Sem descrição registrada.')
     : 'Olá equipe, o sistema está apresentando muita lentidão desde a atualização de ontem. Não consigo emitir as notas fiscais do fechamento. Podem ajudar com urgência?'
+  const formDataEntries = detail?.form_data && typeof detail.form_data === 'object' && !Array.isArray(detail.form_data)
+    ? Object.entries(detail.form_data)
+    : []
   const auditRows = detail ? detail.history : []
+  const isTechnicalUser = profile && ['admin', 'sysadmin', 'analyst', 'agent', 'company_admin'].includes(profile.role)
+  const visibleMessages = isTechnicalUser ? messages : messages.filter(m => !m.is_internal)
+  const visibleAuditRows = isTechnicalUser ? auditRows : auditRows.filter(h => h.is_public)
   const canAct = realMode && Boolean(profile)
   const isResolved = status === 'Resolved' || status === 'Closed'
-  const isClosed = status === 'Closed'
-  // Só permite edição de impacto quando NÃO encerrado (read-only pós-resolução).
-  const canEdit = canAct && !isResolved
-  // Chat permanece aberto em Resolved (cliente confirma/reabre); bloqueia só em Closed.
-  const canChat = canAct && !isClosed
+  // Edição liberada quando NÃO encerrado — OU sempre, se for admin (override).
+  const canEdit = canAct && (!isResolved || isAdmin)
+
 
   // ─── Cronômetro de SLA / tempo decorrido (congela ao resolver) ─
   const openedAt = detail?.created_at ? new Date(detail.created_at).getTime() : null
@@ -303,7 +565,7 @@ const AnalystCockpit = ({ ticket = FALLBACK_TICKET }: { ticket?: WorkspaceTicket
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <h1 className="text-lg font-extrabold text-slate-900 truncate">{number}</h1>
-              <span className="bg-indigo-100 text-indigo-700 text-[11px] font-bold px-2.5 py-0.5 rounded-full shrink-0">{status}</span>
+              <span className="bg-indigo-100 text-indigo-700 text-[11px] font-bold px-2.5 py-0.5 rounded-full shrink-0">{translateState(status)}</span>
               {/* Cronômetro de SLA / tempo decorrido */}
               {elapsedMs !== null && (
                 <span
@@ -333,36 +595,47 @@ const AnalystCockpit = ({ ticket = FALLBACK_TICKET }: { ticket?: WorkspaceTicket
             <button className="flex items-center gap-1.5 px-3 py-2 border border-slate-200 text-slate-600 hover:bg-slate-50 text-sm font-semibold rounded-lg transition-colors">
               <BookOpen className="w-4 h-4" /> <span className="hidden lg:inline">Base de Conhecimento</span>
             </button>
-            {isResolved ? (
+            {isResolved && !isAdmin ? (
               <span className="inline-flex items-center gap-1.5 px-3 py-2 bg-emerald-50 text-emerald-700 border border-emerald-200 text-sm font-bold rounded-lg">
-                <Lock className="w-4 h-4" /> Somente leitura · {status}
+                <Lock className="w-4 h-4" /> Somente leitura · {translateState(status)}
               </span>
             ) : (
               <>
+                {isResolved && isAdmin && (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-2 bg-amber-50 text-amber-700 border border-amber-200 text-[11px] font-bold rounded-lg" title="Override administrativo ativo">
+                    <Lock className="w-3.5 h-3.5" /> God Mode
+                  </span>
+                )}
+                {canEdit && !isEditing && (
+                  <button
+                    onClick={openEditForm}
+                    className="flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg shadow-sm transition-colors"
+                  >
+                    <Edit3 className="w-4 h-4" /> Atualizar Chamado
+                  </button>
+                )}
+                {canEdit && isEditing && (
+                  <button
+                    onClick={handleCancelEdit}
+                    className="flex items-center gap-1.5 px-3 py-2 border border-slate-200 text-slate-600 hover:bg-slate-50 text-sm font-semibold rounded-lg transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                )}
                 <button
-                  onClick={handleAssumir}
-                  disabled={!canEdit || assigning}
+                  onClick={handleStartService}
+                  disabled={!canEdit || assigning || Boolean(detail?.responded_at)}
                   className="flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-semibold rounded-lg shadow-sm transition-colors"
                 >
-                  <CheckCircle className="w-4 h-4" /> {assigning ? 'Assumindo…' : 'Assumir'}
+                  <CheckCircle className="w-4 h-4" /> {assigning ? 'Iniciando…' : detail?.responded_at ? 'Atendimento iniciado' : 'Iniciar Atendimento'}
                 </button>
                 <button
-                  onClick={() => changeState('On Hold')}
-                  disabled={!canEdit || changingState || status === 'On Hold'}
+                  onClick={openPendingForm}
+                  disabled={!canEdit || status === 'On Hold'}
                   className="flex items-center gap-1.5 px-3 py-2 border border-slate-200 text-slate-600 hover:bg-amber-50 hover:text-amber-700 hover:border-amber-200 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-semibold rounded-lg transition-colors"
                 >
-                  <Pause className="w-4 h-4" /> <span className="hidden lg:inline">Em Espera</span>
+                  <Pause className="w-4 h-4" /> <span className="hidden lg:inline">Pendente</span>
                 </button>
-                {/* Máquina de estados (operacionais) */}
-                <select
-                  value={status}
-                  onChange={e => changeState(e.target.value)}
-                  disabled={!canEdit || changingState}
-                  title="Alterar estado"
-                  className="border border-slate-200 rounded-lg px-2 py-2 text-sm font-semibold text-slate-700 bg-white outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50 cursor-pointer"
-                >
-                  {STATE_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
-                </select>
               </>
             )}
           </div>
@@ -412,8 +685,9 @@ const AnalystCockpit = ({ ticket = FALLBACK_TICKET }: { ticket?: WorkspaceTicket
                 </SummaryCard>
                 <SummaryCard icon={<AlertTriangle className="w-4 h-4" />} title="Status & Prioridade">
                   <Field label="Prioridade" value={priority} accent="text-orange-600" />
-                  <Field label="Urgência" value={priority.includes('P1') || priority === 'Crítica' ? 'Alta' : 'Média'} />
-                  <Field label="Estado" value={status} />
+                  <Field label="Impacto" value={translateImpact(detail?.impact)} />
+                  <Field label="Urgência" value={translateUrgency(detail?.urgency)} />
+                  <Field label="Estado" value={translateState(status)} />
                 </SummaryCard>
                 <SummaryCard icon={<Tag className="w-4 h-4" />} title="Categorização & SLA">
                   <Field label="Categoria" value={category} />
@@ -436,6 +710,285 @@ const AnalystCockpit = ({ ticket = FALLBACK_TICKET }: { ticket?: WorkspaceTicket
               </div>
             </section>
 
+            {/* CENTRAL DE CONDUÇÃO DO CHAMADO */}
+            {/* CENTRAL DE CONDUÇÃO DO CHAMADO */}
+            {canEdit && (
+              isEditing ? (
+                <section className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+                  <div className="px-6 py-4 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Send className="w-5 h-5 text-indigo-600" />
+                      <h2 className="text-lg font-bold text-slate-900">Condução do Chamado</h2>
+                    </div>
+                    <span className="text-xs text-slate-400 font-medium">Atualização unificada do chamado</span>
+                  </div>
+
+                  <div className="p-6 space-y-6">
+                    {/* Seletor de Visibilidade (Abas) */}
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Visibilidade da Mensagem</label>
+                      <div className="flex bg-slate-100 p-1 rounded-xl w-fit border border-slate-200">
+                        <button
+                          type="button"
+                          onClick={() => setIsInternal(false)}
+                          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+                            !isInternal
+                              ? 'bg-indigo-600 text-white shadow-sm'
+                              : 'text-slate-500 hover:text-slate-800 bg-transparent'
+                          }`}
+                        >
+                          <User className="w-4 h-4" /> Responder ao Cliente
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setIsInternal(true)}
+                          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+                            isInternal
+                              ? 'bg-amber-500 text-white shadow-sm'
+                              : 'text-slate-500 hover:text-slate-800 bg-transparent'
+                          }`}
+                        >
+                          <Lock className="w-4 h-4" /> Nota Interna
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Campo de Texto */}
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Mensagem / Ação</label>
+                      <textarea
+                        rows={4}
+                        value={formComment}
+                        onChange={e => setFormComment(e.target.value)}
+                        placeholder={
+                          isInternal
+                            ? 'Descreva detalhes técnicos ou anotações internas (oculto para o cliente)...'
+                            : 'Escreva sua resposta ou orientação para o cliente...'
+                        }
+                        className="w-full border border-slate-200 rounded-xl p-3.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500 resize-none transition-all"
+                      />
+                    </div>
+
+                    {/* Campos de Controle Integrados */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-5 pt-2">
+                      {/* Dropdown Estado */}
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Estado (Status)</label>
+                        <select
+                          value={formState}
+                          onChange={e => setFormState(e.target.value)}
+                          className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-white focus:ring-2 focus:ring-indigo-500 outline-none cursor-pointer text-slate-700 font-medium"
+                        >
+                          {Object.entries(STATE_LABELS_PT)
+                            .filter(([value]) => value !== 'Pending User')        // legado, substituído por Pendente + motivo
+                            .filter(([value]) => value !== 'Closed' || isAdmin)   // Fechado só para admin
+                            .map(([value, label]) => (
+                              <option key={value} value={value}>{label}</option>
+                            ))}
+                        </select>
+                      </div>
+
+                      {/* Dropdown Grupo Solucionador */}
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Grupo Solucionador</label>
+                        {loadingGroups ? (
+                          <div className="text-sm text-slate-400 py-2.5 animate-pulse">Carregando grupos...</div>
+                        ) : (
+                          <select
+                            value={formGroupId}
+                            onChange={e => {
+                              const newGroupId = e.target.value
+                              setFormGroupId(newGroupId)
+                              // Limpeza de Responsável ao Transferir Grupo
+                              if (newGroupId !== (detail?.assignment_group_id || detail?.assigned_group_id || '')) {
+                                setFormAssigneeId('')
+                              }
+                            }}
+                            className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-white focus:ring-2 focus:ring-indigo-500 outline-none cursor-pointer text-slate-700 font-medium"
+                          >
+                            <option value="">Nenhum grupo atribuído</option>
+                            {activeGroups.map(g => (
+                              <option key={g.id} value={g.id}>{g.name}</option>
+                            ))}
+                          </select>
+                        )}
+                      </div>
+
+                      {/* Dropdown Analista Responsável */}
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Analista Responsável</label>
+                        <select
+                          disabled={!formGroupId && !detail?.assigned_to_id}
+                          value={formAssigneeId}
+                          onChange={e => setFormAssigneeId(e.target.value)}
+                          className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-white focus:ring-2 focus:ring-indigo-500 outline-none cursor-pointer text-slate-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {!formGroupId && !detail?.assigned_to_id ? (
+                            <option value="">Selecione um grupo primeiro</option>
+                          ) : (
+                            <>
+                              <option value="">Não atribuído</option>
+                              {detail?.assigned_to_id && !groupMembers.some(member => member.id === detail.assigned_to_id) && (
+                                <option value={detail.assigned_to_id}>{detail.assigned_to_name || 'Analista atual'}</option>
+                              )}
+                              {groupMembers.map(m => (
+                                <option key={m.id} value={m.id}>{m.name}</option>
+                              ))}
+                            </>
+                          )}
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Priorização Automática ITIL */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-5 pt-4 border-t border-slate-100 mt-2">
+                      {/* Dropdown Impacto */}
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Impacto</label>
+                        <select
+                          value={formImpact}
+                          onChange={e => setFormImpact(e.target.value)}
+                          className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-white focus:ring-2 focus:ring-indigo-500 outline-none cursor-pointer text-slate-700 font-medium"
+                        >
+                          <option value="Low">Apenas eu (Low)</option>
+                          <option value="Medium">Meu departamento (Medium)</option>
+                          <option value="High">Toda a empresa (High)</option>
+                          <option value="Critical">O negócio / Clientes (Critical)</option>
+                        </select>
+                      </div>
+
+                      {/* Dropdown Urgência */}
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Urgência</label>
+                        <select
+                          value={formUrgency}
+                          onChange={e => setFormUrgency(e.target.value)}
+                          className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-white focus:ring-2 focus:ring-indigo-500 outline-none cursor-pointer text-slate-700 font-medium"
+                        >
+                          <option value="Low">Consigo trabalhar (Low)</option>
+                          <option value="Medium">Tarefa importante parada (Medium)</option>
+                          <option value="High">Totalmente travado (High)</option>
+                        </select>
+                      </div>
+
+                      {/* Prioridade Final Calculada */}
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Prioridade (Calculada)</label>
+                        <div className="h-[42px] flex items-center bg-slate-50 border border-slate-200 rounded-xl px-4 text-sm font-bold text-indigo-700 shadow-inner">
+                          {calculatePriority(formImpact, formUrgency)}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Motivo da Pendência (obrigatório quando Pendente) */}
+                    {formState === 'On Hold' && (
+                      <div className="border-t border-slate-100 pt-5">
+                        <label className="block text-xs font-bold text-amber-700 uppercase tracking-wider mb-2">
+                          Motivo da Pendência <span className="text-red-500">*</span>
+                        </label>
+                        <select
+                          value={formPendingReason}
+                          onChange={e => setFormPendingReason(e.target.value)}
+                          className="w-full md:w-1/2 border border-amber-200 bg-amber-50 rounded-xl px-3 py-2.5 text-sm text-amber-900 font-medium outline-none focus:ring-2 focus:ring-amber-400 cursor-pointer"
+                        >
+                          <option value="">Selecione o motivo…</option>
+                          {PENDING_REASONS.map(r => <option key={r} value={r}>{r}</option>)}
+                        </select>
+                        <p className="text-[11px] text-amber-600 mt-1.5">Ao deixar Pendente, é obrigatório informar o motivo e uma mensagem/justificativa.</p>
+                      </div>
+                    )}
+
+                    {/* Campos de Resolução Condicionais */}
+                    {(formState === 'Resolved' || formState === 'Closed') && (
+                      <div className="border-t border-slate-100 pt-5 space-y-4">
+                        <div className="flex items-center gap-2">
+                          <CheckCircle className="w-4 h-4 text-emerald-600" />
+                          <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Dados de Resolução do Chamado</h4>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                          <div>
+                            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Código de Encerramento <span className="text-red-500">*</span></label>
+                            <select
+                              value={closeCode}
+                              onChange={e => setCloseCode(e.target.value)}
+                              className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-white focus:ring-2 focus:ring-indigo-500 outline-none cursor-pointer text-slate-700 font-medium"
+                            >
+                              <option value="">Selecione…</option>
+                              {CLOSE_CODES.map(grp => (
+                                <optgroup key={grp.group} label={grp.group}>
+                                  {grp.options.map(opt => (
+                                    <option key={opt} value={`${grp.group} / ${opt}`}>{opt}</option>
+                                  ))}
+                                </optgroup>
+                              ))}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Tempo Gasto</label>
+                            <input
+                              value={timeSpent}
+                              onChange={e => setTimeSpent(e.target.value)}
+                              type="text"
+                              placeholder="ex: 1h 30m"
+                              className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-white focus:ring-2 focus:ring-indigo-500 outline-none text-slate-700 font-medium"
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Notas de Resolução <span className="text-red-500">*</span></label>
+                          <textarea
+                            rows={3}
+                            value={closeNotes}
+                            onChange={e => setCloseNotes(e.target.value)}
+                            className="w-full border border-slate-200 rounded-xl p-3.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500 resize-none transition-all text-slate-700"
+                            placeholder="Descreva a solução aplicada (visível ao cliente)..."
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Ação Gravar Condução */}
+                    <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
+                      <button
+                        type="button"
+                        onClick={handleCancelEdit}
+                        className="px-4 py-2 border border-slate-200 text-slate-600 hover:bg-slate-50 text-sm font-semibold rounded-xl transition-colors cursor-pointer"
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        type="button"
+                        disabled={savingConducao}
+                        onClick={handleGravarConducao}
+                        className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm rounded-xl shadow-lg hover:shadow-xl transition-all active:scale-[0.98] disabled:opacity-50 flex items-center gap-2 cursor-pointer"
+                      >
+                        <Send className="w-4 h-4" />
+                        {savingConducao ? 'Gravando…' : 'Gravar Condução'}
+                      </button>
+                    </div>
+                  </div>
+                </section>
+              ) : (
+                <section className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+                      <Edit3 className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-slate-800 text-sm">Atualização do Chamado</h3>
+                      <p className="text-xs text-slate-500 mt-0.5">Clique em "Atualizar Chamado" para responder ao cliente ou alterar a equipe e o estado.</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={openEditForm}
+                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm rounded-lg shadow transition-colors flex items-center gap-1.5 shrink-0"
+                  >
+                    <Edit3 className="w-4 h-4" /> Atualizar Chamado
+                  </button>
+                </section>
+              )
+            )}
+
             {/* DESCRIÇÃO E CHAT */}
             <section>
               <SectionTitle icon={<FileText className="w-5 h-5" />} title="Descrição & Conversa" />
@@ -445,9 +998,20 @@ const AnalystCockpit = ({ ticket = FALLBACK_TICKET }: { ticket?: WorkspaceTicket
                   <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">{description}</p>
                 </div>
 
+                {formDataEntries.length > 0 && (
+                  <div className="rounded-xl border border-indigo-100 bg-indigo-50/40 p-4">
+                    <p className="mb-3 text-[11px] font-bold uppercase tracking-wider text-indigo-500">Dados do Formulário Customizado</p>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      {formDataEntries.map(([label, value]) => (
+                        <Field key={label} label={label} value={formatFormValue(value)} />
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 <div className="space-y-4">
-                  {messages.length === 0 && <p className="text-sm text-slate-400 text-center py-2">Nenhuma mensagem ainda.</p>}
-                  {messages.map(m => (
+                  {visibleMessages.length === 0 && <p className="text-sm text-slate-400 text-center py-2">Nenhuma mensagem ainda.</p>}
+                  {visibleMessages.map(m => (
                     <div key={m.id} className={`flex gap-3 ${m.actor_type === 'analyst' ? 'flex-row-reverse' : ''}`}>
                       <div className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0 ${m.is_internal ? 'bg-amber-100 text-amber-700' : m.actor_type === 'analyst' ? 'bg-indigo-600 text-white' : 'bg-slate-200 text-slate-500'}`}>
                         {(m.sender_name || '?').charAt(0)}
@@ -462,27 +1026,6 @@ const AnalystCockpit = ({ ticket = FALLBACK_TICKET }: { ticket?: WorkspaceTicket
                       </div>
                     </div>
                   ))}
-                </div>
-
-                {/* Input de resposta */}
-                <div className="border border-slate-200 rounded-xl p-3 focus-within:ring-2 ring-indigo-500 transition-all">
-                  <textarea
-                    rows={2}
-                    value={msgText}
-                    onChange={e => setMsgText(e.target.value)}
-                    disabled={!canChat}
-                    className="w-full bg-transparent resize-none outline-none text-sm p-1 disabled:opacity-60"
-                    placeholder={isClosed ? 'Chamado fechado — conversa encerrada.' : canChat ? 'Responder ao solicitante ou registrar nota interna...' : 'Disponível no chamado real (após login)'}
-                  ></textarea>
-                  <div className="flex justify-between items-center mt-1 pt-2 border-t border-slate-100">
-                    <button className="p-2 text-slate-400 hover:text-indigo-600 rounded-lg transition-colors"><Paperclip className="w-4 h-4" /></button>
-                    <div className="flex gap-2">
-                      <button onClick={() => sendMessage(true)} disabled={!canChat || sending || !msgText.trim()} className="px-4 py-1.5 bg-amber-100 hover:bg-amber-200 text-amber-800 text-sm font-semibold rounded-lg transition-colors disabled:opacity-50">Nota Interna</button>
-                      <button onClick={() => sendMessage(false)} disabled={!canChat || sending || !msgText.trim()} className="flex items-center gap-2 px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg shadow-sm transition-colors disabled:opacity-50">
-                        <Send className="w-4 h-4" /> {sending ? 'Enviando…' : 'Enviar'}
-                      </button>
-                    </div>
-                  </div>
                 </div>
               </div>
             </section>
@@ -529,52 +1072,10 @@ const AnalystCockpit = ({ ticket = FALLBACK_TICKET }: { ticket?: WorkspaceTicket
                       {detail?.resolved_at && <Field label="Resolvido em" value={fmt(detail.resolved_at)} />}
                     </div>
                   ) : (
-                    <div className="p-4 space-y-3">
-                      <div>
-                        <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">Código de Encerramento <span className="text-red-500">*</span></label>
-                        <select
-                          value={closeCode}
-                          onChange={e => setCloseCode(e.target.value)}
-                          disabled={!canEdit}
-                          className={`w-full border rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500 bg-white disabled:opacity-50 ${!closeCode ? 'border-slate-200' : 'border-slate-200'}`}
-                        >
-                          <option value="">Selecione…</option>
-                          {CLOSE_CODES.map(grp => (
-                            <optgroup key={grp.group} label={grp.group}>
-                              {grp.options.map(opt => (
-                                <option key={opt} value={`${grp.group} / ${opt}`}>{opt}</option>
-                              ))}
-                            </optgroup>
-                          ))}
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">Notas de Resolução <span className="text-red-500">*</span></label>
-                        <textarea
-                          rows={4}
-                          value={closeNotes}
-                          onChange={e => setCloseNotes(e.target.value)}
-                          disabled={!canEdit}
-                          className="w-full border border-slate-200 rounded-lg p-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500 resize-none disabled:opacity-50"
-                          placeholder="Descreva a solução aplicada (visível ao cliente)..."
-                        ></textarea>
-                      </div>
-                      {(!closeCode || !closeNotes.trim()) && (
-                        <p className="text-[11px] text-amber-600 bg-amber-50 border border-amber-100 rounded-lg px-2 py-1.5 flex items-center gap-1">
-                          <AlertTriangle className="w-3 h-3" /> Código de Encerramento e Notas são obrigatórios para resolver.
-                        </p>
-                      )}
-                      <div className="flex items-center gap-3">
-                        <label className="text-xs font-semibold text-slate-500 flex items-center gap-1"><Clock className="w-3.5 h-3.5" /> Tempo gasto</label>
-                        <input value={timeSpent} onChange={e => setTimeSpent(e.target.value)} type="text" placeholder="ex: 1h 30m" disabled={!canEdit} className="w-28 border border-slate-200 rounded-lg px-2 py-1 text-sm outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50" />
-                        <button
-                          onClick={handleResolve}
-                          disabled={!canEdit || resolving || !closeCode || !closeNotes.trim()}
-                          className="ml-auto px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-semibold rounded-lg transition-colors"
-                        >
-                          {resolving ? 'Resolvendo…' : 'Resolver Chamado'}
-                        </button>
-                      </div>
+                    <div className="p-6 text-center text-slate-400 text-sm">
+                      <AlertTriangle className="w-8 h-8 text-amber-500 mx-auto mb-2" />
+                      O chamado ainda não foi resolvido.
+                      <p className="text-xs text-slate-400 mt-1">Para resolvê-lo, clique no botão <b>"Atualizar Chamado"</b> no topo ou no painel principal e altere o Estado para <b>"Resolvido"</b>.</p>
                     </div>
                   )}
                 </div>
@@ -615,22 +1116,32 @@ const AnalystCockpit = ({ ticket = FALLBACK_TICKET }: { ticket?: WorkspaceTicket
                           <td className="px-4 py-2.5">Chamado registrado pelo portal.</td>
                         </tr>
                       )}
-                      {realMode && auditRows.length === 0 && (
+                      {realMode && visibleAuditRows.length === 0 && (
                         <tr><td colSpan={4} className="px-4 py-6 text-center text-slate-400 text-sm">Sem registros de auditoria.</td></tr>
                       )}
-                      {auditRows.map(h => (
+                      {visibleAuditRows.map(h => (
                         <tr key={h.id} className="text-slate-600 hover:bg-slate-50">
                           <td className="px-4 py-2.5 font-medium">{h.changed_by_name}</td>
                           <td className="px-4 py-2.5 text-slate-400 text-xs whitespace-nowrap">{fmt(h.created_at)}</td>
                           <td className="px-4 py-2.5">
-                            <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded ${h.field_name === 'comment' ? 'bg-indigo-50 text-indigo-600' : 'bg-slate-100 text-slate-600'}`}>
-                              {h.field_name === 'comment' ? 'Comentário' : 'Alteração'}
+                            <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded ${
+                              isOpeningHistory(h.field_name)
+                                ? 'bg-emerald-50 text-emerald-700'
+                                : h.field_name === 'comment'
+                                  ? 'bg-indigo-50 text-indigo-600'
+                                  : h.field_name === 'Início de Atendimento'
+                                    ? 'bg-sky-50 text-sky-700'
+                                    : 'bg-slate-100 text-slate-600'
+                            }`}>
+                              {historyTypeLabel(h.field_name)}
                             </span>
                           </td>
                           <td className="px-4 py-2.5">
-                            {h.field_name === 'comment'
+                            {isOpeningHistory(h.field_name) || h.field_name === 'Início de Atendimento'
                               ? h.comment
-                              : <span><b>{h.field_name}</b>{h.old_value ? <> de <span className="text-red-500 line-through">{h.old_value}</span></> : null} para <b className="text-emerald-600">{h.new_value}</b></span>}
+                              : h.field_name === 'comment'
+                              ? h.comment
+                              : <span><b>{h.field_name === 'state' ? 'Estado' : h.field_name}</b>{h.old_value ? <> de <span className="text-red-500 line-through">{h.field_name === 'state' ? translateState(h.old_value) : h.old_value}</span></> : null} para <b className="text-emerald-600">{h.field_name === 'state' ? translateState(h.new_value) : h.new_value}</b></span>}
                           </td>
                         </tr>
                       ))}

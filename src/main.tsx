@@ -5,13 +5,16 @@ import App from './App.tsx'
 import { TenantProvider } from './tenant'
 import { AuthProvider } from './auth'
 import { ThemeProvider } from './theme'
+import { ToastProvider } from './context'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <TenantProvider>
       <AuthProvider>
         <ThemeProvider>
-          <App />
+          <ToastProvider>
+            <App />
+          </ToastProvider>
         </ThemeProvider>
       </AuthProvider>
     </TenantProvider>

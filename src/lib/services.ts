@@ -7,13 +7,16 @@
 import { createClient } from '@supabase/supabase-js'
 import { supabase } from './supabase'
 import type {
-  CompanyRow, ProfileRow, IncidentRow, IncidentHistoryRow, TicketMessageRow,
+  CompanyRow, ProfileRow, IncidentRow, IncidentHistoryRow, PortalTicketDetail, TicketMessageRow,
   ServiceRequestRow, ProblemRow, ChangeRow, CatalogItemRow, CatalogCategoryRow,
+  CatalogServiceRow, SystemSymptomRow, CatalogServiceSymptomRow,
+  RequestCategoryRow, RequestItemRow, RequestFormField, FormTemplateRow,
   TicketPriority, IncidentState, IncidentCategory,
   RequestState, ChangeType, ChangeRisk, ChangeState,
   IncidentCatalogItemRow, IncidentCatalogSubitemRow, IncidentCatalogSymptomRow,
   RequestCatalogItemRow, RequestCatalogSubitemRow, ApprovalTokenRow,
-  ActiveSessionRow, ChatbotWhitelistRow, ChatbotMessageRow, ChatbotConfigRow
+  ActiveSessionRow, ChatbotWhitelistRow, ChatbotMessageRow, ChatbotConfigRow,
+  AssignmentGroupRow, ProfileRow as _ProfileRow,
 } from './database.types'
 
 const url  = import.meta.env.VITE_SUPABASE_URL  as string
@@ -148,9 +151,11 @@ export type IncidentFilters = {
   priority?: TicketPriority | 'all'
   slaBreached?: boolean
   assignedToId?: string | null
+  callerId?: string
   limit?: number
   offset?: number
   filterCompanyId?: string
+  ticketType?: 'incident' | 'request' | 'all'
 }
 
 export const incidentsService = {
@@ -174,6 +179,8 @@ export const incidentsService = {
     if (filters.priority && filters.priority !== 'all') q = q.eq('priority', filters.priority)
     if (filters.slaBreached !== undefined)            q = q.eq('sla_breached', filters.slaBreached)
     if (filters.search)                               q = q.ilike('short_description', `%${filters.search}%`)
+    if (filters.callerId)                             q = q.eq('caller_id', filters.callerId)
+    if (filters.ticketType && filters.ticketType !== 'all') q = q.eq('ticket_type', filters.ticketType)
     if (filters.limit)                                q = q.limit(filters.limit)
     if (filters.offset)                               q = q.range(filters.offset, filters.offset + (filters.limit ?? 50) - 1)
 
@@ -193,12 +200,52 @@ export const incidentsService = {
     return { ...inc!, history: hist ?? [] }
   },
 
+  /** User-facing one-page detail with catalog context. */
+  async getPortalDetail(id: string, companyId: string): Promise<PortalTicketDetail> {
+    const client = getClientForCompany(companyId)
+    const { data: incident, error: incidentError } = await client
+      .from('incidents')
+      .select('*')
+      .eq('id', id)
+      .single()
+    if (incidentError) throw incidentError
+
+    let catalogCategoryName: string | null = null
+    let catalogSelectionName: string | null = null
+
+    if (incident?.ticket_type === 'request' && incident.request_item_id) {
+      const { data } = await supabase
+        .from('request_items')
+        .select('name, category:request_categories(name)')
+        .eq('id', incident.request_item_id)
+        .maybeSingle()
+      const row = data as any
+      catalogSelectionName = row?.name ?? null
+      catalogCategoryName = row?.category?.name ?? null
+    } else if (incident?.catalog_service_id) {
+      const { data } = await supabase
+        .from('catalog_services')
+        .select('name, category:catalog_categories(name)')
+        .eq('id', incident.catalog_service_id)
+        .maybeSingle()
+      const row = data as any
+      catalogSelectionName = row?.name ?? null
+      catalogCategoryName = row?.category?.name ?? null
+    }
+
+    return {
+      ...incident!,
+      catalog_category_name: catalogCategoryName,
+      catalog_selection_name: catalogSelectionName,
+    }
+  },
+
   /** KPI aggregates for the dashboard */
-  async getKPIs(companyId: string, filterCompanyId?: string) {
+  async getKPIs(companyId: string, filterCompanyId?: string, ticketType?: 'incident' | 'request') {
     const isMSP = companyId === '44444444-4444-4444-4444-444444444444'
     let q = getClientForCompany(companyId)
       .from('incidents')
-      .select('state, priority, sla_breached, assigned_to_id, company_id')
+      .select('state, priority, sla_breached, assigned_to_id, company_id, ticket_type')
 
     if (isMSP) {
       if (filterCompanyId && filterCompanyId !== 'all') {
@@ -206,6 +253,10 @@ export const incidentsService = {
       }
     } else {
       q = q.eq('company_id', companyId)
+    }
+
+    if (ticketType) {
+      q = q.eq('ticket_type', ticketType)
     }
 
     const { data, error } = await q
@@ -248,6 +299,7 @@ export const incidentsService = {
         assigned_to_id:      payload.assignedToId ?? null,
         assigned_group_name: payload.assignedGroupName ?? null,
         assigned_group_id:   payload.assignedGroupId ?? null,
+        ticket_type:         'incident',
       })
       .select()
       .single()
@@ -258,22 +310,39 @@ export const incidentsService = {
   async update(
     id: string,
     companyId: string,
-    changes: Partial<Pick<IncidentRow, 'state' | 'priority' | 'assigned_to_id' | 'assigned_to_name' | 'assigned_group_id' | 'assigned_group_name' | 'description'>>,
+    changes: Partial<Pick<IncidentRow, 'state' | 'priority' | 'assigned_to_id' | 'assigned_to_name' | 'assigned_group_id' | 'assigned_group_name' | 'assignment_group_id' | 'description' | 'impact' | 'urgency'>>,
     actorName: string,
     comment?: string
   ): Promise<IncidentRow> {
     const client = getClientForCompany(companyId)
+
+    // Fetch the current incident state to log old_value and new_value
+    const { data: current, error: getErr } = await client
+      .from('incidents')
+      .select('*')
+      .eq('id', id)
+      .single()
+    if (getErr) throw getErr
+
     // Record history for each field changed
     const historyInserts: object[] = []
     for (const [field, newValue] of Object.entries(changes)) {
-      historyInserts.push({
-        incident_id:     id,
-        changed_by_name: actorName,
-        field_name:      field,
-        new_value:       String(newValue ?? ''),
-        comment:         comment ?? null,
-        is_public:       true,
-      })
+      const oldValue = current ? (current as any)[field] : null
+      const strOld = oldValue !== null && oldValue !== undefined ? String(oldValue) : null
+      const strNew = newValue !== null && newValue !== undefined ? String(newValue) : null
+
+      // Only record history if values actually differ
+      if (strOld !== strNew) {
+        historyInserts.push({
+          incident_id:     id,
+          changed_by_name: actorName,
+          field_name:      field,
+          old_value:       strOld,
+          new_value:       strNew,
+          comment:         comment ?? null,
+          is_public:       true,
+        })
+      }
     }
 
     const [{ data, error: updateErr }, { error: histErr }] = await Promise.all([
@@ -285,6 +354,104 @@ export const incidentsService = {
     if (updateErr) throw updateErr
     if (histErr)   throw histErr
     return data!
+  },
+
+  /** Unifies saving a comment/note, updating incident fields, and writing audit logs in one transaction flow */
+  async conduct(
+    id: string,
+    companyId: string,
+    payload: {
+      changes: Partial<Pick<IncidentRow, 'state' | 'assigned_to_id' | 'assigned_to_name' | 'assigned_group_name' | 'assignment_group_id' | 'close_code' | 'close_notes' | 'resolved_at' | 'closed_at' | 'priority' | 'impact' | 'urgency'>>,
+      comment?: string,
+      isInternal?: boolean,
+      senderId?: string | null,
+      senderName?: string | null,
+    }
+  ): Promise<IncidentRow> {
+    const client = getClientForCompany(companyId)
+
+    // 1. Fetch current incident row to compare old/new values
+    const { data: current, error: getErr } = await client
+      .from('incidents')
+      .select('*')
+      .eq('id', id)
+      .single()
+    if (getErr) throw getErr
+
+    // 2. Prepare history logs for changed fields
+    const historyInserts: any[] = []
+    const actorName = payload.senderName ?? 'Analista'
+    const isPublic = !payload.isInternal
+
+    for (const [field, newValue] of Object.entries(payload.changes)) {
+      const oldValue = current ? (current as any)[field] : null
+      const strOld = oldValue !== null && oldValue !== undefined ? String(oldValue) : null
+      const strNew = newValue !== null && newValue !== undefined ? String(newValue) : null
+
+      if (strOld !== strNew) {
+        historyInserts.push({
+          incident_id:     id,
+          changed_by_name: actorName,
+          changed_by_id:   payload.senderId ?? null,
+          field_name:      field,
+          old_value:       strOld,
+          new_value:       strNew,
+          comment:         payload.comment?.trim() || null,
+          is_public:       isPublic,
+        })
+      }
+    }
+
+    // 3. If there is a comment, add it to history inserts as a comment field
+    if (payload.comment?.trim()) {
+      historyInserts.push({
+        incident_id:     id,
+        changed_by_name: actorName,
+        changed_by_id:   payload.senderId ?? null,
+        field_name:      'comment',
+        comment:         payload.comment.trim(),
+        new_value:       payload.comment.trim(),
+        is_public:       isPublic,
+      })
+    }
+
+    // 4. Perform database updates sequentially
+    let updatedIncident = current
+
+    if (Object.keys(payload.changes).length > 0) {
+      const { data, error: updateErr } = await client
+        .from('incidents')
+        .update(payload.changes)
+        .eq('id', id)
+        .select()
+        .single()
+      if (updateErr) throw updateErr
+      updatedIncident = data!
+    }
+
+    if (historyInserts.length > 0) {
+      const { error: histErr } = await client
+        .from('incident_history')
+        .insert(historyInserts)
+      if (histErr) throw histErr
+    }
+
+    if (payload.comment?.trim()) {
+      const { error: msgErr } = await supabase
+        .from('ticket_messages')
+        .insert({
+          incident_id: id,
+          company_id:  companyId,
+          body:        payload.comment.trim(),
+          is_internal: payload.isInternal ?? false,
+          sender_id:   payload.senderId ?? null,
+          sender_name: payload.senderName ?? null,
+          actor_type:  'analyst',
+        })
+      if (msgErr) throw msgErr
+    }
+
+    return updatedIncident
   },
 
   /** Add a comment/note without changing any field */
@@ -299,21 +466,12 @@ export const incidentsService = {
     if (error) throw error
   },
 
-  /** Assumir o chamado: vincula o técnico e move para "In Progress". */
-  async assign(id: string, companyId: string, technicianId: string, technicianName: string): Promise<IncidentRow> {
-    const client = getClientForCompany(companyId)
-    const { data, error } = await client
-      .from('incidents')
-      .update({ assigned_to_id: technicianId, assigned_to_name: technicianName, state: 'In Progress' })
-      .eq('id', id)
-      .select()
-      .single()
-    if (error) throw error
-    await client.from('incident_history').insert({
-      incident_id: id, changed_by_name: technicianName, field_name: 'state',
-      new_value: 'In Progress', comment: 'Analista assumiu o chamado.', is_public: true,
-    })
-    return data!
+  /** Starts service atomically and closes the first-response SLA clock. */
+  async startService(id: string, companyId: string): Promise<IncidentRow> {
+    void companyId
+    const { data, error } = await supabase
+      .rpc('start_ticket_service', { p_incident_id: id })
+    return throwIfError(data, error)
   },
 
   /** Encerramento padrão ServiceNow: grava close_code/close_notes e move para "Resolved". */
@@ -333,19 +491,60 @@ export const incidentsService = {
     return data!
   },
 
+  /** Solicitante aceita a solução → fecha o chamado (Closed). */
+  async acceptResolution(id: string, companyId: string, actorName: string): Promise<void> {
+    const client = getClientForCompany(companyId)
+    const { error } = await client
+      .from('incidents')
+      .update({ state: 'Closed', closed_at: new Date().toISOString() })
+      .eq('id', id)
+    if (error) throw error
+    await client.from('incident_history').insert({
+      incident_id: id, changed_by_name: actorName, field_name: 'state',
+      new_value: 'Closed', comment: 'Solução aceita pelo solicitante.', is_public: true,
+    })
+  },
+
+  /**
+   * Reabertura pelo solicitante: grava a justificativa no chat (ticket_messages,
+   * actor 'user') — o trigger reopen_incident_on_user_message volta o estado para
+   * In Progress e zera resolved_at — e também registra a justificativa no
+   * incident_history (documento de auditoria).
+   */
+  async userReopen(id: string, companyId: string, justification: string, senderId: string | null, senderName: string): Promise<void> {
+    const reason = justification.trim()
+    // 1) Mensagem no chat (dispara o trigger de reabertura no banco)
+    await messagesService.send({
+      incidentId: id, companyId, body: `🔄 Reabertura solicitada: ${reason}`,
+      isInternal: false, senderId, senderName, actorType: 'user',
+    })
+    // 2) Justificativa explícita na auditoria
+    const client = getClientForCompany(companyId)
+    await client.from('incident_history').insert({
+      incident_id: id, changed_by_name: senderName, field_name: 'reopen',
+      new_value: 'In Progress', comment: `Reaberto pelo solicitante: ${reason}`, is_public: true,
+    })
+  },
+
   /** Subscribe to real-time changes on incidents for a company */
   subscribeToCompany(
     companyId: string,
     onInsert: (row: IncidentRow) => void,
-    onUpdate: (row: IncidentRow) => void
+    onUpdate: (row: IncidentRow) => void,
+    callerId?: string,
   ) {
     const schema = companySchemaMap[companyId] || 'public'
     const isMSP = companyId === '44444444-4444-4444-4444-444444444444'
-    const channelName = isMSP ? 'incidents:msp' : `incidents:${companyId}`
-    const insertConfig: any = isMSP 
+    const channelName = callerId ? `incidents:caller:${callerId}` : isMSP ? 'incidents:msp' : `incidents:${companyId}`
+    const callerFilter = callerId ? `caller_id=eq.${callerId}` : null
+    const insertConfig: any = callerFilter
+      ? { event: 'INSERT', schema, table: 'incidents', filter: callerFilter }
+      : isMSP
       ? { event: 'INSERT', schema, table: 'incidents' }
       : { event: 'INSERT', schema, table: 'incidents', filter: `company_id=eq.${companyId}` }
-    const updateConfig: any = isMSP 
+    const updateConfig: any = callerFilter
+      ? { event: 'UPDATE', schema, table: 'incidents', filter: callerFilter }
+      : isMSP
       ? { event: 'UPDATE', schema, table: 'incidents' }
       : { event: 'UPDATE', schema, table: 'incidents', filter: `company_id=eq.${companyId}` }
 
@@ -362,6 +561,132 @@ export const incidentsService = {
         (payload: any) => onUpdate(payload.new as IncidentRow)
       )
       .subscribe()
+  },
+
+  /** Subscribe to history changes for an incident */
+  subscribeToHistory(incidentId: string, companyId: string, onInsert: (row: IncidentHistoryRow) => void) {
+    const schema = companySchemaMap[companyId] || 'public'
+    return getClientForCompany(companyId)
+      .channel(`incident_history:${incidentId}`)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema, table: 'incident_history', filter: `incident_id=eq.${incidentId}` },
+        (payload: any) => onInsert(payload.new as IncidentHistoryRow),
+      )
+      .subscribe()
+  },
+}
+
+// ─── ASSIGNMENT GROUPS (Equipes Solucionadoras) ──────────────
+
+export const assignmentGroupsService = {
+  /** List active groups for a company */
+  async list(companyId: string): Promise<AssignmentGroupRow[]> {
+    const { data, error } = await supabase
+      .from('assignment_groups')
+      .select('*')
+      .eq('company_id', companyId)
+      .order('name')
+    return throwIfError(data, error)
+  },
+
+  /** List only active groups */
+  async listActive(companyId: string): Promise<AssignmentGroupRow[]> {
+    const { data, error } = await supabase
+      .from('assignment_groups')
+      .select('*')
+      .eq('company_id', companyId)
+      .eq('is_active', true)
+      .order('name')
+    return throwIfError(data, error)
+  },
+
+  /** Create a new group */
+  async create(payload: { companyId: string; name: string; description?: string }): Promise<AssignmentGroupRow> {
+    const { data, error } = await supabase
+      .from('assignment_groups')
+      .insert({
+        company_id: payload.companyId,
+        name: payload.name,
+        description: payload.description ?? null,
+      })
+      .select()
+      .single()
+    return throwIfError(data, error)
+  },
+
+  /** Update group */
+  async update(id: string, payload: Partial<Pick<AssignmentGroupRow, 'name' | 'description' | 'is_active'>>): Promise<AssignmentGroupRow> {
+    const { data, error } = await supabase
+      .from('assignment_groups')
+      .update(payload)
+      .eq('id', id)
+      .select()
+      .single()
+    return throwIfError(data, error)
+  },
+
+  /** Delete group */
+  async remove(id: string): Promise<void> {
+    const { error } = await supabase
+      .from('assignment_groups')
+      .delete()
+      .eq('id', id)
+    if (error) throw error
+  },
+
+  /** List members of a group */
+  async listMembers(groupId: string): Promise<ProfileRow[]> {
+    // Fetch user_ids, then fetch profiles
+    const { data: links, error: e1 } = await supabase
+      .from('user_groups')
+      .select('user_id')
+      .eq('group_id', groupId)
+    if (e1) throw e1
+    if (!links || links.length === 0) return []
+    const ids = links.map((l: any) => l.user_id)
+    const { data: profiles, error: e2 } = await supabase
+      .from('profiles')
+      .select('*')
+      .in('id', ids)
+      .order('name')
+    return throwIfError(profiles, e2)
+  },
+
+  /** List groups a user belongs to */
+  async listForUser(userId: string): Promise<AssignmentGroupRow[]> {
+    const { data: links, error: e1 } = await supabase
+      .from('user_groups')
+      .select('group_id')
+      .eq('user_id', userId)
+    if (e1) throw e1
+    if (!links || links.length === 0) return []
+    const ids = links.map((l: any) => l.group_id)
+    const { data: groups, error: e2 } = await supabase
+      .from('assignment_groups')
+      .select('*')
+      .in('id', ids)
+      .eq('is_active', true)
+      .order('name')
+    return throwIfError(groups, e2)
+  },
+
+  /** Add a member to a group */
+  async addMember(groupId: string, userId: string): Promise<void> {
+    const { error } = await supabase
+      .from('user_groups')
+      .upsert({ user_id: userId, group_id: groupId }, { onConflict: 'user_id,group_id' })
+    if (error) throw error
+  },
+
+  /** Remove a member from a group */
+  async removeMember(groupId: string, userId: string): Promise<void> {
+    const { error } = await supabase
+      .from('user_groups')
+      .delete()
+      .eq('user_id', userId)
+      .eq('group_id', groupId)
+    if (error) throw error
   },
 }
 
@@ -1121,6 +1446,33 @@ export const chatbotService = {
 // ============================================================
 
 export const serviceCatalogService = {
+  // Reusable form templates scoped by tenant
+  async listFormTemplates(tenantId: string): Promise<FormTemplateRow[]> {
+    const { data, error } = await supabase
+      .from('form_templates')
+      .select('*')
+      .eq('tenant_id', tenantId)
+      .order('name')
+    return throwIfError(data, error)
+  },
+  async createFormTemplate(payload: Pick<FormTemplateRow, 'tenant_id' | 'name' | 'fields'>): Promise<FormTemplateRow> {
+    const { data, error } = await supabase.from('form_templates').insert(payload).select().single()
+    return throwIfError(data, error)
+  },
+  async updateFormTemplate(id: string, payload: Partial<Pick<FormTemplateRow, 'name' | 'fields'>>): Promise<FormTemplateRow> {
+    const { data, error } = await supabase
+      .from('form_templates')
+      .update({ ...payload, updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .select()
+      .single()
+    return throwIfError(data, error)
+  },
+  async deleteFormTemplate(id: string): Promise<void> {
+    const { error } = await supabase.from('form_templates').delete().eq('id', id)
+    if (error) throw error
+  },
+
   // ─ Categorias ─────────────────────────────────────────────
   async listCategories(companyId: string, opts?: { activeOnly?: boolean }): Promise<CatalogCategoryRow[]> {
     let q = supabase.from('catalog_categories').select('*').eq('company_id', companyId)
@@ -1141,27 +1493,183 @@ export const serviceCatalogService = {
     if (error) throw error
   },
 
-  // ─ Itens ──────────────────────────────────────────────────
-  async listItems(companyId: string, opts?: { categoryId?: string; activeOnly?: boolean }): Promise<CatalogItemRow[]> {
-    let q = supabase.from('catalog_items').select('*').eq('company_id', companyId)
+  // ─ Serviços (Nível 2) ─────────────────────────────────────
+  async listServices(companyId: string, opts?: { categoryId?: string; activeOnly?: boolean }): Promise<CatalogServiceRow[]> {
+    let q = supabase.from('catalog_services').select('*').eq('company_id', companyId)
     if (opts?.categoryId) q = q.eq('category_id', opts.categoryId)
-    if (opts?.activeOnly) q = q.eq('active', true)
-    const { data, error } = await q.order('name')
+    if (opts?.activeOnly) q = q.eq('is_active', true)
+    const { data, error } = await q.order('sort_order')
     return throwIfError(data, error)
   },
-  async createItem(payload: Partial<CatalogItemRow>): Promise<CatalogItemRow> {
-    const { data, error } = await supabase.from('catalog_items').insert(payload).select().single()
+  async createService(payload: Partial<CatalogServiceRow>): Promise<CatalogServiceRow> {
+    const { data, error } = await supabase.from('catalog_services').insert(payload).select().single()
     return throwIfError(data, error)
   },
-  async updateItem(id: string, payload: Partial<CatalogItemRow>): Promise<CatalogItemRow> {
-    const { data, error } = await supabase.from('catalog_items').update(payload).eq('id', id).select().single()
+  async updateService(id: string, payload: Partial<CatalogServiceRow>): Promise<CatalogServiceRow> {
+    const { data, error } = await supabase.from('catalog_services').update(payload).eq('id', id).select().single()
+    return throwIfError(data, error)
+  },
+  async deleteService(id: string): Promise<void> {
+    const { error } = await supabase.from('catalog_services').delete().eq('id', id)
+    if (error) throw error
+  },
+
+  // ─ Sintomas universais (tabela mestre) ────────────────────
+  async listSymptoms(): Promise<SystemSymptomRow[]> {
+    const { data, error } = await supabase.from('system_symptoms').select('*').order('sort_order')
     return throwIfError(data, error)
   },
 
-  // ─ Abertura de Requisição (cria incident ticket_type='request') ─
+  // ─ Upload de ícone para o Storage (bucket catalog-icons) ──
+  async uploadIcon(companyId: string, file: File): Promise<string> {
+    const ext = (file.name.split('.').pop() || 'png').toLowerCase()
+    const path = `${companyId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
+    const { error } = await supabase.storage.from('catalog-icons').upload(path, file, { upsert: true, contentType: file.type || undefined })
+    if (error) throw error
+    const { data } = supabase.storage.from('catalog-icons').getPublicUrl(path)
+    return data.publicUrl
+  },
+
+  // ─ Índice de busca: todos os sintomas (com serviço/grupo) ─
+  async listAllServiceSymptoms(companyId: string, opts?: { activeOnly?: boolean }): Promise<CatalogServiceSymptomRow[]> {
+    let q = supabase
+      .from('catalog_service_symptoms')
+      .select('*, symptom:system_symptoms(id,name,icon,sort_order), group:assignment_groups(id,name), service:catalog_services(id,name,category_id,icon)')
+      .eq('company_id', companyId)
+    if (opts?.activeOnly) q = q.eq('active', true)
+    const { data, error } = await q
+    return throwIfError(data, error)
+  },
+
+  // ─ Junção Serviço × Sintoma (Nível 3 / governança) ────────
+  async listServiceSymptoms(serviceId: string, opts?: { activeOnly?: boolean }): Promise<CatalogServiceSymptomRow[]> {
+    let q = supabase
+      .from('catalog_service_symptoms')
+      .select('*, symptom:system_symptoms(id,name,icon,sort_order), group:assignment_groups(id,name)')
+      .eq('service_id', serviceId)
+    if (opts?.activeOnly) q = q.eq('active', true)
+    const { data, error } = await q
+    return throwIfError(data, error)
+  },
+  async upsertServiceSymptom(payload: {
+    companyId: string; serviceId: string; symptomId: string
+    slaHours: number; assignmentGroupId?: string | null; active: boolean
+    formFields?: RequestFormField[]; formTemplateId?: string | null; uiConfig?: CatalogServiceSymptomRow['ui_config']
+  }): Promise<CatalogServiceSymptomRow> {
+    const { data, error } = await supabase
+      .from('catalog_service_symptoms')
+      .upsert({
+        company_id: payload.companyId,
+        service_id: payload.serviceId,
+        symptom_id: payload.symptomId,
+        sla_hours: payload.slaHours,
+        assignment_group_id: payload.assignmentGroupId ?? null,
+        form_template_id: payload.formTemplateId ?? null,
+        form_fields: payload.formFields ?? [],
+        ui_config: payload.uiConfig ?? {},
+        active: payload.active,
+      }, { onConflict: 'service_id,symptom_id' })
+      .select('*, symptom:system_symptoms(id,name,icon,sort_order), group:assignment_groups(id,name)')
+      .single()
+    return throwIfError(data, error)
+  },
+
+  // ─ Abertura de Incidente com roteamento (SLA + Grupo herdados) ─
   async openRequest(payload: {
     companyId: string
-    item: Pick<CatalogItemRow, 'id' | 'name' | 'category'>
+    serviceId: string
+    serviceName: string
+    symptomId: string
+    symptomName: string
+    slaHours: number
+    assignmentGroupId?: string | null
+    assignmentGroupName?: string | null
+    description?: string
+    callerId?: string | null
+    callerName: string
+    impact?: string
+    urgency?: string
+    formData?: Record<string, unknown>
+  }): Promise<IncidentRow> {
+    const slaDeadline = new Date(Date.now() + (payload.slaHours || 24) * 3600 * 1000).toISOString()
+    const { data, error } = await getClientForCompany(payload.companyId)
+      .from('incidents')
+      .insert({
+        company_id:          payload.companyId,
+        short_description:   `${payload.serviceName} — ${payload.symptomName}`,
+        description:         payload.description ?? null,
+        priority:            'P3 - Moderate',
+        category:            'Inquiry',
+        caller_name:         payload.callerName,
+        caller_id:           payload.callerId ?? null,
+        ticket_type:         'incident',
+        catalog_service_id:  payload.serviceId,
+        symptom_id:          payload.symptomId,
+        assignment_group_id: payload.assignmentGroupId ?? null,
+        assigned_group_name: payload.assignmentGroupName ?? null,
+        sla_deadline:        slaDeadline,
+        impact:              payload.impact ?? null,
+        urgency:             payload.urgency ?? null,
+        form_data:           payload.formData ?? null,
+      })
+      .select()
+      .single()
+    return throwIfError(data, error)
+  },
+
+  // ══════════════════════════════════════════════════════════
+  // ESTEIRA DE REQUISIÇÕES (catálogo de 2 níveis) — migration 024
+  // ══════════════════════════════════════════════════════════
+
+  // ─ Categorias de Requisição (Nível 1) ─
+  async listRequestCategories(companyId: string, opts?: { activeOnly?: boolean }): Promise<RequestCategoryRow[]> {
+    let q = supabase.from('request_categories').select('*').eq('company_id', companyId)
+    if (opts?.activeOnly) q = q.eq('active', true)
+    const { data, error } = await q.order('sort_order')
+    return throwIfError(data, error)
+  },
+  async createRequestCategory(payload: Partial<RequestCategoryRow>): Promise<RequestCategoryRow> {
+    const { data, error } = await supabase.from('request_categories').insert(payload).select().single()
+    return throwIfError(data, error)
+  },
+  async updateRequestCategory(id: string, payload: Partial<RequestCategoryRow>): Promise<RequestCategoryRow> {
+    const { data, error } = await supabase.from('request_categories').update(payload).eq('id', id).select().single()
+    return throwIfError(data, error)
+  },
+  async deleteRequestCategory(id: string): Promise<void> {
+    const { error } = await supabase.from('request_categories').delete().eq('id', id)
+    if (error) throw error
+  },
+
+  // ─ Itens de Requisição (Nível 2) ─
+  async listRequestItems(companyId: string, opts?: { categoryId?: string; activeOnly?: boolean }): Promise<RequestItemRow[]> {
+    let q = supabase
+      .from('request_items')
+      .select('*, group:assignment_groups(id,name)')
+      .eq('company_id', companyId)
+    if (opts?.categoryId) q = q.eq('request_category_id', opts.categoryId)
+    if (opts?.activeOnly) q = q.eq('active', true)
+    const { data, error } = await q.order('sort_order')
+    return throwIfError(data, error)
+  },
+  async createRequestItem(payload: Partial<RequestItemRow>): Promise<RequestItemRow> {
+    const { data, error } = await supabase.from('request_items').insert(payload).select('*, group:assignment_groups(id,name)').single()
+    return throwIfError(data, error)
+  },
+  async updateRequestItem(id: string, payload: Partial<RequestItemRow>): Promise<RequestItemRow> {
+    const { data, error } = await supabase.from('request_items').update(payload).eq('id', id).select('*, group:assignment_groups(id,name)').single()
+    return throwIfError(data, error)
+  },
+  async deleteRequestItem(id: string): Promise<void> {
+    const { error } = await supabase.from('request_items').delete().eq('id', id)
+    if (error) throw error
+  },
+
+  // ─ Abertura de Requisição via item (roteia p/ assignment_group_id) ─
+  async openServiceRequest(payload: {
+    companyId: string
+    item: Pick<RequestItemRow, 'id' | 'name' | 'assignment_group_id'> & { groupName?: string | null }
+    formData?: Record<string, unknown>
     description?: string
     callerId?: string | null
     callerName: string
@@ -1169,15 +1677,18 @@ export const serviceCatalogService = {
     const { data, error } = await getClientForCompany(payload.companyId)
       .from('incidents')
       .insert({
-        company_id:        payload.companyId,
-        short_description: payload.item.name,
-        description:       payload.description ?? null,
-        priority:          'P3 - Moderate',
-        category:          'Inquiry',
-        caller_name:       payload.callerName,
-        caller_id:         payload.callerId ?? null,
-        ticket_type:       'request',
-        catalog_item_id:   payload.item.id,
+        company_id:          payload.companyId,
+        short_description:   payload.item.name,
+        description:         payload.description ?? null,
+        priority:            'P3 - Moderate',
+        category:            'Inquiry',
+        caller_name:         payload.callerName,
+        caller_id:           payload.callerId ?? null,
+        ticket_type:         'request',
+        request_item_id:     payload.item.id,
+        assignment_group_id: payload.item.assignment_group_id ?? null,
+        assigned_group_name: payload.item.groupName ?? null,
+        form_data:           payload.formData ?? null,
       })
       .select()
       .single()

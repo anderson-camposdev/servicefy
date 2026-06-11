@@ -67,6 +67,20 @@ export interface GroupRow {
   created_at: string
 }
 
+export interface AssignmentGroupRow {
+  id: string
+  company_id: string
+  name: string
+  description: string | null
+  is_active: boolean
+  created_at: string
+}
+
+export interface UserGroupRow {
+  user_id: string
+  group_id: string
+}
+
 export interface IncidentRow {
   id: string
   number: string
@@ -82,11 +96,13 @@ export interface IncidentRow {
   assigned_to_name: string | null
   assigned_group_id: string | null
   assigned_group_name: string | null
+  assignment_group_id: string | null
   sla_breached: boolean
   sla_deadline: string | null
   related_problem_id: string | null
   created_at: string
   updated_at: string
+  responded_at: string | null
   resolved_at: string | null
   closed_at: string | null
   // Encerramento padrão ServiceNow (migration 013)
@@ -95,6 +111,16 @@ export interface IncidentRow {
   // Service Catalog (migration 019)
   ticket_type: 'incident' | 'request'
   catalog_item_id: string | null
+  impact?: 'Low' | 'Medium' | 'High' | 'Critical' | null
+  urgency?: 'Low' | 'Medium' | 'High' | null
+  // Motivo da pendência (migration 022) — obrigatório quando state = 'On Hold'
+  pending_reason?: string | null
+  // Roteamento do catálogo 3 níveis (migration 023)
+  catalog_service_id?: string | null
+  symptom_id?: string | null
+  // Esteira de requisições (migration 024)
+  request_item_id?: string | null
+  form_data?: Json | null
 }
 
 /** Interações do chamado (chat público + notas internas). Migration 013. */
@@ -123,6 +149,11 @@ export interface IncidentHistoryRow {
   comment: string | null
   is_public: boolean
   created_at: string
+}
+
+export interface PortalTicketDetail extends IncidentRow {
+  catalog_category_name: string | null
+  catalog_selection_name: string | null
 }
 
 export interface ServiceRequestRow {
@@ -226,6 +257,95 @@ export interface CatalogCategoryRow {
   sort_order: number
   is_active: boolean
   created_at: string
+}
+
+/** Nível 2 — Serviço (migration 023), vinculado a uma categoria. */
+export interface CatalogServiceRow {
+  id: string
+  company_id: string
+  category_id: string
+  name: string
+  description: string | null
+  icon: string
+  sort_order: number
+  is_active: boolean
+  created_at: string
+}
+
+/** Tabela mestre de sintomas universais (migration 023, global). */
+export interface SystemSymptomRow {
+  id: string
+  name: string
+  icon: string | null
+  sort_order: number
+}
+
+/** Nível 3 — Junção Serviço × Sintoma com a governança (migration 023). */
+export interface CatalogServiceSymptomRow {
+  id: string
+  company_id: string
+  service_id: string
+  symptom_id: string
+  sla_hours: number
+  assignment_group_id: string | null
+  form_template_id: string | null
+  form_fields: Json
+  ui_config: Json
+  active: boolean
+  created_at: string
+  // joins opcionais
+  symptom?: SystemSymptomRow | null
+  group?: { id: string; name: string } | null
+  service?: { id: string; name: string; category_id: string; icon?: string | null } | null
+}
+
+/** Campo de formulário dinâmico de um item de requisição. */
+export interface RequestFormField {
+  id: string
+  label: string
+  type: 'text' | 'textarea' | 'select' | 'checkbox' | 'datetime' | 'number' | 'date'
+  required: boolean
+  options?: string[]
+}
+
+export interface FormTemplateRow {
+  id: string
+  tenant_id: string
+  name: string
+  fields: Json
+  created_at: string
+  updated_at: string
+}
+
+/** Esteira de Requisições — Nível 1 (migration 024). */
+export interface RequestCategoryRow {
+  id: string
+  company_id: string
+  name: string
+  description: string | null
+  icon: string | null
+  active: boolean
+  sort_order: number
+  created_at: string
+}
+
+/** Esteira de Requisições — Nível 2 (migration 024). */
+export interface RequestItemRow {
+  id: string
+  company_id: string
+  request_category_id: string
+  name: string
+  description: string | null
+  icon: string | null
+  form_template_id: string | null
+  form_fields: Json
+  ui_config: Json
+  assignment_group_id: string | null
+  active: boolean
+  sort_order: number
+  created_at: string
+  // join opcional
+  group?: { id: string; name: string } | null
 }
 
 export interface SLAPolicyRow {
@@ -444,12 +564,15 @@ export type Database = {
       companies:                  { Row: CompanyRow;                   Insert: Partial<CompanyRow>;                   Update: Partial<CompanyRow>;                   Relationships: [] }
       profiles:                   { Row: ProfileRow;                    Insert: Partial<ProfileRow>;                    Update: Partial<ProfileRow>;                    Relationships: [] }
       groups:                     { Row: GroupRow;                      Insert: Partial<GroupRow>;                      Update: Partial<GroupRow>;                      Relationships: [] }
+      assignment_groups:          { Row: AssignmentGroupRow;            Insert: Partial<AssignmentGroupRow>;            Update: Partial<AssignmentGroupRow>;            Relationships: [] }
+      user_groups:                { Row: UserGroupRow;                  Insert: UserGroupRow;                           Update: Partial<UserGroupRow>;                  Relationships: [] }
       incidents:                  { Row: IncidentRow;                   Insert: Partial<IncidentRow>;                   Update: Partial<IncidentRow>;                   Relationships: [] }
       incident_history:           { Row: IncidentHistoryRow;            Insert: Partial<IncidentHistoryRow>;            Update: Partial<IncidentHistoryRow>;            Relationships: [] }
       service_requests:           { Row: ServiceRequestRow;             Insert: Partial<ServiceRequestRow>;             Update: Partial<ServiceRequestRow>;             Relationships: [] }
       problems:                   { Row: ProblemRow;                    Insert: Partial<ProblemRow>;                    Update: Partial<ProblemRow>;                    Relationships: [] }
       changes:                    { Row: ChangeRow;                     Insert: Partial<ChangeRow>;                     Update: Partial<ChangeRow>;                     Relationships: [] }
       catalog_items:              { Row: CatalogItemRow;                Insert: Partial<CatalogItemRow>;                Update: Partial<CatalogItemRow>;                Relationships: [] }
+      form_templates:             { Row: FormTemplateRow;               Insert: Partial<FormTemplateRow>;               Update: Partial<FormTemplateRow>;               Relationships: [] }
       sla_policies:               { Row: SLAPolicyRow;                  Insert: Partial<SLAPolicyRow>;                  Update: Partial<SLAPolicyRow>;                  Relationships: [] }
       workflow_rules:             { Row: WorkflowRuleRow;               Insert: Partial<WorkflowRuleRow>;               Update: Partial<WorkflowRuleRow>;               Relationships: [] }
       notifications:              { Row: NotificationRow;               Insert: Partial<NotificationRow>;               Update: Partial<NotificationRow>;               Relationships: [] }

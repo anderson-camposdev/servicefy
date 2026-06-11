@@ -24,13 +24,21 @@ export interface UseIncidentsReturn {
   setPriorityFilter: (v: TicketPriority | 'all') => void
   setFilterCompanyId: (v: string) => void
   refetch: () => void
+  upsertIncident: (incident: IncidentRow) => void
   updateState: (id: string, state: IncidentState, actorName: string, comment?: string) => Promise<void>
   addComment: (incidentId: string, comment: string, actorName: string) => Promise<void>
 }
 
 const DEFAULT_KPIS = { total: 0, critical: 0, inProgress: 0, slaBreached: 0, unassigned: 0 }
+const summarizeIncidents = (rows: IncidentRow[]) => ({
+  total: rows.length,
+  critical: rows.filter(row => row.priority === 'P1 - Critical').length,
+  inProgress: rows.filter(row => row.state === 'In Progress').length,
+  slaBreached: rows.filter(row => row.sla_breached).length,
+  unassigned: rows.filter(row => !row.assigned_to_id).length,
+})
 
-export function useIncidents(companyId: string): UseIncidentsReturn {
+export function useIncidents(companyId: string, callerId?: string, ticketType?: 'incident' | 'request' | 'all'): UseIncidentsReturn {
   const [incidents, setIncidents] = useState<IncidentRow[]>([])
   const [kpis, setKpis] = useState(DEFAULT_KPIS)
   const [loading, setLoading] = useState(true)
@@ -54,11 +62,13 @@ export function useIncidents(companyId: string): UseIncidentsReturn {
         state: stateFilter !== 'all' ? stateFilter : undefined,
         priority: priorityFilter !== 'all' ? priorityFilter : undefined,
         filterCompanyId: filterCompanyId !== 'all' ? filterCompanyId : undefined,
+        callerId,
+        ticketType: ticketType !== 'all' ? ticketType : undefined,
       }
-      const [rows, kpiData] = await Promise.all([
-        incidentsService.list(filters),
-        incidentsService.getKPIs(companyId, filterCompanyId),
-      ])
+      const rows = await incidentsService.list(filters)
+      const kpiData = callerId
+        ? summarizeIncidents(rows)
+        : await incidentsService.getKPIs(companyId, filterCompanyId, ticketType !== 'all' ? ticketType : undefined)
       setIncidents(rows)
       setKpis(kpiData)
     } catch (err) {
@@ -66,7 +76,7 @@ export function useIncidents(companyId: string): UseIncidentsReturn {
     } finally {
       setLoading(false)
     }
-  }, [companyId, search, stateFilter, priorityFilter, filterCompanyId])
+  }, [companyId, search, stateFilter, priorityFilter, filterCompanyId, callerId, ticketType])
 
   // Initial load + filter changes
   useEffect(() => {
@@ -79,6 +89,17 @@ export function useIncidents(companyId: string): UseIncidentsReturn {
     setSearch(value)
   }, [])
 
+  const upsertIncident = useCallback((row: IncidentRow) => {
+    if (callerId && row.caller_id !== callerId) return
+    if (ticketType && ticketType !== 'all' && row.ticket_type !== ticketType) return
+    setIncidents(previous => {
+      const next = [row, ...previous.filter(candidate => candidate.id !== row.id)]
+        .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
+      if (callerId) setKpis(summarizeIncidents(next))
+      return next
+    })
+  }, [callerId, ticketType])
+
   // Real-time subscription
   useEffect(() => {
     if (!companyId) return
@@ -87,28 +108,26 @@ export function useIncidents(companyId: string): UseIncidentsReturn {
       companyId,
       // On INSERT — add to top of list
       (newRow) => {
-        setIncidents(prev => [newRow, ...prev])
-        setKpis(prev => ({
-          ...prev,
-          total: prev.total + 1,
-          critical:   newRow.priority === 'P1 - Critical' ? prev.critical + 1 : prev.critical,
-          inProgress: newRow.state === 'In Progress'      ? prev.inProgress + 1 : prev.inProgress,
-          slaBreached: newRow.sla_breached               ? prev.slaBreached + 1 : prev.slaBreached,
-          unassigned: !newRow.assigned_to_id             ? prev.unassigned + 1 : prev.unassigned,
-        }))
+        upsertIncident(newRow)
       },
       // On UPDATE — merge the updated row
       (updatedRow) => {
-        setIncidents(prev => prev.map(i => i.id === updatedRow.id ? updatedRow : i))
-        // Re-fetch KPIs (easier to keep consistent)
-        incidentsService.getKPIs(companyId, filterCompanyId).then(setKpis).catch(console.error)
-      }
+        setIncidents(prev => {
+          const next = prev.map(i => i.id === updatedRow.id ? updatedRow : i)
+          if (callerId) setKpis(summarizeIncidents(next))
+          return next
+        })
+        if (!callerId) {
+          incidentsService.getKPIs(companyId, filterCompanyId, ticketType !== 'all' ? ticketType : undefined).then(setKpis).catch(console.error)
+        }
+      },
+      callerId,
     )
 
     return () => {
       channel.unsubscribe()
     }
-  }, [companyId, filterCompanyId])
+  }, [companyId, filterCompanyId, callerId, upsertIncident, ticketType])
 
   const updateState = useCallback(async (id: string, state: IncidentState, actorName: string, comment?: string) => {
     await incidentsService.update(id, companyId, { state }, actorName, comment)
@@ -134,6 +153,7 @@ export function useIncidents(companyId: string): UseIncidentsReturn {
     setPriorityFilter,
     setFilterCompanyId,
     refetch: fetchData,
+    upsertIncident,
     updateState,
     addComment,
   }

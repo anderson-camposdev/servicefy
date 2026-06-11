@@ -1,6 +1,8 @@
-import { useState } from 'react'
-import { Search, Clock, AlertTriangle, CheckCircle, MoreHorizontal, Building2, LayoutGrid, List, ChevronRight } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Search, Clock, AlertTriangle, CheckCircle, MoreHorizontal, Building2, LayoutGrid, List, ChevronRight, Settings, X, User, Users } from 'lucide-react'
 import { useIncidents } from '../hooks/useIncidents'
+import { translateState } from '../lib/statusLabels'
+import { useAuth } from '../auth'
 import type { WorkspaceTicket, CompanyLite } from './workspace.types'
 
 /**
@@ -15,9 +17,19 @@ interface TicketManagementDashboardProps {
   companyId?: string
   isProvider?: boolean
   companies?: CompanyLite[]
+  ticketType?: 'incident' | 'request'
 }
 
-type Row = WorkspaceTicket & { column: string; companyId?: string }
+type Row = WorkspaceTicket & { 
+  column: string
+  companyId?: string
+  assignedToId?: string | null
+  slaBreached?: boolean
+  slaDeadline?: string | null
+  updatedAt?: string
+  resolvedAt?: string | null
+  ticketType?: string
+}
 
 // ─── Mocks (modo preview, sem companyId) ──────────────────────
 const mockClients: CompanyLite[] = [
@@ -28,9 +40,82 @@ const mockClients: CompanyLite[] = [
 ]
 
 const mockRows: Row[] = [
-  { id: 'INC-08722', date: '08/06/2026 10:54', title: 'Sistema ERP com lentidão extrema', client: 'Grupo Wish', priority: 'Alta', sla: '1h 15m', requester: 'Karen Ribeiro', status: 'Aberto', techGroup: 'Sistemas', column: 'open' },
-  { id: 'REQ-09101', date: '08/06/2026 11:30', title: 'Solicitação de Acesso - VPN', client: 'Sephora', priority: 'Baixa', sla: '12h 00m', requester: 'Lucas Pietro', status: 'Em Atendimento', techGroup: 'Acessos e Contas', column: 'progress' },
-  { id: 'INC-08550', date: '08/06/2026 09:15', title: 'Falha no link principal', client: 'Allied IT', priority: 'Crítica', sla: '0h 20m', requester: 'Roberto Teixeira', status: 'Em Atendimento', techGroup: 'Infraestrutura', column: 'progress' },
+  { 
+    id: 'INC-08722', 
+    date: '08/06/2026 10:54', 
+    title: 'Sistema ERP com lentidão extrema', 
+    client: 'Grupo Wish', 
+    priority: 'Alta', 
+    sla: '1h 15m', 
+    requester: 'Karen Ribeiro', 
+    status: 'Aberto', 
+    techGroup: 'Sistemas', 
+    column: 'open',
+    assignedToId: 'u-some-analyst',
+    slaBreached: false,
+    slaDeadline: new Date(Date.now() + 3600000 * 1.5).toISOString(),
+    updatedAt: new Date().toISOString(),
+    resolvedAt: null,
+    ticketType: 'incident',
+    companyId: 'wish',
+  },
+  { 
+    id: 'REQ-09101', 
+    date: '08/06/2026 11:30', 
+    title: 'Solicitação de Acesso - VPN', 
+    client: 'Sephora', 
+    priority: 'Baixa', 
+    sla: '12h 00m', 
+    requester: 'Lucas Pietro', 
+    status: 'Em Atendimento', 
+    techGroup: 'Acessos e Contas', 
+    column: 'progress',
+    assignedToId: null, // Unassigned!
+    slaBreached: false,
+    slaDeadline: new Date(Date.now() + 43200000).toISOString(),
+    updatedAt: new Date().toISOString(),
+    resolvedAt: null,
+    ticketType: 'request',
+    companyId: 'sephora',
+  },
+  { 
+    id: 'INC-08550', 
+    date: '08/06/2026 09:15', 
+    title: 'Falha no link principal', 
+    client: 'Allied IT', 
+    priority: 'Crítica', 
+    sla: 'Violado', 
+    requester: 'Roberto Teixeira', 
+    status: 'Em Atendimento', 
+    techGroup: 'Infraestrutura', 
+    column: 'progress',
+    assignedToId: 'u-sys-1', // Assigned to sysadmin / current user!
+    slaBreached: true, // SLA Breached!
+    slaDeadline: new Date(Date.now() - 3600000).toISOString(),
+    updatedAt: new Date().toISOString(),
+    resolvedAt: null,
+    ticketType: 'incident',
+    companyId: 'allied',
+  },
+  { 
+    id: 'INC-08200', 
+    date: '08/06/2026 08:00', 
+    title: 'Acesso bloqueado ERP', 
+    client: 'Sephora', 
+    priority: 'Alta', 
+    sla: 'Resolvido', 
+    requester: 'Diana Prince', 
+    status: 'Resolvido', 
+    techGroup: 'Sistemas', 
+    column: 'resolved',
+    assignedToId: 'u-sys-1',
+    slaBreached: false,
+    slaDeadline: new Date(Date.now() - 3600000).toISOString(),
+    updatedAt: new Date().toISOString(),
+    resolvedAt: new Date().toISOString(), // Resolved today!
+    ticketType: 'incident',
+    companyId: 'sephora',
+  },
 ]
 
 const KANBAN_COLUMNS = [
@@ -72,13 +157,115 @@ function TypeBadge({ type }: { type?: string }) {
   )
 }
 
-const TicketManagementDashboard = ({ onOpenTicket, companyId, isProvider, companies }: TicketManagementDashboardProps) => {
+// ─── CONFIGURAÇÃO DE MÉTRICAS (8 OPÇÕES DISPONÍVEIS) ─────────
+const AVAILABLE_METRICS = [
+  {
+    key: 'total',
+    title: 'Total na Fila',
+    icon: List,
+    color: 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100',
+    activeColor: 'bg-slate-900 text-white border-slate-900 shadow-md ring-2 ring-slate-900',
+    filterFn: () => true,
+    countFn: (rows: Row[]) => rows.length,
+  },
+  {
+    key: 'critical',
+    title: 'Críticos P1',
+    icon: AlertTriangle,
+    color: 'bg-red-50 text-red-700 border-red-200 hover:bg-red-100',
+    activeColor: 'bg-red-600 text-white border-red-600 shadow-md ring-2 ring-red-600',
+    filterFn: (r: Row) => r.priority === 'Crítica' || r.priority === 'P1 - Critical' || r.priority.includes('P1'),
+    countFn: (rows: Row[]) => rows.filter(r => r.priority === 'Crítica' || r.priority === 'P1 - Critical' || r.priority.includes('P1')).length,
+  },
+  {
+    key: 'inProgress',
+    title: 'Em Atendimento',
+    icon: Clock,
+    color: 'bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100',
+    activeColor: 'bg-indigo-600 text-white border-indigo-600 shadow-md ring-2 ring-indigo-600',
+    filterFn: (r: Row) => r.status === 'Em Atendimento' || r.status === 'In Progress',
+    countFn: (rows: Row[]) => rows.filter(r => r.status === 'Em Atendimento' || r.status === 'In Progress').length,
+  },
+  {
+    key: 'slaBreached',
+    title: 'SLA Violado',
+    icon: AlertTriangle,
+    color: 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100',
+    activeColor: 'bg-rose-600 text-white border-rose-600 shadow-md ring-2 ring-rose-600',
+    filterFn: (r: Row) => r.slaBreached === true || r.sla === 'Violado',
+    countFn: (rows: Row[]) => rows.filter(r => r.slaBreached === true || r.sla === 'Violado').length,
+  },
+  {
+    key: 'slaToExpire',
+    title: 'SLA a Vencer',
+    icon: Clock,
+    color: 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100',
+    activeColor: 'bg-amber-600 text-white border-amber-600 shadow-md ring-2 ring-amber-600',
+    filterFn: (r: Row) => !r.slaBreached && r.status !== 'Resolved' && r.status !== 'Closed' && r.status !== 'Resolvido' && r.status !== 'Fechado' && r.sla !== 'Violado' && !!r.slaDeadline,
+    countFn: (rows: Row[]) => rows.filter(r => !r.slaBreached && r.status !== 'Resolved' && r.status !== 'Closed' && r.status !== 'Resolvido' && r.status !== 'Fechado' && r.sla !== 'Violado' && !!r.slaDeadline).length,
+  },
+  {
+    key: 'myQueue',
+    title: 'Minha Fila',
+    icon: User,
+    color: 'bg-teal-50 text-teal-700 border-teal-200 hover:bg-teal-100',
+    activeColor: 'bg-teal-600 text-white border-teal-600 shadow-md ring-2 ring-teal-600',
+    filterFn: (r: Row, profileId?: string) => r.assignedToId === profileId,
+    countFn: (rows: Row[], profileId?: string) => rows.filter(r => r.assignedToId === profileId).length,
+  },
+  {
+    key: 'unassigned',
+    title: 'Não Atribuídos',
+    icon: Users,
+    color: 'bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100',
+    activeColor: 'bg-purple-600 text-white border-purple-600 shadow-md ring-2 ring-purple-600',
+    filterFn: (r: Row) => !r.assignedToId,
+    countFn: (rows: Row[]) => rows.filter(r => !r.assignedToId).length,
+  },
+  {
+    key: 'resolvedToday',
+    title: 'Resolvidos Hoje',
+    icon: CheckCircle,
+    color: 'bg-green-50 text-green-700 border-green-200 hover:bg-green-100',
+    activeColor: 'bg-green-600 text-white border-green-600 shadow-md ring-2 ring-green-600',
+    filterFn: (r: Row) => (r.status === 'Resolved' || r.status === 'Resolvido' || r.status === 'Closed' || r.status === 'Fechado') && (r.resolvedAt ? new Date(r.resolvedAt).toDateString() === new Date().toDateString() : (r.updatedAt ? new Date(r.updatedAt).toDateString() === new Date().toDateString() : true)),
+    countFn: (rows: Row[]) => rows.filter(r => (r.status === 'Resolved' || r.status === 'Resolvido' || r.status === 'Closed' || r.status === 'Fechado') && (r.resolvedAt ? new Date(r.resolvedAt).toDateString() === new Date().toDateString() : (r.updatedAt ? new Date(r.updatedAt).toDateString() === new Date().toDateString() : true))).length,
+  }
+]
+
+const DEFAULT_METRIC_KEYS = ['total', 'critical', 'inProgress', 'slaBreached']
+
+const TicketManagementDashboard = ({ onOpenTicket, companyId, isProvider, companies, ticketType }: TicketManagementDashboardProps) => {
   const realMode = Boolean(companyId)
-  const { incidents, kpis, loading, filterCompanyId, setFilterCompanyId, setSearch } = useIncidents(companyId ?? '')
+  const { incidents, loading, filterCompanyId, setFilterCompanyId, setSearch } = useIncidents(companyId ?? '', undefined, ticketType)
+  const { profile } = useAuth()
 
   const [localClient, setLocalClient] = useState('all')
   const [localSearch, setLocalSearch] = useState('')
   const [viewMode, setViewMode] = useState<'table' | 'kanban'>('table')
+
+  // Estados dos Indicadores e Customização Self-Service
+  const [activeFilterCard, setActiveFilterCard] = useState<string | null>(null)
+  const [isCustomizing, setIsCustomizing] = useState(false)
+  const [selectedMetricKeys, setSelectedMetricKeys] = useState<string[]>([])
+
+  // Carrega preferências do localStorage baseado no ID do usuário
+  useEffect(() => {
+    const key = profile?.id ? `flowfy_dashboard_metrics_${profile.id}` : 'flowfy_dashboard_metrics_guest'
+    const saved = localStorage.getItem(key)
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved)
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setSelectedMetricKeys(parsed)
+          return
+        }
+      } catch (e) {
+        console.error('Falha ao parsear métricas salvas:', e)
+      }
+    }
+    setSelectedMetricKeys(DEFAULT_METRIC_KEYS)
+  }, [profile?.id])
 
   const companyName = (id: string) => companies?.find(c => c.id === id)?.name ?? '—'
 
@@ -98,10 +285,15 @@ const TicketManagementDashboard = ({ onOpenTicket, companyId, isProvider, compan
         ticketType: i.ticket_type,
         incidentId: i.id,
         companyId: i.company_id,
+        assignedToId: i.assigned_to_id,
+        slaBreached: i.sla_breached,
+        slaDeadline: i.sla_deadline,
+        updatedAt: i.updated_at,
+        resolvedAt: i.resolved_at,
       }))
-    : mockRows
+    : mockRows.filter(r => !ticketType || r.ticketType === ticketType)
 
-  // Filtro de cliente (provedor): real usa o filtro do hook; preview usa local
+  // 1. Filtro de cliente (provedor): real usa o filtro do hook; preview usa local
   const activeClient = realMode ? filterCompanyId : localClient
   const setActiveClient = realMode ? setFilterCompanyId : setLocalClient
   const showClientChips = !realMode || (isProvider && (companies?.length ?? 0) > 0)
@@ -109,19 +301,30 @@ const TicketManagementDashboard = ({ onOpenTicket, companyId, isProvider, compan
     ? [{ id: 'all', name: 'Todos os Clientes' }, ...(companies ?? [])]
     : mockClients
 
-  // Contadores
-  const counters = realMode
-    ? [
-        { id: 1, title: 'Total na Fila', count: kpis.total, color: 'bg-slate-50 text-slate-700 border-slate-200', icon: List },
-        { id: 2, title: 'Críticos (P1)', count: kpis.critical, color: 'bg-red-50 text-red-700 border-red-200', icon: AlertTriangle },
-        { id: 3, title: 'Em Atendimento', count: kpis.inProgress, color: 'bg-amber-50 text-amber-700 border-amber-200', icon: Clock },
-        { id: 4, title: 'SLA Violado', count: kpis.slaBreached, color: 'bg-green-50 text-green-700 border-green-200', icon: CheckCircle },
-      ]
-    : [
-        { id: 1, title: 'Meus Incidentes Críticos', count: 4, color: 'bg-red-50 text-red-700 border-red-200', icon: AlertTriangle },
-        { id: 2, title: 'Aguardando Fornecedor', count: 12, color: 'bg-amber-50 text-amber-700 border-amber-200', icon: Clock },
-        { id: 3, title: 'Resolvidos Hoje', count: 45, color: 'bg-green-50 text-green-700 border-green-200', icon: CheckCircle },
-      ]
+  const clientFilteredRows = activeClient === 'all'
+    ? rows
+    : rows.filter(r => r.companyId === activeClient || r.client === activeClient || (activeClient === 'allied' && r.client === 'Allied IT') || (activeClient === 'wish' && r.client === 'Grupo Wish') || (activeClient === 'sephora' && r.client === 'Sephora'))
+
+  // 2. Filtro por Busca
+  const searchedRows = realMode
+    ? clientFilteredRows
+    : clientFilteredRows.filter(r => 
+        r.id.toLowerCase().includes(localSearch.toLowerCase()) || 
+        r.title.toLowerCase().includes(localSearch.toLowerCase()) ||
+        (r.requester ?? '').toLowerCase().includes(localSearch.toLowerCase())
+      )
+
+  // 3. Filtro por tipo (Incidente x Requisição) - removido, divisor físico por ticketType
+  const typedRows = searchedRows
+
+  // 4. Filtro Ativo pelo Card selecionado
+  const profileIdForMetrics = profile?.id || 'u-sys-1'
+  const finalFilteredRows = activeFilterCard
+    ? typedRows.filter(r => {
+        const metric = AVAILABLE_METRICS.find(m => m.key === activeFilterCard)
+        return metric ? metric.filterFn(r, profileIdForMetrics) : true
+      })
+    : typedRows
 
   const handleSearchChange = (value: string) => {
     if (realMode) setSearch(value)
@@ -170,6 +373,8 @@ const TicketManagementDashboard = ({ onOpenTicket, companyId, isProvider, compan
             />
           </div>
 
+          {/* O filtro de tipo unificado foi removido, a divisão agora é física via barra lateral */}
+
           {/* TOGGLE: Kanban vs Tabela */}
           <div className="flex bg-slate-100 p-1 rounded-lg border border-slate-200">
             <button
@@ -192,20 +397,41 @@ const TicketManagementDashboard = ({ onOpenTicket, companyId, isProvider, compan
 
       {/* 2. ÁREA SELF-SERVICE: Contadores */}
       <div className="px-6 py-4 flex items-center gap-4 shrink-0 overflow-x-auto hide-scrollbar">
-        {counters.map(counter => {
-          const Icon = counter.icon
-          return (
-            <div key={counter.id} className={`flex items-center gap-4 p-3 rounded-xl border min-w-[220px] cursor-pointer hover:shadow-md transition-shadow ${counter.color}`}>
-              <div className="p-2 bg-white/50 rounded-lg rounded-tr-none">
-                <Icon className="w-5 h-5" />
-              </div>
-              <div>
-                <p className="text-2xl font-black leading-none">{counter.count}</p>
-                <p className="text-xs font-semibold uppercase tracking-wider mt-1 opacity-80">{counter.title}</p>
-              </div>
-            </div>
-          )
-        })}
+        <div className="flex items-center gap-4 flex-1">
+          {selectedMetricKeys.map(key => {
+            const metric = AVAILABLE_METRICS.find(m => m.key === key)
+            if (!metric) return null
+            const Icon = metric.icon
+            const count = metric.countFn(typedRows, profileIdForMetrics)
+            const isActive = activeFilterCard === key
+            
+            return (
+              <button
+                key={key}
+                onClick={() => setActiveFilterCard(isActive ? null : key)}
+                className={`flex items-center gap-4 p-3 rounded-xl border text-left min-w-[220px] transition-all duration-200 select-none active:scale-98 ${
+                  isActive ? metric.activeColor : `${metric.color} border-slate-200 shadow-xs hover:shadow-md`
+                }`}
+              >
+                <div className={`p-2 rounded-lg rounded-tr-none transition-colors ${isActive ? 'bg-white/20' : 'bg-white/60 shadow-2xs'}`}>
+                  <Icon className="w-5 h-5" />
+                </div>
+                <div>
+                  <p className="text-2xl font-black leading-none">{count}</p>
+                  <p className="text-xs font-semibold uppercase tracking-wider mt-1.5 opacity-90">{metric.title}</p>
+                </div>
+              </button>
+            )
+          })}
+        </div>
+        <button
+          onClick={() => setIsCustomizing(true)}
+          className="flex items-center gap-2 px-4 py-3 bg-white hover:bg-slate-50 border border-slate-200 hover:border-slate-300 rounded-xl text-xs font-bold text-slate-700 transition-all shadow-2xs hover:shadow-xs shrink-0 group"
+          title="Personalizar cards do topo"
+        >
+          <Settings className="w-4 h-4 text-slate-500 group-hover:rotate-90 transition-transform duration-300" />
+          <span>⚙️ Customizar Visão</span>
+        </button>
       </div>
 
       {/* 3. ÁREA PRINCIPAL: Tabela ou Kanban */}
@@ -231,16 +457,16 @@ const TicketManagementDashboard = ({ onOpenTicket, companyId, isProvider, compan
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {realMode && loading && rows.length === 0 && (
+                  {realMode && loading && finalFilteredRows.length === 0 && (
                     <tr><td colSpan={11} className="p-8 text-center text-slate-400 text-sm">
                       <span className="inline-block w-4 h-4 border-2 border-slate-300 border-t-indigo-500 rounded-full animate-spin mr-2 align-middle" />
                       Carregando chamados…
                     </td></tr>
                   )}
-                  {!loading && rows.length === 0 && (
+                  {!loading && finalFilteredRows.length === 0 && (
                     <tr><td colSpan={11} className="p-8 text-center text-slate-400 text-sm">Nenhum chamado encontrado.</td></tr>
                   )}
-                  {rows.map((ticket) => (
+                  {finalFilteredRows.map((ticket) => (
                     <tr key={ticket.id} onClick={() => openTicket(ticket)} className="hover:bg-indigo-50/50 transition-colors cursor-pointer group">
                       <td className="p-3 text-center" onClick={(e) => e.stopPropagation()}><input type="checkbox" className="rounded border-slate-300" /></td>
                       <td className="p-3 font-extrabold text-indigo-600 whitespace-nowrap">
@@ -250,14 +476,22 @@ const TicketManagementDashboard = ({ onOpenTicket, companyId, isProvider, compan
                       <td className="p-3 font-medium"><span className="flex items-center gap-1"><Building2 className="w-3 h-3 text-slate-400"/> {ticket.client}</span></td>
                       <td className="p-3 text-slate-600">{ticket.requester}</td>
                       <td className="p-3 font-semibold text-slate-900 truncate max-w-[300px]" title={ticket.title}>{ticket.title}</td>
-                      <td className="p-3 text-slate-600">{ticket.status}</td>
+                      <td className="p-3 text-slate-600">{translateState(ticket.status)}</td>
                       <td className="p-3">
                         <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-md ${priorityClass(ticket.priority)}`}>
                           {ticket.priority}
                         </span>
                       </td>
                       <td className="p-3 font-bold text-slate-600"><span className="flex items-center gap-1"><Clock className="w-3 h-3"/> {ticket.sla}</span></td>
-                      <td className="p-3 text-slate-600">{ticket.techGroup}</td>
+                      <td className="p-3">
+                        {ticket.techGroup !== '—' ? (
+                          <span className="inline-flex items-center px-2 py-0.5 bg-indigo-50 border border-indigo-100 text-indigo-700 text-xs font-bold rounded-md shadow-xs">
+                            {ticket.techGroup}
+                          </span>
+                        ) : (
+                          <span className="text-slate-400 italic text-xs">Sem equipe</span>
+                        )}
+                      </td>
                       <td className="p-3 text-right">
                         <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-indigo-600" />
                       </td>
@@ -267,7 +501,7 @@ const TicketManagementDashboard = ({ onOpenTicket, companyId, isProvider, compan
               </table>
             </div>
             <div className="bg-slate-50 border-t border-slate-200 p-3 px-4 text-xs text-slate-500 flex justify-between items-center">
-              <span>{realMode ? `${rows.length} chamado(s)` : 'Mostrando 1 a 25 de 6.779 chamados'}</span>
+              <span>{realMode ? `${finalFilteredRows.length} chamado(s)` : `Mostrando 1 a ${finalFilteredRows.length} de ${finalFilteredRows.length} chamados`}</span>
               <div className="flex gap-1">
                 <button className="px-3 py-1 border border-slate-200 rounded hover:bg-white">Anterior</button>
                 <button className="px-3 py-1 border border-slate-200 rounded hover:bg-white bg-white font-bold">Próximo</button>
@@ -279,7 +513,7 @@ const TicketManagementDashboard = ({ onOpenTicket, companyId, isProvider, compan
 
           <div className="flex gap-6 h-full min-w-max">
             {KANBAN_COLUMNS.map(col => {
-              const colRows = rows.filter(t => t.column === col.id)
+              const colRows = finalFilteredRows.filter(t => t.column === col.id)
               return (
                 <div key={col.id} className="w-[340px] flex flex-col max-h-full bg-slate-100/50 rounded-2xl border border-slate-200">
                   <div className={`p-4 border-t-4 rounded-t-2xl flex justify-between items-center bg-slate-100 ${col.color}`}>
@@ -309,6 +543,107 @@ const TicketManagementDashboard = ({ onOpenTicket, companyId, isProvider, compan
         )}
 
       </div>
+
+      {/* Customization Modal */}
+      {isCustomizing && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs transition-all">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-md overflow-hidden transform transition-all scale-100 p-0">
+            {/* Header */}
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+              <div className="flex items-center gap-2">
+                <Settings className="w-5 h-5 text-indigo-600" />
+                <h3 className="font-extrabold text-slate-800 text-base">Customizar Painel</h3>
+              </div>
+              <button 
+                onClick={() => setIsCustomizing(false)} 
+                className="p-1 rounded-lg hover:bg-slate-200 text-slate-400 hover:text-slate-600 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="p-6 space-y-4 max-h-[400px] overflow-y-auto">
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                Selecione quais indicadores deseja exibir no topo do painel:
+              </p>
+
+              <div className="space-y-2">
+                {AVAILABLE_METRICS.map(metric => {
+                  const Icon = metric.icon
+                  const isChecked = selectedMetricKeys.includes(metric.key)
+                  
+                  return (
+                    <label 
+                      key={metric.key}
+                      className={`flex items-center gap-3 p-3.5 rounded-xl border-2 cursor-pointer transition-all select-none ${
+                        isChecked 
+                          ? 'border-indigo-500 bg-indigo-50/40 hover:bg-indigo-50/60' 
+                          : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={() => {
+                          if (isChecked) {
+                            if (selectedMetricKeys.length > 1) {
+                              setSelectedMetricKeys(prev => prev.filter(k => k !== metric.key))
+                            }
+                          } else {
+                            setSelectedMetricKeys(prev => [...prev, metric.key])
+                          }
+                        }}
+                        className="w-4.5 h-4.5 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500"
+                      />
+                      <div className={`p-1.5 rounded-lg ${isChecked ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-600'}`}>
+                        <Icon className="w-4 h-4" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-sm font-bold text-slate-800">{metric.title}</p>
+                      </div>
+                    </label>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex items-center justify-end gap-3">
+              <button
+                onClick={() => {
+                  const key = profile?.id ? `flowfy_dashboard_metrics_${profile.id}` : 'flowfy_dashboard_metrics_guest'
+                  const saved = localStorage.getItem(key)
+                  if (saved) {
+                    try {
+                      setSelectedMetricKeys(JSON.parse(saved))
+                    } catch(e) {
+                      setSelectedMetricKeys(DEFAULT_METRIC_KEYS)
+                    }
+                  } else {
+                    setSelectedMetricKeys(DEFAULT_METRIC_KEYS)
+                  }
+                  setIsCustomizing(false)
+                }}
+                className="px-4 py-2 border border-slate-200 hover:border-slate-300 hover:bg-slate-100 text-slate-600 text-sm font-bold rounded-xl transition-all"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => {
+                  const key = profile?.id ? `flowfy_dashboard_metrics_${profile.id}` : 'flowfy_dashboard_metrics_guest'
+                  localStorage.setItem(key, JSON.stringify(selectedMetricKeys))
+                  setIsCustomizing(false)
+                }}
+                className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white text-sm font-extrabold rounded-xl transition-all shadow-md hover:shadow-lg"
+              >
+                Salvar Preferências
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   )
 }
