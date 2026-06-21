@@ -11,6 +11,20 @@ import type {
   RequestCategoryRow, RequestItemRow, RequestFormField, IncidentRow,
 } from '../lib/database.types'
 import type { FormAnswers, FormFieldValue } from '../lib/catalogFormFields'
+import { useTenant } from '../tenant/TenantContext'
+
+export type CatalogUiConfig = {
+  layout_style?: 'sephora_3d' | 'striped_3d' | 'default'
+  background?: { type: 'image' | 'color' | 'pattern'; value: string }
+  cards?: {
+    id: string
+    title: string
+    description?: string
+    image_url?: string
+    action: 'incident' | 'request'
+    style?: 'pill_label' | 'default'
+  }[]
+}
 
 interface ServiceCatalogProps {
   companyId: string
@@ -57,6 +71,9 @@ const slaFromInc = (inc: IncidentRow, fallback = 'Padrão') => {
 }
 
 export default function ServiceCatalog({ companyId, currentUserId, currentUserName, primaryColor, catalogHeadline, catalogHeadlineColor, catalogHeadlineSize, greetingPrefix, greetingColor, onCreated, onNavigateToTickets }: ServiceCatalogProps) {
+  const { tenant } = useTenant()
+  const uiConfig = (tenant?.catalog_ui_config || {}) as CatalogUiConfig
+
   const [mode, setMode] = useState<Mode>(null)
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
@@ -329,18 +346,64 @@ export default function ServiceCatalog({ companyId, currentUserId, currentUserNa
         // ─── PASSO 1: escolher a jornada ───
         !mode ? (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            <button onClick={() => setMode('incident')} className="group text-left bg-white rounded-2xl border border-slate-200 shadow-sm p-8 hover:shadow-lg hover:border-rose-200 hover:-translate-y-0.5 transition-all">
-              <div className="w-16 h-16 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mb-5 group-hover:scale-105 transition-transform"><AlertTriangle className="w-8 h-8" /></div>
-              <h2 className="text-xl font-bold text-slate-900">Reportar um Problema?</h2>
-              <p className="text-sm text-slate-500 mt-2">Algo está com erro, lento ou fora do ar. Vamos diagnosticar em 3 passos.</p>
-              <span className="mt-5 inline-flex items-center text-sm font-semibold text-rose-600">Abrir Incidente →</span>
-            </button>
-            <button onClick={() => setMode('request')} className="group text-left bg-white rounded-2xl border border-slate-200 shadow-sm p-8 hover:shadow-lg hover:border-indigo-200 hover:-translate-y-0.5 transition-all">
-              <div className="w-16 h-16 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center mb-5 group-hover:scale-105 transition-transform"><ShoppingCart className="w-8 h-8" /></div>
-              <h2 className="text-xl font-bold text-slate-900">Solicitar Algo / Serviço?</h2>
-              <p className="text-sm text-slate-500 mt-2">Pedir equipamentos, acessos ou serviços do catálogo da empresa.</p>
-              <span className="mt-5 inline-flex items-center text-sm font-semibold text-indigo-600">Abrir Requisição →</span>
-            </button>
+            {uiConfig?.cards && uiConfig.cards.length > 0 ? (
+              uiConfig.cards.map((card, idx) => {
+                if (card.style === 'pill_label') {
+                  return (
+                    <button
+                      key={idx}
+                      onClick={() => setMode(card.action)}
+                      className="group relative flex flex-col items-center justify-center bg-white rounded-3xl border-2 border-slate-100 shadow-sm hover:shadow-2xl hover:-translate-y-1 hover:border-slate-300 transition-all overflow-hidden h-[300px]"
+                    >
+                      {/* Efeito de listras padrão no fundo do card se for sephora_3d */}
+                      {uiConfig.layout_style === 'sephora_3d' && (
+                        <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 10px, #000 10px, #000 20px)' }} />
+                      )}
+                      
+                      <div className="relative z-10 w-48 h-48 mb-6 flex items-center justify-center transition-transform group-hover:scale-110 duration-500">
+                        {card.image_url ? (
+                          <img src={card.image_url} alt={card.title} className="w-full h-full object-contain drop-shadow-2xl" />
+                        ) : (
+                          card.action === 'incident' ? <AlertTriangle className="w-20 h-20 text-rose-500 drop-shadow-lg" /> : <ShoppingCart className="w-20 h-20 text-indigo-500 drop-shadow-lg" />
+                        )}
+                      </div>
+                      
+                      <div className="absolute bottom-6 z-20 px-6 py-2.5 bg-slate-800 rounded-full text-white font-bold text-sm shadow-xl flex items-center gap-2 group-hover:bg-slate-900 transition-colors">
+                        {card.title}
+                      </div>
+                    </button>
+                  )
+                }
+
+                // Default dynamic style
+                return (
+                  <button key={idx} onClick={() => setMode(card.action)} className="group text-left bg-white rounded-2xl border border-slate-200 shadow-sm p-8 hover:shadow-lg hover:-translate-y-0.5 transition-all" style={{ borderColor: primaryColor }}>
+                    <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-5 group-hover:scale-105 transition-transform" style={{ backgroundColor: `${primaryColor}1a`, color: primaryColor }}>
+                       {card.image_url ? <img src={card.image_url} alt="" className="w-10 h-10 object-contain" /> : (card.action === 'incident' ? <AlertTriangle className="w-8 h-8" /> : <ShoppingCart className="w-8 h-8" />)}
+                    </div>
+                    <h2 className="text-xl font-bold text-slate-900">{card.title}</h2>
+                    {card.description && <p className="text-sm text-slate-500 mt-2">{card.description}</p>}
+                    <span className="mt-5 inline-flex items-center text-sm font-semibold" style={{ color: primaryColor }}>{card.action === 'incident' ? 'Abrir Incidente →' : 'Abrir Requisição →'}</span>
+                  </button>
+                )
+              })
+            ) : (
+              // Fallback original para tenants sem config
+              <>
+                <button onClick={() => setMode('incident')} className="group text-left bg-white rounded-2xl border border-slate-200 shadow-sm p-8 hover:shadow-lg hover:border-rose-200 hover:-translate-y-0.5 transition-all">
+                  <div className="w-16 h-16 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mb-5 group-hover:scale-105 transition-transform"><AlertTriangle className="w-8 h-8" /></div>
+                  <h2 className="text-xl font-bold text-slate-900">Reportar um Problema?</h2>
+                  <p className="text-sm text-slate-500 mt-2">Algo está com erro, lento ou fora do ar. Vamos diagnosticar em 3 passos.</p>
+                  <span className="mt-5 inline-flex items-center text-sm font-semibold text-rose-600">Abrir Incidente →</span>
+                </button>
+                <button onClick={() => setMode('request')} className="group text-left bg-white rounded-2xl border border-slate-200 shadow-sm p-8 hover:shadow-lg hover:border-indigo-200 hover:-translate-y-0.5 transition-all">
+                  <div className="w-16 h-16 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center mb-5 group-hover:scale-105 transition-transform"><ShoppingCart className="w-8 h-8" /></div>
+                  <h2 className="text-xl font-bold text-slate-900">Solicitar Algo / Serviço?</h2>
+                  <p className="text-sm text-slate-500 mt-2">Pedir equipamentos, acessos ou serviços do catálogo da empresa.</p>
+                  <span className="mt-5 inline-flex items-center text-sm font-semibold text-indigo-600">Abrir Requisição →</span>
+                </button>
+              </>
+            )}
           </div>
         ) : mode === 'incident' ? (
           // ─── INCIDENTE ───

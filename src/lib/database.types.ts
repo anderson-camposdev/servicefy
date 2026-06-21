@@ -43,6 +43,7 @@ export interface CompanyRow {
   greeting_color: string | null
   catalog_headline_color: string | null
   catalog_headline_size: string | null
+  catalog_ui_config: Json | null
   allow_local_login: boolean
   sso_providers: Json
   created_at: string
