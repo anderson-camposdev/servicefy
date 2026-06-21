@@ -8,19 +8,15 @@ import { useState, useEffect, useCallback } from 'react'
 import {
   companiesService,
   profilesService,
-  requestsService,
   problemsService,
   changesService,
-  catalogService,
   setCompanySchemas,
 } from '../lib/services'
 import type {
   CompanyRow,
   ProfileRow,
-  ServiceRequestRow,
   ProblemRow,
   ChangeRow,
-  CatalogItemRow,
 } from '../lib/database.types'
 
 // ─── COMPANIES + PROFILES (app-level, loaded once on mount) ──
@@ -56,37 +52,6 @@ export function useAppData() {
   }, [])
 
   return { companies, profiles, loading, error }
-}
-
-// ─── SERVICE REQUESTS ─────────────────────────────────────────
-
-export function useRequests(companyId: string) {
-  const [requests, setRequests] = useState<ServiceRequestRow[]>([])
-  const [kpis, setKpis] = useState({ total: 0, awaiting: 0, fulfilled: 0, cost: 0 })
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
-  const fetch = useCallback(async () => {
-    if (!companyId) return
-    setLoading(true)
-    setError(null)
-    try {
-      const [rows, kpiData] = await Promise.all([
-        requestsService.list(companyId),
-        requestsService.getKPIs(companyId),
-      ])
-      setRequests(rows)
-      setKpis(kpiData)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erro ao carregar requisições.')
-    } finally {
-      setLoading(false)
-    }
-  }, [companyId])
-
-  useEffect(() => { fetch() }, [fetch])
-
-  return { requests, kpis, loading, error, refetch: fetch }
 }
 
 // ─── PROBLEMS ─────────────────────────────────────────────────
@@ -151,27 +116,3 @@ export function useChanges(companyId: string) {
   return { changes, kpis, loading, error, refetch: fetch }
 }
 
-// ─── CATALOG ──────────────────────────────────────────────────
-
-export function useCatalog(companyId: string) {
-  const [items, setItems] = useState<CatalogItemRow[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
-  const fetch = useCallback(async () => {
-    if (!companyId) return
-    setLoading(true)
-    try {
-      const rows = await catalogService.listByCompany(companyId)
-      setItems(rows)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erro ao carregar catálogo.')
-    } finally {
-      setLoading(false)
-    }
-  }, [companyId])
-
-  useEffect(() => { fetch() }, [fetch])
-
-  return { items, loading, error, refetch: fetch }
-}

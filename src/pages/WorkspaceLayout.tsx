@@ -43,28 +43,38 @@ const WorkspaceLayout = ({ companyId, isProvider, companies, ticketType }: Works
     setActiveId(cur => (cur === id ? ROOT_ID : cur))
   }
 
-  return (
-    <div className="flex flex-col h-full bg-slate-100">
+  // Classes limpas baseadas no tema dinâmico
+  const barBg = 'bg-surface-container/60 border-b border-outline-variant'
 
+  return (
+    <div className="flex flex-col h-full bg-background text-on-background">
       {/* Barra de Abas Internas */}
-      <div className="flex items-stretch gap-1 bg-slate-200/60 px-2 pt-2 overflow-x-auto hide-scrollbar shrink-0">
+      <div className={`flex items-stretch gap-1 px-2 pt-2 overflow-x-auto hide-scrollbar shrink-0 ${barBg}`}>
         {tabs.map(tab => {
           const active = tab.id === activeId
           const isRoot = tab.id === ROOT_ID
+          
+          let tabStyle = ''
+          if (active) {
+            tabStyle = 'bg-surface text-primary border-t-2 border-t-primary border-x border-x-outline-variant font-bold rounded-t-lg shadow-sm'
+          } else {
+            tabStyle = 'bg-transparent text-on-surface-variant border-transparent hover:text-on-surface hover:bg-surface-container rounded-t-lg'
+          }
+
           return (
             <button
               key={tab.id}
               onClick={() => setActiveId(tab.id)}
-              className={`group flex items-center gap-2 px-4 py-2 rounded-t-lg text-sm font-semibold whitespace-nowrap transition-colors ${
-                active ? 'bg-slate-50 text-slate-900 shadow-sm' : 'bg-slate-200/50 text-slate-500 hover:text-slate-800 hover:bg-slate-200'
-              }`}
+              className={`group flex items-center gap-2 px-4 py-2 text-sm whitespace-nowrap transition-all ${tabStyle}`}
             >
-              {isRoot && <LayoutGrid className="w-4 h-4 text-indigo-600" />}
+              {isRoot && (
+                <LayoutGrid className="w-4 h-4 text-primary" />
+              )}
               {tab.title}
               {!isRoot && (
                 <span
                   onClick={(e) => closeTab(tab.id, e)}
-                  className="ml-1 p-0.5 rounded hover:bg-slate-300 text-slate-400 hover:text-slate-700 transition-colors"
+                  className="ml-1 p-0.5 rounded transition-colors text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface"
                   aria-label="Fechar aba"
                 >
                   <X className="w-3.5 h-3.5" />
@@ -76,7 +86,7 @@ const WorkspaceLayout = ({ companyId, isProvider, companies, ticketType }: Works
       </div>
 
       {/* Conteúdo das Abas (todas montadas; só a ativa fica visível) */}
-      <div className="flex-1 min-h-0 bg-slate-50">
+      <div className="flex-1 min-h-0 bg-background">
         <div className={activeId === ROOT_ID ? 'h-full' : 'hidden'}>
           <TicketManagementDashboard
             onOpenTicket={openTicket}

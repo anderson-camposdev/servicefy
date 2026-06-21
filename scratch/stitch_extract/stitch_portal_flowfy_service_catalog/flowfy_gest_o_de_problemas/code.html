@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+
+<html class="light" lang="pt-BR"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Flowfy - Gestão de Problemas</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;600;700;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "on-error-container": "#93000a",
+                      "on-error": "#ffffff",
+                      "on-tertiary": "#ffffff",
+                      "on-secondary": "#ffffff",
+                      "on-tertiary-fixed": "#360f00",
+                      "error-container": "#ffdad6",
+                      "on-tertiary-container": "#ffede6",
+                      "on-primary-container": "#eeefff",
+                      "tertiary-fixed": "#ffdbcd",
+                      "surface-dim": "#d2d9f4",
+                      "surface-container-lowest": "#ffffff",
+                      "inverse-surface": "#283044",
+                      "background": "#faf8ff",
+                      "surface-container-highest": "#dae2fd",
+                      "on-surface-variant": "#434655",
+                      "on-secondary-fixed-variant": "#38485d",
+                      "secondary-fixed-dim": "#b7c8e1",
+                      "on-primary": "#ffffff",
+                      "on-primary-fixed": "#00174b",
+                      "surface-container": "#eaedff",
+                      "secondary": "#505f76",
+                      "on-tertiary-fixed-variant": "#7d2d00",
+                      "tertiary": "#943700",
+                      "primary-fixed-dim": "#b4c5ff",
+                      "primary-container": "#2563eb",
+                      "surface-bright": "#faf8ff",
+                      "outline-variant": "#c3c6d7",
+                      "on-primary-fixed-variant": "#003ea8",
+                      "primary": "#004ac6",
+                      "surface-variant": "#dae2fd",
+                      "surface-tint": "#0053db",
+                      "secondary-fixed": "#d3e4fe",
+                      "on-secondary-container": "#54647a",
+                      "on-surface": "#131b2e",
+                      "tertiary-container": "#bc4800",
+                      "on-background": "#131b2e",
+                      "primary-fixed": "#dbe1ff",
+                      "inverse-on-surface": "#eef0ff",
+                      "surface-container-low": "#f2f3ff",
+                      "secondary-container": "#d0e1fb",
+                      "inverse-primary": "#b4c5ff",
+                      "tertiary-fixed-dim": "#ffb596",
+                      "outline": "#737686",
+                      "on-secondary-fixed": "#0b1c30",
+                      "error": "#ba1a1a",
+                      "surface-container-high": "#e2e7ff",
+                      "surface": "#faf8ff"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.25rem",
+                      "lg": "0.5rem",
+                      "xl": "0.75rem",
+                      "full": "9999px"
+              },
+              "spacing": {
+                      "xl": "32px",
+                      "md": "16px",
+                      "margin-desktop": "40px",
+                      "lg": "24px",
+                      "2xl": "48px",
+                      "xs": "4px",
+                      "margin-mobile": "16px",
+                      "gutter": "24px",
+                      "base": "4px",
+                      "sm": "8px",
+                      "3xl": "64px"
+              },
+              "fontFamily": {
+                      "headline-lg": ["Hanken Grotesk"],
+                      "title-md": ["Hanken Grotesk"],
+                      "label-md": ["Hanken Grotesk"],
+                      "headline-lg-mobile": ["Hanken Grotesk"],
+                      "body-sm": ["Hanken Grotesk"],
+                      "display-lg": ["Hanken Grotesk"],
+                      "body-md": ["Hanken Grotesk"]
+              },
+              "fontSize": {
+                      "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                      "title-md": ["20px", {"lineHeight": "28px", "fontWeight": "600"}],
+                      "label-md": ["12px", {"lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "600"}],
+                      "headline-lg-mobile": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+                      "body-sm": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
+                      "display-lg": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                      "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}]
+              }
+            },
+          },
+        }
+    </script>
+<style>
+        body {
+            font-family: 'Hanken Grotesk', sans-serif;
+            background-color: #faf8ff;
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .glass-card {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(226, 231, 255, 0.5);
+        }
+    </style>
+</head>
+<body class="text-on-surface">
+<!-- SideNavBar Shell -->
+<aside class="fixed left-0 top-0 h-full flex flex-col p-4 border-r border-outline-variant dark:border-outline bg-surface dark:bg-inverse-surface shadow-sm w-64 z-50">
+<div class="mb-8 px-2 flex items-center gap-3">
+<div class="w-10 h-10 bg-primary-container rounded-lg flex items-center justify-center text-on-primary-container">
+<span class="material-symbols-outlined font-black" style="font-variation-settings: 'FILL' 1;">flag</span>
+</div>
+<div>
+<h1 class="font-headline-lg text-headline-lg font-black text-primary dark:text-inverse-primary leading-none">Flowfy</h1>
+<p class="font-body-sm text-body-sm text-on-surface-variant opacity-70">ITSM Portal</p>
+</div>
+</div>
+<nav class="flex-1 space-y-1">
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant dark:text-outline-variant hover:bg-surface-container-high dark:hover:bg-surface-container transition-colors rounded-xl" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="font-body-md text-body-md">Dashboard</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant dark:text-outline-variant hover:bg-surface-container-high dark:hover:bg-surface-container transition-colors rounded-xl" href="#">
+<span class="material-symbols-outlined">published_with_changes</span>
+<span class="font-body-md text-body-md">Mudanças</span>
+</a>
+<!-- Active Tab: Problemas -->
+<a class="flex items-center gap-3 px-4 py-3 bg-primary-container text-on-primary-container rounded-xl font-bold shadow-sm transition-transform active:scale-95" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">report_problem</span>
+<span class="font-body-md text-body-md">Problemas</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant dark:text-outline-variant hover:bg-surface-container-high dark:hover:bg-surface-container transition-colors rounded-xl" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span class="font-body-md text-body-md">Configurações</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant dark:text-outline-variant hover:bg-surface-container-high dark:hover:bg-surface-container transition-colors rounded-xl" href="#">
+<span class="material-symbols-outlined">person</span>
+<span class="font-body-md text-body-md">Perfil</span>
+</a>
+</nav>
+<div class="mt-auto pt-6 border-t border-outline-variant">
+<button class="w-full bg-primary text-on-primary py-3 px-4 rounded-xl font-bold mb-6 flex items-center justify-center gap-2 hover:opacity-90 transition-opacity">
+<span class="material-symbols-outlined text-md">add</span>
+                Novo Chamado
+            </button>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container rounded-xl transition-colors" href="#">
+<span class="material-symbols-outlined">help</span>
+<span class="font-body-md text-body-md">Suporte</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container rounded-xl transition-colors" href="#">
+<span class="material-symbols-outlined text-error">logout</span>
+<span class="font-body-md text-body-md">Sair</span>
+</a>
+</div>
+</aside>
+<!-- Main Content Area -->
+<main class="ml-64 min-h-screen flex flex-col">
+<!-- TopNavBar Shell -->
+<header class="fixed top-0 right-0 left-64 z-40 flex justify-between items-center h-16 px-margin-desktop bg-background/80 backdrop-blur-md border-b border-outline-variant">
+<div class="flex items-center gap-8">
+<div class="relative group">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline">search</span>
+<input class="pl-10 pr-4 py-2 bg-surface-container-low border-none rounded-full w-64 focus:ring-2 focus:ring-primary/20 transition-all text-body-sm font-body-sm" placeholder="Buscar problemas ou IDs..." type="text"/>
+</div>
+<nav class="hidden md:flex gap-6">
+<a class="text-on-surface-variant dark:text-outline-variant hover:text-primary transition-colors font-title-md text-title-md" href="#">Visão Geral</a>
+<a class="text-primary font-bold border-b-2 border-primary pb-1 font-title-md text-title-md" href="#">Relatórios</a>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<button class="hover:bg-surface-container-low rounded-full p-2 transition-all relative">
+<span class="material-symbols-outlined text-on-surface-variant">notifications</span>
+<span class="absolute top-2 right-2 w-2 h-2 bg-error rounded-full border-2 border-background"></span>
+</button>
+<button class="hover:bg-surface-container-low rounded-full p-2 transition-all">
+<span class="material-symbols-outlined text-on-surface-variant">history</span>
+</button>
+<div class="h-8 w-[1px] bg-outline-variant mx-2"></div>
+<div class="flex items-center gap-3 cursor-pointer group">
+<div class="text-right hidden sm:block">
+<p class="text-body-sm font-bold text-on-surface leading-none">Ricardo Silva</p>
+<p class="text-[10px] text-outline uppercase tracking-wider">Gestor de TI</p>
+</div>
+<img alt="Foto de Perfil do Usuário" class="w-10 h-10 rounded-full border-2 border-surface-container-highest group-hover:border-primary transition-colors" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBQN7FndM-NxcNP_ns5F6j6mBN-_CmiTiSkg2VnaGvSx3NUeM4_FINlS_qE5qvzema9kP7DvaPHguQhm8mVZm90U_CxjSab3HlLoe_O-yYxj_QA4dTPTzqYQQT46zDtzeSEMh4JDBFlJbTYfbpD2tGCX9cMM7wE8y_3MIeV5rnXf048enLJtYusruhU-9QNZTKay_WnxXb-6EQLrtHi6qquM3tiXaBsXg2LaLkoH-NjeK30LoPSM5T2j1hhWTTJLI3ROzasivxDitU"/>
+</div>
+</div>
+</header>
+<!-- Canvas -->
+<section class="mt-16 p-margin-desktop space-y-8 max-w-[1600px] mx-auto w-full">
+<!-- Page Header -->
+<div class="flex justify-between items-end">
+<div>
+<h2 class="font-headline-lg text-headline-lg text-on-surface">Gestão de Problemas</h2>
+<p class="text-on-surface-variant font-body-md">Análise técnica e diagnósticos de causa raiz em tempo real.</p>
+</div>
+<div class="flex gap-3">
+<button class="flex items-center gap-2 px-4 py-2 rounded-lg border border-outline-variant text-on-surface-variant hover:bg-surface-container-low transition-all font-label-md text-label-md">
+<span class="material-symbols-outlined text-sm">filter_list</span>
+                        Filtros Avançados
+                    </button>
+<button class="flex items-center gap-2 px-4 py-2 rounded-lg border border-outline-variant text-on-surface-variant hover:bg-surface-container-low transition-all font-label-md text-label-md">
+<span class="material-symbols-outlined text-sm">download</span>
+                        Exportar CSV
+                    </button>
+</div>
+</div>
+<!-- KPI Bento Grid -->
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-gutter">
+<!-- Open Problems -->
+<div class="glass-card p-lg rounded-2xl flex flex-col justify-between h-36 hover:shadow-lg transition-shadow group">
+<div class="flex justify-between items-start">
+<span class="p-2 bg-primary/10 text-primary rounded-lg material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">error_outline</span>
+<span class="text-label-md text-outline uppercase">Abertos</span>
+</div>
+<div class="flex items-baseline gap-2">
+<span class="text-display-lg font-display-lg text-on-surface">24</span>
+<span class="text-body-sm text-error font-bold flex items-center">+3 <span class="material-symbols-outlined text-xs">trending_up</span></span>
+</div>
+</div>
+<!-- Investigation -->
+<div class="glass-card p-lg rounded-2xl flex flex-col justify-between h-36 hover:shadow-lg transition-shadow">
+<div class="flex justify-between items-start">
+<span class="p-2 bg-tertiary/10 text-tertiary rounded-lg material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">search</span>
+<span class="text-label-md text-outline uppercase">Em Investigação</span>
+</div>
+<div class="flex items-baseline gap-2">
+<span class="text-display-lg font-display-lg text-on-surface">12</span>
+<span class="text-body-sm text-secondary font-bold">Estável</span>
+</div>
+</div>
+<!-- Known Errors -->
+<div class="glass-card p-lg rounded-2xl flex flex-col justify-between h-36 hover:shadow-lg transition-shadow">
+<div class="flex justify-between items-start">
+<span class="p-2 bg-on-secondary-container/10 text-on-secondary-container rounded-lg material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">auto_stories</span>
+<span class="text-label-md text-outline uppercase">Erros Conhecidos</span>
+</div>
+<div class="flex items-baseline gap-2">
+<span class="text-display-lg font-display-lg text-on-surface">158</span>
+<span class="text-body-sm text-primary font-bold flex items-center">-12 <span class="material-symbols-outlined text-xs">trending_down</span></span>
+</div>
+</div>
+<!-- Resolved -->
+<div class="glass-card p-lg rounded-2xl flex flex-col justify-between h-36 hover:shadow-lg transition-shadow">
+<div class="flex justify-between items-start">
+<span class="p-2 bg-green-100 text-green-700 rounded-lg material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+<span class="text-label-md text-outline uppercase">Resolvidos (Mês)</span>
+</div>
+<div class="flex items-baseline gap-2">
+<span class="text-display-lg font-display-lg text-on-surface">42</span>
+<span class="text-body-sm text-green-600 font-bold flex items-center">92% efic.</span>
+</div>
+</div>
+</div>
+<!-- Main Data Table Container -->
+<div class="glass-card rounded-2xl overflow-hidden shadow-sm">
+<div class="px-lg py-md border-b border-outline-variant flex items-center justify-between bg-surface-container-low/50">
+<h3 class="font-title-md text-title-md text-on-surface">Lista de Problemas Ativos</h3>
+<div class="flex gap-2">
+<button class="p-2 rounded-lg hover:bg-surface-container transition-colors text-outline">
+<span class="material-symbols-outlined">sort</span>
+</button>
+<button class="p-2 rounded-lg hover:bg-surface-container transition-colors text-outline">
+<span class="material-symbols-outlined">more_vert</span>
+</button>
+</div>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="bg-surface-container-low/30 border-b border-outline-variant">
+<th class="px-lg py-4 font-label-md text-label-md text-outline uppercase tracking-wider">ID</th>
+<th class="px-lg py-4 font-label-md text-label-md text-outline uppercase tracking-wider">Título do Problema</th>
+<th class="px-lg py-4 font-label-md text-label-md text-outline uppercase tracking-wider text-center">Impacto</th>
+<th class="px-lg py-4 font-label-md text-label-md text-outline uppercase tracking-wider text-center">Urgência</th>
+<th class="px-lg py-4 font-label-md text-label-md text-outline uppercase tracking-wider">Analista</th>
+<th class="px-lg py-4 font-label-md text-label-md text-outline uppercase tracking-wider">Status</th>
+<th class="px-lg py-4"></th>
+</tr>
+</thead>
+<tbody class="divide-y divide-outline-variant">
+<!-- Row 1 -->
+<tr class="hover:bg-surface-container-low transition-colors group cursor-pointer">
+<td class="px-lg py-4">
+<span class="font-bold text-primary font-body-sm">PRB-4092</span>
+</td>
+<td class="px-lg py-4">
+<div class="flex flex-col">
+<span class="font-bold text-on-surface font-body-md">Lentidão Crítica no Database Prod-04</span>
+<span class="text-body-sm text-outline">Relacionado a incidentes de latência em SP e RJ.</span>
+</div>
+</td>
+<td class="px-lg py-4 text-center">
+<span class="px-3 py-1 rounded-full bg-error-container text-on-error-container font-bold text-[10px] uppercase">Alto</span>
+</td>
+<td class="px-lg py-4 text-center">
+<span class="px-3 py-1 rounded-full bg-error-container text-on-error-container font-bold text-[10px] uppercase">Crítica</span>
+</td>
+<td class="px-lg py-4">
+<div class="flex items-center gap-2">
+<img alt="Analista" class="w-6 h-6 rounded-full" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAQQGwyVBGbPKiKDeyxBmwSLEumvlL_fzysoFBPBIgF-_NIuaXsduZGqNLBoFAMHppW_5ivYBhssMW0kD3OqJr2eY229I7Rkc9UefiL3YblBNgWglewx6EnuxlP6FwCwcXRdGj5K6ScB1UVIDY6thiO9PnJRXpPPQ4_HJW5mSIAWxJ2Zob9rggdOxwSitRIKvnHaAGQnUXCOF_4CjyfvPt85eDLp0-UKHyE5CaXfpgfa7pU8ty41YRmV_P5mYRX5sRUVUkRYeIR8Yk"/>
+<span class="font-body-sm text-on-surface-variant">Ana Martins</span>
+</div>
+</td>
+<td class="px-lg py-4">
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-tertiary animate-pulse"></span>
+<span class="text-body-sm font-bold text-tertiary">Investigação</span>
+</div>
+</td>
+<td class="px-lg py-4 text-right">
+<button class="p-2 text-outline hover:text-primary opacity-0 group-hover:opacity-100 transition-all">
+<span class="material-symbols-outlined">arrow_forward_ios</span>
+</button>
+</td>
+</tr>
+<!-- Row 2 -->
+<tr class="hover:bg-surface-container-low transition-colors group cursor-pointer">
+<td class="px-lg py-4">
+<span class="font-bold text-primary font-body-sm">PRB-3911</span>
+</td>
+<td class="px-lg py-4">
+<div class="flex flex-col">
+<span class="font-bold text-on-surface font-body-md">Falha Intermitente Autenticação SSO</span>
+<span class="text-body-sm text-outline">Token expira antes do tempo configurado.</span>
+</div>
+</td>
+<td class="px-lg py-4 text-center">
+<span class="px-3 py-1 rounded-full bg-secondary-container text-on-secondary-container font-bold text-[10px] uppercase">Médio</span>
+</td>
+<td class="px-lg py-4 text-center">
+<span class="px-3 py-1 rounded-full bg-secondary-container text-on-secondary-container font-bold text-[10px] uppercase">Alta</span>
+</td>
+<td class="px-lg py-4">
+<div class="flex items-center gap-2">
+<img alt="Analista" class="w-6 h-6 rounded-full" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDSiFsX5pxq_7u5Cw6RiC7SBIQcPbB2Tkdo1GOkFYdXeD77lREdeAGpmCVqGltHP1PkGp_-yx7jHjXd6vVHp3w557xP6huOYv_jzq9q1Vb8uICi-bJqvnNoeKLxvNQA0ksa1uejR5DlXYE9J0K1ywRUPF7HPmeSUEFRThRyffEaO8ysD2YswR754_cNKDf1a2zhXjj96g5iw-D2SUTJ8htssbFYUJY8NXDj8jGEHxEyKto-72v8c_trnFbGIpiIQU8HOIzdbu26HZ0"/>
+<span class="font-body-sm text-on-surface-variant">Carlos Eduardo</span>
+</div>
+</td>
+<td class="px-lg py-4">
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-on-surface-variant"></span>
+<span class="text-body-sm font-bold text-on-surface-variant">Aberto</span>
+</div>
+</td>
+<td class="px-lg py-4 text-right">
+<button class="p-2 text-outline hover:text-primary opacity-0 group-hover:opacity-100 transition-all">
+<span class="material-symbols-outlined">arrow_forward_ios</span>
+</button>
+</td>
+</tr>
+<!-- Row 3 -->
+<tr class="hover:bg-surface-container-low transition-colors group cursor-pointer">
+<td class="px-lg py-4">
+<span class="font-bold text-primary font-body-sm">PRB-3850</span>
+</td>
+<td class="px-lg py-4">
+<div class="flex flex-col">
+<span class="font-bold text-on-surface font-body-md">Vulnerabilidade CVE-2023-X Patching</span>
+<span class="text-body-sm text-outline">RCA concluída. Aguardando janela de manutenção.</span>
+</div>
+</td>
+<td class="px-lg py-4 text-center">
+<span class="px-3 py-1 rounded-full bg-error-container text-on-error-container font-bold text-[10px] uppercase">Alto</span>
+</td>
+<td class="px-lg py-4 text-center">
+<span class="px-3 py-1 rounded-full bg-secondary-container text-on-secondary-container font-bold text-[10px] uppercase">Média</span>
+</td>
+<td class="px-lg py-4">
+<div class="flex items-center gap-2">
+<img alt="Analista" class="w-6 h-6 rounded-full" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCR9VJocYpkQBXXDxSSyUtUAEyevKtjMLXn4ZxoqDSFetTKVV_TvwWsdRY80UiRDu7RaR5M-DsCgWf07RxBDSFCIV8VQQDJPtDH7EiEI5nSnt6jRiJgTB0QMCEhi2jhQhEAnuckALrwdYH0F2Wc_AIQw4qAJgKMQZGmk1TsFPiuMBhYE-YPy1DM2_ds7AKHezAOMyRX1HUZNx_25dt0obyv5xKMqrXF2yjV97wVn6LPfk2fqjo-FPh5V65FXneIPSg_m4COAPQeaa8"/>
+<span class="font-body-sm text-on-surface-variant">Julia Mendes</span>
+</div>
+</td>
+<td class="px-lg py-4">
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-primary"></span>
+<span class="text-body-sm font-bold text-primary">Erro Conhecido</span>
+</div>
+</td>
+<td class="px-lg py-4 text-right">
+<button class="p-2 text-outline hover:text-primary opacity-0 group-hover:opacity-100 transition-all">
+<span class="material-symbols-outlined">arrow_forward_ios</span>
+</button>
+</td>
+</tr>
+<!-- Row 4 -->
+<tr class="hover:bg-surface-container-low transition-colors group cursor-pointer">
+<td class="px-lg py-4">
+<span class="font-bold text-primary font-body-sm">PRB-3722</span>
+</td>
+<td class="px-lg py-4">
+<div class="flex flex-col">
+<span class="font-bold text-on-surface font-body-md">Queda de Links VPN Escritório Remoto</span>
+<span class="text-body-sm text-outline">Problema de hardware no concentrador identificado.</span>
+</div>
+</td>
+<td class="px-lg py-4 text-center">
+<span class="px-3 py-1 rounded-full bg-surface-container-highest text-on-surface font-bold text-[10px] uppercase">Baixo</span>
+</td>
+<td class="px-lg py-4 text-center">
+<span class="px-3 py-1 rounded-full bg-surface-container-highest text-on-surface font-bold text-[10px] uppercase">Baixa</span>
+</td>
+<td class="px-lg py-4">
+<div class="flex items-center gap-2">
+<img alt="Analista" class="w-6 h-6 rounded-full" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAL5gX-Gu_qcVZLnVMg3Txm7T6k7ltL4QSjQLqowNUD9q8RX2GJhcVwxIw88SkON9g05gqzp03b5tzrW4o6GwbDmx6HeO1eTN54yGF8k4QBiQn3Xb_d4Z2AzDfPiAgL4KzX8TS2BmSR4PSEMXKODfMhCFgQuwBVTOhJ6d2vcnanjjaCvuEvqifrnltt8f5TsbcKqOlFd3UFVUJ63r5GISWrfyHDPHLe_4eL3dhVQe85y4VyLPvioDrPtw_VMGo16kMwB33-4HUf0_s"/>
+<span class="font-body-sm text-on-surface-variant">Roberto Lima</span>
+</div>
+</td>
+<td class="px-lg py-4">
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-green-500"></span>
+<span class="text-body-sm font-bold text-green-600">Resolvido</span>
+</div>
+</td>
+<td class="px-lg py-4 text-right">
+<button class="p-2 text-outline hover:text-primary opacity-0 group-hover:opacity-100 transition-all">
+<span class="material-symbols-outlined">arrow_forward_ios</span>
+</button>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="px-lg py-4 border-t border-outline-variant flex items-center justify-between text-body-sm text-outline bg-surface-container-lowest">
+<span>Exibindo 4 de 24 problemas ativos</span>
+<div class="flex items-center gap-4">
+<button class="flex items-center gap-1 hover:text-primary transition-colors disabled:opacity-50" disabled="">
+<span class="material-symbols-outlined text-sm">chevron_left</span> Anterior
+                        </button>
+<div class="flex gap-2">
+<span class="w-8 h-8 flex items-center justify-center bg-primary text-on-primary rounded-md font-bold">1</span>
+<span class="w-8 h-8 flex items-center justify-center hover:bg-surface-container rounded-md cursor-pointer">2</span>
+<span class="w-8 h-8 flex items-center justify-center hover:bg-surface-container rounded-md cursor-pointer">3</span>
+</div>
+<button class="flex items-center gap-1 hover:text-primary transition-colors">
+                            Próximo <span class="material-symbols-outlined text-sm">chevron_right</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Root Cause Analysis Section (Visual Highlight) -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-gutter">
+<div class="lg:col-span-2 glass-card rounded-2xl p-lg space-y-6">
+<div class="flex justify-between items-center">
+<h3 class="font-title-md text-title-md text-on-surface flex items-center gap-2">
+<span class="material-symbols-outlined text-primary">analytics</span>
+                            Foco em Causa Raiz (RCA) - Prioridades
+                        </h3>
+<a class="text-primary text-body-sm font-bold hover:underline" href="#">Ver Mapa Completo</a>
+</div>
+<div class="space-y-4">
+<!-- RCA Item 1 -->
+<div class="p-4 rounded-xl bg-surface-container-low border-l-4 border-error flex gap-4">
+<div class="flex-1">
+<h4 class="font-bold text-on-surface text-body-md">Indisponibilidade de API de Pagamentos</h4>
+<p class="text-body-sm text-on-surface-variant mt-1">Status RCA: <span class="font-bold">5 Whys em andamento</span>. Identificado timeout no gateway secundário.</p>
+<div class="mt-3 flex items-center gap-4">
+<div class="flex -space-x-2">
+<img alt="User" class="w-6 h-6 rounded-full border border-surface shadow-sm" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAR3Ticfmdjug-WLh7IwTKmcE7f3nEqIoRxHhUPsw5U19OEZXr8p3_ciQKuXKrwre1q7PK-QsH-lKBmFSqpQ_pk-NBslX-ShX9RBHRkj7oKuGI79istkYEjQLJ0G5SamFT8YOQWzanxNDzDlnS0Hp_ZECwF2wUi0uoqU5kVlOOfW_G4HEbt95pv_KdZG-menOT7mrIZJkYwP8vXOCRmQvfyVTOHV8bA2USpPH5QIeMJnsxpqJAlh96VjIPyc-2rX8RioYv9hMROzfE"/>
+<img alt="User" class="w-6 h-6 rounded-full border border-surface shadow-sm" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBcpvwbjNHvh3P8a37VIpgmm6qYQvUTTxH7g6AbIGVzJNqujGyJtwl1A5pkuH61ue7znc7IZDALUYQb16JS2g09JsPvJYQOy5fNCJkQeFiV9XtjOGwKCkUPQ5Y9alDjkqCmjamYiuhhIljDl6KRGmviT7mqGkWGuwvJ7Z9QGWTdAO1y3HbOAHDTu4Fy9_QmSgyb2OPJ_1VTpUG5YOl0qPtdBCeeTqiBkimKwHLXtVSxUuldjH_fR6WfdTWOqF1l6woDWM-xFAizrFE"/>
+</div>
+<span class="text-[10px] uppercase font-bold text-outline">Task Force Ativada</span>
+</div>
+</div>
+<div class="text-right">
+<span class="text-label-md font-bold text-error">CRÍTICO</span>
+</div>
+</div>
+<!-- RCA Item 2 -->
+<div class="p-4 rounded-xl bg-surface-container-low border-l-4 border-tertiary flex gap-4">
+<div class="flex-1">
+<h4 class="font-bold text-on-surface text-body-md">Corrupção de Logs no ElasticSearch</h4>
+<p class="text-body-sm text-on-surface-variant mt-1">Status RCA: <span class="font-bold">Coleta de evidências</span>. Suspeita de estouro de heap memory.</p>
+<div class="mt-3 flex items-center gap-4">
+<div class="flex -space-x-2">
+<img alt="User" class="w-6 h-6 rounded-full border border-surface shadow-sm" src="https://lh3.googleusercontent.com/aida-public/AB6AXuADrqJryAr4mDD3cD9rE1jbprj13qkI0qzXWLlZC2NiJlf9ZsnT2kbp1JktdysOcUMJjj40DaQ5ww0W9C_Uo1ndtkP5onwn3cKZPU1XPADQJsIkuxZzpJ-Aye_p0qxQsQaBiROmHFq-RQGpnDbQSrtfiGXcBp4OTex_j1TnJBrJmUZ39WM3KWWBKBaA5l_IA3lRLKIZm-qJ8G672yGXxEv3_Y_85KOJOKxW3dKej6Q84E1QVWSm6mCod5E6bwcTUObhFp1AEKPzsas"/>
+</div>
+<span class="text-[10px] uppercase font-bold text-outline">Aguardando Log Dump</span>
+</div>
+</div>
+<div class="text-right">
+<span class="text-label-md font-bold text-tertiary">IMPORTANTE</span>
+</div>
+</div>
+</div>
+</div>
+<div class="glass-card rounded-2xl p-lg flex flex-col justify-between overflow-hidden relative group">
+<div class="z-10 relative">
+<h3 class="font-title-md text-title-md text-on-surface mb-2">Próxima Janela de Mudança</h3>
+<p class="text-body-sm text-on-surface-variant">Correção para 5 Problemas de Alta Prioridade.</p>
+<div class="mt-8 flex flex-col gap-2">
+<div class="flex justify-between items-baseline">
+<span class="text-display-lg font-display-lg text-primary">22/10</span>
+<span class="text-body-md font-bold">23:00h</span>
+</div>
+<p class="text-[10px] uppercase font-bold text-outline tracking-widest">Sábado • Manutenção Preventiva</p>
+</div>
+</div>
+<!-- Subtle background abstract art -->
+<div class="absolute -right-4 -bottom-4 w-32 h-32 opacity-10 group-hover:scale-110 transition-transform">
+<span class="material-symbols-outlined text-[120px] text-primary">update</span>
+</div>
+<button class="mt-6 w-full py-2 bg-on-surface text-surface rounded-xl font-bold text-label-md hover:bg-primary transition-colors z-10">
+                        Acessar Plano de Mudança
+                    </button>
+</div>
+</div>
+</section>
+<!-- Toast Notification Area (Simulation) -->
+<div class="fixed bottom-8 right-8 z-50" id="toast-container">
+<div class="glass-card rounded-xl shadow-2xl p-4 flex items-center gap-4 animate-bounce hover:animate-none cursor-pointer border-l-4 border-primary">
+<div class="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+<span class="material-symbols-outlined">info</span>
+</div>
+<div>
+<p class="font-bold text-body-sm">Novo Erro Conhecido publicado</p>
+<p class="text-[10px] text-outline">KEDB-442: Solução de contorno para VPN Escritório.</p>
+</div>
+<button class="text-outline hover:text-on-surface" onclick="this.parentElement.remove()">
+<span class="material-symbols-outlined text-sm">close</span>
+</button>
+</div>
+</div>
+</main>
+<script>
+        // Micro-interaction for table rows
+        document.querySelectorAll('tbody tr').forEach(row => {
+            row.addEventListener('click', () => {
+                const id = row.querySelector('.font-bold.text-primary').textContent;
+                console.log(`Abrindo detalhes do Problema: ${id}`);
+                // In a real app, this would redirect to detail page
+            });
+        });
+
+        // Search bar focus effect
+        const searchInput = document.querySelector('input[type="text"]');
+        searchInput.addEventListener('focus', () => {
+            searchInput.parentElement.classList.add('scale-105');
+        });
+        searchInput.addEventListener('blur', () => {
+            searchInput.parentElement.classList.remove('scale-105');
+        });
+    </script>
+</body></html>

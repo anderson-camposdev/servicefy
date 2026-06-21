@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
-import { Search, Clock, AlertTriangle, CheckCircle, MoreHorizontal, Building2, LayoutGrid, List, ChevronRight, Settings, X, User, Users } from 'lucide-react'
+import { Search, Clock, AlertTriangle, CheckCircle, MoreHorizontal, Building2, LayoutGrid, List, ChevronRight, Settings, X, User, Users, Plus } from 'lucide-react'
+import NewTicketModal from './NewTicketModal'
 import { useIncidents } from '../hooks/useIncidents'
 import { translateState } from '../lib/statusLabels'
 import { useAuth } from '../auth'
@@ -243,6 +244,7 @@ const TicketManagementDashboard = ({ onOpenTicket, companyId, isProvider, compan
   const [localClient, setLocalClient] = useState('all')
   const [localSearch, setLocalSearch] = useState('')
   const [viewMode, setViewMode] = useState<'table' | 'kanban'>('table')
+  const [showNewTicket, setShowNewTicket] = useState(false)
 
   // Estados dos Indicadores e Customização Self-Service
   const [activeFilterCard, setActiveFilterCard] = useState<string | null>(null)
@@ -333,8 +335,23 @@ const TicketManagementDashboard = ({ onOpenTicket, companyId, isProvider, compan
 
   const openTicket = (row: Row) => onOpenTicket?.(row)
 
+  // Empresa-alvo para abertura: o cliente filtrado (se houver) ou o tenant atual.
+  const newTicketCompanyId = (activeClient && activeClient !== 'all') ? activeClient : (companyId ?? '')
+  const newTicketLabel = ticketType === 'request' ? 'Nova Requisição' : 'Novo Incidente'
+  const canOpenNew = realMode && Boolean(profile) && Boolean(newTicketCompanyId)
+
   return (
     <div className="flex flex-col h-full bg-slate-50 overflow-hidden font-sans text-slate-900">
+
+      {canOpenNew && profile && (
+        <NewTicketModal
+          open={showNewTicket}
+          onClose={() => setShowNewTicket(false)}
+          companyId={newTicketCompanyId}
+          analyst={{ id: profile.id, name: profile.name }}
+          defaultTicketType={ticketType ?? 'incident'}
+        />
+      )}
 
       {/* 1. BARRA SUPERIOR: Filtros e Controle de Visão */}
       <div className="bg-white border-b border-slate-200 px-6 py-3 flex items-center justify-between shrink-0 gap-4">
@@ -373,7 +390,14 @@ const TicketManagementDashboard = ({ onOpenTicket, companyId, isProvider, compan
             />
           </div>
 
-          {/* O filtro de tipo unificado foi removido, a divisão agora é física via barra lateral */}
+          {canOpenNew && (
+            <button
+              onClick={() => setShowNewTicket(true)}
+              className="flex items-center gap-1.5 px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-lg shadow-sm transition-all shrink-0"
+            >
+              <Plus className="w-4 h-4" /> {newTicketLabel}
+            </button>
+          )}
 
           {/* TOGGLE: Kanban vs Tabela */}
           <div className="flex bg-slate-100 p-1 rounded-lg border border-slate-200">

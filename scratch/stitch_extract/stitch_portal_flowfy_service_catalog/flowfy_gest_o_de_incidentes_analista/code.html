@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+
+<html lang="pt-br"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Portal Flowfy - Gestão de Tickets</title>
+<!-- Google Font: Hanken Grotesk -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS CDN -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: '#2563eb',
+            surface: '#faf8ff',
+            'surface-container': '#ffffff',
+            'border-light': '#e2e8f0',
+          },
+          fontFamily: {
+            sans: ['Hanken Grotesk', 'sans-serif'],
+          },
+          borderRadius: {
+            'custom': '8px',
+          }
+        }
+      }
+    }
+  </script>
+<style data-purpose="custom-layout">
+    body {
+      background-color: #f8fafc;
+      font-family: 'Hanken Grotesk', sans-serif;
+    }
+    .sidebar-item-active {
+      background-color: #1e293b;
+      color: white;
+      border-radius: 8px;
+    }
+    .table-row-hover:hover {
+      background-color: #f1f5f9;
+    }
+    .scrollbar-hide::-webkit-scrollbar {
+      display: none;
+    }
+  </style>
+</head>
+<body class="flex min-h-screen text-slate-700">
+<!-- BEGIN: MainSidebar -->
+<aside class="w-64 bg-white border-r border-border-light flex flex-col h-screen sticky top-0" data-purpose="sidebar">
+<!-- Logo Section -->
+<div class="p-6 flex items-center gap-2">
+<div class="w-8 h-8 bg-primary rounded flex items-center justify-center">
+<svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+</div>
+<span class="text-xl font-bold tracking-tight text-slate-800">Flowfy <span class="text-[10px] font-normal text-slate-400 align-top">ITSM</span></span>
+</div>
+<!-- Navigation Modules -->
+<nav class="flex-1 px-4 py-2 space-y-6 overflow-y-auto">
+<div>
+<h3 class="px-2 mb-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Módulos ITIL V4</h3>
+<ul class="space-y-1">
+<li>
+<a class="sidebar-item-active flex items-center gap-3 px-3 py-2 text-sm font-medium" href="#">
+<svg class="w-5 h-5" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+              Incidentes
+            </a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 rounded-custom" href="#">
+<svg class="w-5 h-5" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+              Requisições
+            </a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 rounded-custom" href="#">
+<svg class="w-5 h-5" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+              Problemas
+            </a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 rounded-custom" href="#">
+<svg class="w-5 h-5" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+              Mudanças
+            </a>
+</li>
+</ul>
+</div>
+<div>
+<h3 class="px-2 mb-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Acesso</h3>
+<ul class="space-y-1">
+<li>
+<a class="flex items-center gap-3 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 rounded-custom" href="#">
+<svg class="w-5 h-5" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+              Portal do Usuário
+            </a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 rounded-custom" href="#">
+<svg class="w-5 h-5" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+              API de Integração
+            </a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 rounded-custom" href="#">
+<svg class="w-5 h-5" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+              Governança Admin
+            </a>
+</li>
+</ul>
+</div>
+</nav>
+<!-- Sidebar Footer -->
+<div class="p-4 border-t border-border-light">
+<div class="bg-slate-50 p-3 rounded-custom flex items-center gap-3">
+<div class="w-10 h-10 rounded-full border-2 border-primary flex items-center justify-center p-1">
+<img alt="Tenant Logo" class="rounded-full grayscale" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAbcfJB8mAs_ezAqrbaHrUed9Qyruo8X7NAxW4gGJrG4TMFFWpM4jJTKD-XVIlSVx2hvx_ID5vZ8i8QROqv8Tf0D_VELe7jpvBZW0taswQKzc64_zkWerEmrcnLpz0taaYU2lh_4tHf1aK_wg_tTM1pQk9kdQLghUMiopBVWlCq6nzszuLkrDMOc65KbmleveSaJGpmxcScvZVw6K2jLfMG6VMdRQ2cOvKoSKUzU1GrB-jqvskuDWna4paket_EYTg9CLYpIBFYuy0"/>
+</div>
+<div>
+<p class="text-[10px] font-bold text-slate-400 uppercase">Tenant Ativo</p>
+<p class="text-sm font-bold text-slate-800 leading-tight">Allied IT</p>
+<p class="text-[10px] text-slate-500">alliedit.com</p>
+</div>
+</div>
+</div>
+</aside>
+<!-- END: MainSidebar -->
+<!-- Main Content Area -->
+<main class="flex-1 flex flex-col min-w-0 overflow-hidden">
+<!-- BEGIN: TopHeader -->
+<header class="h-16 bg-white border-b border-border-light px-8 flex items-center justify-between z-10">
+<div class="flex items-center gap-4">
+<!-- Tenant Switcher -->
+<div class="flex items-center gap-2 px-3 py-1.5 border border-slate-200 rounded-custom bg-slate-50/50">
+<span class="text-xs font-semibold text-slate-500">Allied IT</span>
+<span class="px-2 py-0.5 text-[10px] font-bold bg-blue-100 text-primary rounded">PROVEDOR MSP</span>
+</div>
+<!-- Role Selector -->
+<div class="relative">
+<button class="flex items-center gap-2 px-3 py-1.5 text-sm text-slate-600 border border-slate-200 rounded-custom hover:bg-slate-50">
+<span class="text-xs font-medium text-slate-400">SIMULAR PAPEL:</span>
+<span class="font-semibold">SysAdmin (Admin Global)</span>
+<svg class="w-4 h-4" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M19 9l-7 7-7-7" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+</button>
+</div>
+</div>
+<div class="flex items-center gap-6">
+<!-- User Profile -->
+<div class="flex items-center gap-3 pl-6 border-l border-border-light">
+<div class="text-right">
+<p class="text-sm font-bold text-slate-800">Felipe</p>
+<p class="text-[10px] font-bold text-slate-400 uppercase">SYSADMIN</p>
+</div>
+<div class="relative">
+<img alt="Avatar" class="w-9 h-9 rounded-full border border-slate-200" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBmUVIWY-AgQEhxWdLmXSSWtL6SbHdlezWSneolWxDhJiJNcqEO8iuhQ1o75rKaUjD9WE-79YwBphtACe5_Q_Chfq1Mkixzk_n0ZDu9OBYuiCROZjaZh0fwADAZjq8viMq-tCJTwnjJwh2wQwQJQ3ddp1H8WcqE4pphk-COGOmITKmJ9QpLOIj5rf2Hitzos1NpLcVXqWPOGR24Uo-TlemVIc-tAyiijhZpu-2FTnBrK6LQuh67tAsWPl66jTrffIsrEnAv6zrfHuc"/>
+<div class="absolute -top-1 -right-1 w-4 h-4 bg-red-500 border-2 border-white rounded-full text-[8px] text-white flex items-center justify-center font-bold">1</div>
+</div>
+<button class="text-slate-400 hover:text-slate-600">
+<svg class="w-6 h-6" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+</button>
+</div>
+</div>
+</header>
+<!-- END: TopHeader -->
+<!-- BEGIN: DashboardBody -->
+<div class="flex-1 overflow-y-auto p-8" data-purpose="dashboard-container">
+<!-- Dashboard Title & Filters -->
+<div class="mb-8" data-purpose="dashboard-header">
+<div class="flex items-center gap-2 mb-4">
+<div class="w-8 h-8 bg-blue-100 text-primary flex items-center justify-center rounded-custom">
+<svg class="w-5 h-5" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M4 6h16M4 10h16M4 14h16M4 18h16" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+</div>
+<h1 class="text-xl font-bold text-slate-800">Gestão de Tickets</h1>
+</div>
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-2 scrollbar-hide overflow-x-auto pb-2">
+<button class="flex items-center gap-2 px-3 py-1.5 text-xs font-bold text-slate-400 uppercase tracking-tight">
+<svg class="w-4 h-4" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+              Clientes
+            </button>
+<button class="px-4 py-1.5 bg-slate-800 text-white text-xs font-bold rounded-full">Todos os Clientes</button>
+<button class="px-4 py-1.5 border border-slate-200 text-slate-600 text-xs font-bold rounded-full bg-white hover:bg-slate-50">Acme Corp</button>
+<button class="px-4 py-1.5 border border-slate-200 text-slate-600 text-xs font-bold rounded-full bg-white hover:bg-slate-50">Allied IT</button>
+<button class="px-4 py-1.5 border border-slate-200 text-slate-600 text-xs font-bold rounded-full bg-white hover:bg-slate-50">Alpha Tech</button>
+<button class="px-4 py-1.5 border border-slate-200 text-slate-600 text-xs font-bold rounded-full bg-white hover:bg-slate-50">Beta Hospital</button>
+<button class="px-4 py-1.5 border border-slate-200 text-slate-600 text-xs font-bold rounded-full bg-white hover:bg-slate-50">Globex IT</button>
+<button class="px-4 py-1.5 border border-slate-200 text-slate-600 text-xs font-bold rounded-full bg-white hover:bg-slate-50">Initech Finance</button>
+</div>
+<div class="flex items-center gap-2">
+<div class="relative">
+<input class="pl-10 pr-4 py-2 border border-slate-200 rounded-custom text-sm w-64 focus:ring-primary focus:border-primary" placeholder="Buscar ID ou assunto..." type="text"/>
+<svg class="w-4 h-4 text-slate-400 absolute left-3 top-3" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+</div>
+<button class="p-2 border border-slate-200 rounded-custom bg-white hover:bg-slate-50">
+<svg class="w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M4 6h16M4 12h16m-7 6h7" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+</button>
+<button class="p-2 border border-slate-200 rounded-custom bg-white hover:bg-slate-50">
+<svg class="w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+</button>
+</div>
+</div>
+</div>
+<!-- KPI Grid -->
+<div class="grid grid-cols-4 gap-6 mb-8" data-purpose="kpi-cards">
+<div class="bg-white border border-slate-200 p-5 rounded-custom flex items-center gap-4 shadow-sm">
+<div class="w-12 h-12 bg-slate-50 rounded-custom flex items-center justify-center text-slate-500">
+<svg class="w-6 h-6" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M4 6h16M4 10h16M4 14h16M4 18h16" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+</div>
+<div>
+<p class="text-2xl font-bold text-slate-800">14</p>
+<p class="text-[10px] font-bold text-slate-400 uppercase">TOTAL NA FILA</p>
+</div>
+</div>
+<div class="bg-red-50 border border-red-100 p-5 rounded-custom flex items-center gap-4 shadow-sm">
+<div class="w-12 h-12 bg-white rounded-custom flex items-center justify-center text-red-500 shadow-sm">
+<svg class="w-6 h-6" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+</div>
+<div>
+<p class="text-2xl font-bold text-red-600">4</p>
+<p class="text-[10px] font-bold text-red-400 uppercase">CRÍTICOS P1</p>
+</div>
+</div>
+<div class="bg-indigo-50 border border-indigo-100 p-5 rounded-custom flex items-center gap-4 shadow-sm">
+<div class="w-12 h-12 bg-white rounded-custom flex items-center justify-center text-indigo-500 shadow-sm">
+<svg class="w-6 h-6" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+</div>
+<div>
+<p class="text-2xl font-bold text-indigo-600">5</p>
+<p class="text-[10px] font-bold text-indigo-400 uppercase">EM ATENDIMENTO</p>
+</div>
+</div>
+<div class="bg-rose-50 border border-rose-100 p-5 rounded-custom flex items-center gap-4 shadow-sm">
+<div class="w-12 h-12 bg-white rounded-custom flex items-center justify-center text-rose-500 shadow-sm">
+<svg class="w-6 h-6" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+</div>
+<div>
+<p class="text-2xl font-bold text-rose-600">3</p>
+<p class="text-[10px] font-bold text-rose-400 uppercase">SLA VIOLADO</p>
+</div>
+<div class="ml-auto">
+<button class="flex items-center gap-2 px-3 py-1.5 border border-slate-200 text-slate-500 text-[10px] font-bold rounded-custom bg-white hover:bg-slate-50">
+<svg class="w-3 h-3" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+                Customizar Visão
+             </button>
+</div>
+</div>
+</div>
+<!-- BEGIN: IncidentTable -->
+<div class="bg-white border border-slate-200 rounded-custom overflow-hidden shadow-sm" data-purpose="incident-table">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="bg-slate-50 border-b border-slate-200 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+<th class="px-6 py-4 w-12"><input class="rounded text-primary focus:ring-primary border-slate-300" type="checkbox"/></th>
+<th class="px-4 py-4">TICKET ID</th>
+<th class="px-4 py-4">ABERTURA</th>
+<th class="px-4 py-4">EMPRESA</th>
+<th class="px-4 py-4">SOLICITANTE</th>
+<th class="px-4 py-4">ASSUNTO</th>
+<th class="px-4 py-4">STATUS</th>
+<th class="px-4 py-4">PRIORIDADE</th>
+<th class="px-4 py-4">SLA</th>
+<th class="px-4 py-4">GRUPO TÉCNICO</th>
+<th class="px-4 py-4"></th>
+</tr>
+</thead>
+<tbody class="text-sm">
+<!-- Row 1 -->
+<tr class="border-b border-slate-100 table-row-hover">
+<td class="px-6 py-4"><input class="rounded text-primary focus:ring-primary border-slate-300" type="checkbox"/></td>
+<td class="px-4 py-4">
+<div class="flex items-center gap-2">
+<span class="text-primary font-bold">INC0010041</span>
+<span class="flex items-center gap-1 text-[8px] font-bold px-1.5 py-0.5 bg-red-50 text-red-500 rounded border border-red-100">
+<svg class="w-2 h-2" fill="currentColor" viewbox="0 0 20 20"><path d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z"></path></svg>
+                    INCIDENTE
+                  </span>
+</div>
+</td>
+<td class="px-4 py-4 text-slate-500">12/06/2026, 16:30:52</td>
+<td class="px-4 py-4 font-medium flex items-center gap-1"><svg class="w-3 h-3 text-slate-400" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg> Alpha Tech</td>
+<td class="px-4 py-4 text-slate-600">Aldo Alpha</td>
+<td class="px-4 py-4 font-semibold text-slate-800">Notebook não liga (BSOD recorrente)</td>
+<td class="px-4 py-4"><span class="text-slate-500">Pendente</span></td>
+<td class="px-4 py-4"><span class="text-[10px] font-bold px-2 py-0.5 border border-slate-200 rounded">P3 - MODERATE</span></td>
+<td class="px-4 py-4"><svg class="w-4 h-4 text-slate-300" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg></td>
+<td class="px-4 py-4 text-slate-400 italic">Sem equipe</td>
+<td class="px-4 py-4"><svg class="w-4 h-4 text-slate-300" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M9 5l7 7-7 7" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg></td>
+</tr>
+<!-- Row 2 -->
+<tr class="border-b border-slate-100 table-row-hover">
+<td class="px-6 py-4"><input class="rounded text-primary focus:ring-primary border-slate-300" type="checkbox"/></td>
+<td class="px-4 py-4">
+<div class="flex items-center gap-2">
+<span class="text-primary font-bold">INC0010040</span>
+<span class="flex items-center gap-1 text-[8px] font-bold px-1.5 py-0.5 bg-red-50 text-red-500 rounded border border-red-100">
+<svg class="w-2 h-2" fill="currentColor" viewbox="0 0 20 20"><path d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z"></path></svg>
+                    INCIDENTE
+                  </span>
+</div>
+</td>
+<td class="px-4 py-4 text-slate-500">12/06/2026, 16:30:52</td>
+<td class="px-4 py-4 font-medium flex items-center gap-1"><svg class="w-3 h-3 text-slate-400" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg> Beta Hospital</td>
+<td class="px-4 py-4 text-slate-600">Bia Beta</td>
+<td class="px-4 py-4 font-semibold text-slate-800">Erro ao emitir nota fiscal de internação</td>
+<td class="px-4 py-4"><span class="text-slate-500">Em Atendimento</span></td>
+<td class="px-4 py-4"><span class="text-[10px] font-bold px-2 py-0.5 border border-slate-200 rounded">P4 - LOW</span></td>
+<td class="px-4 py-4"><svg class="w-4 h-4 text-slate-300" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg></td>
+<td class="px-4 py-4 text-slate-400 italic">Sem equipe</td>
+<td class="px-4 py-4"><svg class="w-4 h-4 text-slate-300" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M9 5l7 7-7 7" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg></td>
+</tr>
+<!-- Row 3 - Critical -->
+<tr class="border-b border-slate-100 table-row-hover bg-red-50/20">
+<td class="px-6 py-4"><input class="rounded text-primary focus:ring-primary border-slate-300" type="checkbox"/></td>
+<td class="px-4 py-4">
+<div class="flex items-center gap-2">
+<span class="text-primary font-bold">INC0010039</span>
+<span class="flex items-center gap-1 text-[8px] font-bold px-1.5 py-0.5 bg-red-50 text-red-500 rounded border border-red-100">
+<svg class="w-2 h-2" fill="currentColor" viewbox="0 0 20 20"><path d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z"></path></svg>
+                    INCIDENTE
+                  </span>
+</div>
+</td>
+<td class="px-4 py-4 text-slate-500">12/06/2026, 16:30:52</td>
+<td class="px-4 py-4 font-medium flex items-center gap-1"><svg class="w-3 h-3 text-slate-400" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg> Alpha Tech</td>
+<td class="px-4 py-4 text-slate-600">Alice Alpha</td>
+<td class="px-4 py-4 font-semibold text-slate-800">Queda total do link dedicado</td>
+<td class="px-4 py-4"><span class="text-slate-500">Novo</span></td>
+<td class="px-4 py-4"><span class="text-[10px] font-bold px-2 py-0.5 bg-red-500 text-white rounded">P1 - CRITICAL</span></td>
+<td class="px-4 py-4"><svg class="w-4 h-4 text-slate-300" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg></td>
+<td class="px-4 py-4 text-slate-400 italic">Sem equipe</td>
+<td class="px-4 py-4"><svg class="w-4 h-4 text-slate-300" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M9 5l7 7-7 7" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg></td>
+</tr>
+<!-- Row 4 - Nível 1 Suporte -->
+<tr class="border-b border-slate-100 table-row-hover">
+<td class="px-6 py-4"><input class="rounded text-primary focus:ring-primary border-slate-300" type="checkbox"/></td>
+<td class="px-4 py-4">
+<div class="flex items-center gap-2">
+<span class="text-primary font-bold">INC0010013</span>
+<span class="flex items-center gap-1 text-[8px] font-bold px-1.5 py-0.5 bg-red-50 text-red-500 rounded border border-red-100">
+<svg class="w-2 h-2" fill="currentColor" viewbox="0 0 20 20"><path d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z"></path></svg>
+                    INCIDENTE
+                  </span>
+</div>
+</td>
+<td class="px-4 py-4 text-slate-500">10/06/2026, 20:19:14</td>
+<td class="px-4 py-4 font-medium flex items-center gap-1"><svg class="w-3 h-3 text-slate-400" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg> Acme Corp</td>
+<td class="px-4 py-4 text-slate-600">Juliana Costa</td>
+<td class="px-4 py-4 font-semibold text-slate-800">THEXPOS — Erro / Falha</td>
+<td class="px-4 py-4"><span class="text-slate-500">Em Atendimento</span></td>
+<td class="px-4 py-4"><span class="text-[10px] font-bold px-2 py-0.5 border border-slate-200 rounded">P4 - LOW</span></td>
+<td class="px-4 py-4"><svg class="w-4 h-4 text-slate-300" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg></td>
+<td class="px-4 py-4"><span class="text-[10px] font-bold px-2 py-1 bg-indigo-50 text-indigo-600 border border-indigo-100 rounded-full">Nível 1 - Suporte</span></td>
+<td class="px-4 py-4"><svg class="w-4 h-4 text-slate-300" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M9 5l7 7-7 7" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg></td>
+</tr>
+<!-- Row 5 - SLA Violado -->
+<tr class="border-b border-slate-100 table-row-hover">
+<td class="px-6 py-4"><input class="rounded text-primary focus:ring-primary border-slate-300" type="checkbox"/></td>
+<td class="px-4 py-4">
+<div class="flex items-center gap-2">
+<span class="text-primary font-bold">INC0010001</span>
+<span class="flex items-center gap-1 text-[8px] font-bold px-1.5 py-0.5 bg-red-50 text-red-500 rounded border border-red-100">
+<svg class="w-2 h-2" fill="currentColor" viewbox="0 0 20 20"><path d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z"></path></svg>
+                    INCIDENTE
+                  </span>
+</div>
+</td>
+<td class="px-4 py-4 text-slate-500">06/06/2026, 16:19:37</td>
+<td class="px-4 py-4 font-medium flex items-center gap-1"><svg class="w-3 h-3 text-slate-400" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg> Acme Corp</td>
+<td class="px-4 py-4 text-slate-600">Juliana Costa</td>
+<td class="px-4 py-4 font-semibold text-slate-800">Servidor de produção fora do ar</td>
+<td class="px-4 py-4"><span class="text-slate-500">Pendente</span></td>
+<td class="px-4 py-4"><span class="text-[10px] font-bold px-2 py-0.5 border border-slate-200 rounded">P3 - MODERATE</span></td>
+<td class="px-4 py-4 text-rose-500 flex items-center gap-1 font-bold"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg> Violado</td>
+<td class="px-4 py-4"><span class="text-[10px] font-bold px-2 py-1 bg-blue-50 text-blue-600 border border-blue-100 rounded-full">Nível 2 - Infraestrutura</span></td>
+<td class="px-4 py-4"><svg class="w-4 h-4 text-slate-300" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M9 5l7 7-7 7" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg></td>
+</tr>
+<!-- Row 6 -->
+<tr class="border-b border-slate-100 table-row-hover">
+<td class="px-6 py-4"><input class="rounded text-primary focus:ring-primary border-slate-300" type="checkbox"/></td>
+<td class="px-4 py-4">
+<div class="flex items-center gap-2">
+<span class="text-primary font-bold">INC0010006</span>
+<span class="flex items-center gap-1 text-[8px] font-bold px-1.5 py-0.5 bg-red-50 text-red-500 rounded border border-red-100">
+<svg class="w-2 h-2" fill="currentColor" viewbox="0 0 20 20"><path d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z"></path></svg>
+                    INCIDENTE
+                  </span>
+</div>
+</td>
+<td class="px-4 py-4 text-slate-500">06/06/2026, 16:19:37</td>
+<td class="px-4 py-4 font-medium flex items-center gap-1"><svg class="w-3 h-3 text-slate-400" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg> Globex IT</td>
+<td class="px-4 py-4 text-slate-600">Diego Alves</td>
+<td class="px-4 py-4 font-semibold text-slate-800">E-mail corporativo inacessível</td>
+<td class="px-4 py-4"><span class="text-slate-500">Resolvido</span></td>
+<td class="px-4 py-4"><span class="text-[10px] font-bold px-2 py-0.5 bg-red-500 text-white rounded">P1 - CRITICAL</span></td>
+<td class="px-4 py-4 text-rose-500 flex items-center gap-1 font-bold"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg> Violado</td>
+<td class="px-4 py-4"><span class="text-[10px] font-bold px-2 py-1 bg-indigo-50 text-indigo-600 border border-indigo-100 rounded-full">Suporte Técnico Globex</span></td>
+<td class="px-4 py-4"><svg class="w-4 h-4 text-slate-300" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M9 5l7 7-7 7" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg></td>
+</tr>
+</tbody>
+</table>
+<!-- Table Footer/Pagination -->
+<div class="px-6 py-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between">
+<span class="text-xs text-slate-500">14 chamado(s)</span>
+<div class="flex items-center gap-2">
+<button class="px-3 py-1 text-xs font-bold text-slate-500 border border-slate-200 rounded hover:bg-white bg-transparent">Anterior</button>
+<button class="px-3 py-1 text-xs font-bold text-slate-500 border border-slate-200 rounded hover:bg-white bg-transparent">Próximo</button>
+</div>
+</div>
+</div>
+<!-- END: IncidentTable -->
+</div>
+<!-- END: DashboardBody -->
+</main>
+</body></html>

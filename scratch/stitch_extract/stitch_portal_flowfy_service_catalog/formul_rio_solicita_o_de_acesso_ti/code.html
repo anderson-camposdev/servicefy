@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="pt-BR"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Portal Flowfy - ITSM Dashboard</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .glass-panel {
+            background: rgba(250, 248, 255, 0.02);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        .dark .glass-panel {
+            background: rgba(19, 27, 46, 0.6);
+            border: 1px solid rgba(115, 118, 134, 0.2);
+        }
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #737686;
+            border-radius: 10px;
+        }
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "primary-fixed-dim": "#b4c5ff",
+                      "on-primary-fixed": "#00174b",
+                      "on-tertiary-container": "#ffede6",
+                      "secondary": "#505f76",
+                      "surface-container-high": "#e2e7ff",
+                      "primary": "#004ac6",
+                      "surface": "#faf8ff",
+                      "error-container": "#ffdad6",
+                      "surface-bright": "#faf8ff",
+                      "inverse-surface": "#283044",
+                      "on-secondary-fixed": "#0b1c30",
+                      "surface-dim": "#d2d9f4",
+                      "surface-container-highest": "#dae2fd",
+                      "secondary-fixed-dim": "#b7c8e1",
+                      "on-tertiary": "#ffffff",
+                      "on-secondary": "#ffffff",
+                      "on-tertiary-fixed-variant": "#7d2d00",
+                      "tertiary-fixed": "#ffdbcd",
+                      "on-primary-fixed-variant": "#003ea8",
+                      "inverse-on-surface": "#eef0ff",
+                      "outline": "#737686",
+                      "primary-fixed": "#dbe1ff",
+                      "on-surface-variant": "#434655",
+                      "inverse-primary": "#b4c5ff",
+                      "on-primary": "#ffffff",
+                      "on-background": "#131b2e",
+                      "on-primary-container": "#eeefff",
+                      "surface-container-low": "#f2f3ff",
+                      "tertiary-container": "#bc4800",
+                      "tertiary-fixed-dim": "#ffb596",
+                      "secondary-fixed": "#d3e4fe",
+                      "on-error": "#ffffff",
+                      "outline-variant": "#c3c6d7",
+                      "on-secondary-fixed-variant": "#38485d",
+                      "surface-container-lowest": "#ffffff",
+                      "primary-container": "#2563eb",
+                      "surface-variant": "#dae2fd",
+                      "on-tertiary-fixed": "#360f00",
+                      "on-secondary-container": "#54647a",
+                      "on-surface": "#131b2e",
+                      "on-error-container": "#93000a",
+                      "tertiary": "#943700",
+                      "background": "#faf8ff",
+                      "error": "#ba1a1a",
+                      "secondary-container": "#d0e1fb",
+                      "surface-container": "#eaedff",
+                      "surface-tint": "#0053db"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.5rem",
+                      "lg": "0.5rem",
+                      "xl": "0.75rem",
+                      "full": "9999px"
+              },
+              "spacing": {
+                      "sm": "8px",
+                      "xs": "4px",
+                      "base": "4px",
+                      "gutter": "24px",
+                      "2xl": "48px",
+                      "xl": "32px",
+                      "md": "16px",
+                      "3xl": "64px",
+                      "margin-mobile": "16px",
+                      "lg": "24px",
+                      "margin-desktop": "40px"
+              },
+              "fontFamily": {
+                      "label-md": ["Hanken Grotesk"],
+                      "display-lg": ["Hanken Grotesk"],
+                      "body-sm": ["Hanken Grotesk"],
+                      "body-md": ["Hanken Grotesk"],
+                      "title-md": ["Hanken Grotesk"],
+                      "headline-lg": ["Hanken Grotesk"],
+                      "headline-lg-mobile": ["Hanken Grotesk"]
+              },
+              "fontSize": {
+                      "label-md": ["12px", {"lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "600"}],
+                      "display-lg": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                      "body-sm": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
+                      "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                      "title-md": ["20px", {"lineHeight": "28px", "fontWeight": "600"}],
+                      "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                      "headline-lg-mobile": ["24px", {"lineHeight": "32px", "fontWeight": "600"}]
+              }
+            },
+          },
+        }
+    </script>
+</head>
+<body class="bg-background dark:bg-on-background text-on-surface dark:text-inverse-on-surface font-body-md transition-colors duration-300">
+<!-- Top Navigation Bar -->
+<header class="fixed top-0 left-0 w-full z-50 bg-surface-container-lowest dark:bg-surface-container-lowest border-b border-outline-variant dark:border-outline-variant shadow-sm h-16 flex justify-between items-center px-margin-desktop">
+<div class="flex items-center gap-md">
+<h1 class="font-headline-lg text-headline-lg font-bold text-primary dark:text-primary-fixed">ITSM Portal</h1>
+<div class="h-6 w-[1px] bg-outline-variant mx-sm"></div>
+<nav class="hidden md:flex items-center gap-lg">
+<a class="text-primary dark:text-primary-fixed font-bold border-b-2 border-primary h-16 flex items-center" href="#">Dashboard</a>
+<a class="text-on-surface-variant dark:text-on-surface-variant hover:bg-surface-container-high dark:hover:bg-surface-container-high transition-colors px-md py-sm rounded-lg" href="#">Analytics</a>
+<a class="text-on-surface-variant dark:text-on-surface-variant hover:bg-surface-container-high dark:hover:bg-surface-container-high transition-colors px-md py-sm rounded-lg" href="#">Team</a>
+</nav>
+</div>
+<div class="flex items-center gap-md">
+<div class="relative hidden lg:block">
+<span class="material-symbols-outlined absolute left-sm top-1/2 -translate-y-1/2 text-outline">search</span>
+<input class="bg-surface-container-low dark:bg-surface-container-low border-none rounded-full pl-xl pr-md py-xs w-64 focus:ring-2 focus:ring-primary text-body-sm" placeholder="Search services..." type="text"/>
+</div>
+<div class="flex gap-sm">
+<button class="material-symbols-outlined p-sm rounded-full hover:bg-surface-container-high dark:hover:bg-surface-container-high transition-colors text-on-surface-variant">notifications</button>
+<button class="material-symbols-outlined p-sm rounded-full hover:bg-surface-container-high dark:hover:bg-surface-container-high transition-colors text-on-surface-variant">settings</button>
+<button class="material-symbols-outlined p-sm rounded-full hover:bg-surface-container-high dark:hover:bg-surface-container-high transition-colors text-on-surface-variant">help</button>
+</div>
+<div class="w-8 h-8 rounded-full overflow-hidden border border-outline-variant">
+<img alt="User avatar" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDwait8NvNGBHE_UxDQYrQJIWAYj28azPPbPRbfdV8PcBRQDgv_itp3_rOGxl87gszWrXHmeZVqciwT8zbQdyme31srlOkhvYyGyDY9qbdm51dXnaljvV7FwX-j7ZBDMwOy-4jU04rsPx9JuyDv6xsxfUoh2eNC7EGlJXhB4xaZbKif4jYD-SdlqgIzfZmNnr-YmwfmHDs3SpYU4UCkaIusSmhwJkGQ2UThK0SQEw1vnthB57uOKBUzvdAkTz0wYg5kt3WU0Wz9Z3E"/>
+</div>
+</div>
+</header>
+<!-- Side Navigation Bar (Service Form Drawer) -->
+<aside class="fixed left-0 top-0 h-full w-72 lg:w-80 z-40 bg-surface-container-low dark:bg-surface-container-low shadow-md pt-20 pb-lg px-md flex flex-col gap-sm">
+<div class="mb-lg px-md">
+<div class="flex flex-col gap-xs">
+<h2 class="font-title-md text-title-md font-bold text-on-surface">Solicitação de Acesso</h2>
+<p class="font-label-md text-label-md text-on-surface-variant">Solicite acesso a sistemas corporativos, pastas de rede ou VPN.</p>
+</div>
+</div>
+<nav class="flex-1 overflow-y-auto no-scrollbar">
+<form class="space-y-md px-md pb-md">
+<div class="space-y-xs">
+<label class="font-label-md text-on-surface-variant">Nome do Usuário</label>
+<input class="w-full bg-surface-container-lowest dark:bg-surface-container-low border border-outline-variant rounded-lg px-md py-sm text-body-sm focus:ring-2 focus:ring-primary" placeholder="Ex: João Silva" type="text"/>
+</div>
+<div class="space-y-xs">
+<label class="font-label-md text-on-surface-variant">Departamento / Centro de Custo</label>
+<select class="w-full bg-surface-container-lowest dark:bg-surface-container-low border border-outline-variant rounded-lg px-md py-sm text-body-sm focus:ring-2 focus:ring-primary">
+<option>TI - Infraestrutura</option>
+<option>Financeiro</option>
+<option>Recursos Humanos</option>
+<option>Vendas</option>
+<option>Marketing</option>
+</select>
+</div>
+<div class="space-y-xs">
+<label class="font-label-md text-on-surface-variant">Justificativa e Sistemas Necessários</label>
+<textarea class="w-full bg-surface-container-lowest dark:bg-surface-container-low border border-outline-variant rounded-lg px-md py-sm text-body-sm focus:ring-2 focus:ring-primary h-32 resize-none" placeholder="Descreva os sistemas (SAP, Slack, Jira, etc.) e o motivo do acesso..."></textarea>
+</div>
+<div class="flex items-start gap-sm pt-sm">
+<input class="mt-1 rounded border-outline-variant text-primary focus:ring-primary" id="lgpd-check" type="checkbox"/>
+<label class="text-body-sm text-on-surface-variant" for="lgpd-check">Declaro ciência das normas de LGPD e segurança da informação da empresa.</label>
+</div>
+</form>
+</nav>
+<div class="mt-auto px-md pb-md">
+<button class="w-full bg-primary text-on-primary py-md rounded-lg font-title-md font-bold hover:opacity-90 transition-opacity shadow-md">Solicitar Acesso</button>
+</div>
+</aside>
+<!-- Main Content -->
+<main class="ml-72 lg:ml-80 pt-24 px-margin-desktop pb-2xl min-h-screen">
+<!-- Header & Breadcrumbs -->
+<div class="mb-xl">
+<div class="flex items-center gap-xs text-on-surface-variant font-label-md mb-xs">
+<span>Portal Flowfy</span>
+<span class="material-symbols-outlined text-sm">chevron_right</span>
+<span class="text-primary font-bold">Portal de Serviços IT</span>
+</div>
+<div class="flex flex-col md:flex-row md:items-end justify-between gap-md">
+<div>
+<h2 class="font-headline-lg text-headline-lg text-on-surface dark:text-inverse-on-surface">Portal de Serviços IT</h2>
+<p class="text-body-md text-on-surface-variant">Selecione uma categoria para iniciar sua solicitação</p>
+</div>
+<div class="flex gap-sm">
+<button class="flex items-center gap-xs bg-surface-container-high dark:bg-surface-container-high text-on-surface-variant px-md py-sm rounded-lg font-label-md hover:bg-outline-variant transition-colors">
+<span class="material-symbols-outlined text-[20px]">filter_list</span>
+                    Filtros Avançados
+                </button>
+</div>
+</div>
+</div>
+<!-- Category Filters -->
+<div class="flex gap-md mb-2xl overflow-x-auto pb-sm no-scrollbar">
+<button class="flex-none px-xl py-sm rounded-full bg-primary text-on-primary font-label-md transition-all shadow-md">Todas Categorias</button>
+<button class="flex-none px-xl py-sm rounded-full bg-surface-container-low dark:bg-surface-container-low text-on-surface-variant border border-outline-variant font-label-md hover:bg-surface-container-high transition-all">Infrastructure</button>
+<button class="flex-none px-xl py-sm rounded-full bg-surface-container-low dark:bg-surface-container-low text-on-surface-variant border border-outline-variant font-label-md hover:bg-surface-container-high transition-all">Software</button>
+<button class="flex-none px-xl py-sm rounded-full bg-surface-container-low dark:bg-surface-container-low text-on-surface-variant border border-outline-variant font-label-md hover:bg-surface-container-high transition-all">Access</button>
+<button class="flex-none px-xl py-sm rounded-full bg-surface-container-low dark:bg-surface-container-low text-on-surface-variant border border-outline-variant font-label-md hover:bg-surface-container-high transition-all">Cloud</button>
+</div>
+<!-- Service Cards Grid -->
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-lg">
+<!-- Card 1: Provisionamento de Banco de Dados -->
+<div class="glass-panel rounded-xl p-lg flex flex-col gap-md group hover:-translate-y-1 transition-all duration-300">
+<div class="flex justify-between items-start">
+<div class="w-12 h-12 bg-tertiary-container text-on-tertiary-container rounded-lg flex items-center justify-center">
+<span class="material-symbols-outlined text-[28px]" style="font-variation-settings: 'FILL' 1;">database</span>
+</div>
+<div class="flex flex-col items-end gap-xs">
+<span class="px-sm py-1 bg-surface-container-high text-on-surface-variant text-[10px] font-bold rounded-full uppercase tracking-wider">Infrastructure</span>
+<span class="px-sm py-1 bg-error-container text-on-error-container text-[10px] font-bold rounded-full">ALTA PRIORIDADE</span>
+</div>
+</div>
+<div>
+<h3 class="font-title-md text-title-md text-on-surface dark:text-inverse-on-surface mb-xs">Provisionamento de Banco de Dados</h3>
+<p class="text-body-sm text-on-surface-variant line-clamp-2">Solicite uma nova instância de RDS ou SQL Server para seu projeto corporativo seguindo as políticas de segurança.</p>
+</div>
+<div class="mt-auto pt-md border-t border-outline-variant flex justify-between items-center">
+<div class="flex items-center gap-xs">
+<span class="material-symbols-outlined text-outline text-[18px]">schedule</span>
+<span class="font-label-md text-label-md text-on-surface-variant">SLA 4h</span>
+</div>
+<button class="bg-primary text-on-primary w-10 h-10 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+<span class="material-symbols-outlined">arrow_forward</span>
+</button>
+</div>
+</div>
+<!-- Card 2: Acesso a VPN -->
+<div class="glass-panel rounded-xl p-lg flex flex-col gap-md group hover:-translate-y-1 transition-all duration-300">
+<div class="flex justify-between items-start">
+<div class="w-12 h-12 bg-primary-container text-on-primary-container rounded-lg flex items-center justify-center">
+<span class="material-symbols-outlined text-[28px]" style="font-variation-settings: 'FILL' 1;">vpn_key</span>
+</div>
+<div class="flex flex-col items-end gap-xs">
+<span class="px-sm py-1 bg-surface-container-high text-on-surface-variant text-[10px] font-bold rounded-full uppercase tracking-wider">Access</span>
+<span class="px-sm py-1 bg-secondary-container text-on-secondary-container text-[10px] font-bold rounded-full">MÉDIA PRIORIDADE</span>
+</div>
+</div>
+<div>
+<h3 class="font-title-md text-title-md text-on-surface dark:text-inverse-on-surface mb-xs">Acesso a VPN</h3>
+<p class="text-body-sm text-on-surface-variant line-clamp-2">Liberação de credenciais e configuração de túnel seguro para acesso remoto aos servidores internos.</p>
+</div>
+<div class="mt-auto pt-md border-t border-outline-variant flex justify-between items-center">
+<div class="flex items-center gap-xs">
+<span class="material-symbols-outlined text-outline text-[18px]">schedule</span>
+<span class="font-label-md text-label-md text-on-surface-variant">SLA 2h</span>
+</div>
+<button class="bg-primary text-on-primary w-10 h-10 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+<span class="material-symbols-outlined">arrow_forward</span>
+</button>
+</div>
+</div>
+<!-- Card 3: Backup de Servidor -->
+<div class="glass-panel rounded-xl p-lg flex flex-col gap-md group hover:-translate-y-1 transition-all duration-300">
+<div class="flex justify-between items-start">
+<div class="w-12 h-12 bg-secondary text-on-secondary rounded-lg flex items-center justify-center">
+<span class="material-symbols-outlined text-[28px]" style="font-variation-settings: 'FILL' 1;">cloud_upload</span>
+</div>
+<div class="flex flex-col items-end gap-xs">
+<span class="px-sm py-1 bg-surface-container-high text-on-surface-variant text-[10px] font-bold rounded-full uppercase tracking-wider">Cloud</span>
+<span class="px-sm py-1 bg-surface-container-highest text-on-surface-variant text-[10px] font-bold rounded-full">BAIXA PRIORIDADE</span>
+</div>
+</div>
+<div>
+<h3 class="font-title-md text-title-md text-on-surface dark:text-inverse-on-surface mb-xs">Backup de Servidor</h3>
+<p class="text-body-sm text-on-surface-variant line-clamp-2">Agendamento ou restauração de backups críticos. Suporte a ambientes on-premise e multicloud.</p>
+</div>
+<div class="mt-auto pt-md border-t border-outline-variant flex justify-between items-center">
+<div class="flex items-center gap-xs">
+<span class="material-symbols-outlined text-outline text-[18px]">schedule</span>
+<span class="font-label-md text-label-md text-on-surface-variant">SLA 24h</span>
+</div>
+<button class="bg-primary text-on-primary w-10 h-10 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+<span class="material-symbols-outlined">arrow_forward</span>
+</button>
+</div>
+</div>
+<!-- Card 4: Software License -->
+<div class="glass-panel rounded-xl p-lg flex flex-col gap-md group hover:-translate-y-1 transition-all duration-300">
+<div class="flex justify-between items-start">
+<div class="w-12 h-12 bg-tertiary text-on-tertiary rounded-lg flex items-center justify-center">
+<span class="material-symbols-outlined text-[28px]" style="font-variation-settings: 'FILL' 1;">terminal</span>
+</div>
+<div class="flex flex-col items-end gap-xs">
+<span class="px-sm py-1 bg-surface-container-high text-on-surface-variant text-[10px] font-bold rounded-full uppercase tracking-wider">Software</span>
+<span class="px-sm py-1 bg-secondary-container text-on-secondary-container text-[10px] font-bold rounded-full">MÉDIA PRIORIDADE</span>
+</div>
+</div>
+<div>
+<h3 class="font-title-md text-title-md text-on-surface dark:text-inverse-on-surface mb-xs">Licenciamento de Software</h3>
+<p class="text-body-sm text-on-surface-variant line-clamp-2">Solicitação de novas chaves de licença ou renovação de assinaturas Adobe, Microsoft ou JetBrains.</p>
+</div>
+<div class="mt-auto pt-md border-t border-outline-variant flex justify-between items-center">
+<div class="flex items-center gap-xs">
+<span class="material-symbols-outlined text-outline text-[18px]">schedule</span>
+<span class="font-label-md text-label-md text-on-surface-variant">SLA 8h</span>
+</div>
+<button class="bg-primary text-on-primary w-10 h-10 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+<span class="material-symbols-outlined">arrow_forward</span>
+</button>
+</div>
+</div>
+</div>
+</main>
+<!-- Theme Customizer Widget -->
+<div class="fixed bottom-lg right-lg z-[100]" id="theme-customizer">
+<button class="w-14 h-14 bg-primary text-on-primary rounded-full shadow-lg flex items-center justify-center hover:scale-105 active:scale-95 transition-transform" onclick="toggleCustomizer()">
+<span class="material-symbols-outlined">palette</span>
+</button>
+<div class="hidden absolute bottom-20 right-0 w-72 glass-panel rounded-2xl p-lg shadow-2xl animate-in slide-in-from-bottom-5 duration-300" id="customizer-panel">
+<div class="flex justify-between items-center mb-md">
+<h3 class="font-title-md text-title-md">Customizer</h3>
+<button class="material-symbols-outlined text-on-surface-variant" onclick="toggleCustomizer()">close</button>
+</div>
+<div class="space-y-lg">
+<!-- Mode Toggle -->
+<div class="flex justify-between items-center bg-surface-container-low dark:bg-surface-container-high p-sm rounded-xl">
+<span class="font-label-md">Theme Mode</span>
+<button class="p-xs bg-primary-container text-on-primary-container rounded-lg flex items-center gap-xs" onclick="toggleDarkMode()">
+<span class="material-symbols-outlined text-[18px]" id="mode-icon">dark_mode</span>
+</button>
+</div>
+<!-- Accent Color -->
+<div>
+<span class="font-label-md block mb-sm">Accent Color</span>
+<div class="flex gap-sm">
+<button class="w-8 h-8 rounded-full bg-[#004ac6] border-2 border-white ring-2 ring-primary" onclick="updateAccent('#004ac6')"></button>
+<button class="w-8 h-8 rounded-full bg-[#943700] border-2 border-white" onclick="updateAccent('#943700')"></button>
+<button class="w-8 h-8 rounded-full bg-[#006a6a] border-2 border-white" onclick="updateAccent('#006a6a')"></button>
+<button class="w-8 h-8 rounded-full bg-[#4355b9] border-2 border-white" onclick="updateAccent('#4355b9')"></button>
+</div>
+</div>
+<!-- Glassmorphism Intensity -->
+<div>
+<span class="font-label-md block mb-sm">Glass Intensity</span>
+<input class="w-full accent-primary" max="100" min="0" type="range" value="60"/>
+</div>
+</div>
+</div>
+</div>
+<script>
+    function toggleCustomizer() {
+        const panel = document.getElementById('customizer-panel');
+        panel.classList.toggle('hidden');
+    }
+
+    function toggleDarkMode() {
+        const html = document.documentElement;
+        const icon = document.getElementById('mode-icon');
+        if (html.classList.contains('dark')) {
+            html.classList.remove('dark');
+            icon.innerText = 'light_mode';
+        } else {
+            html.classList.add('dark');
+            icon.innerText = 'dark_mode';
+        }
+    }
+
+    function updateAccent(color) {
+        document.querySelectorAll('.bg-primary').forEach(el => {
+            el.style.backgroundColor = color;
+        });
+        document.querySelectorAll('.text-primary').forEach(el => {
+            el.style.color = color;
+        });
+    }
+
+    window.addEventListener('click', (e) => {
+        const customizer = document.getElementById('theme-customizer');
+        const panel = document.getElementById('customizer-panel');
+        if (customizer && panel && !customizer.contains(e.target) && !panel.classList.contains('hidden')) {
+            panel.classList.add('hidden');
+        }
+    });
+</script>
+</body></html>

@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+
+<html class="light" lang="pt-BR"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Configurações - Flowfy ITSM Portal</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "on-error-container": "#93000a",
+                    "on-error": "#ffffff",
+                    "on-tertiary": "#ffffff",
+                    "on-secondary": "#ffffff",
+                    "on-tertiary-fixed": "#360f00",
+                    "error-container": "#ffdad6",
+                    "on-tertiary-container": "#ffede6",
+                    "on-primary-container": "#eeefff",
+                    "tertiary-fixed": "#ffdbcd",
+                    "surface-dim": "#d2d9f4",
+                    "surface-container-lowest": "#ffffff",
+                    "inverse-surface": "#283044",
+                    "background": "#faf8ff",
+                    "surface-container-highest": "#dae2fd",
+                    "on-surface-variant": "#434655",
+                    "on-secondary-fixed-variant": "#38485d",
+                    "secondary-fixed-dim": "#b7c8e1",
+                    "on-primary": "#ffffff",
+                    "on-primary-fixed": "#00174b",
+                    "surface-container": "#eaedff",
+                    "secondary": "#505f76",
+                    "on-tertiary-fixed-variant": "#7d2d00",
+                    "tertiary": "#943700",
+                    "primary-fixed-dim": "#b4c5ff",
+                    "primary-container": "#2563eb",
+                    "surface-bright": "#faf8ff",
+                    "outline-variant": "#c3c6d7",
+                    "on-primary-fixed-variant": "#003ea8",
+                    "primary": "#004ac6",
+                    "surface-variant": "#dae2fd",
+                    "surface-tint": "#0053db",
+                    "secondary-fixed": "#d3e4fe",
+                    "on-secondary-container": "#54647a",
+                    "on-surface": "#131b2e",
+                    "tertiary-container": "#bc4800",
+                    "on-background": "#131b2e",
+                    "primary-fixed": "#dbe1ff",
+                    "inverse-on-surface": "#eef0ff",
+                    "surface-container-low": "#f2f3ff",
+                    "secondary-container": "#d0e1fb",
+                    "inverse-primary": "#b4c5ff",
+                    "tertiary-fixed-dim": "#ffb596",
+                    "outline": "#737686",
+                    "on-secondary-fixed": "#0b1c30",
+                    "error": "#ba1a1a",
+                    "surface-container-high": "#e2e7ff",
+                    "surface": "#faf8ff"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "xl": "32px",
+                    "md": "16px",
+                    "margin-desktop": "40px",
+                    "lg": "24px",
+                    "2xl": "48px",
+                    "xs": "4px",
+                    "margin-mobile": "16px",
+                    "gutter": "24px",
+                    "base": "4px",
+                    "sm": "8px",
+                    "3xl": "64px"
+            },
+            "fontFamily": {
+                    "headline-lg": ["Hanken Grotesk"],
+                    "title-md": ["Hanken Grotesk"],
+                    "label-md": ["Hanken Grotesk"],
+                    "headline-lg-mobile": ["Hanken Grotesk"],
+                    "body-sm": ["Hanken Grotesk"],
+                    "display-lg": ["Hanken Grotesk"],
+                    "body-md": ["Hanken Grotesk"]
+            },
+            "fontSize": {
+                    "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                    "title-md": ["20px", {"lineHeight": "28px", "fontWeight": "600"}],
+                    "label-md": ["12px", {"lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "600"}],
+                    "headline-lg-mobile": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+                    "body-sm": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
+                    "display-lg": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                    "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        body { font-family: 'Hanken Grotesk', sans-serif; }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            display: inline-block;
+            line-height: 1;
+            text-transform: none;
+            letter-spacing: normal;
+            word-wrap: normal;
+            white-space: nowrap;
+            direction: ltr;
+        }
+        .settings-card {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .settings-card:hover {
+            transform: translateY(-2px);
+        }
+        /* Custom scrollbar for a cleaner look */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { 
+            background: #c3c6d7; 
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb:hover { background: #737686; }
+    </style>
+</head>
+<body class="bg-background text-on-background min-h-screen">
+<!-- SideNavBar Shell -->
+<aside class="fixed left-0 top-0 h-full flex flex-col p-4 border-r border-outline-variant dark:border-outline bg-surface dark:bg-inverse-surface w-64 z-50">
+<div class="flex items-center gap-3 mb-8 px-2">
+<div class="w-10 h-10 bg-primary rounded-lg flex items-center justify-center text-on-primary">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">flag</span>
+</div>
+<div>
+<h1 class="font-headline-lg text-headline-lg font-black text-primary dark:text-inverse-primary leading-tight">Flowfy</h1>
+<p class="font-body-sm text-body-sm text-outline opacity-80">ITSM Portal</p>
+</div>
+</div>
+<nav class="flex-1 space-y-2">
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant dark:text-outline-variant hover:bg-surface-container-high dark:hover:bg-surface-container transition-colors rounded-xl" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="font-body-md text-body-md">Dashboard</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant dark:text-outline-variant hover:bg-surface-container-high dark:hover:bg-surface-container transition-colors rounded-xl" href="#">
+<span class="material-symbols-outlined">published_with_changes</span>
+<span class="font-body-md text-body-md">Mudanças</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant dark:text-outline-variant hover:bg-surface-container-high dark:hover:bg-surface-container transition-colors rounded-xl" href="#">
+<span class="material-symbols-outlined">report_problem</span>
+<span class="font-body-md text-body-md">Problemas</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 bg-primary-container text-on-primary-container rounded-xl font-bold" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span class="font-body-md text-body-md">Configurações</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant dark:text-outline-variant hover:bg-surface-container-high dark:hover:bg-surface-container transition-colors rounded-xl" href="#">
+<span class="material-symbols-outlined">person</span>
+<span class="font-body-md text-body-md">Perfil</span>
+</a>
+</nav>
+<div class="mt-auto pt-4 border-t border-outline-variant space-y-2">
+<button class="w-full bg-primary text-on-primary py-3 px-4 rounded-xl font-bold flex items-center justify-center gap-2 mb-4 hover:opacity-90 active:scale-95 transition-all">
+<span class="material-symbols-outlined">add</span>
+                Novo Chamado
+            </button>
+<a class="flex items-center gap-3 px-4 py-2 text-on-surface-variant dark:text-outline-variant hover:bg-surface-container-high transition-colors rounded-lg" href="#">
+<span class="material-symbols-outlined">help</span>
+<span class="font-body-md text-body-md">Suporte</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-2 text-error hover:bg-error-container/20 transition-colors rounded-lg" href="#">
+<span class="material-symbols-outlined">logout</span>
+<span class="font-body-md text-body-md">Sair</span>
+</a>
+</div>
+</aside>
+<!-- Main Content Area -->
+<main class="ml-64 min-h-screen flex flex-col">
+<!-- TopNavBar Shell -->
+<header class="fixed top-0 right-0 left-64 z-40 flex justify-between items-center h-16 px-margin-desktop bg-background/80 backdrop-blur-md border-b border-outline-variant">
+<div class="flex items-center gap-6">
+<div class="relative">
+<span class="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-outline">search</span>
+<input class="bg-surface-container-low border-none rounded-full pl-10 pr-4 py-2 w-64 focus:ring-2 focus:ring-primary/20 text-body-sm" placeholder="Buscar configurações..." type="text"/>
+</div>
+<nav class="hidden md:flex gap-4">
+<a class="text-on-surface-variant dark:text-outline-variant hover:text-primary transition-colors font-title-md text-title-md" href="#">Visão Geral</a>
+<a class="text-on-surface-variant dark:text-outline-variant hover:text-primary transition-colors font-title-md text-title-md" href="#">Relatórios</a>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<button class="hover:bg-surface-container-low rounded-full p-2 transition-all relative">
+<span class="material-symbols-outlined text-on-surface-variant">notifications</span>
+<span class="absolute top-2 right-2 w-2 h-2 bg-error rounded-full"></span>
+</button>
+<button class="hover:bg-surface-container-low rounded-full p-2 transition-all">
+<span class="material-symbols-outlined text-on-surface-variant">history</span>
+</button>
+<div class="h-8 w-[1px] bg-outline-variant mx-2"></div>
+<div class="flex items-center gap-3">
+<span class="text-right hidden sm:block">
+<p class="font-bold text-body-sm leading-none">Admin Flowfy</p>
+<p class="text-[10px] text-outline uppercase tracking-wider">Super User</p>
+</span>
+<img alt="Foto de Perfil do Usuário" class="w-10 h-10 rounded-full object-cover border-2 border-primary-container" data-alt="A professional studio portrait of a modern business executive with a friendly smile, set against a clean, neutral background. The lighting is soft and flattering, highlighting a contemporary corporate aesthetic that fits a high-end SaaS portal. The image exudes confidence, expertise, and a welcoming professional demeanor suitable for an administrative profile." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAVlEL5WtAwk-ZOsmBVC5WCcsensFD3o6VgHWkdYexNCcZD1TmK_iNUIfOO1lUrIZfWMfYo4uHTR8TRzQUSUdzcgF3BnhE--Av1Ns7PSAOVHKEXIEJgp_Z7shw6rPoXUZ93DijMf-hm08Gxl-WrMBQ87Xv-UwP0BHU5JNlPU9u_o4myoQaSbfcA_OEv_Dm4MJXrrX-4uYMZfnQjtn5Y1fmuo82U9Ohwn85e2_bCKTAcxLPGKKOhyWWADgJdKM6YbG-ICeesoQP0st0"/>
+</div>
+</div>
+</header>
+<!-- Content Canvas -->
+<div class="mt-16 p-margin-desktop space-y-8">
+<header class="flex flex-col gap-1">
+<h2 class="font-headline-lg text-headline-lg text-primary">Configurações do Portal</h2>
+<p class="text-on-surface-variant font-body-md">Gerencie as preferências da sua conta, empresa e notificações.</p>
+</header>
+<!-- Bento Grid Settings -->
+<div class="grid grid-cols-1 md:grid-cols-12 gap-gutter">
+<!-- Section: Preferências de Interface -->
+<section class="md:col-span-7 space-y-md">
+<div class="bg-surface-container-lowest p-lg rounded-xl border border-outline-variant shadow-sm settings-card h-full">
+<div class="flex items-center gap-3 mb-6">
+<div class="w-10 h-10 bg-secondary-container text-on-secondary-container rounded-lg flex items-center justify-center">
+<span class="material-symbols-outlined">palette</span>
+</div>
+<h3 class="font-title-md text-title-md">Preferências de Interface</h3>
+</div>
+<div class="space-y-6">
+<!-- Theme Toggle -->
+<div class="flex items-center justify-between p-md bg-surface-container-low rounded-lg">
+<div>
+<p class="font-bold text-body-md">Tema do Sistema</p>
+<p class="text-body-sm text-on-surface-variant">Escolha entre modo claro ou escuro.</p>
+</div>
+<div class="flex bg-white p-1 rounded-full border border-outline-variant">
+<button class="px-4 py-1.5 rounded-full text-body-sm font-bold bg-primary text-on-primary flex items-center gap-2" onclick="document.documentElement.classList.remove('dark')">
+<span class="material-symbols-outlined text-[18px]">light_mode</span> Claro
+                                    </button>
+<button class="px-4 py-1.5 rounded-full text-body-sm font-bold text-on-surface-variant hover:bg-surface-variant transition-colors flex items-center gap-2" onclick="document.documentElement.classList.add('dark')">
+<span class="material-symbols-outlined text-[18px]">dark_mode</span> Escuro
+                                    </button>
+</div>
+</div>
+<!-- Language Selector -->
+<div class="flex items-center justify-between p-md border-b border-outline-variant">
+<div>
+<p class="font-bold text-body-md">Idioma Principal</p>
+<p class="text-body-sm text-on-surface-variant">Defina a linguagem padrão da interface.</p>
+</div>
+<select class="bg-surface-container-low border-outline-variant rounded-lg px-4 py-2 text-body-sm focus:ring-primary focus:border-primary">
+<option selected="">Português (Brasil)</option>
+<option>English (US)</option>
+<option>Español</option>
+</select>
+</div>
+<!-- Typography & Size -->
+<div class="flex items-center justify-between p-md">
+<div>
+<p class="font-bold text-body-md">Densidade da Informação</p>
+<p class="text-body-sm text-on-surface-variant">Ajuste o espaçamento dos elementos.</p>
+</div>
+<div class="flex gap-2">
+<button class="w-10 h-10 rounded-lg border border-outline-variant flex items-center justify-center hover:bg-primary/5">P</button>
+<button class="w-10 h-10 rounded-lg border-2 border-primary bg-primary/10 flex items-center justify-center font-bold">M</button>
+<button class="w-10 h-10 rounded-lg border border-outline-variant flex items-center justify-center hover:bg-primary/5">G</button>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Section: Notificações -->
+<section class="md:col-span-5 space-y-md">
+<div class="bg-surface-container-lowest p-lg rounded-xl border border-outline-variant shadow-sm settings-card h-full">
+<div class="flex items-center gap-3 mb-6">
+<div class="w-10 h-10 bg-tertiary-container text-on-tertiary-fixed rounded-lg flex items-center justify-center">
+<span class="material-symbols-outlined">notifications_active</span>
+</div>
+<h3 class="font-title-md text-title-md">Central de Notificações</h3>
+</div>
+<div class="space-y-4">
+<div class="p-md rounded-lg border border-outline-variant hover:border-primary transition-colors cursor-pointer group">
+<div class="flex items-center justify-between mb-2">
+<span class="flex items-center gap-2 font-bold text-body-md">
+<span class="material-symbols-outlined text-outline group-hover:text-primary transition-colors">mail</span>
+                                        E-mail
+                                    </span>
+<input checked="" class="w-5 h-5 rounded text-primary focus:ring-primary border-outline-variant" type="checkbox"/>
+</div>
+<p class="text-body-sm text-on-surface-variant">Alertas de novos chamados e atualizações críticas direto no seu e-mail corporativo.</p>
+</div>
+<div class="p-md rounded-lg border border-outline-variant hover:border-primary transition-colors cursor-pointer group">
+<div class="flex items-center justify-between mb-2">
+<span class="flex items-center gap-2 font-bold text-body-md">
+<span class="material-symbols-outlined text-outline group-hover:text-primary transition-colors">send_to_mobile</span>
+                                        Push Web
+                                    </span>
+<input checked="" class="w-5 h-5 rounded text-primary focus:ring-primary border-outline-variant" type="checkbox"/>
+</div>
+<p class="text-body-sm text-on-surface-variant">Notificações instantâneas no navegador mesmo com a aba em segundo plano.</p>
+</div>
+<div class="p-md rounded-lg border border-outline-variant hover:border-primary transition-colors cursor-pointer group opacity-60">
+<div class="flex items-center justify-between mb-2">
+<span class="flex items-center gap-2 font-bold text-body-md">
+<span class="material-symbols-outlined text-outline group-hover:text-primary transition-colors">sms</span>
+                                        SMS / WhatsApp
+                                    </span>
+<input class="w-5 h-5 rounded text-primary focus:ring-primary border-outline-variant" type="checkbox"/>
+</div>
+<p class="text-body-sm text-on-surface-variant">Envio de alertas via mobile para incidentes de Prioridade 1 (P1).</p>
+</div>
+</div>
+</div>
+</section>
+<!-- Section: Gestão de Tenant (Full Width Bottom) -->
+<section class="md:col-span-12">
+<div class="bg-surface-container-lowest p-lg rounded-xl border border-outline-variant shadow-sm settings-card">
+<div class="flex items-center justify-between mb-8">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 bg-primary-container text-on-primary-container rounded-lg flex items-center justify-center">
+<span class="material-symbols-outlined">business</span>
+</div>
+<div>
+<h3 class="font-title-md text-title-md">Gestão do Tenant</h3>
+<p class="text-body-sm text-on-surface-variant">Configurações globais da organização.</p>
+</div>
+</div>
+<button class="bg-primary text-on-primary px-6 py-2 rounded-lg font-bold hover:opacity-90 transition-all flex items-center gap-2 shadow-md">
+<span class="material-symbols-outlined text-[20px]">save</span> Salvar Alterações
+                            </button>
+</div>
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-xl">
+<!-- Company Logo -->
+<div class="space-y-4">
+<p class="font-bold text-body-md">Logo da Empresa</p>
+<div class="relative group w-full aspect-video bg-surface-container rounded-xl border-2 border-dashed border-outline-variant flex flex-col items-center justify-center overflow-hidden">
+<img alt="Empresa Logo Preview" class="absolute inset-0 w-full h-full object-cover opacity-20 grayscale group-hover:opacity-40 transition-opacity" data-alt="A clean, abstract corporate background featuring fluid gradient waves in shades of blue and white. The aesthetic is professional and minimalist, perfect for a high-tech software company's portal branding area. The lighting is diffused, giving it a soft and modern tech-industry feel with high contrast and clarity." id="logo-preview" src="https://lh3.googleusercontent.com/aida-public/AB6AXuB2SdFcpOyWNzsCiG3ORHf9rASnLTAiKKaF7_YwSn7V29DHiV9NEkZiB8u-ufW2-_L1F8_q0kWwht9IVM8OOraepFCExEkY5guIJPOWC3iH-FoDtLMZq8N3BO-Di4T0zNdi9q2ZJ4F9IZvf49Hc_lsPS6qymJqjbI2bKl0pQvrQrXPKnB5hx4ZGdh4dbmBfhAX43mKJZ0qPT76ot2OHH0KCsgYAWvRMiICfVvmrFbkkAbDiRMMrOj20CUlxqw8eUf9lS2Ktsd5Dywo"/>
+<div class="relative z-10 text-center p-4">
+<span class="material-symbols-outlined text-4xl text-primary mb-2">upload_file</span>
+<p class="text-body-sm font-bold text-on-surface">Arraste sua Logo aqui</p>
+<p class="text-[10px] text-outline uppercase mt-1">PNG ou SVG (Máx 2MB)</p>
+</div>
+<button class="absolute bottom-3 right-3 bg-white/90 backdrop-blur-sm p-2 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity">
+<span class="material-symbols-outlined text-primary">edit</span>
+</button>
+</div>
+</div>
+<!-- Company Details Form -->
+<div class="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-md">
+<div class="space-y-1">
+<label class="font-bold text-label-md text-outline">NOME DA ORGANIZAÇÃO</label>
+<input class="w-full bg-surface-container-low border border-outline-variant rounded-lg px-4 py-3 text-body-md focus:ring-2 focus:ring-primary/20" type="text" value="Flowfy Tech Solutions Ltda"/>
+</div>
+<div class="space-y-1">
+<label class="font-bold text-label-md text-outline">DOMÍNIO DO PORTAL</label>
+<div class="flex items-center bg-surface-container-low border border-outline-variant rounded-lg px-4 overflow-hidden">
+<input class="flex-1 bg-transparent border-none py-3 text-body-md focus:ring-0" type="text" value="flowfy"/>
+<span class="text-outline font-body-sm">.flowfy.com</span>
+</div>
+</div>
+<div class="space-y-1">
+<label class="font-bold text-label-md text-outline">E-MAIL DE SUPORTE</label>
+<input class="w-full bg-surface-container-low border border-outline-variant rounded-lg px-4 py-3 text-body-md focus:ring-2 focus:ring-primary/20" type="email" value="suporte@flowfy.com.br"/>
+</div>
+<div class="space-y-1">
+<label class="font-bold text-label-md text-outline">FUSO HORÁRIO PADRÃO</label>
+<select class="w-full bg-surface-container-low border border-outline-variant rounded-lg px-4 py-3 text-body-md focus:ring-2 focus:ring-primary/20">
+<option selected="">(GMT-03:00) Brasília</option>
+<option>(GMT-05:00) Eastern Time</option>
+<option>(GMT+00:00) London</option>
+</select>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Additional Security Info (Minor Card) -->
+<section class="md:col-span-12">
+<div class="bg-primary-container/10 p-md rounded-xl border border-primary/20 flex items-center gap-4">
+<span class="material-symbols-outlined text-primary text-3xl">verified_user</span>
+<div class="flex-1">
+<p class="font-bold text-body-md text-primary">Autenticação em Duas Etapas (2FA)</p>
+<p class="text-body-sm text-on-surface-variant">Sua conta está protegida. O login exige confirmação via aplicativo Flowfy Authenticator.</p>
+</div>
+<button class="text-primary font-bold text-body-sm hover:underline">Configurar Segurança</button>
+</div>
+</section>
+</div>
+</div>
+<!-- Footer Info -->
+<footer class="mt-auto p-margin-desktop border-t border-outline-variant">
+<div class="flex justify-between items-center opacity-60">
+<p class="text-body-sm">© 2024 Flowfy ITSM Portal. Versão 2.4.1-stable</p>
+<div class="flex gap-4">
+<a class="text-body-sm hover:text-primary transition-colors" href="#">Termos</a>
+<a class="text-body-sm hover:text-primary transition-colors" href="#">Privacidade</a>
+</div>
+</div>
+</footer>
+</main>
+<script>
+        // Simple micro-interaction for checkboxes
+        document.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
+            checkbox.addEventListener('change', function() {
+                const parent = this.closest('.group');
+                if (this.checked) {
+                    parent.style.borderColor = 'var(--primary)';
+                } else {
+                    parent.style.borderColor = 'var(--outline-variant)';
+                }
+            });
+        });
+
+        // Toggle Dark Mode Simulation
+        window.toggleDarkMode = () => {
+            document.documentElement.classList.toggle('dark');
+        }
+    </script>
+</body></html>

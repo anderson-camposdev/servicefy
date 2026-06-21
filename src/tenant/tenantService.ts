@@ -12,7 +12,7 @@ import type { CompanyRow } from '../lib/database.types'
 
 /** Colunas necessárias para resolver o tenant e montar o branding. */
 const TENANT_COLUMNS =
-  'id, name, domain, slug, active, logo_url, primary_color, secondary_color, brand_name, accent_color, bg_color, welcome_title, welcome_subtitle'
+  'id, name, domain, slug, active, logo_url, primary_color, secondary_color, brand_name, accent_color, bg_color, welcome_title, welcome_subtitle, title_color, title_font, title_size, subtitle_color, subtitle_font, subtitle_size, catalog_headline, catalog_headline_color, catalog_headline_size, greeting_prefix, greeting_color'
 
 /**
  * Busca um tenant ativo pelo slug (subdomínio).

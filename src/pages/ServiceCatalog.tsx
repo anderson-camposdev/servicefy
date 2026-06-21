@@ -1,8 +1,9 @@
 import { useState, useEffect, useMemo } from 'react'
-import { AlertTriangle, ShoppingCart, ChevronLeft, Search } from 'lucide-react'
+import { AlertTriangle, ShoppingCart, ChevronLeft, Search, Check, Ticket, ArrowLeft, ShieldCheck } from 'lucide-react'
 import { serviceCatalogService } from '../lib/services'
 import { buildLabeledFormData, isEmptyFormValue, parseFormFields } from '../lib/catalogFormFields'
 import { parseCatalogUiConfig } from '../lib/catalogUiConfig'
+import { IMPACT_OPTIONS, URGENCY_OPTIONS } from '../lib/priority'
 import CatalogIcon from './CatalogIcon'
 import DynamicFormFields from './DynamicFormFields'
 import type {
@@ -16,17 +17,50 @@ interface ServiceCatalogProps {
   currentUserId: string
   currentUserName: string
   primaryColor: string
+  catalogHeadline?: string
+  catalogHeadlineColor?: string
+  catalogHeadlineSize?: string
+  greetingPrefix?: string
+  greetingColor?: string
   onCreated?: (incident: IncidentRow) => void
+  /** Navega para a aba "Meus Chamados" (botão da tela de confirmação). */
+  onNavigateToTickets?: () => void
 }
 
-const getMsg = (e: any) => e?.message || e?.details || (e instanceof Error ? e.message : '') || 'Erro ao carregar o catálogo.'
+const getMsg = (e: unknown): string => {
+  if (e && typeof e === 'object') {
+    const o = e as { message?: unknown; details?: unknown }
+    if (typeof o.message === 'string' && o.message) return o.message
+    if (typeof o.details === 'string' && o.details) return o.details
+  }
+  return e instanceof Error ? e.message : 'Erro ao carregar o catálogo.'
+}
 type Mode = null | 'incident' | 'request'
 
-export default function ServiceCatalog({ companyId, currentUserId, currentUserName, primaryColor, onCreated }: ServiceCatalogProps) {
+// Dados exibidos na tela de confirmação (capturados no momento do envio).
+type DoneInfo = { number: string; service: string; priority: string; sla: string; ref: string }
+
+// Gera um "Ref ID" curto e legível a partir do incidente real criado.
+const makeRef = (inc: IncidentRow) => {
+  const digits = (inc.number?.match(/\d+/g)?.join('') ?? '').slice(-4) || '0000'
+  return `${inc.id.slice(0, 3)}-${digits}-flw`
+}
+
+// SLA estimado em horas a partir dos prazos do incidente (fallback amigável).
+const slaFromInc = (inc: IncidentRow, fallback = 'Padrão') => {
+  const dl = inc.sla_resolution_deadline || inc.sla_deadline
+  if (dl && inc.created_at) {
+    const h = Math.max(1, Math.round((new Date(dl).getTime() - new Date(inc.created_at).getTime()) / 3_600_000))
+    return `${h}h`
+  }
+  return fallback
+}
+
+export default function ServiceCatalog({ companyId, currentUserId, currentUserName, primaryColor, catalogHeadline, catalogHeadlineColor, catalogHeadlineSize, greetingPrefix, greetingColor, onCreated, onNavigateToTickets }: ServiceCatalogProps) {
   const [mode, setMode] = useState<Mode>(null)
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
-  const [done, setDone] = useState<string | null>(null)
+  const [done, setDone] = useState<DoneInfo | null>(null)
   const [loading, setLoading] = useState(true)
 
   // Índice em memória (alimenta jornada + busca)
@@ -135,7 +169,14 @@ export default function ServiceCatalog({ companyId, currentUserId, currentUserNa
         formData: buildLabeledFormData(incidentFields, incidentAnswers),
       })
       onCreated?.(inc)
-      setDone(inc.number); resetAll()
+      setDone({
+        number: inc.number,
+        service: service.name,
+        priority: inc.priority ?? '—',
+        sla: symptom.sla_hours != null ? `${symptom.sla_hours}h` : slaFromInc(inc, '—'),
+        ref: makeRef(inc),
+      })
+      resetAll()
     } catch (e) { setError(getMsg(e)) } finally { setSubmitting(false) }
   }
 
@@ -162,17 +203,68 @@ export default function ServiceCatalog({ companyId, currentUserId, currentUserNa
         formData, callerId: currentUserId, callerName: currentUserName,
       })
       onCreated?.(inc)
-      setDone(inc.number); resetAll()
+      setDone({
+        number: inc.number,
+        service: reqItem.name,
+        priority: inc.priority ?? 'Padrão',
+        sla: slaFromInc(inc),
+        ref: makeRef(inc),
+      })
+      resetAll()
     } catch (e) { setError(getMsg(e)) } finally { setSubmitting(false) }
   }
 
   if (done) {
     return (
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm text-center py-16 space-y-3">
-        <div className="text-5xl">✅</div>
-        <h2 className="text-xl font-bold text-slate-800">Chamado aberto!</h2>
-        <p className="text-slate-500 text-sm">Seu chamado <b className="font-mono">{done}</b> foi registrado e roteado para o time responsável.</p>
-        <button onClick={() => setDone(null)} className="px-5 py-2 rounded-xl text-sm font-bold text-white shadow-md hover:opacity-90 transition-all" style={{ backgroundColor: primaryColor }}>Voltar ao Catálogo</button>
+      <div className="flex justify-center py-6">
+        <div className="relative w-full max-w-lg bg-white rounded-2xl border border-slate-200 shadow-xl overflow-hidden">
+          {/* Barra de acento no topo */}
+          <div className="h-1.5 w-full" style={{ backgroundColor: primaryColor }} />
+
+          <div className="px-8 py-10 text-center">
+            {/* Selo de sucesso */}
+            <div className="mx-auto mb-6 flex items-center justify-center w-20 h-20 rounded-full" style={{ backgroundColor: `${primaryColor}1f` }}>
+              <div className="flex items-center justify-center w-14 h-14 rounded-full shadow-lg" style={{ backgroundColor: primaryColor }}>
+                <Check className="w-7 h-7 text-white" strokeWidth={3} />
+              </div>
+            </div>
+
+            <h2 className="text-2xl font-bold text-slate-800 mb-2">Solicitação Enviada com Sucesso!</h2>
+            <p className="text-sm text-slate-500 max-w-sm mx-auto mb-8">
+              Seu chamado <b style={{ color: primaryColor }}>#{done.number}</b> foi registrado e nossa equipe técnica já está analisando.
+            </p>
+
+            {/* Resumo do chamado */}
+            <div className="grid grid-cols-3 gap-3 mb-8">
+              <InfoPill label="Serviço" value={done.service} />
+              <InfoPill label="Prioridade" value={done.priority} dotColor={priorityDot(done.priority)} />
+              <InfoPill label="SLA Estimado" value={done.sla} accentColor={primaryColor} />
+            </div>
+
+            {/* Ações */}
+            <div className="flex flex-col sm:flex-row gap-3">
+              <button
+                onClick={() => { setDone(null); onNavigateToTickets?.() }}
+                className="flex-1 inline-flex items-center justify-center gap-2 py-3 px-5 rounded-xl text-sm font-bold text-white shadow-md hover:opacity-90 active:scale-[0.99] transition-all"
+                style={{ backgroundColor: primaryColor }}
+              >
+                <Ticket className="w-4 h-4" /> Ir para Meus Chamados
+              </button>
+              <button
+                onClick={() => setDone(null)}
+                className="flex-1 inline-flex items-center justify-center gap-2 py-3 px-5 rounded-xl text-sm font-bold text-slate-600 border border-slate-200 hover:bg-slate-50 transition-all"
+              >
+                <ArrowLeft className="w-4 h-4" /> Voltar ao Catálogo
+              </button>
+            </div>
+          </div>
+
+          {/* Rodapé */}
+          <div className="px-8 py-3 border-t border-slate-100 flex items-center justify-between text-[10px] text-slate-400">
+            <span className="flex items-center gap-1"><ShieldCheck className="w-3 h-3" /> Flowfy Security Protocol Active</span>
+            <span className="font-mono">Ref ID: {done.ref}</span>
+          </div>
+        </div>
       </div>
     )
   }
@@ -181,7 +273,8 @@ export default function ServiceCatalog({ companyId, currentUserId, currentUserNa
     <div className="space-y-6">
       {/* BUSCA PREDITIVA */}
       <div className="text-center max-w-2xl mx-auto">
-        <h1 className="text-2xl font-extrabold text-slate-800 mb-4">Como podemos te ajudar hoje?</h1>
+        <p className="text-sm font-semibold mb-1.5" style={{ color: greetingColor || primaryColor }}>{greetingPrefix || 'Olá'}, {currentUserName.split(' ')[0]}! 👋</p>
+        <h1 className="text-3xl md:text-4xl font-extrabold mb-5 tracking-tight" style={{ color: catalogHeadlineColor || undefined, fontSize: catalogHeadlineSize || undefined }}>{catalogHeadline || 'Como podemos te ajudar hoje?'}</h1>
         <div className="relative">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
           <input
@@ -236,17 +329,17 @@ export default function ServiceCatalog({ companyId, currentUserId, currentUserNa
         // ─── PASSO 1: escolher a jornada ───
         !mode ? (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            <button onClick={() => setMode('incident')} className="group text-left bg-white rounded-2xl border border-slate-200 shadow-sm p-7 hover:shadow-lg hover:border-rose-200 hover:-translate-y-0.5 transition-all">
-              <div className="w-14 h-14 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mb-4 group-hover:scale-105 transition-transform"><AlertTriangle className="w-7 h-7" /></div>
-              <h2 className="text-lg font-bold text-slate-900">Reportar um Problema?</h2>
-              <p className="text-sm text-slate-500 mt-1">Algo está com erro, lento ou fora do ar. Vamos diagnosticar em 3 passos.</p>
-              <span className="mt-4 inline-flex items-center text-sm font-semibold text-rose-600">Abrir Incidente →</span>
+            <button onClick={() => setMode('incident')} className="group text-left bg-white rounded-2xl border border-slate-200 shadow-sm p-8 hover:shadow-lg hover:border-rose-200 hover:-translate-y-0.5 transition-all">
+              <div className="w-16 h-16 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mb-5 group-hover:scale-105 transition-transform"><AlertTriangle className="w-8 h-8" /></div>
+              <h2 className="text-xl font-bold text-slate-900">Reportar um Problema?</h2>
+              <p className="text-sm text-slate-500 mt-2">Algo está com erro, lento ou fora do ar. Vamos diagnosticar em 3 passos.</p>
+              <span className="mt-5 inline-flex items-center text-sm font-semibold text-rose-600">Abrir Incidente →</span>
             </button>
-            <button onClick={() => setMode('request')} className="group text-left bg-white rounded-2xl border border-slate-200 shadow-sm p-7 hover:shadow-lg hover:border-indigo-200 hover:-translate-y-0.5 transition-all">
-              <div className="w-14 h-14 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center mb-4 group-hover:scale-105 transition-transform"><ShoppingCart className="w-7 h-7" /></div>
-              <h2 className="text-lg font-bold text-slate-900">Solicitar Algo / Serviço?</h2>
-              <p className="text-sm text-slate-500 mt-1">Pedir equipamentos, acessos ou serviços do catálogo da empresa.</p>
-              <span className="mt-4 inline-flex items-center text-sm font-semibold text-indigo-600">Abrir Requisição →</span>
+            <button onClick={() => setMode('request')} className="group text-left bg-white rounded-2xl border border-slate-200 shadow-sm p-8 hover:shadow-lg hover:border-indigo-200 hover:-translate-y-0.5 transition-all">
+              <div className="w-16 h-16 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center mb-5 group-hover:scale-105 transition-transform"><ShoppingCart className="w-8 h-8" /></div>
+              <h2 className="text-xl font-bold text-slate-900">Solicitar Algo / Serviço?</h2>
+              <p className="text-sm text-slate-500 mt-2">Pedir equipamentos, acessos ou serviços do catálogo da empresa.</p>
+              <span className="mt-5 inline-flex items-center text-sm font-semibold text-indigo-600">Abrir Requisição →</span>
             </button>
           </div>
         ) : mode === 'incident' ? (
@@ -279,8 +372,8 @@ export default function ServiceCatalog({ companyId, currentUserId, currentUserNa
                   }}
                 />
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <SelectField label="Impacto" value={impact} onChange={setImpact} options={[['Low', 'Apenas eu'], ['Medium', 'Meu departamento'], ['High', 'Toda a empresa'], ['Critical', 'O negócio / Clientes']]} />
-                  <SelectField label="Urgência" value={urgency} onChange={setUrgency} options={[['Low', 'Consigo trabalhar'], ['Medium', 'Tarefa importante parada'], ['High', 'Totalmente travado']]} />
+                  <SelectField label="Quem é afetado? (Impacto)" value={impact} onChange={setImpact} options={IMPACT_OPTIONS} />
+                  <SelectField label="Impacto no seu trabalho? (Urgência)" value={urgency} onChange={setUrgency} options={URGENCY_OPTIONS} />
                 </div>
                 <TextareaField label="Detalhes" value={incDescription} onChange={setIncDescription} placeholder="Descreva o que está acontecendo (opcional)…" />
                 <SubmitBtn onClick={submitIncident} loading={submitting} color={primaryColor} label="Abrir Incidente" />
@@ -332,6 +425,30 @@ export default function ServiceCatalog({ companyId, currentUserId, currentUserNa
 }
 
 // ─── Subcomponentes ───
+
+// Cor do "ponto" de prioridade na tela de confirmação.
+function priorityDot(p: string): string {
+  const t = (p || '').toLowerCase()
+  if (t.includes('p1') || t.includes('crit')) return '#ef4444'
+  if (t.includes('p2') || t.includes('high') || t.includes('alta')) return '#f97316'
+  if (t.includes('p3') || t.includes('mod') || t.includes('medium') || t.includes('méd')) return '#f59e0b'
+  if (t.includes('p4') || t.includes('low') || t.includes('baix')) return '#64748b'
+  return '#64748b'
+}
+
+// Pílula de resumo (Serviço / Prioridade / SLA) da tela de confirmação.
+function InfoPill({ label, value, dotColor, accentColor }: { label: string; value: string; dotColor?: string; accentColor?: string }) {
+  return (
+    <div className="rounded-xl bg-slate-50 border border-slate-200/70 px-3 py-3">
+      <div className="text-[9px] font-bold uppercase tracking-widest text-slate-400 mb-1.5 text-center">{label}</div>
+      <div className="flex items-center justify-center gap-1.5 text-sm font-bold" style={{ color: accentColor ?? '#1e293b' }}>
+        {dotColor && <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: dotColor }} />}
+        <span className="truncate">{value}</span>
+      </div>
+    </div>
+  )
+}
+
 function Grid({ children }: { children: React.ReactNode }) { return <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">{children}</div> }
 function Empty({ children }: { children: React.ReactNode }) { return <div className="col-span-full text-center py-12 text-slate-400">{children}</div> }
 function BackBtn({ onClick }: { onClick: () => void }) {
@@ -353,13 +470,13 @@ function Card({ icon, name, desc, onClick, color, uiConfig }: { icon?: string | 
   return (
     <button
       onClick={onClick}
-      style={{ minHeight: Math.max(160, config.iconSize + 40) }}
-      className={`group flex w-full items-center gap-5 rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-lg ${config.buttonPosition === 'bottom' ? 'flex-wrap' : ''}`}
+      style={{ minHeight: Math.max(180, config.iconSize + 60) }}
+      className={`group flex w-full items-center gap-5 rounded-2xl border border-slate-200 bg-white p-6 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-lg ${config.buttonPosition === 'bottom' ? 'flex-wrap' : ''}`}
     >
       <CatalogIcon icon={icon} name={name} size={config.iconSize} />
       <div className="min-w-0 flex-1">
-        <div className="text-base font-bold text-slate-800">{name}</div>
-        {desc && <div className="mt-1 line-clamp-2 text-xs leading-relaxed text-slate-500">{desc}</div>}
+        <div className="text-lg font-bold text-slate-800">{name}</div>
+        {desc && <div className="mt-1 line-clamp-2 text-sm leading-relaxed text-slate-500">{desc}</div>}
         {config.buttonPosition === 'bottom' && (
           <span className={`mt-3 inline-flex items-center rounded-lg border font-bold transition-transform group-hover:translate-x-0.5 ${buttonSizeClass}`} style={buttonStyle}>
             {config.buttonLabel} →
@@ -377,7 +494,7 @@ function Card({ icon, name, desc, onClick, color, uiConfig }: { icon?: string | 
 function SelectField({ label, value, onChange, options }: { label: string; value: string; onChange: (v: string) => void; options: [string, string][] }) {
   return (
     <div>
-      <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">{label}</label>
+      <label className="block text-sm font-bold text-slate-500 uppercase tracking-wide mb-2">{label}</label>
       <select value={value} onChange={e => onChange(e.target.value)} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-700 outline-none focus:ring-2 focus:ring-slate-300 bg-white shadow-sm font-medium">
         {options.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
       </select>
@@ -387,7 +504,7 @@ function SelectField({ label, value, onChange, options }: { label: string; value
 function TextareaField({ label, value, onChange, placeholder }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string }) {
   return (
     <div className="space-y-2">
-      <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider">{label}</label>
+      <label className="block text-sm font-bold text-slate-500 uppercase tracking-wide">{label}</label>
       <textarea rows={4} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-700 outline-none focus:ring-2 focus:ring-slate-300 resize-none bg-white shadow-sm" />
     </div>
   )

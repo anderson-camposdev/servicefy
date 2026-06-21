@@ -6,7 +6,7 @@
 export type Json = string | number | boolean | null | { [key: string]: Json } | Json[]
 
 // ─── Enums ────────────────────────────────────────────────────
-export type TicketPriority   = 'P1 - Critical' | 'P2 - High' | 'P3 - Moderate' | 'P4 - Low'
+export type TicketPriority   = 'P1 - Critical' | 'P2 - High' | 'P3 - Moderate' | 'P4 - Low' | 'P5 - Planning'
 export type UserRole         = 'sysadmin' | 'company_admin' | 'agent' | 'end_user' | 'technician' | 'area_manager' | 'it_manager' | 'client_manager' | 'cio'
 export type IncidentState    = 'New' | 'In Progress' | 'On Hold' | 'Pending User' | 'Resolved' | 'Closed'
 export type IncidentCategory = 'Hardware' | 'Software' | 'Network' | 'Database' | 'Security' | 'Inquiry' | 'Other'
@@ -32,11 +32,24 @@ export interface CompanyRow {
   bg_color: string
   welcome_title: string
   welcome_subtitle: string
+  title_color?: string | null
+  title_font?: string | null
+  title_size?: string | null
+  subtitle_color?: string | null
+  subtitle_font?: string | null
+  subtitle_size?: string | null
+  catalog_headline: string | null
+  greeting_prefix: string | null
+  greeting_color: string | null
+  catalog_headline_color: string | null
+  catalog_headline_size: string | null
   allow_local_login: boolean
   sso_providers: Json
   created_at: string
   updated_at: string
   schema_name: string | null
+  // Motor de SLA: calendário útil padrão do cliente (migration 032)
+  default_sla_calendar_id: string | null
   // Licenças Concorrentes
   concurrent_licenses: number
   license_plan: string
@@ -51,6 +64,8 @@ export interface ProfileRow {
   name: string
   email: string
   role: UserRole
+  // Analista híbrido (migration 033): consultoria vs time interno do cliente.
+  profile_role: 'allied_analyst' | 'client_analyst' | null
   department: string | null
   phone: string | null
   avatar_url: string | null
@@ -121,6 +136,46 @@ export interface IncidentRow {
   // Esteira de requisições (migration 024)
   request_item_id?: string | null
   form_data?: Json | null
+  // Motor de SLA: prioridade numérica + prazos projetados (migration 033)
+  priority_level?: number | null
+  sla_response_deadline?: string | null
+  sla_resolution_deadline?: string | null
+  sla_managed_by_client?: boolean
+  // Motor de SLA: acumulador de pausa (migration 034)
+  paused_at?: string | null
+  accumulated_paused_time_minutes?: number
+  // Motor de SLA: governança de pausa + breach (migration 035)
+  pending_reason_id?: string | null
+  is_response_breached?: boolean
+  is_resolution_breached?: boolean
+}
+
+// Motivos de pendência por tenant (migration 035).
+export interface PendingReasonRow {
+  id: string
+  company_id: string
+  name: string
+  slug: string
+  requires_customer_action: boolean
+  active: boolean
+  created_at: string
+}
+
+// Livro-caixa de eventos de SLA (migration 035).
+export type SlaEventType =
+  | 'response_start'
+  | 'response_achieved'
+  | 'resolution_start'
+  | 'paused'
+  | 'resumed'
+  | 'breached'
+
+export interface SlaEventRow {
+  id: string
+  incident_id: string
+  event_type: SlaEventType
+  metadata: Json
+  created_at: string
 }
 
 /** Interações do chamado (chat público + notas internas). Migration 013. */
@@ -156,28 +211,32 @@ export interface PortalTicketDetail extends IncidentRow {
   catalog_selection_name: string | null
 }
 
-export interface ServiceRequestRow {
+// ─── Motor de SLA: Calendário Útil por cliente (migration 032) ──
+export interface SlaCalendarRow {
   id: string
-  number: string
   company_id: string
-  catalog_item_id: string | null
-  catalog_item_name: string
-  requester_id: string | null
-  requester_name: string
-  approver_id: string | null
-  approver_name: string | null
-  approved_at: string | null
-  rejection_reason: string | null
-  state: RequestState
-  priority: TicketPriority
-  form_data: Json
-  cost: number | null
-  currency: string | null
-  assigned_to_id: string | null
-  assigned_to_name: string | null
+  name: string
+  timezone: string
+  is_24x7: boolean
+  active: boolean
   created_at: string
   updated_at: string
-  fulfilled_at: string | null
+}
+
+export interface SlaCalendarShiftRow {
+  id: string
+  calendar_id: string
+  /** 0=Domingo .. 6=Sábado (igual a EXTRACT(DOW)) */
+  weekday: number
+  start_time: string
+  end_time: string
+}
+
+export interface SlaCalendarHolidayRow {
+  id: string
+  calendar_id: string
+  holiday: string
+  name: string | null
 }
 
 export interface ProblemRow {
@@ -293,6 +352,9 @@ export interface CatalogServiceSymptomRow {
   ui_config: Json
   active: boolean
   created_at: string
+  // Overrides do motor de SLA (migration 033)
+  sla_calendar_id?: string | null
+  fixed_priority?: number | null
   // joins opcionais
   symptom?: SystemSymptomRow | null
   group?: { id: string; name: string } | null
@@ -344,19 +406,31 @@ export interface RequestItemRow {
   active: boolean
   sort_order: number
   created_at: string
+  // Overrides do motor de SLA (migration 033)
+  sla_calendar_id?: string | null
+  fixed_priority?: number | null
   // join opcional
   group?: { id: string; name: string } | null
 }
 
+// Política de SLA por tenant (migration 033) — prioridade numérica 1..5.
 export interface SLAPolicyRow {
   id: string
   company_id: string
-  ticket_type: string
-  priority: TicketPriority
-  response_time_mins: number
-  resolution_time_mins: number
+  priority: number
+  response_time_minutes: number
+  resolution_time_minutes: number
   active: boolean
   created_at: string
+  updated_at: string
+}
+
+// Matriz de prioridade ITIL global (migration 033).
+export interface SlaPriorityMatrixRow {
+  id: string
+  impact: 'low' | 'medium' | 'high'
+  urgency: 'low' | 'medium' | 'high'
+  resulting_priority: number
 }
 
 export interface WorkflowRuleRow {
@@ -568,12 +642,20 @@ export type Database = {
       user_groups:                { Row: UserGroupRow;                  Insert: UserGroupRow;                           Update: Partial<UserGroupRow>;                  Relationships: [] }
       incidents:                  { Row: IncidentRow;                   Insert: Partial<IncidentRow>;                   Update: Partial<IncidentRow>;                   Relationships: [] }
       incident_history:           { Row: IncidentHistoryRow;            Insert: Partial<IncidentHistoryRow>;            Update: Partial<IncidentHistoryRow>;            Relationships: [] }
-      service_requests:           { Row: ServiceRequestRow;             Insert: Partial<ServiceRequestRow>;             Update: Partial<ServiceRequestRow>;             Relationships: [] }
       problems:                   { Row: ProblemRow;                    Insert: Partial<ProblemRow>;                    Update: Partial<ProblemRow>;                    Relationships: [] }
       changes:                    { Row: ChangeRow;                     Insert: Partial<ChangeRow>;                     Update: Partial<ChangeRow>;                     Relationships: [] }
       catalog_items:              { Row: CatalogItemRow;                Insert: Partial<CatalogItemRow>;                Update: Partial<CatalogItemRow>;                Relationships: [] }
       form_templates:             { Row: FormTemplateRow;               Insert: Partial<FormTemplateRow>;               Update: Partial<FormTemplateRow>;               Relationships: [] }
       sla_policies:               { Row: SLAPolicyRow;                  Insert: Partial<SLAPolicyRow>;                  Update: Partial<SLAPolicyRow>;                  Relationships: [] }
+      // ─ Motor de SLA: Calendário Útil (migration 032)
+      sla_calendars:              { Row: SlaCalendarRow;                Insert: Partial<SlaCalendarRow>;                Update: Partial<SlaCalendarRow>;                Relationships: [] }
+      sla_calendar_shifts:        { Row: SlaCalendarShiftRow;           Insert: Partial<SlaCalendarShiftRow>;           Update: Partial<SlaCalendarShiftRow>;           Relationships: [] }
+      sla_calendar_holidays:      { Row: SlaCalendarHolidayRow;         Insert: Partial<SlaCalendarHolidayRow>;         Update: Partial<SlaCalendarHolidayRow>;         Relationships: [] }
+      // ─ Motor de SLA: Matriz de prioridade ITIL (migration 033)
+      sla_priority_matrix:        { Row: SlaPriorityMatrixRow;          Insert: Partial<SlaPriorityMatrixRow>;          Update: Partial<SlaPriorityMatrixRow>;          Relationships: [] }
+      // ─ Motor de SLA: Governança de pausa + ledger (migration 035)
+      pending_reasons:            { Row: PendingReasonRow;              Insert: Partial<PendingReasonRow>;              Update: Partial<PendingReasonRow>;              Relationships: [] }
+      sla_events:                 { Row: SlaEventRow;                   Insert: Partial<SlaEventRow>;                   Update: Partial<SlaEventRow>;                   Relationships: [] }
       workflow_rules:             { Row: WorkflowRuleRow;               Insert: Partial<WorkflowRuleRow>;               Update: Partial<WorkflowRuleRow>;               Relationships: [] }
       notifications:              { Row: NotificationRow;               Insert: Partial<NotificationRow>;               Update: Partial<NotificationRow>;               Relationships: [] }
       // ─ Novos: Catálogo Hierárquico de Incidentes

@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+
+<html class="light" lang="pt-BR"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Solicitação Enviada - Flowfy</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;600;700;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "tertiary-fixed-dim": "#ffb596",
+                    "on-primary": "#ffffff",
+                    "background": "#faf8ff",
+                    "surface-container": "#eaedff",
+                    "primary-fixed": "#dbe1ff",
+                    "surface-tint": "#0053db",
+                    "primary-fixed-dim": "#b4c5ff",
+                    "on-surface-variant": "#434655",
+                    "on-tertiary-fixed": "#360f00",
+                    "on-secondary-fixed-variant": "#38485d",
+                    "on-error": "#ffffff",
+                    "surface": "#faf8ff",
+                    "inverse-primary": "#b4c5ff",
+                    "on-primary-fixed-variant": "#003ea8",
+                    "error": "#ba1a1a",
+                    "on-tertiary-fixed-variant": "#7d2d00",
+                    "tertiary-container": "#bc4800",
+                    "surface-container-lowest": "#ffffff",
+                    "on-primary-container": "#eeefff",
+                    "secondary-fixed-dim": "#b7c8e1",
+                    "tertiary-fixed": "#ffdbcd",
+                    "error-container": "#ffdad6",
+                    "surface-container-low": "#f2f3ff",
+                    "secondary-fixed": "#d3e4fe",
+                    "surface-dim": "#d2d9f4",
+                    "secondary-container": "#d0e1fb",
+                    "outline": "#737686",
+                    "outline-variant": "#c3c6d7",
+                    "on-secondary-container": "#54647a",
+                    "inverse-surface": "#283044",
+                    "primary": "#004ac6",
+                    "secondary": "#505f76",
+                    "on-error-container": "#93000a",
+                    "on-background": "#131b2e",
+                    "surface-container-highest": "#dae2fd",
+                    "surface-variant": "#dae2fd",
+                    "on-surface": "#131b2e",
+                    "on-tertiary-container": "#ffede6",
+                    "primary-container": "#2563eb",
+                    "on-primary-fixed": "#00174b",
+                    "inverse-on-surface": "#eef0ff",
+                    "on-tertiary": "#ffffff",
+                    "on-secondary-fixed": "#0b1c30",
+                    "surface-container-high": "#e2e7ff",
+                    "on-secondary": "#ffffff",
+                    "surface-bright": "#faf8ff",
+                    "tertiary": "#943700"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "sm": "8px",
+                    "base": "4px",
+                    "2xl": "48px",
+                    "md": "16px",
+                    "xs": "4px",
+                    "margin-mobile": "16px",
+                    "3xl": "64px",
+                    "margin-desktop": "40px",
+                    "xl": "32px",
+                    "lg": "24px",
+                    "gutter": "24px"
+            },
+            "fontFamily": {
+                    "headline-lg": ["Hanken Grotesk"],
+                    "label-md": ["Hanken Grotesk"],
+                    "body-sm": ["Hanken Grotesk"],
+                    "body-md": ["Hanken Grotesk"],
+                    "title-md": ["Hanken Grotesk"],
+                    "display-lg": ["Hanken Grotesk"],
+                    "headline-lg-mobile": ["Hanken Grotesk"]
+            },
+            "fontSize": {
+                    "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                    "label-md": ["12px", {"lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "600"}],
+                    "body-sm": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
+                    "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                    "title-md": ["20px", {"lineHeight": "28px", "fontWeight": "600"}],
+                    "display-lg": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                    "headline-lg-mobile": ["24px", {"lineHeight": "32px", "fontWeight": "600"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        body {
+            font-family: 'Hanken Grotesk', sans-serif;
+            -webkit-font-smoothing: antialiased;
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            vertical-align: middle;
+        }
+        .success-checkmark-anim {
+            animation: scaleIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+        @keyframes scaleIn {
+            from { transform: scale(0.8); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+        .confetti-canvas {
+            pointer-events: none;
+            position: absolute;
+            inset: 0;
+            z-index: 50;
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background overflow-hidden">
+<div class="flex h-screen w-full">
+<!-- SideNavBar (Authority: JSON) -->
+<aside class="hidden md:flex flex-col h-full py-lg px-md gap-base border-r border-outline-variant bg-surface-container-low w-64 z-50">
+<div class="flex items-center gap-sm mb-xl px-sm">
+<div class="w-10 h-10 rounded-lg bg-primary flex items-center justify-center text-white font-black text-headline-lg">F</div>
+<div>
+<h1 class="font-headline-lg text-headline-lg font-black text-primary">Flowfy</h1>
+<p class="font-label-md text-label-md text-on-surface-variant opacity-70 uppercase tracking-widest">ITSM Portal</p>
+</div>
+</div>
+<nav class="flex-1 space-y-base">
+<!-- Home -->
+<a class="flex items-center gap-md px-md py-sm text-on-surface-variant hover:bg-surface-container-highest transition-all active:translate-x-1 duration-200 rounded-lg font-label-md text-label-md group" href="#">
+<span class="material-symbols-outlined group-hover:text-primary" data-icon="home">home</span>
+                    Home
+                </a>
+<!-- Service Catalog -->
+<a class="flex items-center gap-md px-md py-sm text-on-surface-variant hover:bg-surface-container-highest transition-all active:translate-x-1 duration-200 rounded-lg font-label-md text-label-md group" href="#">
+<span class="material-symbols-outlined group-hover:text-primary" data-icon="apps">apps</span>
+                    Service Catalog
+                </a>
+<!-- My Tickets (Active State Logic) -->
+<a class="flex items-center gap-md px-md py-sm bg-primary-container text-on-primary-container font-bold rounded-lg transition-all active:translate-x-1 duration-200 font-label-md text-label-md" href="#">
+<span class="material-symbols-outlined" data-icon="confirmation_number">confirmation_number</span>
+                    My Tickets
+                </a>
+</nav>
+<div class="mt-auto space-y-base pt-md border-t border-outline-variant">
+<a class="flex items-center gap-md px-md py-sm text-on-surface-variant hover:bg-surface-container-highest transition-all rounded-lg font-label-md text-label-md" href="#">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+                    Settings
+                </a>
+<a class="flex items-center gap-md px-md py-sm text-on-surface-variant hover:bg-surface-container-highest transition-all rounded-lg font-label-md text-label-md" href="#">
+<span class="material-symbols-outlined" data-icon="logout">logout</span>
+                    Logout
+                </a>
+</div>
+</aside>
+<div class="flex-1 flex flex-col relative overflow-hidden">
+<!-- TopNavBar (Authority: JSON) -->
+<header class="flex justify-between items-center w-full px-margin-desktop h-16 z-40 bg-surface border-b border-outline-variant shadow-sm shrink-0">
+<div class="flex items-center gap-lg">
+<div class="md:hidden font-headline-lg-mobile text-headline-lg-mobile font-bold text-primary">Flowfy</div>
+<div class="relative group">
+<span class="absolute inset-y-0 left-3 flex items-center pointer-events-none text-outline">
+<span class="material-symbols-outlined text-[20px]">search</span>
+</span>
+<input class="pl-10 pr-4 py-2 bg-surface-container-low border-none rounded-full w-64 focus:ring-2 focus:ring-primary/20 transition-all font-body-sm text-body-sm" placeholder="Pesquisar chamados..." type="text"/>
+</div>
+</div>
+<div class="flex items-center gap-md">
+<button class="w-10 h-10 flex items-center justify-center rounded-full hover:bg-surface-container-low transition-colors active:scale-95 duration-150 relative">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+<span class="absolute top-2 right-2 w-2 h-2 bg-error rounded-full"></span>
+</button>
+<button class="w-10 h-10 flex items-center justify-center rounded-full hover:bg-surface-container-low transition-colors active:scale-95 duration-150">
+<span class="material-symbols-outlined" data-icon="help">help</span>
+</button>
+<div class="w-8 h-8 rounded-full overflow-hidden border border-outline-variant">
+<img alt="User profile photo" data-alt="Professional corporate headshot of a person with a friendly expression, set against a soft blurred office background with neutral blue and gray tones, high-quality studio lighting, minimalist executive portrait style." src="https://lh3.googleusercontent.com/aida-public/AB6AXuD8HD9cJKUFt5evAtr7RhhidKxXmJI7QAM835fXlY6zeyRLEwOSXzivY3I4PhNvkbdNnKsEkHif2nerzbpwO0PSNrShA42jAYDSqveyxbH3YXCGTNQ3_SS9NGmASWRf0a2vaVPN2IkeoAQT042fxBvQmKwUTbbh3LYjm9XkhEs0fu-HIcQAndh7HzzB6ExgPj4OB3Lfjq_vnzqfMp4Gf7xcmhWMCHMG168HHbznlAEDlHgx5bASFyBilnZukLfwe35DaGPZMVQnchI"/>
+</div>
+</div>
+</header>
+<!-- Main Content Canvas -->
+<main class="flex-1 overflow-y-auto bg-surface-container-low/30 relative flex items-center justify-center p-md md:p-xl">
+<!-- Atmospheric Background Elements -->
+<div class="absolute inset-0 z-0 opacity-40">
+
+</div>
+<!-- Success Content Card -->
+<div class="relative z-10 w-full max-w-2xl bg-surface-container-lowest border border-outline-variant/30 rounded-3xl shadow-2xl shadow-primary/5 overflow-hidden success-checkmark-anim">
+<!-- Top Gradient Accent -->
+<div class="h-2 w-full bg-gradient-to-r from-primary to-primary-container"></div>
+<div class="p-lg md:p-3xl flex flex-col items-center text-center">
+<!-- Success Icon Container -->
+<div class="mb-xl relative">
+<div class="w-24 h-24 rounded-full bg-primary-fixed flex items-center justify-center animate-pulse duration-[3000ms] opacity-50 absolute inset-0 scale-125"></div>
+<div class="w-24 h-24 rounded-full bg-primary flex items-center justify-center shadow-xl shadow-primary/30 relative">
+<span class="material-symbols-outlined text-white text-[48px]" style="font-variation-settings: 'FILL' 1, 'wght' 600;">check_circle</span>
+</div>
+</div>
+<!-- Header -->
+<h2 class="font-headline-lg text-headline-lg text-on-background mb-sm">Solicitação Enviada com Sucesso!</h2>
+<p class="font-body-md text-body-md text-on-surface-variant max-w-md mx-auto">
+                            Seu chamado <span class="font-bold text-primary">#FLW-2048</span> foi registrado e nossa equipe técnica já está analisando.
+                        </p>
+<!-- Details Section (Bento Inspired) -->
+<div class="w-full mt-xl grid grid-cols-1 md:grid-cols-3 gap-sm">
+<div class="p-md rounded-2xl bg-surface-container-low border border-outline-variant/20 flex flex-col items-center gap-base">
+<span class="text-on-surface-variant font-label-md text-label-md uppercase opacity-60">Service</span>
+<p class="font-title-md text-title-md text-on-background">Access to VPN</p>
+</div>
+<div class="p-md rounded-2xl bg-surface-container-low border border-outline-variant/20 flex flex-col items-center gap-base">
+<span class="text-on-surface-variant font-label-md text-label-md uppercase opacity-60">Priority</span>
+<div class="flex items-center gap-xs">
+<span class="w-2 h-2 rounded-full bg-tertiary"></span>
+<p class="font-title-md text-title-md text-on-background">Medium</p>
+</div>
+</div>
+<div class="p-md rounded-2xl bg-surface-container-low border border-outline-variant/20 flex flex-col items-center gap-base">
+<span class="text-on-surface-variant font-label-md text-label-md uppercase opacity-60">Estimated SLA</span>
+<p class="font-title-md text-title-md text-primary font-bold">2h</p>
+</div>
+</div>
+<!-- CTA Cluster -->
+<div class="mt-2xl flex flex-col md:flex-row gap-md w-full justify-center">
+<button class="px-xl py-lg bg-primary text-on-primary font-bold rounded-xl shadow-lg shadow-primary/20 hover:bg-primary-container hover:shadow-xl transition-all active:scale-[0.98] duration-150 flex items-center justify-center gap-sm">
+<span class="material-symbols-outlined" data-icon="confirmation_number">confirmation_number</span>
+                                Ir para Meus Chamados
+                            </button>
+<button class="px-xl py-lg bg-surface border border-outline-variant text-on-surface-variant font-bold rounded-xl hover:bg-surface-container-low transition-all active:scale-[0.98] duration-150 flex items-center justify-center gap-sm">
+<span class="material-symbols-outlined" data-icon="arrow_back">arrow_back</span>
+                                Voltar ao Catálogo
+                            </button>
+</div>
+</div>
+<!-- Footer Note -->
+<div class="px-lg py-md bg-surface-container-low border-t border-outline-variant/30 flex justify-between items-center text-on-surface-variant/60 font-label-md text-label-md">
+<div class="flex items-center gap-xs">
+<span class="material-symbols-outlined text-[16px]">verified_user</span>
+                            Flowfy Security Protocol Active
+                        </div>
+<div>Ref ID: d9a-2048-flw</div>
+</div>
+</div>
+<!-- Background "Glass" decorations -->
+<div class="absolute top-20 right-40 w-64 h-64 bg-primary/10 rounded-full blur-3xl -z-10"></div>
+<div class="absolute bottom-20 left-40 w-80 h-80 bg-tertiary/5 rounded-full blur-3xl -z-10"></div>
+</main>
+</div>
+</div>
+<!-- Micro-interaction: Confetti logic (Visual only) -->
+<canvas class="confetti-canvas" id="confetti"></canvas>
+<script>
+        // Simple confetti effect for celebration
+        const canvas = document.getElementById('confetti');
+        const ctx = canvas.getContext('2d');
+        let particles = [];
+
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+
+        window.addEventListener('resize', resize);
+        resize();
+
+        class Particle {
+            constructor() {
+                this.x = Math.random() * canvas.width;
+                this.y = -10;
+                this.size = Math.random() * 8 + 4;
+                this.speedY = Math.random() * 3 + 2;
+                this.speedX = (Math.random() - 0.5) * 2;
+                this.color = ['#004ac6', '#2563eb', '#b4c5ff', '#943700'][Math.floor(Math.random() * 4)];
+                this.rotation = Math.random() * 360;
+                this.rotationSpeed = Math.random() * 5 - 2.5;
+            }
+            update() {
+                this.y += this.speedY;
+                this.x += this.speedX;
+                this.rotation += this.rotationSpeed;
+            }
+            draw() {
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                ctx.rotate(this.rotation * Math.PI / 180);
+                ctx.fillStyle = this.color;
+                ctx.fillRect(-this.size / 2, -this.size / 2, this.size, this.size);
+                ctx.restore();
+            }
+        }
+
+        function createConfetti() {
+            for (let i = 0; i < 60; i++) {
+                setTimeout(() => {
+                    particles.push(new Particle());
+                }, i * 30);
+            }
+        }
+
+        function animate() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            for (let i = 0; i < particles.length; i++) {
+                particles[i].update();
+                particles[i].draw();
+                if (particles[i].y > canvas.height) {
+                    particles.splice(i, 1);
+                    i--;
+                }
+            }
+            requestAnimationFrame(animate);
+        }
+
+        // Trigger on load
+        window.addEventListener('DOMContentLoaded', () => {
+            createConfetti();
+            animate();
+        });
+    </script>
+</body></html>

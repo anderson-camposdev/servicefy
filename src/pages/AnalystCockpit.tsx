@@ -1,14 +1,17 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import {
-  User, Building2, AlertTriangle, Tag, Users, Send,
+  User, Building2, AlertTriangle, Send,
   BookOpen, CheckCircle, History, FileText, ListTree, Link2, Lock, Pause, Timer, Edit3,
+  ShieldAlert,
 } from 'lucide-react'
-import { incidentsService, messagesService, assignmentGroupsService } from '../lib/services'
-import { translateState, STATE_LABELS_PT, PENDING_REASONS } from '../lib/statusLabels'
+import { incidentsService, messagesService, assignmentGroupsService, pendingReasonsService } from '../lib/services'
+import { translateState, STATE_LABELS_PT } from '../lib/statusLabels'
 import { useAuth } from '../auth'
 import { useToast } from '../context'
-import type { IncidentRow, IncidentHistoryRow, TicketMessageRow, AssignmentGroupRow, ProfileRow } from '../lib/database.types'
+import type { IncidentRow, IncidentHistoryRow, IncidentState, TicketMessageRow, AssignmentGroupRow, ProfileRow, PendingReasonRow } from '../lib/database.types'
 import type { WorkspaceTicket } from './workspace.types'
+import SlaEventTimeline from './SlaEventTimeline'
+import { priorityString, IMPACT_OPTIONS, URGENCY_OPTIONS } from '../lib/priority'
 
 /**
  * Cockpit do Analista — Single-Pane sob abas de contexto, com ciclo de
@@ -33,6 +36,18 @@ type ContextTab = 'detalhes' | 'historico' | 'subchamados' | 'relacionamentos'
 
 const fmt = (iso: string) => {
   try { return new Date(iso).toLocaleString('pt-BR') } catch { return iso }
+}
+
+// Extrai a mensagem REAL de erros do Supabase (PostgrestError não é instanceof Error).
+const dbErrMsg = (e: unknown, fallback: string): string => {
+  if (e instanceof Error && e.message) return e.message
+  if (e && typeof e === 'object') {
+    const o = e as { message?: unknown; details?: unknown; hint?: unknown }
+    if (typeof o.message === 'string' && o.message) return o.message
+    if (typeof o.details === 'string' && o.details) return o.details
+    if (typeof o.hint === 'string' && o.hint) return o.hint
+  }
+  return fallback
 }
 
 const formatFormValue = (value: unknown) => {
@@ -66,6 +81,15 @@ const fmtDuration = (ms: number) => {
 
 
 
+// Matriz visual de prioridades ITIL (P1..P5) — usada nos badges e no command bar NOC.
+const PRIORITY_STYLES: Record<number, { badge: string; dot: string; label: string }> = {
+  1: { badge: 'bg-rose-500/10 border-rose-500/30 text-rose-500 font-extrabold shadow-sm', dot: 'bg-rose-500 animate-ping', label: 'P1 · Crítica' },
+  2: { badge: 'bg-orange-500/10 border-orange-500/30 text-orange-500 font-bold shadow-sm', dot: 'bg-orange-500', label: 'P2 · Alta' },
+  3: { badge: 'bg-amber-500/10 border-amber-500/30 text-amber-500 font-bold shadow-sm', dot: 'bg-amber-500', label: 'P3 · Moderada' },
+  4: { badge: 'bg-sky-500/10 border-sky-500/30 text-sky-500 font-semibold', dot: 'bg-sky-500', label: 'P4 · Baixa' },
+  5: { badge: 'bg-slate-500/10 border-slate-500/20 text-slate-500 font-semibold', dot: 'bg-slate-400', label: 'P5 · Planejada' },
+}
+
 const CONTEXT_TABS: { id: ContextTab; label: string; icon: React.ReactNode }[] = [
   { id: 'detalhes', label: 'Detalhes', icon: <FileText className="w-4 h-4" /> },
   { id: 'historico', label: 'Histórico de Chamados', icon: <History className="w-4 h-4" /> },
@@ -86,33 +110,13 @@ const MOCK_MESSAGES: TicketMessageRow[] = [
 ]
 
 // ─── Subcomponentes de UI ─────────────────────────────────────
-function SummaryCard({ icon, title, children }: { icon: React.ReactNode; title: string; children: React.ReactNode }) {
-  return (
-    <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
-      <div className="flex items-center gap-2 text-slate-400 mb-3">
-        <span className="text-indigo-500">{icon}</span>
-        <h3 className="text-[11px] font-bold uppercase tracking-wider">{title}</h3>
-      </div>
-      <div className="space-y-2.5 text-sm">{children}</div>
-    </div>
-  )
-}
+
 
 function Field({ label, value, accent }: { label: string; value: string; accent?: string }) {
   return (
     <div>
-      <p className="text-[11px] text-slate-400">{label}</p>
-      <p className={`font-semibold ${accent ?? 'text-slate-800'}`}>{value || '—'}</p>
-    </div>
-  )
-}
-
-function SectionTitle({ icon, title, hint }: { icon: React.ReactNode; title: string; hint?: string }) {
-  return (
-    <div className="flex items-center gap-2 mb-4">
-      <span className="text-indigo-600">{icon}</span>
-      <h2 className="text-lg font-bold text-slate-900">{title}</h2>
-      {hint && <span className="text-xs text-slate-400 font-medium">{hint}</span>}
+      <p className="text-[11px] uppercase tracking-wider font-bold text-on-surface-variant/70">{label}</p>
+      <p className={`text-sm font-semibold ${accent ?? 'text-text-main'}`}>{value || '—'}</p>
     </div>
   )
 }
@@ -120,11 +124,11 @@ function SectionTitle({ icon, title, hint }: { icon: React.ReactNode; title: str
 function EmptyContext({ icon, title, desc }: { icon: React.ReactNode; title: string; desc: string }) {
   return (
     <div className="max-w-6xl mx-auto p-6">
-      <div className="bg-white border border-dashed border-slate-300 rounded-2xl p-12 flex flex-col items-center justify-center text-center">
-        <div className="w-14 h-14 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mb-4">{icon}</div>
-        <h3 className="text-lg font-bold text-slate-700">{title}</h3>
-        <p className="text-sm text-slate-500 mt-1 max-w-sm">{desc}</p>
-        <span className="mt-4 text-[10px] font-bold uppercase tracking-wider text-indigo-600 bg-indigo-50 border border-indigo-100 px-3 py-1 rounded-full">
+      <div className="p-12 flex flex-col items-center justify-center text-center border border-dashed bg-surface border-outline-variant rounded-xl">
+        <div className="w-14 h-14 flex items-center justify-center mb-4 rounded-xl bg-surface-container text-on-surface-variant">{icon}</div>
+        <h3 className="text-lg font-bold text-text-main">{title}</h3>
+        <p className="text-sm mt-1 max-w-sm text-on-surface-variant">{desc}</p>
+        <span className="mt-4 text-[10px] font-bold uppercase tracking-wider px-3 py-1 border bg-primary/10 text-primary border-primary/20 rounded-full">
           Em desenvolvimento
         </span>
       </div>
@@ -132,45 +136,30 @@ function EmptyContext({ icon, title, desc }: { icon: React.ReactNode; title: str
   )
 }
 
-function calculatePriority(impact: string, urgency: string): 'P1 - Critical' | 'P2 - High' | 'P3 - Moderate' | 'P4 - Low' {
-  if (impact === 'Critical') {
-    return (urgency === 'High' || urgency === 'Medium') ? 'P1 - Critical' : 'P2 - High'
-  }
-  if (impact === 'High') {
-    if (urgency === 'High') return 'P1 - Critical'
-    if (urgency === 'Medium') return 'P2 - High'
-    return 'P3 - Moderate'
-  }
-  if (impact === 'Medium') {
-    if (urgency === 'High') return 'P2 - High'
-    if (urgency === 'Medium') return 'P3 - Moderate'
-    return 'P4 - Low'
-  }
-  if (impact === 'Low') {
-    if (urgency === 'High') return 'P3 - Moderate'
-    return 'P4 - Low'
-  }
-  return 'P3 - Moderate'
-}
-
+// Rótulos das PERGUNTAS (fonte única em ../lib/priority).
 const translateImpact = (val: string | null | undefined) => {
-  if (val === 'Low') return 'Apenas eu (Low)'
-  if (val === 'Medium') return 'Meu departamento (Medium)'
-  if (val === 'High') return 'Toda a empresa (High)'
-  if (val === 'Critical') return 'O negócio / Clientes (Critical)'
-  return val || '—'
+  const opt = IMPACT_OPTIONS.find(([v]) => v === val)
+  return opt ? `${opt[1]} (${opt[0]})` : (val || '—')
 }
 
 const translateUrgency = (val: string | null | undefined) => {
-  if (val === 'Low') return 'Consigo trabalhar, mas incomoda (Low)'
-  if (val === 'Medium') return 'Uma tarefa importante está parada (Medium)'
-  if (val === 'High') return 'Estou totalmente travado (High)'
-  return val || '—'
+  const opt = URGENCY_OPTIONS.find(([v]) => v === val)
+  return opt ? `${opt[1]} (${opt[0]})` : (val || '—')
 }
 
 const AnalystCockpit = ({ ticket = FALLBACK_TICKET }: { ticket?: WorkspaceTicket }) => {
   const { profile } = useAuth()
   const { toast } = useToast()
+  const isAlpha = false
+  const isBeta = false
+
+  // Classes limpas e independentes de tenant baseadas no tema dinâmico
+  const cardClass = 'bg-surface border border-outline-variant rounded-xl shadow-sm'
+  const headerBg = 'bg-surface-container/30 border-b border-outline-variant'
+  const inputClass = 'bg-surface border border-outline-variant rounded-lg text-text-main placeholder-on-surface-variant/50 focus:ring-2 focus:ring-primary text-sm outline-none px-3 py-2'
+  const buttonPrimaryClass = 'bg-primary text-on-primary rounded-lg shadow-sm hover:opacity-90 active:scale-[0.98]'
+  const buttonSecondaryClass = 'border border-outline-variant text-text-main hover:bg-surface-container rounded-lg'
+
   const realMode = Boolean(ticket.incidentId && ticket.companyId)
   // God Mode: admin/sysadmin têm passe livre nas travas de governança.
   const isAdmin = Boolean(profile && ['sysadmin', 'company_admin', 'admin'].includes(profile.role))
@@ -179,6 +168,89 @@ const AnalystCockpit = ({ ticket = FALLBACK_TICKET }: { ticket?: WorkspaceTicket
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [activeContext, setActiveContext] = useState<ContextTab>('detalhes')
+
+  // Helper to render Priority badges (P1–P5, dinâmico via priority_level das triggers)
+  const renderPriorityBadge = (prio: string | null | undefined, level?: number | null) => {
+    // Resolve o nível 1..5: prioriza o priority_level real; senão, lê do texto legado.
+    let lvl = level && level >= 1 && level <= 5 ? level : 0
+    if (!lvl) {
+      const t = prio || ''
+      if (t.includes('P1')) lvl = 1
+      else if (t.includes('P2')) lvl = 2
+      else if (t.includes('P3')) lvl = 3
+      else if (t.includes('P4')) lvl = 4
+      else if (t.includes('P5')) lvl = 5
+      else lvl = 3
+    }
+    const cfg = PRIORITY_STYLES[lvl]
+    return (
+      <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs border uppercase tracking-wider ${cfg.badge}`}>
+        <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />
+        {cfg.label}
+      </span>
+    )
+  }
+
+  // Helper to render SLA countdown timer.
+  const renderSlaTimer = (
+    label: string,
+    deadline: string | null | undefined,
+    achievedAt: string | null | undefined,
+    isBreached: boolean | undefined,
+    nowTime: number,
+    createdAt: string | null | undefined
+  ) => {
+    if (!deadline) {
+      return (
+        <div className="border border-outline-variant p-4 flex flex-col justify-center bg-surface-container/30 rounded-xl shadow-sm">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">{label}</span>
+          <span className="text-xs font-semibold italic mt-1">Sem prazo definido</span>
+        </div>
+      )
+    }
+
+    const targetTime = new Date(deadline).getTime()
+    const startTime = createdAt ? new Date(createdAt).getTime() : targetTime - (4 * 3600 * 1000)
+    const totalDuration = targetTime - startTime
+
+    let status: 'fulfilled' | 'breached' | 'warning' | 'normal' = 'normal'
+    let text = ''
+
+    if (achievedAt) {
+      status = 'fulfilled'
+      text = `Cumprido em ${fmt(achievedAt)}`
+    } else {
+      const remaining = targetTime - nowTime
+
+      if (isBreached || remaining < 0) {
+        status = 'breached'
+        text = remaining < 0 ? `Estourado há ${fmtDuration(Math.abs(remaining))}` : 'Estourado'
+      } else {
+        text = `${fmtDuration(remaining)} restante`
+        // Alerta amarelo ao consumir 75% do prazo (≤25% restante) ou na última hora.
+        if (remaining <= 0.25 * totalDuration || remaining <= 3600 * 1000) {
+          status = 'warning'
+        }
+      }
+    }
+
+    const styles = {
+      fulfilled: 'bg-emerald-50 border-emerald-200 text-emerald-700',
+      breached: 'bg-rose-50 border-rose-200 text-rose-700 animate-pulse',
+      warning: 'bg-amber-50 border-amber-200 text-amber-700',
+      normal: 'bg-slate-50 border-zinc-200 text-slate-700'
+    }[status]
+
+    return (
+      <div className={`border rounded-xl p-4 flex flex-col justify-center transition-all shadow-sm ${styles}`}>
+        <span className="text-[10px] font-bold uppercase tracking-wider opacity-75">{label}</span>
+        <span className="text-sm font-extrabold tracking-tight mt-1">{text}</span>
+        {!achievedAt && status !== 'breached' && (
+          <span className="text-[9px] opacity-75 mt-0.5">Prazo: {fmt(deadline)}</span>
+        )}
+      </div>
+    )
+  }
 
   // Chat / mensagens
   const [messages, setMessages] = useState<TicketMessageRow[]>([])
@@ -204,7 +276,8 @@ const AnalystCockpit = ({ ticket = FALLBACK_TICKET }: { ticket?: WorkspaceTicket
   const [formAssigneeId, setFormAssigneeId] = useState('')
   const [formImpact, setFormImpact] = useState('Low')
   const [formUrgency, setFormUrgency] = useState('Low')
-  const [formPendingReason, setFormPendingReason] = useState('')
+  const [formPendingReasonId, setFormPendingReasonId] = useState('')
+  const [pendingReasons, setPendingReasons] = useState<PendingReasonRow[]>([])
   const [savingConducao, setSavingConducao] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
 
@@ -238,7 +311,7 @@ const AnalystCockpit = ({ ticket = FALLBACK_TICKET }: { ticket?: WorkspaceTicket
       setFormAssigneeId(detail.assigned_to_id || '')
       setFormImpact(detail.impact || 'Low')
       setFormUrgency(detail.urgency || 'Low')
-      setFormPendingReason(detail.pending_reason || '')
+      setFormPendingReasonId(detail.pending_reason_id || '')
       setIsEditing(false)
     }
   }, [detail])
@@ -249,6 +322,17 @@ const AnalystCockpit = ({ ticket = FALLBACK_TICKET }: { ticket?: WorkspaceTicket
       setFormState(stateOverride)
     }
   }, [stateOverride])
+
+  // Carrega os Motivos de Pendência do tenant (governança de SLA — migration 035)
+  useEffect(() => {
+    const cid = detail?.company_id || ticket.companyId
+    if (!cid) { setPendingReasons([]); return }
+    let cancelled = false
+    pendingReasonsService.list(cid)
+      .then(rows => { if (!cancelled) setPendingReasons(rows) })
+      .catch(() => { if (!cancelled) setPendingReasons([]) })
+    return () => { cancelled = true }
+  }, [detail?.company_id, ticket.companyId])
 
   // Load active assignment groups for this company
   useEffect(() => {
@@ -356,7 +440,7 @@ const AnalystCockpit = ({ ticket = FALLBACK_TICKET }: { ticket?: WorkspaceTicket
       refreshIncident()
       refreshMessages()
     } catch (e) {
-      const errMsg = e instanceof Error ? e.message : 'Falha ao iniciar atendimento.'
+      const errMsg = dbErrMsg(e, 'Falha ao iniciar atendimento.')
       setActionMsg(errMsg)
       toast.error(`Erro ao iniciar atendimento: ${errMsg}`)
     } finally {
@@ -371,7 +455,7 @@ const AnalystCockpit = ({ ticket = FALLBACK_TICKET }: { ticket?: WorkspaceTicket
       setFormAssigneeId(detail.assigned_to_id || '')
       setFormImpact(detail.impact || 'Low')
       setFormUrgency(detail.urgency || 'Low')
-      setFormPendingReason(detail.pending_reason || '')
+      setFormPendingReasonId(detail.pending_reason_id || '')
       setFormComment('')
       setCloseCode(detail.close_code || '')
       setCloseNotes(detail.close_notes || '')
@@ -421,7 +505,7 @@ const AnalystCockpit = ({ ticket = FALLBACK_TICKET }: { ticket?: WorkspaceTicket
 
     // Pendência: exige Motivo da Pendência + comentário obrigatório
     if (formState === 'On Hold') {
-      if (!formPendingReason) {
+      if (!formPendingReasonId) {
         const msg = 'Para colocar o chamado como Pendente, selecione o Motivo da Pendência.'
         setError(msg); toast.error(msg); return
       }
@@ -440,16 +524,19 @@ const AnalystCockpit = ({ ticket = FALLBACK_TICKET }: { ticket?: WorkspaceTicket
       const selectedAssigneeName = groupMembers.find(m => m.id === formAssigneeId)?.name
         ?? (formAssigneeId === detail?.assigned_to_id ? detail.assigned_to_name : null)
 
-      const changes: any = {
-        state: formState as any,
+      const changes: Partial<IncidentRow> = {
+        state: formState as IncidentState,
         assignment_group_id: formGroupId || null,
         assigned_group_name: selectedGroupName,
         assigned_to_id: formAssigneeId || null,
         assigned_to_name: selectedAssigneeName,
-        impact: formImpact,
-        urgency: formUrgency,
-        priority: calculatePriority(formImpact, formUrgency),
-        pending_reason: formState === 'On Hold' ? formPendingReason : null,
+        impact: formImpact as IncidentRow['impact'],
+        urgency: formUrgency as IncidentRow['urgency'],
+        priority: priorityString(formImpact, formUrgency),
+        pending_reason_id: formState === 'On Hold' ? (formPendingReasonId || null) : null,
+        pending_reason: formState === 'On Hold'
+          ? (pendingReasons.find(r => r.id === formPendingReasonId)?.name ?? null)
+          : null,
       }
 
       // If resolving/closing and closeCode/closeNotes are filled, include them
@@ -489,13 +576,13 @@ const AnalystCockpit = ({ ticket = FALLBACK_TICKET }: { ticket?: WorkspaceTicket
       refreshIncident()
       refreshMessages()
     } catch (e) {
-      const errMsg = e instanceof Error ? e.message : 'Falha ao registrar condução.'
+      const errMsg = dbErrMsg(e, 'Falha ao registrar condução.')
       setError(errMsg)
       toast.error(`Falha no banco de dados: ${errMsg}`)
     } finally {
       setSavingConducao(false)
     }
-  }, [ticket.incidentId, ticket.companyId, detail?.company_id, formState, formGroupId, formAssigneeId, formImpact, formUrgency, formPendingReason, formComment, isInternal, activeGroups, groupMembers, closeCode, closeNotes, timeSpent, detail, profile, toast, refreshIncident, refreshMessages, isAdmin])
+  }, [ticket.incidentId, ticket.companyId, detail?.company_id, formState, formGroupId, formAssigneeId, formImpact, formUrgency, formPendingReasonId, pendingReasons, formComment, isInternal, activeGroups, groupMembers, closeCode, closeNotes, timeSpent, detail, profile, toast, refreshIncident, refreshMessages, isAdmin])
 
   const handleCancelEdit = useCallback(() => {
     setIsEditing(false)
@@ -516,7 +603,9 @@ const AnalystCockpit = ({ ticket = FALLBACK_TICKET }: { ticket?: WorkspaceTicket
   // Valores de exibição
   const number = ticket.id
   const status = stateOverride ?? detail?.state ?? ticket.status
-  statusRef.current = status
+  useEffect(() => {
+    statusRef.current = status
+  }, [status])
   const title = detail?.short_description ?? ticket.title
   const priority = detail?.priority ?? ticket.priority
   const requester = detail?.caller_name || ticket.requester || 'Solicitante'
@@ -524,9 +613,7 @@ const AnalystCockpit = ({ ticket = FALLBACK_TICKET }: { ticket?: WorkspaceTicket
   const assignee = (stateOverride && profile ? profile.name : detail?.assigned_to_name) ?? 'Não atribuído'
   const company = ticket.client ?? '—'
   const category = detail?.category ?? '—'
-  const slaLabel = detail
-    ? (detail.sla_breached ? 'SLA Violado' : (detail.sla_deadline ? fmt(detail.sla_deadline) : '—'))
-    : (ticket.sla || '—')
+
   const description = realMode
     ? (detail?.description || detail?.short_description || 'Sem descrição registrada.')
     : 'Olá equipe, o sistema está apresentando muita lentidão desde a atualização de ontem. Não consigo emitir as notas fiscais do fechamento. Podem ajudar com urgência?'
@@ -557,24 +644,23 @@ const AnalystCockpit = ({ ticket = FALLBACK_TICKET }: { ticket?: WorkspaceTicket
   const slaBreached = !isResolved && (Boolean(detail?.sla_breached) || (remainingMs !== null && remainingMs < 0))
 
   return (
-    <div className="h-full overflow-y-auto bg-slate-50 text-slate-900 font-sans">
-
+    <div className="h-full overflow-y-auto bg-background text-text-main font-sans">
       {/* BARRA SUPERIOR (STICKY): ações + abas de contexto */}
-      <div className="sticky top-0 z-20 bg-white/95 backdrop-blur border-b border-slate-200 shadow-sm">
+      <div className="sticky top-0 z-20 backdrop-blur bg-surface/95 border-b border-outline-variant shadow-sm">
         <div className="px-6 pt-3 flex items-center justify-between gap-4 flex-wrap">
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="text-lg font-extrabold text-slate-900 truncate">{number}</h1>
-              <span className="bg-indigo-100 text-indigo-700 text-[11px] font-bold px-2.5 py-0.5 rounded-full shrink-0">{translateState(status)}</span>
+              <h1 className="text-lg font-bold truncate text-text-main">{number}</h1>
+              <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full shrink-0 bg-primary-container text-on-primary-container">{translateState(status)}</span>
               {/* Cronômetro de SLA / tempo decorrido */}
               {elapsedMs !== null && (
                 <span
-                  className={`inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-0.5 rounded-full shrink-0 border ${
+                  className={`inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-0.5 shrink-0 border rounded-full ${
                     isResolved
                       ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                       : slaBreached
-                        ? 'bg-red-50 text-red-700 border-red-200 animate-pulse'
-                        : 'bg-slate-50 text-slate-600 border-slate-200'
+                        ? 'bg-rose-50 text-rose-700 border-rose-200 animate-pulse'
+                        : 'bg-surface-container text-on-surface-variant border-outline-variant'
                   }`}
                   title={deadlineAt ? `Prazo SLA: ${fmt(detail!.sla_deadline!)}` : 'Tempo desde a abertura'}
                 >
@@ -586,30 +672,30 @@ const AnalystCockpit = ({ ticket = FALLBACK_TICKET }: { ticket?: WorkspaceTicket
                       : `${fmtDuration(elapsedMs ?? 0)} em aberto`}
                 </span>
               )}
-              {loading && <span className="text-xs text-slate-400 animate-pulse">carregando…</span>}
+              {loading && <span className="text-xs text-on-surface-variant animate-pulse">carregando…</span>}
             </div>
-            <p className="text-xs text-slate-500 truncate">{title}</p>
+            <p className="text-xs text-on-surface-variant truncate">{title}</p>
           </div>
 
-          <div className="flex items-center gap-2 shrink-0">
-            <button className="flex items-center gap-1.5 px-3 py-2 border border-slate-200 text-slate-600 hover:bg-slate-50 text-sm font-semibold rounded-lg transition-colors">
+          <div className="flex items-center gap-2 shrink-0 pb-2">
+            <button className="flex items-center gap-1.5 px-3 py-2 text-sm font-semibold transition-colors border border-outline-variant text-text-main hover:bg-surface-container rounded-lg">
               <BookOpen className="w-4 h-4" /> <span className="hidden lg:inline">Base de Conhecimento</span>
             </button>
             {isResolved && !isAdmin ? (
-              <span className="inline-flex items-center gap-1.5 px-3 py-2 bg-emerald-50 text-emerald-700 border border-emerald-200 text-sm font-bold rounded-lg">
+              <span className="inline-flex items-center gap-1.5 px-3 py-2 border text-sm font-bold bg-surface-container text-on-surface-variant border-outline-variant rounded-lg">
                 <Lock className="w-4 h-4" /> Somente leitura · {translateState(status)}
               </span>
             ) : (
               <>
                 {isResolved && isAdmin && (
-                  <span className="inline-flex items-center gap-1 px-2.5 py-2 bg-amber-50 text-amber-700 border border-amber-200 text-[11px] font-bold rounded-lg" title="Override administrativo ativo">
+                  <span className="inline-flex items-center gap-1 px-2.5 py-2 border text-[11px] font-bold bg-amber-500/10 text-amber-500 border border-amber-500/20 rounded-lg" title="Override administrativo ativo">
                     <Lock className="w-3.5 h-3.5" /> God Mode
                   </span>
                 )}
                 {canEdit && !isEditing && (
                   <button
                     onClick={openEditForm}
-                    className="flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg shadow-sm transition-colors"
+                    className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold shadow-sm transition-all hover:opacity-90 active:scale-[0.98] bg-primary text-on-primary rounded-lg"
                   >
                     <Edit3 className="w-4 h-4" /> Atualizar Chamado
                   </button>
@@ -617,7 +703,7 @@ const AnalystCockpit = ({ ticket = FALLBACK_TICKET }: { ticket?: WorkspaceTicket
                 {canEdit && isEditing && (
                   <button
                     onClick={handleCancelEdit}
-                    className="flex items-center gap-1.5 px-3 py-2 border border-slate-200 text-slate-600 hover:bg-slate-50 text-sm font-semibold rounded-lg transition-colors"
+                    className="flex items-center gap-1.5 px-3 py-2 border text-sm font-semibold transition-colors border-outline-variant text-text-main hover:bg-surface-container rounded-lg"
                   >
                     Cancelar
                   </button>
@@ -625,14 +711,14 @@ const AnalystCockpit = ({ ticket = FALLBACK_TICKET }: { ticket?: WorkspaceTicket
                 <button
                   onClick={handleStartService}
                   disabled={!canEdit || assigning || Boolean(detail?.responded_at)}
-                  className="flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-semibold rounded-lg shadow-sm transition-colors"
+                  className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold shadow-sm transition-all hover:opacity-90 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed bg-primary text-on-primary rounded-lg"
                 >
                   <CheckCircle className="w-4 h-4" /> {assigning ? 'Iniciando…' : detail?.responded_at ? 'Atendimento iniciado' : 'Iniciar Atendimento'}
                 </button>
                 <button
                   onClick={openPendingForm}
                   disabled={!canEdit || status === 'On Hold'}
-                  className="flex items-center gap-1.5 px-3 py-2 border border-slate-200 text-slate-600 hover:bg-amber-50 hover:text-amber-700 hover:border-amber-200 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-semibold rounded-lg transition-colors"
+                  className="flex items-center gap-1.5 px-3 py-2 border text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed border-outline-variant text-text-main hover:bg-amber-500/15 hover:text-amber-500 hover:border-amber-500/30 rounded-lg"
                 >
                   <Pause className="w-4 h-4" /> <span className="hidden lg:inline">Pendente</span>
                 </button>
@@ -641,17 +727,22 @@ const AnalystCockpit = ({ ticket = FALLBACK_TICKET }: { ticket?: WorkspaceTicket
           </div>
         </div>
 
-        {/* Menu de Contexto do Ticket (sub-abas) */}
-        <div className="px-4 pt-2 flex items-center gap-1 overflow-x-auto hide-scrollbar">
+        <div className="px-4 pt-2 flex items-center gap-1 overflow-x-auto hide-scrollbar border-t border-outline-variant">
           {CONTEXT_TABS.map(tab => {
             const active = tab.id === activeContext
+            
+            let tabBtnStyle = ''
+            if (active) {
+              tabBtnStyle = 'border-primary text-primary bg-surface-container/30 rounded-t-lg'
+            } else {
+              tabBtnStyle = 'border-transparent text-on-surface-variant hover:text-on-surface hover:bg-surface-container rounded-t-lg'
+            }
+
             return (
               <button
                 key={tab.id}
                 onClick={() => setActiveContext(tab.id)}
-                className={`flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-t-lg border-b-2 whitespace-nowrap transition-colors ${
-                  active ? 'border-indigo-600 text-indigo-700 bg-slate-50' : 'border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-100'
-                }`}
+                className={`flex items-center gap-2 px-4 py-2 text-sm font-semibold border-b-2 whitespace-nowrap transition-colors ${tabBtnStyle}`}
               >
                 {tab.icon}{tab.label}
               </button>
@@ -667,491 +758,643 @@ const AnalystCockpit = ({ ticket = FALLBACK_TICKET }: { ticket?: WorkspaceTicket
       {activeContext === 'detalhes' && (
         <>
           {(error || actionMsg) && (
-            <div className={`m-6 mb-0 text-sm rounded-xl p-3 ${error ? 'bg-red-50 border border-red-200 text-red-600' : 'bg-emerald-50 border border-emerald-200 text-emerald-700'}`}>
+            <div className={`m-6 mb-0 text-sm rounded-xl p-3 ${error ? 'bg-error/10 border border-error/20 text-error' : 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-500'}`}>
               {error || actionMsg}
             </div>
           )}
 
-          <div className="p-6 space-y-8 max-w-6xl mx-auto">
-
-            {/* GRID DE RESUMO (4 COLUNAS) */}
-            <section>
-              <SectionTitle icon={<User className="w-5 h-5" />} title="Resumo do Chamado" />
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-                <SummaryCard icon={<User className="w-4 h-4" />} title="Empresa & Solicitante">
-                  <Field label="Solicitante" value={requester} />
-                  <Field label="Empresa" value={company} accent="text-indigo-600" />
-                  <Field label="Abertura" value={detail ? fmt(detail.created_at) : (ticket.date ?? '—')} />
-                </SummaryCard>
-                <SummaryCard icon={<AlertTriangle className="w-4 h-4" />} title="Status & Prioridade">
-                  <Field label="Prioridade" value={priority} accent="text-orange-600" />
-                  <Field label="Impacto" value={translateImpact(detail?.impact)} />
-                  <Field label="Urgência" value={translateUrgency(detail?.urgency)} />
-                  <Field label="Estado" value={translateState(status)} />
-                </SummaryCard>
-                <SummaryCard icon={<Tag className="w-4 h-4" />} title="Categorização & SLA">
-                  <Field label="Categoria" value={category} />
-                  <Field
-                    label={isResolved ? 'SLA' : (remainingMs !== null ? 'SLA restante' : 'Tempo em aberto')}
-                    value={
-                      isResolved ? 'Encerrado'
-                      : remainingMs !== null ? (slaBreached ? `Estourado há ${fmtDuration(remainingMs)}` : fmtDuration(remainingMs))
-                      : elapsedMs !== null ? fmtDuration(elapsedMs)
-                      : slaLabel
-                    }
-                    accent={isResolved ? 'text-emerald-600' : slaBreached ? 'text-red-600' : 'text-slate-800'}
-                  />
-                  <Field label="Tipo" value={(detail?.ticket_type ?? ticket.ticketType) === 'request' ? 'Requisição' : 'Incidente'} />
-                </SummaryCard>
-                <SummaryCard icon={<Users className="w-4 h-4" />} title="Grupo & Responsável">
-                  <Field label="Responsável" value={assignee} />
-                  <Field label="Grupo Técnico" value={group} />
-                </SummaryCard>
-              </div>
-            </section>
-
-            {/* CENTRAL DE CONDUÇÃO DO CHAMADO */}
-            {/* CENTRAL DE CONDUÇÃO DO CHAMADO */}
-            {canEdit && (
-              isEditing ? (
-                <section className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
-                  <div className="px-6 py-4 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Send className="w-5 h-5 text-indigo-600" />
-                      <h2 className="text-lg font-bold text-slate-900">Condução do Chamado</h2>
-                    </div>
-                    <span className="text-xs text-slate-400 font-medium">Atualização unificada do chamado</span>
-                  </div>
-
-                  <div className="p-6 space-y-6">
-                    {/* Seletor de Visibilidade (Abas) */}
-                    <div>
-                      <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Visibilidade da Mensagem</label>
-                      <div className="flex bg-slate-100 p-1 rounded-xl w-fit border border-slate-200">
-                        <button
-                          type="button"
-                          onClick={() => setIsInternal(false)}
-                          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
-                            !isInternal
-                              ? 'bg-indigo-600 text-white shadow-sm'
-                              : 'text-slate-500 hover:text-slate-800 bg-transparent'
-                          }`}
-                        >
-                          <User className="w-4 h-4" /> Responder ao Cliente
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setIsInternal(true)}
-                          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
-                            isInternal
-                              ? 'bg-amber-500 text-white shadow-sm'
-                              : 'text-slate-500 hover:text-slate-800 bg-transparent'
-                          }`}
-                        >
-                          <Lock className="w-4 h-4" /> Nota Interna
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Campo de Texto */}
-                    <div>
-                      <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Mensagem / Ação</label>
-                      <textarea
-                        rows={4}
-                        value={formComment}
-                        onChange={e => setFormComment(e.target.value)}
-                        placeholder={
-                          isInternal
-                            ? 'Descreva detalhes técnicos ou anotações internas (oculto para o cliente)...'
-                            : 'Escreva sua resposta ou orientação para o cliente...'
-                        }
-                        className="w-full border border-slate-200 rounded-xl p-3.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500 resize-none transition-all"
-                      />
-                    </div>
-
-                    {/* Campos de Controle Integrados */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-5 pt-2">
-                      {/* Dropdown Estado */}
-                      <div>
-                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Estado (Status)</label>
-                        <select
-                          value={formState}
-                          onChange={e => setFormState(e.target.value)}
-                          className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-white focus:ring-2 focus:ring-indigo-500 outline-none cursor-pointer text-slate-700 font-medium"
-                        >
-                          {Object.entries(STATE_LABELS_PT)
-                            .filter(([value]) => value !== 'Pending User')        // legado, substituído por Pendente + motivo
-                            .filter(([value]) => value !== 'Closed' || isAdmin)   // Fechado só para admin
-                            .map(([value, label]) => (
-                              <option key={value} value={value}>{label}</option>
-                            ))}
-                        </select>
-                      </div>
-
-                      {/* Dropdown Grupo Solucionador */}
-                      <div>
-                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Grupo Solucionador</label>
-                        {loadingGroups ? (
-                          <div className="text-sm text-slate-400 py-2.5 animate-pulse">Carregando grupos...</div>
-                        ) : (
-                          <select
-                            value={formGroupId}
-                            onChange={e => {
-                              const newGroupId = e.target.value
-                              setFormGroupId(newGroupId)
-                              // Limpeza de Responsável ao Transferir Grupo
-                              if (newGroupId !== (detail?.assignment_group_id || detail?.assigned_group_id || '')) {
-                                setFormAssigneeId('')
-                              }
-                            }}
-                            className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-white focus:ring-2 focus:ring-indigo-500 outline-none cursor-pointer text-slate-700 font-medium"
-                          >
-                            <option value="">Nenhum grupo atribuído</option>
-                            {activeGroups.map(g => (
-                              <option key={g.id} value={g.id}>{g.name}</option>
-                            ))}
-                          </select>
-                        )}
-                      </div>
-
-                      {/* Dropdown Analista Responsável */}
-                      <div>
-                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Analista Responsável</label>
-                        <select
-                          disabled={!formGroupId && !detail?.assigned_to_id}
-                          value={formAssigneeId}
-                          onChange={e => setFormAssigneeId(e.target.value)}
-                          className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-white focus:ring-2 focus:ring-indigo-500 outline-none cursor-pointer text-slate-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          {!formGroupId && !detail?.assigned_to_id ? (
-                            <option value="">Selecione um grupo primeiro</option>
-                          ) : (
-                            <>
-                              <option value="">Não atribuído</option>
-                              {detail?.assigned_to_id && !groupMembers.some(member => member.id === detail.assigned_to_id) && (
-                                <option value={detail.assigned_to_id}>{detail.assigned_to_name || 'Analista atual'}</option>
-                              )}
-                              {groupMembers.map(m => (
-                                <option key={m.id} value={m.id}>{m.name}</option>
-                              ))}
-                            </>
-                          )}
-                        </select>
-                      </div>
-                    </div>
-
-                    {/* Priorização Automática ITIL */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-5 pt-4 border-t border-slate-100 mt-2">
-                      {/* Dropdown Impacto */}
-                      <div>
-                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Impacto</label>
-                        <select
-                          value={formImpact}
-                          onChange={e => setFormImpact(e.target.value)}
-                          className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-white focus:ring-2 focus:ring-indigo-500 outline-none cursor-pointer text-slate-700 font-medium"
-                        >
-                          <option value="Low">Apenas eu (Low)</option>
-                          <option value="Medium">Meu departamento (Medium)</option>
-                          <option value="High">Toda a empresa (High)</option>
-                          <option value="Critical">O negócio / Clientes (Critical)</option>
-                        </select>
-                      </div>
-
-                      {/* Dropdown Urgência */}
-                      <div>
-                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Urgência</label>
-                        <select
-                          value={formUrgency}
-                          onChange={e => setFormUrgency(e.target.value)}
-                          className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-white focus:ring-2 focus:ring-indigo-500 outline-none cursor-pointer text-slate-700 font-medium"
-                        >
-                          <option value="Low">Consigo trabalhar (Low)</option>
-                          <option value="Medium">Tarefa importante parada (Medium)</option>
-                          <option value="High">Totalmente travado (High)</option>
-                        </select>
-                      </div>
-
-                      {/* Prioridade Final Calculada */}
-                      <div>
-                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Prioridade (Calculada)</label>
-                        <div className="h-[42px] flex items-center bg-slate-50 border border-slate-200 rounded-xl px-4 text-sm font-bold text-indigo-700 shadow-inner">
-                          {calculatePriority(formImpact, formUrgency)}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Motivo da Pendência (obrigatório quando Pendente) */}
-                    {formState === 'On Hold' && (
-                      <div className="border-t border-slate-100 pt-5">
-                        <label className="block text-xs font-bold text-amber-700 uppercase tracking-wider mb-2">
-                          Motivo da Pendência <span className="text-red-500">*</span>
-                        </label>
-                        <select
-                          value={formPendingReason}
-                          onChange={e => setFormPendingReason(e.target.value)}
-                          className="w-full md:w-1/2 border border-amber-200 bg-amber-50 rounded-xl px-3 py-2.5 text-sm text-amber-900 font-medium outline-none focus:ring-2 focus:ring-amber-400 cursor-pointer"
-                        >
-                          <option value="">Selecione o motivo…</option>
-                          {PENDING_REASONS.map(r => <option key={r} value={r}>{r}</option>)}
-                        </select>
-                        <p className="text-[11px] text-amber-600 mt-1.5">Ao deixar Pendente, é obrigatório informar o motivo e uma mensagem/justificativa.</p>
-                      </div>
-                    )}
-
-                    {/* Campos de Resolução Condicionais */}
-                    {(formState === 'Resolved' || formState === 'Closed') && (
-                      <div className="border-t border-slate-100 pt-5 space-y-4">
-                        <div className="flex items-center gap-2">
-                          <CheckCircle className="w-4 h-4 text-emerald-600" />
-                          <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Dados de Resolução do Chamado</h4>
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                          <div>
-                            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Código de Encerramento <span className="text-red-500">*</span></label>
-                            <select
-                              value={closeCode}
-                              onChange={e => setCloseCode(e.target.value)}
-                              className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-white focus:ring-2 focus:ring-indigo-500 outline-none cursor-pointer text-slate-700 font-medium"
-                            >
-                              <option value="">Selecione…</option>
-                              {CLOSE_CODES.map(grp => (
-                                <optgroup key={grp.group} label={grp.group}>
-                                  {grp.options.map(opt => (
-                                    <option key={opt} value={`${grp.group} / ${opt}`}>{opt}</option>
-                                  ))}
-                                </optgroup>
-                              ))}
-                            </select>
-                          </div>
-                          <div>
-                            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Tempo Gasto</label>
-                            <input
-                              value={timeSpent}
-                              onChange={e => setTimeSpent(e.target.value)}
-                              type="text"
-                              placeholder="ex: 1h 30m"
-                              className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-white focus:ring-2 focus:ring-indigo-500 outline-none text-slate-700 font-medium"
-                            />
-                          </div>
-                        </div>
-                        <div>
-                          <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Notas de Resolução <span className="text-red-500">*</span></label>
-                          <textarea
-                            rows={3}
-                            value={closeNotes}
-                            onChange={e => setCloseNotes(e.target.value)}
-                            className="w-full border border-slate-200 rounded-xl p-3.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500 resize-none transition-all text-slate-700"
-                            placeholder="Descreva a solução aplicada (visível ao cliente)..."
-                          />
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Ação Gravar Condução */}
-                    <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
-                      <button
-                        type="button"
-                        onClick={handleCancelEdit}
-                        className="px-4 py-2 border border-slate-200 text-slate-600 hover:bg-slate-50 text-sm font-semibold rounded-xl transition-colors cursor-pointer"
-                      >
-                        Cancelar
-                      </button>
-                      <button
-                        type="button"
-                        disabled={savingConducao}
-                        onClick={handleGravarConducao}
-                        className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm rounded-xl shadow-lg hover:shadow-xl transition-all active:scale-[0.98] disabled:opacity-50 flex items-center gap-2 cursor-pointer"
-                      >
-                        <Send className="w-4 h-4" />
-                        {savingConducao ? 'Gravando…' : 'Gravar Condução'}
-                      </button>
-                    </div>
-                  </div>
-                </section>
-              ) : (
-                <section className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
-                  <div className="flex items-start gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
-                      <Edit3 className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <h3 className="font-bold text-slate-800 text-sm">Atualização do Chamado</h3>
-                      <p className="text-xs text-slate-500 mt-0.5">Clique em "Atualizar Chamado" para responder ao cliente ou alterar a equipe e o estado.</p>
-                    </div>
-                  </div>
-                  <button
-                    onClick={openEditForm}
-                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm rounded-lg shadow transition-colors flex items-center gap-1.5 shrink-0"
-                  >
-                    <Edit3 className="w-4 h-4" /> Atualizar Chamado
-                  </button>
-                </section>
-              )
-            )}
-
-            {/* DESCRIÇÃO E CHAT */}
-            <section>
-              <SectionTitle icon={<FileText className="w-5 h-5" />} title="Descrição & Conversa" />
-              <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-5 space-y-5">
-                <div className="bg-slate-50 border border-slate-100 rounded-xl p-4">
-                  <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">Descrição Original</p>
-                  <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">{description}</p>
-                </div>
-
-                {formDataEntries.length > 0 && (
-                  <div className="rounded-xl border border-indigo-100 bg-indigo-50/40 p-4">
-                    <p className="mb-3 text-[11px] font-bold uppercase tracking-wider text-indigo-500">Dados do Formulário Customizado</p>
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      {formDataEntries.map(([label, value]) => (
-                        <Field key={label} label={label} value={formatFormValue(value)} />
-                      ))}
-                    </div>
+          <div className="p-6 max-w-7xl mx-auto space-y-6">
+            {/* Banners de estado especial no topo */}
+            {detail && (
+              <div className="space-y-3">
+                {detail.sla_managed_by_client && (
+                  <div className="flex items-start gap-2 bg-sky-500/10 border border-sky-500/25 rounded-xl px-4 py-3">
+                    <ShieldAlert className="w-4 h-4 text-sky-500 mt-0.5 shrink-0" />
+                    <p className="text-sm text-sky-700 dark:text-sky-200">
+                      <b>Sob gestão do time do cliente.</b> O relógio de SLA da Allied está congelado para não penalizar as métricas da consultoria.
+                    </p>
                   </div>
                 )}
+                {detail.paused_at && (
+                  <div className="flex items-start gap-2 bg-amber-500/10 border border-amber-500/25 rounded-xl px-4 py-3">
+                    <Pause className="w-4 h-4 text-amber-500 mt-0.5 shrink-0" />
+                    <p className="text-sm text-amber-700 dark:text-amber-200">
+                      <b>SLA pausado</b> desde {fmt(detail.paused_at)}
+                      {detail.pending_reason ? <> · Motivo: <b>{detail.pending_reason}</b></> : null}.
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
 
-                <div className="space-y-4">
-                  {visibleMessages.length === 0 && <p className="text-sm text-slate-400 text-center py-2">Nenhuma mensagem ainda.</p>}
-                  {visibleMessages.map(m => (
-                    <div key={m.id} className={`flex gap-3 ${m.actor_type === 'analyst' ? 'flex-row-reverse' : ''}`}>
-                      <div className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0 ${m.is_internal ? 'bg-amber-100 text-amber-700' : m.actor_type === 'analyst' ? 'bg-indigo-600 text-white' : 'bg-slate-200 text-slate-500'}`}>
-                        {(m.sender_name || '?').charAt(0)}
-                      </div>
-                      <div className={`border p-3.5 rounded-2xl shadow-sm max-w-[80%] ${m.is_internal ? 'bg-amber-50 border-amber-200' : m.actor_type === 'analyst' ? 'bg-indigo-50 border-indigo-100' : 'bg-white border-slate-200'}`}>
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="font-semibold text-sm">{m.sender_name || (m.actor_type === 'system' ? 'Sistema' : 'Usuário')}</span>
-                          {m.is_internal && <span className="inline-flex items-center gap-1 text-[9px] font-bold uppercase text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded"><Lock className="w-2.5 h-2.5" /> Interno</span>}
-                          <span className="text-xs text-slate-400 ml-auto">{fmt(m.created_at)}</span>
-                        </div>
-                        <p className="text-sm text-slate-600 leading-relaxed whitespace-pre-wrap">{m.body}</p>
+            {/* SLA Governance Timers */}
+            {detail && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {renderSlaTimer('Prazo Limite de Resposta', detail.sla_response_deadline, detail.responded_at, detail.is_response_breached, now, detail.created_at)}
+                {renderSlaTimer('Prazo Limite de Solução', detail.sla_resolution_deadline, detail.resolved_at, detail.is_resolution_breached, now, detail.created_at)}
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* COLUNA ESQUERDA (70% ou col-span-2) */}
+              <div className="lg:col-span-2 space-y-6">
+                {/* DESCRIÇÃO E CHAT */}
+                <section className={`${cardClass} p-5 space-y-5`}>
+                  <div className="flex items-center gap-2 border-b pb-3 border-outline-variant">
+                    <FileText className="w-5 h-5 text-primary" />
+                    <h2 className="text-sm font-bold uppercase tracking-wider text-text-main">Descrição & Conversa</h2>
+                  </div>
+                  <div className="p-4 border bg-surface-container/30 border-outline-variant rounded-xl">
+                    <p className="text-[11px] font-bold uppercase tracking-wider mb-2 text-on-surface-variant/80">Descrição Original</p>
+                    <p className="text-sm leading-relaxed whitespace-pre-wrap text-text-main">{description}</p>
+                  </div>
+
+                  {formDataEntries.length > 0 && (
+                    <div className="p-4 border bg-primary/5 border-primary/20 rounded-xl">
+                      <p className="mb-3 text-[11px] font-bold uppercase tracking-wider text-primary">Dados do Formulário Customizado</p>
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        {formDataEntries.map(([label, value]) => (
+                          <Field key={label} label={label} value={formatFormValue(value)} />
+                        ))}
                       </div>
                     </div>
-                  ))}
-                </div>
-              </div>
-            </section>
+                  )}
 
-            {/* FORMULÁRIO DINÂMICO */}
-            <section>
-              <SectionTitle icon={<FileText className="w-5 h-5" />} title="Formulário de Solicitação" hint="campos preenchidos na abertura" />
-              <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-5 grid grid-cols-1 md:grid-cols-3 gap-5">
-                {[
-                  { label: 'Nome da Empresa', value: company },
-                  { label: 'CNPJ', value: '12.345.678/0001-90' },
-                  { label: 'Endereço', value: 'Av. Paulista, 1000 — São Paulo/SP' },
-                  { label: 'Centro de Custo', value: 'TI-OPS-04' },
-                  { label: 'Ramal', value: '4021' },
-                  { label: 'Sistema Afetado', value: 'ERP / Faturamento' },
-                ].map(f => (
-                  <div key={f.label}>
-                    <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">{f.label}</label>
-                    <div className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700">{f.value}</div>
+                  <div className="space-y-4 pt-2">
+                    {visibleMessages.length === 0 && <p className="text-sm text-on-surface-variant italic text-center py-2">Nenhuma mensagem ainda.</p>}
+                    {visibleMessages.map(m => (
+                      <div key={m.id} className={`flex gap-3 ${m.actor_type === 'analyst' ? 'flex-row-reverse' : ''}`}>
+                        <div className={`w-9 h-9 flex items-center justify-center font-bold text-sm flex-shrink-0 rounded-full ${
+                          m.is_internal 
+                            ? 'bg-amber-500/10 text-amber-500' 
+                            : m.actor_type === 'analyst' 
+                              ? 'bg-primary text-on-primary' 
+                              : 'bg-surface-container-high text-on-surface-variant'
+                        }`}>
+                          {(m.sender_name || '?').charAt(0)}
+                        </div>
+                        <div className={`border p-3.5 shadow-sm max-w-[80%] ${
+                          m.is_internal
+                            ? 'bg-amber-500/5 border-amber-500/25 text-text-main rounded-2xl'
+                            : m.actor_type === 'analyst'
+                              ? 'bg-primary/5 border-primary/10 text-text-main rounded-2xl'
+                              : 'bg-surface border-outline-variant text-text-main rounded-2xl'
+                        }`}>
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="font-semibold text-sm">{m.sender_name || (m.actor_type === 'system' ? 'Sistema' : 'Usuário')}</span>
+                            {m.is_internal && (
+                              <span className="inline-flex items-center gap-1 text-[9px] font-bold uppercase text-amber-500 bg-amber-500/15 px-1.5 py-0.5 rounded-full">
+                                <Lock className="w-2.5 h-2.5" /> Interno
+                              </span>
+                            )}
+                            <span className="text-xs ml-auto text-on-surface-variant">{fmt(m.created_at)}</span>
+                          </div>
+                          <p className="text-sm text-on-surface-variant leading-relaxed whitespace-pre-wrap">{m.body}</p>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            </section>
+                </section>
 
-            {/* RESOLUÇÃO E NOTAS */}
-            <section>
-              <SectionTitle icon={<CheckCircle className="w-5 h-5" />} title="Resolução & Notas Técnicas" />
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-                {/* Resolução com Close Code */}
-                <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
-                  <div className="px-4 py-2.5 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
-                    <span className="text-sm font-bold text-slate-700">Resolução (encerramento)</span>
-                    {isResolved && <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded"><Lock className="w-3 h-3" /> Encerrado</span>}
+                {/* RESOLUÇÃO E NOTAS */}
+                <section className={`${cardClass} overflow-hidden`}>
+                  <div className={`px-5 py-3.5 border-b flex items-center justify-between ${headerBg}`}>
+                    <span className="text-sm font-bold text-text-main">Resolução (encerramento)</span>
+                    {isResolved && (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase border px-2 py-0.5 bg-emerald-500/10 text-emerald-600 border-emerald-500/25 rounded-full">
+                        <Lock className="w-3 h-3" /> Encerrado
+                      </span>
+                    )}
                   </div>
 
                   {isResolved ? (
-                    // Read-only pós-resolução (documento histórico para auditoria)
-                    <div className="p-4 space-y-3">
-                      <Field label="Código de Encerramento" value={detail?.close_code ?? closeCode ?? '—'} accent="text-emerald-700" />
+                    <div className="p-5 space-y-4">
+                      <Field label="Código de Encerramento" value={detail?.close_code ?? closeCode ?? '—'} accent="text-emerald-500 font-bold" />
                       <div>
-                        <p className="text-[11px] text-slate-400">Notas de Resolução</p>
-                        <p className="text-sm text-slate-700 whitespace-pre-wrap mt-0.5">{detail?.close_notes ?? closeNotes ?? '—'}</p>
+                        <p className={`text-[11px] font-bold uppercase tracking-wider ${
+                          isAlpha ? 'text-zinc-500 font-mono' : 'text-on-surface-variant'
+                        }`}>Notas de Resolução</p>
+                        <p className={`text-sm whitespace-pre-wrap mt-0.5 ${isAlpha ? 'text-zinc-300 font-mono' : 'text-on-surface'}`}>{detail?.close_notes ?? closeNotes ?? '—'}</p>
                       </div>
                       {detail?.resolved_at && <Field label="Resolvido em" value={fmt(detail.resolved_at)} />}
                     </div>
                   ) : (
-                    <div className="p-6 text-center text-slate-400 text-sm">
-                      <AlertTriangle className="w-8 h-8 text-amber-500 mx-auto mb-2" />
+                    <div className={`p-6 text-center text-sm ${isAlpha ? 'font-mono text-zinc-400' : 'text-on-surface-variant'}`}>
+                      <AlertTriangle className={`w-8 h-8 text-amber-500 mx-auto mb-2 ${isAlpha ? 'animate-pulse' : ''}`} />
                       O chamado ainda não foi resolvido.
-                      <p className="text-xs text-slate-400 mt-1">Para resolvê-lo, clique no botão <b>"Atualizar Chamado"</b> no topo ou no painel principal e altere o Estado para <b>"Resolvido"</b>.</p>
+                      <p className={`text-xs mt-1 ${isAlpha ? 'text-zinc-500' : 'text-on-surface-variant'}`}>
+                        Para resolvê-lo, use o painel de <b>Condução do Chamado</b> na coluna lateral e altere o Estado para <b>"Resolvido"</b>.
+                      </p>
                     </div>
                   )}
-                </div>
+                </section>
 
-                {/* Notas Técnicas internas (atalho para nota) */}
-                <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
-                  <div className="flex items-center justify-between px-4 py-2.5 border-b border-slate-100 bg-amber-50">
-                    <span className="text-sm font-bold text-amber-800">Notas Técnicas (interno)</span>
-                    <span className="text-[10px] font-bold uppercase text-amber-600 bg-amber-100 px-2 py-0.5 rounded">Privado</span>
-                  </div>
-                  <div className="p-4 text-sm text-slate-500">
-                    Use o botão <b>"Nota Interna"</b> no campo de conversa acima para registrar notas técnicas — elas ficam ocultas do solicitante (RLS) e visíveis só para a equipe.
-                  </div>
-                </div>
-              </div>
-            </section>
+                {/* HISTÓRICO DE AUDITORIA (LIVRO-CAIXA / EVENTOS DE SLA) */}
+                {detail && detail.id && (
+                  <SlaEventTimeline incidentId={detail.id} />
+                )}
 
-            {/* TABELA DE HISTÓRICO (AUDITORIA) */}
-            <section>
-              <SectionTitle icon={<History className="w-5 h-5" />} title="Histórico de Auditoria" />
-              <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-sm">
-                    <thead className="bg-slate-50 border-b border-slate-200">
-                      <tr className="text-slate-500 font-bold uppercase text-[10px] tracking-wider">
-                        <th className="px-4 py-3">Usuário</th>
-                        <th className="px-4 py-3">Data</th>
-                        <th className="px-4 py-3">Tipo</th>
-                        <th className="px-4 py-3">Ação Detalhada</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {!realMode && (
-                        <tr className="text-slate-600">
-                          <td className="px-4 py-2.5 font-medium">{requester}</td>
-                          <td className="px-4 py-2.5 text-slate-400 text-xs whitespace-nowrap">{fmt(new Date().toISOString())}</td>
-                          <td className="px-4 py-2.5"><span className="text-[10px] font-bold uppercase bg-slate-100 text-slate-600 px-2 py-0.5 rounded">Abertura</span></td>
-                          <td className="px-4 py-2.5">Chamado registrado pelo portal.</td>
+                {/* TABELA DE HISTÓRICO LEGADA (OPCIONAL/AUDITORIA GERAL) */}
+                <section className={`${cardClass} overflow-hidden`}>
+                  <div className={`px-5 py-3 border-b flex items-center gap-2 ${
+                    isAlpha 
+                      ? 'border-zinc-800 bg-zinc-900/50' 
+                      : isBeta 
+                        ? 'border-zinc-200 bg-slate-50/80' 
+                        : 'border-outline-variant bg-surface-container/30'
+                  }`}>
+                    <History className={`w-4 h-4 ${isBeta ? 'text-medical-blue' : 'text-primary'}`} />
+                    <h2 className={`text-xs font-bold uppercase tracking-wider ${isAlpha ? 'text-zinc-300 font-mono' : 'text-on-surface'}`}>
+                      Histórico de Alterações (Campos)
+                    </h2>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-sm">
+                      <thead className={`${
+                        isAlpha 
+                          ? 'bg-zinc-950 border-b border-zinc-800' 
+                          : isBeta 
+                            ? 'bg-slate-50/50 border-b border-zinc-200' 
+                            : 'bg-surface-container border-b border-outline-variant'
+                      }`}>
+                        <tr className={`font-bold uppercase text-[10px] tracking-wider ${isAlpha ? 'text-zinc-500 font-mono' : 'text-on-surface-variant'}`}>
+                          <th className="px-4 py-3">Usuário</th>
+                          <th className="px-4 py-3">Data</th>
+                          <th className="px-4 py-3">Tipo</th>
+                          <th className="px-4 py-3">Ação Detalhada</th>
                         </tr>
-                      )}
-                      {realMode && visibleAuditRows.length === 0 && (
-                        <tr><td colSpan={4} className="px-4 py-6 text-center text-slate-400 text-sm">Sem registros de auditoria.</td></tr>
-                      )}
-                      {visibleAuditRows.map(h => (
-                        <tr key={h.id} className="text-slate-600 hover:bg-slate-50">
-                          <td className="px-4 py-2.5 font-medium">{h.changed_by_name}</td>
-                          <td className="px-4 py-2.5 text-slate-400 text-xs whitespace-nowrap">{fmt(h.created_at)}</td>
-                          <td className="px-4 py-2.5">
-                            <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded ${
-                              isOpeningHistory(h.field_name)
-                                ? 'bg-emerald-50 text-emerald-700'
+                      </thead>
+                      <tbody className={`divide-y ${
+                        isAlpha 
+                          ? 'divide-zinc-900' 
+                          : isBeta 
+                            ? 'divide-zinc-100' 
+                            : 'divide-outline-variant'
+                      }`}>
+                        {!realMode && (
+                          <tr className={isAlpha ? 'text-zinc-300 font-mono' : 'text-on-surface-variant'}>
+                            <td className="px-4 py-2.5 font-medium">{requester}</td>
+                            <td className="px-4 py-2.5 text-xs whitespace-nowrap">{fmt(new Date().toISOString())}</td>
+                            <td className="px-4 py-2.5">
+                              <span className={`text-[10px] font-bold uppercase px-2 py-0.5 ${
+                                isAlpha 
+                                  ? 'bg-emerald-950/20 text-emerald-400 border border-emerald-800/30 rounded-lg' 
+                                  : isBeta 
+                                    ? 'bg-emerald-50 text-emerald-800 border border-emerald-100 rounded-sm' 
+                                    : 'bg-surface-container-high text-on-surface rounded'
+                              }`}>Abertura</span>
+                            </td>
+                            <td className="px-4 py-2.5">Chamado registrado pelo portal.</td>
+                          </tr>
+                        )}
+                        {realMode && visibleAuditRows.length === 0 && (
+                          <tr><td colSpan={4} className={`px-4 py-6 text-center text-sm italic ${isAlpha ? 'text-zinc-500 font-mono' : 'text-on-surface-variant'}`}>Sem registros de auditoria.</td></tr>
+                        )}
+                        {visibleAuditRows.map(h => (
+                          <tr key={h.id} className={`text-sm ${
+                            isAlpha 
+                              ? 'text-zinc-300 hover:bg-zinc-800/30 border-b border-zinc-900' 
+                              : isBeta 
+                                ? 'text-zinc-700 hover:bg-zinc-50 border-b border-zinc-100' 
+                                : 'text-on-surface hover:bg-surface-container/30 border-b border-outline-variant'
+                          }`}>
+                            <td className="px-4 py-2.5 font-medium">{h.changed_by_name}</td>
+                            <td className={`px-4 py-2.5 text-xs whitespace-nowrap ${isAlpha ? 'text-zinc-500 font-mono' : 'text-on-surface-variant'}`}>{fmt(h.created_at)}</td>
+                            <td className="px-4 py-2.5">
+                              <span className={`text-[10px] font-bold uppercase px-2 py-0.5 ${
+                                isAlpha ? 'font-mono rounded-lg' : isBeta ? 'rounded-sm' : 'rounded'
+                              } ${
+                                isOpeningHistory(h.field_name)
+                                  ? isAlpha
+                                    ? 'bg-emerald-950/20 text-emerald-400 border border-emerald-800/30'
+                                    : 'bg-emerald-50 text-emerald-800 border border-emerald-100'
+                                  : h.field_name === 'comment'
+                                    ? isAlpha
+                                      ? 'bg-cyan-950/20 text-cyan-400 border border-cyan-800/30'
+                                      : 'bg-blue-50 text-medical-blue border border-blue-100'
+                                    : h.field_name === 'Início de Atendimento'
+                                      ? isAlpha
+                                        ? 'bg-sky-950/20 text-sky-400 border border-sky-800/30'
+                                        : 'bg-sky-50 text-sky-700 border border-sky-100'
+                                      : isAlpha
+                                        ? 'bg-zinc-900 text-zinc-400 border border-zinc-800'
+                                        : 'bg-zinc-50 text-zinc-600 border border-zinc-200'
+                              }`}>
+                                {historyTypeLabel(h.field_name)}
+                              </span>
+                            </td>
+                            <td className="px-4 py-2.5 text-sm">
+                              {isOpeningHistory(h.field_name) || h.field_name === 'Início de Atendimento'
+                                ? h.comment
                                 : h.field_name === 'comment'
-                                  ? 'bg-indigo-50 text-indigo-600'
-                                  : h.field_name === 'Início de Atendimento'
-                                    ? 'bg-sky-50 text-sky-700'
-                                    : 'bg-slate-100 text-slate-600'
-                            }`}>
-                              {historyTypeLabel(h.field_name)}
-                            </span>
-                          </td>
-                          <td className="px-4 py-2.5">
-                            {isOpeningHistory(h.field_name) || h.field_name === 'Início de Atendimento'
-                              ? h.comment
-                              : h.field_name === 'comment'
-                              ? h.comment
-                              : <span><b>{h.field_name === 'state' ? 'Estado' : h.field_name}</b>{h.old_value ? <> de <span className="text-red-500 line-through">{h.field_name === 'state' ? translateState(h.old_value) : h.old_value}</span></> : null} para <b className="text-emerald-600">{h.field_name === 'state' ? translateState(h.new_value) : h.new_value}</b></span>}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                                  ? h.comment
+                                  : <span><b>{h.field_name === 'state' ? 'Estado' : h.field_name}</b>{h.old_value ? <> de <span className="text-error line-through">{h.field_name === 'state' ? translateState(h.old_value) : h.old_value}</span></> : null} para <b className="text-emerald-500">{h.field_name === 'state' ? translateState(h.new_value) : h.new_value}</b></span>}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </section>
               </div>
-            </section>
 
-            <div className="flex items-center gap-2 text-slate-400 text-xs justify-center pt-2">
+              {/* COLUNA DIREITA (30% ou col-span-1) */}
+              <div className="space-y-6">
+                {/* CARTÃO DE RESUMO/METADADOS DO TICKET */}
+                <div className={`${cardClass} p-5 shadow-sm space-y-4`}>
+                  <div className={`flex items-center gap-2 border-b pb-3 ${
+                    isAlpha ? 'border-zinc-800' : isBeta ? 'border-zinc-200' : 'border-outline-variant'
+                  }`}>
+                    <Building2 className={`w-4 h-4 ${isBeta ? 'text-medical-blue' : 'text-primary'}`} />
+                    <h3 className={`text-xs font-bold uppercase tracking-wider ${isAlpha ? 'text-zinc-300 font-mono' : 'text-on-surface'}`}>
+                      Metadados do Chamado
+                    </h3>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4 text-xs">
+                    <Field label="Solicitante" value={requester} />
+                    <Field label="Empresa" value={company} accent={isBeta ? 'text-medical-blue font-bold' : 'text-primary font-bold'} />
+                    <Field label="Abertura" value={detail ? fmt(detail.created_at) : (ticket.date ?? '—')} />
+                    <Field label="Tipo" value={(detail?.ticket_type ?? ticket.ticketType) === 'request' ? 'Requisição' : 'Incidente'} />
+                    <div className="col-span-2">
+                      <p className={`text-[11px] font-bold uppercase tracking-wider mb-1 ${
+                        isAlpha ? 'text-zinc-500 font-mono' : 'text-on-surface-variant'
+                      }`}>Prioridade</p>
+                      {renderPriorityBadge(priority, detail?.priority_level)}
+                    </div>
+                    <Field label="Impacto" value={translateImpact(detail?.impact)} />
+                    <Field label="Urgência" value={translateUrgency(detail?.urgency)} />
+                    <Field label="Estado" value={translateState(status)} />
+                    <Field label="Categoria" value={category} />
+                    <Field label="Responsável" value={assignee} />
+                    <Field label="Grupo Técnico" value={group} />
+                  </div>
+                </div>
+
+                {/* CONDUÇÃO DO CHAMADO (EDIT / ACTION VIEW) */}
+                {canEdit && (
+                  isEditing ? (
+                    <div className={`${cardClass} overflow-hidden`}>
+                      <div className={`px-5 py-4 border-b flex items-center justify-between ${
+                        isAlpha 
+                          ? 'border-zinc-800 bg-zinc-900/50' 
+                          : isBeta 
+                            ? 'border-zinc-200 bg-slate-50/80' 
+                            : 'border-outline-variant bg-surface-container/30'
+                      }`}>
+                        <div className="flex items-center gap-2">
+                          <Send className={`w-4 h-4 ${isBeta ? 'text-medical-blue' : 'text-primary'}`} />
+                          <h2 className={`text-sm font-bold ${isAlpha ? 'text-zinc-300 font-mono' : 'text-on-surface'}`}>
+                            Condução do Chamado
+                          </h2>
+                        </div>
+                      </div>
+
+                      <div className="p-5 space-y-5">
+                        {/* Seletor de Visibilidade (Abas) */}
+                        <div>
+                          <label className={`block text-[10px] font-bold uppercase tracking-widest mb-1.5 ${
+                            isAlpha ? 'text-zinc-500 font-mono' : 'text-on-surface-variant'
+                          }`}>
+                            Visibilidade da Mensagem
+                          </label>
+                          <div className={`flex p-0.5 w-full border ${
+                            isAlpha 
+                              ? 'bg-zinc-950 border-zinc-800 rounded-lg' 
+                              : isBeta 
+                                ? 'bg-slate-50 border-zinc-200 rounded-sm' 
+                                : 'bg-surface-container border-outline-variant rounded-lg'
+                          }`}>
+                            <button
+                              type="button"
+                              onClick={() => setIsInternal(false)}
+                              className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs font-semibold transition-all cursor-pointer ${
+                                !isInternal
+                                  ? isAlpha
+                                    ? 'bg-primary text-on-primary rounded-md shadow-sm font-mono'
+                                    : isBeta
+                                      ? 'bg-medical-blue text-white rounded-sm shadow-sm'
+                                      : 'bg-primary text-on-primary rounded-md shadow-sm'
+                                  : 'text-on-surface-variant hover:text-on-surface bg-transparent'
+                              }`}
+                            >
+                              <User className="w-3.5 h-3.5" /> Cliente
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setIsInternal(true)}
+                              className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs font-semibold transition-all cursor-pointer ${
+                                isInternal
+                                  ? isAlpha
+                                    ? 'bg-amber-500 text-white rounded-md shadow-sm font-mono'
+                                    : isBeta
+                                      ? 'bg-amber-500 text-white rounded-sm shadow-sm'
+                                      : 'bg-amber-500 text-white rounded-md shadow-sm'
+                                  : 'text-on-surface-variant hover:text-on-surface bg-transparent'
+                              }`}
+                            >
+                              <Lock className="w-3.5 h-3.5" /> Interno
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Campo de Texto */}
+                        <div>
+                          <label className={`block text-[10px] font-bold uppercase tracking-widest mb-1.5 ${
+                            isAlpha ? 'text-zinc-500 font-mono' : 'text-on-surface-variant'
+                          }`}>
+                            Mensagem / Ação
+                          </label>
+                          <textarea
+                            rows={3}
+                            value={formComment}
+                            onChange={e => setFormComment(e.target.value)}
+                            placeholder={
+                              isInternal
+                                ? 'Descreva detalhes técnicos ou anotações internas (oculto para o cliente)...'
+                                : 'Escreva sua resposta ou orientação para o cliente...'
+                            }
+                            className={`w-full p-3 text-xs outline-none resize-none transition-all ${inputClass}`}
+                          />
+                        </div>
+
+                        {/* Campos de Controle Integrados */}
+                        <div className="space-y-4">
+                          {/* Dropdown Estado */}
+                          <div>
+                            <label className={`block text-[10px] font-bold uppercase tracking-widest mb-1.5 ${
+                              isAlpha ? 'text-zinc-500 font-mono' : 'text-on-surface-variant'
+                            }`}>
+                              Estado (Status)
+                            </label>
+                            <select
+                              value={formState}
+                              onChange={e => setFormState(e.target.value)}
+                              className={`w-full px-2.5 py-2 text-xs outline-none cursor-pointer font-medium ${inputClass}`}
+                            >
+                              {Object.entries(STATE_LABELS_PT)
+                                .filter(([value]) => value !== 'Pending User')
+                                .filter(([value]) => value !== 'Closed' || isAdmin)
+                                .map(([value, label]) => (
+                                  <option key={value} value={value}>{label}</option>
+                                ))}
+                            </select>
+                          </div>
+
+                          {/* Motivo da Pendência (obrigatório quando Pendente) — logo após o Estado */}
+                          {formState === 'On Hold' && (
+                            <div className={`border-t pt-4 space-y-2 ${isAlpha ? 'border-zinc-800' : 'border-outline-variant'}`}>
+                              <label className="block text-[10px] font-bold text-amber-500 uppercase tracking-wider">
+                                Motivo da Pendência <span className="text-error">*</span>
+                              </label>
+                              <select
+                                value={formPendingReasonId}
+                                onChange={e => setFormPendingReasonId(e.target.value)}
+                                className={`w-full px-2.5 py-2 text-xs font-medium outline-none cursor-pointer ${
+                                  isAlpha
+                                    ? 'bg-amber-500/10 border border-amber-500/25 text-amber-400 rounded-lg focus:ring-1 focus:ring-amber-500'
+                                    : isBeta
+                                      ? 'bg-amber-50 border border-amber-200 text-amber-800 rounded-sm focus:ring-2 focus:ring-amber-500/20'
+                                      : 'bg-amber-500/10 border border-amber-500/25 text-amber-500 rounded-xl focus:ring-2 focus:ring-amber-500'
+                                }`}
+                              >
+                                <option value="">Selecione o motivo…</option>
+                                {pendingReasons.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+                              </select>
+                              {(() => {
+                                const sel = pendingReasons.find(r => r.id === formPendingReasonId)
+                                return sel ? (
+                                  <p className="text-[10px] text-amber-500 flex items-start gap-1.5 leading-normal">
+                                    <Pause className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                                    <span>
+                                      {sel.requires_customer_action
+                                        ? 'Aguarda ação do cliente — o relógio de SLA fica pausado enquanto Pendente.'
+                                        : 'Pendência interna/terceiros — o relógio de SLA fica pausado enquanto Pendente.'}
+                                    </span>
+                                  </p>
+                                ) : null
+                              })()}
+                              {pendingReasons.length === 0 && (
+                                <p className="text-[10px] text-error font-medium">Nenhum motivo cadastrado. Configure os Motivos de Pendência na governança de SLA.</p>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Dropdown Grupo Solucionador */}
+                          <div>
+                            <label className={`block text-[10px] font-bold uppercase tracking-widest mb-1.5 ${
+                              isAlpha ? 'text-zinc-500 font-mono' : 'text-on-surface-variant'
+                            }`}>
+                              Grupo Solucionador
+                            </label>
+                            {loadingGroups ? (
+                              <div className={`text-xs py-2 animate-pulse ${isAlpha ? 'text-zinc-500 font-mono' : 'text-on-surface-variant'}`}>
+                                Carregando grupos...
+                              </div>
+                            ) : (
+                              <select
+                                value={formGroupId}
+                                onChange={e => {
+                                  const newGroupId = e.target.value
+                                  setFormGroupId(newGroupId)
+                                  if (newGroupId !== (detail?.assignment_group_id || detail?.assigned_group_id || '')) {
+                                    setFormAssigneeId('')
+                                  }
+                                }}
+                                className={`w-full px-2.5 py-2 text-xs outline-none cursor-pointer font-medium ${inputClass}`}
+                              >
+                                <option value="">Nenhum grupo atribuído</option>
+                                {activeGroups.map(g => (
+                                  <option key={g.id} value={g.id}>{g.name}</option>
+                                ))}
+                              </select>
+                            )}
+                          </div>
+
+                          {/* Dropdown Analista Responsável */}
+                          <div>
+                            <label className={`block text-[10px] font-bold uppercase tracking-widest mb-1.5 ${
+                              isAlpha ? 'text-zinc-500 font-mono' : 'text-on-surface-variant'
+                            }`}>
+                              Analista Responsável
+                            </label>
+                            <select
+                              disabled={!formGroupId && !detail?.assigned_to_id}
+                              value={formAssigneeId}
+                              onChange={e => setFormAssigneeId(e.target.value)}
+                              className={`w-full px-2.5 py-2 text-xs outline-none cursor-pointer font-medium disabled:opacity-50 disabled:cursor-not-allowed ${inputClass}`}
+                            >
+                              {!formGroupId && !detail?.assigned_to_id ? (
+                                <option value="">Selecione um grupo primeiro</option>
+                              ) : (
+                                <>
+                                  <option value="">Não atribuído</option>
+                                  {detail?.assigned_to_id && !groupMembers.some(member => member.id === detail.assigned_to_id) && (
+                                    <option value={detail.assigned_to_id}>{detail.assigned_to_name || 'Analista atual'}</option>
+                                  )}
+                                  {groupMembers.map(m => (
+                                    <option key={m.id} value={m.id}>{m.name}</option>
+                                  ))}
+                                </>
+                              )}
+                            </select>
+                          </div>
+                        </div>
+
+                        {/* Priorização Automática ITIL (perguntas → matriz ServiceNow) */}
+                        <div className={`space-y-4 pt-3 border-t ${
+                          isAlpha ? 'border-zinc-800' : 'border-outline-variant'
+                        }`}>
+                          {/* Dropdown Impacto — pergunta "Quem é afetado?" */}
+                          <div>
+                            <label className={`block text-[10px] font-bold uppercase tracking-widest mb-1.5 ${
+                              isAlpha ? 'text-zinc-500 font-mono' : 'text-on-surface-variant'
+                            }`}>
+                              Impacto — Quem é afetado?
+                            </label>
+                            <select
+                              value={formImpact}
+                              onChange={e => setFormImpact(e.target.value)}
+                              className={`w-full px-2.5 py-2 text-xs outline-none cursor-pointer font-medium ${inputClass}`}
+                            >
+                              {IMPACT_OPTIONS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                            </select>
+                          </div>
+
+                          {/* Dropdown Urgência — pergunta "Impacto no trabalho?" */}
+                          <div>
+                            <label className={`block text-[10px] font-bold uppercase tracking-widest mb-1.5 ${
+                              isAlpha ? 'text-zinc-500 font-mono' : 'text-on-surface-variant'
+                            }`}>
+                              Urgência — Impacto no trabalho?
+                            </label>
+                            <select
+                              value={formUrgency}
+                              onChange={e => setFormUrgency(e.target.value)}
+                              className={`w-full px-2.5 py-2 text-xs outline-none cursor-pointer font-medium ${inputClass}`}
+                            >
+                              {URGENCY_OPTIONS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                            </select>
+                          </div>
+
+                          {/* Prioridade Final Calculada */}
+                          <div>
+                            <label className={`block text-[10px] font-bold uppercase tracking-widest mb-1.5 ${
+                              isAlpha ? 'text-zinc-500 font-mono' : 'text-on-surface-variant'
+                            }`}>
+                              Prioridade (Calculada)
+                            </label>
+                            <div className={`py-2.5 flex items-center px-3 text-xs font-bold shadow-inner ${
+                                isAlpha 
+                                  ? 'bg-zinc-950 border border-zinc-800 text-cyan-400 font-mono rounded-lg' 
+                                  : isBeta 
+                                    ? 'bg-slate-50 border border-zinc-200 text-medical-blue rounded-sm' 
+                                    : 'bg-surface-container border border-outline-variant text-primary rounded-xl'
+                            }`}>
+                              {priorityString(formImpact, formUrgency)}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Campos de Resolução Condicionais */}
+                        {(formState === 'Resolved' || formState === 'Closed') && (
+                          <div className={`border-t pt-4 space-y-4 ${isAlpha ? 'border-zinc-800' : 'border-outline-variant'}`}>
+                            <div className="flex items-center gap-1.5">
+                              <CheckCircle className="w-4 h-4 text-emerald-500" />
+                              <h4 className={`text-[10px] font-bold uppercase tracking-wider ${isAlpha ? 'text-zinc-400 font-mono' : 'text-on-surface'}`}>Dados de Resolução</h4>
+                            </div>
+                            <div className="space-y-3">
+                              <div>
+                                <label className={`block text-[10px] font-bold uppercase tracking-wider mb-1.5 ${isAlpha ? 'text-zinc-500 font-mono' : 'text-on-surface-variant'}`}>Código de Encerramento <span className="text-error">*</span></label>
+                                <select
+                                  value={closeCode}
+                                  onChange={e => setCloseCode(e.target.value)}
+                                  className={`w-full px-2.5 py-2 text-xs outline-none cursor-pointer font-medium ${inputClass}`}
+                                >
+                                  <option value="">Selecione…</option>
+                                  {CLOSE_CODES.map(grp => (
+                                    <optgroup key={grp.group} label={grp.group}>
+                                      {grp.options.map(opt => (
+                                        <option key={opt} value={`${grp.group} / ${opt}`}>{opt}</option>
+                                      ))}
+                                    </optgroup>
+                                  ))}
+                                </select>
+                              </div>
+                              <div>
+                                <label className={`block text-[10px] font-bold uppercase tracking-wider mb-1.5 ${isAlpha ? 'text-zinc-500 font-mono' : 'text-on-surface-variant'}`}>Tempo Gasto</label>
+                                <input
+                                  value={timeSpent}
+                                  onChange={e => setTimeSpent(e.target.value)}
+                                  type="text"
+                                  placeholder="ex: 1h 30m"
+                                  className={`w-full px-2.5 py-2 text-xs outline-none font-medium ${inputClass}`}
+                                />
+                              </div>
+                              <div>
+                                <label className={`block text-[10px] font-bold uppercase tracking-wider mb-1.5 ${isAlpha ? 'text-zinc-500 font-mono' : 'text-on-surface-variant'}`}>Notas de Resolução <span className="text-error">*</span></label>
+                                <textarea
+                                  rows={2}
+                                  value={closeNotes}
+                                  onChange={e => setCloseNotes(e.target.value)}
+                                  className={`w-full p-3 text-xs outline-none resize-none transition-all ${inputClass}`}
+                                  placeholder="Descreva a solução aplicada (visível ao cliente)..."
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Ação Gravar Condução */}
+                        <div className={`flex gap-2 pt-3 border-t justify-end ${isAlpha ? 'border-zinc-800' : 'border-outline-variant'}`}>
+                          <button
+                            type="button"
+                            onClick={handleCancelEdit}
+                            className={`px-3 py-2 text-xs font-semibold transition-colors cursor-pointer ${buttonSecondaryClass}`}
+                          >
+                            Cancelar
+                          </button>
+                          <button
+                            type="button"
+                            disabled={savingConducao}
+                            onClick={handleGravarConducao}
+                            className={`px-4 py-2 font-bold text-xs shadow transition-all active:scale-[0.98] disabled:opacity-50 flex items-center gap-1.5 cursor-pointer ${buttonPrimaryClass}`}
+                          >
+                            <Send className="w-3.5 h-3.5" />
+                            {savingConducao ? 'Gravando…' : 'Gravar'}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className={`${cardClass} p-5 flex flex-col items-center justify-center text-center gap-3`}>
+                      <div className={`w-10 h-10 flex items-center justify-center ${
+                        isAlpha 
+                          ? 'rounded-lg bg-zinc-950 text-cyan-400 border border-zinc-800' 
+                          : isBeta 
+                            ? 'rounded-sm bg-blue-50 text-medical-blue' 
+                            : 'rounded-full bg-primary/10 text-primary'
+                      }`}>
+                        <Edit3 className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h3 className={`font-bold text-xs ${isAlpha ? 'text-zinc-300 font-mono' : 'text-on-surface'}`}>Atualização do Chamado</h3>
+                        <p className={`text-[11px] mt-1 leading-relaxed ${isAlpha ? 'text-zinc-500 font-mono' : 'text-on-surface-variant'}`}>
+                          Responda ao cliente, mude o estado, altere atribuições ou adicione notas internas.
+                        </p>
+                      </div>
+                      <button
+                        onClick={openEditForm}
+                        className={`w-full px-4 py-2 text-xs font-semibold shadow transition-all flex items-center justify-center gap-1.5 cursor-pointer ${buttonPrimaryClass}`}
+                      >
+                        <Edit3 className="w-4 h-4" /> Atualizar Chamado
+                      </button>
+                    </div>
+                  )
+                )}
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 text-on-surface-variant text-xs justify-center pt-2">
               <Building2 className="w-3.5 h-3.5" /> {company} · {number}
             </div>
           </div>

@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+
+<html class="light" lang="pt-br"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@100..900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-error-container": "#93000a",
+                        "on-error": "#ffffff",
+                        "on-tertiary": "#ffffff",
+                        "on-secondary": "#ffffff",
+                        "on-tertiary-fixed": "#360f00",
+                        "error-container": "#ffdad6",
+                        "on-tertiary-container": "#ffede6",
+                        "on-primary-container": "#eeefff",
+                        "tertiary-fixed": "#ffdbcd",
+                        "surface-dim": "#d2d9f4",
+                        "surface-container-lowest": "#ffffff",
+                        "inverse-surface": "#283044",
+                        "background": "#faf8ff",
+                        "surface-container-highest": "#dae2fd",
+                        "on-surface-variant": "#434655",
+                        "on-secondary-fixed-variant": "#38485d",
+                        "secondary-fixed-dim": "#b7c8e1",
+                        "on-primary": "#ffffff",
+                        "on-primary-fixed": "#00174b",
+                        "surface-container": "#eaedff",
+                        "secondary": "#505f76",
+                        "on-tertiary-fixed-variant": "#7d2d00",
+                        "tertiary": "#943700",
+                        "primary-fixed-dim": "#b4c5ff",
+                        "primary-container": "#2563eb",
+                        "surface-bright": "#faf8ff",
+                        "outline-variant": "#c3c6d7",
+                        "on-primary-fixed-variant": "#003ea8",
+                        "primary": "#004ac6",
+                        "surface-variant": "#dae2fd",
+                        "surface-tint": "#0053db",
+                        "secondary-fixed": "#d3e4fe",
+                        "on-secondary-container": "#54647a",
+                        "on-surface": "#131b2e",
+                        "tertiary-container": "#bc4800",
+                        "on-background": "#131b2e",
+                        "primary-fixed": "#dbe1ff",
+                        "inverse-on-surface": "#eef0ff",
+                        "surface-container-low": "#f2f3ff",
+                        "secondary-container": "#d0e1fb",
+                        "inverse-primary": "#b4c5ff",
+                        "tertiary-fixed-dim": "#ffb596",
+                        "outline": "#737686",
+                        "on-secondary-fixed": "#0b1c30",
+                        "error": "#ba1a1a",
+                        "surface-container-high": "#e2e7ff",
+                        "surface": "#faf8ff"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "xl": "32px",
+                        "md": "16px",
+                        "margin-desktop": "40px",
+                        "lg": "24px",
+                        "2xl": "48px",
+                        "xs": "4px",
+                        "margin-mobile": "16px",
+                        "gutter": "24px",
+                        "base": "4px",
+                        "sm": "8px",
+                        "3xl": "64px"
+                    },
+                    "fontFamily": {
+                        "headline-lg": ["Hanken Grotesk"],
+                        "title-md": ["Hanken Grotesk"],
+                        "label-md": ["Hanken Grotesk"],
+                        "headline-lg-mobile": ["Hanken Grotesk"],
+                        "body-sm": ["Hanken Grotesk"],
+                        "display-lg": ["Hanken Grotesk"],
+                        "body-md": ["Hanken Grotesk"]
+                    },
+                    "fontSize": {
+                        "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                        "title-md": ["20px", {"lineHeight": "28px", "fontWeight": "600"}],
+                        "label-md": ["12px", {"lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "600"}],
+                        "headline-lg-mobile": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+                        "body-sm": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
+                        "display-lg": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                        "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body { font-family: 'Hanken Grotesk', sans-serif; }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .profile-mesh {
+            background-image: radial-gradient(at 0% 0%, rgba(0, 74, 198, 0.05) 0px, transparent 50%),
+                              radial-gradient(at 100% 100%, rgba(37, 99, 235, 0.03) 0px, transparent 50%);
+        }
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body class="bg-background text-on-background min-h-screen">
+<!-- SideNavBar -->
+<aside class="fixed left-0 top-0 h-full flex flex-col p-4 border-r border-outline-variant bg-surface shadow-sm w-64 z-50">
+<div class="mb-10 px-2">
+<h1 class="font-headline-lg text-headline-lg font-black text-primary">Flowfy</h1>
+<p class="font-body-md text-body-md text-on-surface-variant opacity-70">ITSM Portal</p>
+</div>
+<nav class="flex flex-col gap-2 flex-grow">
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container-high transition-colors rounded-xl group" href="#">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+<span class="font-body-md text-body-md">Dashboard</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container-high transition-colors rounded-xl group" href="#">
+<span class="material-symbols-outlined" data-icon="published_with_changes">published_with_changes</span>
+<span class="font-body-md text-body-md">Mudanças</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container-high transition-colors rounded-xl group" href="#">
+<span class="material-symbols-outlined" data-icon="report_problem">report_problem</span>
+<span class="font-body-md text-body-md">Problemas</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container-high transition-colors rounded-xl group" href="#">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+<span class="font-body-md text-body-md">Configurações</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 bg-primary-container text-on-primary-container rounded-xl font-bold" href="#">
+<span class="material-symbols-outlined" data-icon="person">person</span>
+<span class="font-body-md text-body-md">Perfil</span>
+</a>
+</nav>
+<button class="mb-6 w-full py-3 px-4 bg-primary text-on-primary rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-primary/20 hover:scale-[0.98] transition-transform">
+<span class="material-symbols-outlined" data-icon="add">add</span>
+<span>Novo Chamado</span>
+</button>
+<div class="border-t border-outline-variant pt-4 flex flex-col gap-1">
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container-high transition-colors rounded-xl" href="#">
+<span class="material-symbols-outlined" data-icon="help">help</span>
+<span class="font-body-md text-body-md">Suporte</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container-high transition-colors rounded-xl text-error" href="#">
+<span class="material-symbols-outlined" data-icon="logout">logout</span>
+<span class="font-body-md text-body-md">Sair</span>
+</a>
+</div>
+</aside>
+<!-- Main Canvas -->
+<main class="ml-64 min-h-screen profile-mesh">
+<!-- TopNavBar -->
+<header class="fixed top-0 right-0 left-64 z-40 flex justify-between items-center h-16 px-margin-desktop bg-background/80 backdrop-blur-md border-b border-outline-variant">
+<div class="flex items-center gap-xl w-1/2">
+<div class="relative w-full max-w-md">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline" data-icon="search">search</span>
+<input class="w-full bg-surface-container-low border-none rounded-full py-2 pl-10 pr-4 focus:ring-2 focus:ring-primary/20 text-body-md" placeholder="Pesquisar no portal..." type="text"/>
+</div>
+</div>
+<div class="flex items-center gap-lg">
+<nav class="hidden md:flex items-center gap-lg mr-lg">
+<a class="text-on-surface-variant hover:text-primary transition-colors font-title-md text-title-md" href="#">Visão Geral</a>
+<a class="text-on-surface-variant hover:text-primary transition-colors font-title-md text-title-md" href="#">Relatórios</a>
+</nav>
+<div class="flex items-center gap-sm">
+<button class="hover:bg-surface-container-low rounded-full p-2 transition-all relative">
+<span class="material-symbols-outlined text-on-surface-variant" data-icon="notifications">notifications</span>
+<span class="absolute top-2 right-2 w-2 h-2 bg-error rounded-full"></span>
+</button>
+<button class="hover:bg-surface-container-low rounded-full p-2 transition-all">
+<span class="material-symbols-outlined text-on-surface-variant" data-icon="history">history</span>
+</button>
+</div>
+<div class="h-10 w-10 rounded-full overflow-hidden border-2 border-primary-container">
+<img alt="Felipe Profile" class="w-full h-full object-cover" data-alt="A professional close-up portrait of a young man with a friendly expression, styled in a clean, high-end corporate aesthetic. The lighting is soft and natural, emphasizing a bright and professional atmosphere that aligns with a modern SaaS platform. The background is a blurred, minimalist office space with soft blue and white tones to maintain visual cohesion with the UI palette." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDy8iVvdKrYvx_G7OsIBWo1arqHdw4jyKzKBnerkjqwjXoVLmcAWxltUzFgTDIvkvsceg1TKpLKSMqEBZri2ma60BQ8BpREg_GCWLJ72e7WHJ4OgshzWQYCbsrtxyYtmMa_PyF58BD7ZD3BgeEboeP3IvFeXNfZINMWcogBfvxaGzfCK0Z4L_qXMhtygyVrZZxsGMELuV_kK5eHeAPMwetAY1Wsmd8P3IviVXwi6GNvh7VnBAcrBwHCmxiTdMruPmd96AN8brltJw8"/>
+</div>
+</div>
+</header>
+<div class="pt-24 pb-xl px-margin-desktop max-w-6xl mx-auto">
+<!-- User Header -->
+<section class="flex flex-col md:flex-row items-center md:items-end gap-xl mb-3xl">
+<div class="relative group">
+<div class="w-40 h-40 rounded-3xl overflow-hidden shadow-2xl shadow-primary/10 border-4 border-white transition-transform duration-500 group-hover:scale-[1.02]">
+<img alt="Felipe" class="w-full h-full object-cover" data-alt="A large, clear profile portrait of a male professional named Felipe, appearing confident and approachable. The image is captured with shallow depth of field, set against a pristine, light-filled modern architectural background. The overall aesthetic is ultra-minimalist and premium, using a cool color temperature that matches the Flowfy IT portal's professional and systematic brand identity." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCPJuzD5WfTTjdnLjusk95BiMJFxV6YuII9qaqxi_6u4qtIUhBLgFWJtxlCpuIEzKpYAh2HTXB4UtJ5ET2yFu8f1X3mJRDZyIZ17FQgsnmzaMoKfr_aa3ZOcfgtSkjdBIytRNnT92I0GP5EXfnAPlK3Mc7ePQ9xJOUKeDCbdyH-bj1shNigosAgOTVc5lBpwNh405ATIw_P0hOauA0kIgYDfwKzcHF72O9Hz-qs4VFO08z8coLpVp92cus4GRZMZwynJUCtdjC9aT4"/>
+</div>
+<button class="absolute -bottom-2 -right-2 bg-primary text-on-primary p-3 rounded-2xl shadow-lg hover:scale-110 transition-all">
+<span class="material-symbols-outlined text-[20px]" data-icon="edit">edit</span>
+</button>
+</div>
+<div class="text-center md:text-left pb-4">
+<h2 class="font-headline-lg text-headline-lg text-on-surface mb-1">Felipe</h2>
+<div class="flex items-center gap-sm justify-center md:justify-start">
+<span class="px-3 py-1 bg-primary-container text-on-primary-container rounded-full text-label-md font-label-md">SysAdmin</span>
+<span class="flex items-center gap-1 text-on-surface-variant font-body-sm text-body-sm">
+<span class="material-symbols-outlined text-[16px] text-primary" data-icon="verified">verified</span>
+                            Nível de Acesso: Total
+                        </span>
+</div>
+</div>
+</section>
+<!-- Bento Grid Content -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-lg">
+<!-- Informações Pessoais -->
+<div class="lg:col-span-2 bg-surface border border-outline-variant/30 rounded-3xl p-xl shadow-sm hover:shadow-md transition-shadow">
+<div class="flex justify-between items-center mb-xl">
+<h3 class="font-title-md text-title-md text-on-surface">Informações Pessoais</h3>
+<button class="text-primary font-label-md hover:underline flex items-center gap-1">
+                            Editar tudo
+                        </button>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-xl">
+<div class="space-y-1">
+<p class="text-label-md text-outline uppercase tracking-wider">E-mail Corporativo</p>
+<p class="text-body-md text-on-surface font-medium">felipe.admin@flowfy.com.br</p>
+</div>
+<div class="space-y-1">
+<p class="text-label-md text-outline uppercase tracking-wider">Telefone</p>
+<p class="text-body-md text-on-surface font-medium">+55 (11) 98765-4321</p>
+</div>
+<div class="space-y-1">
+<p class="text-label-md text-outline uppercase tracking-wider">Departamento</p>
+<p class="text-body-md text-on-surface font-medium">Infraestrutura &amp; Operações</p>
+</div>
+<div class="space-y-1">
+<p class="text-label-md text-outline uppercase tracking-wider">Localização</p>
+<p class="text-body-md text-on-surface font-medium">São Paulo, BR (Sede)</p>
+</div>
+</div>
+</div>
+<!-- Segurança Card -->
+<div class="bg-surface border border-outline-variant/30 rounded-3xl p-xl shadow-sm flex flex-col">
+<h3 class="font-title-md text-title-md text-on-surface mb-xl">Segurança</h3>
+<div class="space-y-4 flex-grow">
+<button class="w-full flex items-center justify-between p-4 bg-surface-container-low rounded-2xl hover:bg-surface-container transition-colors group">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-primary" data-icon="lock_reset">lock_reset</span>
+<span class="text-body-md font-medium">Trocar Senha</span>
+</div>
+<span class="material-symbols-outlined text-outline group-hover:translate-x-1 transition-transform" data-icon="chevron_right">chevron_right</span>
+</button>
+<div class="p-4 bg-surface-container-low rounded-2xl flex items-center justify-between">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-tertiary" data-icon="security">security</span>
+<div class="flex flex-col">
+<span class="text-body-md font-medium">MFA / 2FA</span>
+<span class="text-label-md text-on-surface-variant">Ativado via Flowfy Auth</span>
+</div>
+</div>
+<div class="w-10 h-6 bg-primary rounded-full relative cursor-pointer">
+<div class="absolute right-1 top-1 w-4 h-4 bg-white rounded-full"></div>
+</div>
+</div>
+</div>
+<div class="mt-6 pt-4 border-t border-outline-variant/30">
+<p class="text-label-md text-outline">Último login: Hoje, 08:42 AM</p>
+</div>
+</div>
+<!-- Histórico de Atividade -->
+<div class="lg:col-span-3 bg-surface border border-outline-variant/30 rounded-3xl p-xl shadow-sm">
+<div class="flex justify-between items-center mb-xl">
+<h3 class="font-title-md text-title-md text-on-surface">Histórico de Atividade</h3>
+<div class="flex gap-2">
+<button class="px-4 py-2 rounded-full bg-surface-container text-body-sm hover:bg-surface-container-high transition-all">Exportar Logs</button>
+<button class="px-4 py-2 rounded-full border border-outline-variant text-body-sm hover:bg-surface-container-low transition-all">Ver tudo</button>
+</div>
+</div>
+<div class="space-y-0">
+<!-- Activity Item -->
+<div class="flex items-center gap-lg py-4 border-b border-outline-variant/10 group">
+<div class="w-10 h-10 rounded-xl bg-primary/5 flex items-center justify-center text-primary">
+<span class="material-symbols-outlined" data-icon="history_edu">history_edu</span>
+</div>
+<div class="flex-grow">
+<p class="text-body-md font-medium text-on-surface">Ticket #4509 - Acesso negado ao Servidor DB01</p>
+<p class="text-body-sm text-on-surface-variant">Atualizou status para "Resolvido"</p>
+</div>
+<div class="text-right hidden md:block">
+<p class="text-body-sm font-medium">Há 15 minutos</p>
+<p class="text-label-md text-outline">Via Web Interface</p>
+</div>
+</div>
+<!-- Activity Item -->
+<div class="flex items-center gap-lg py-4 border-b border-outline-variant/10 group">
+<div class="w-10 h-10 rounded-xl bg-tertiary/5 flex items-center justify-center text-tertiary">
+<span class="material-symbols-outlined" data-icon="settings_suggest">settings_suggest</span>
+</div>
+<div class="flex-grow">
+<p class="text-body-md font-medium text-on-surface">Alteração de Configuração de Sistema</p>
+<p class="text-body-sm text-on-surface-variant">Modificou limite de threads no core do portal</p>
+</div>
+<div class="text-right hidden md:block">
+<p class="text-body-sm font-medium">Há 2 horas</p>
+<p class="text-label-md text-outline">Via API</p>
+</div>
+</div>
+<!-- Activity Item -->
+<div class="flex items-center gap-lg py-4 group">
+<div class="w-10 h-10 rounded-xl bg-secondary/5 flex items-center justify-center text-secondary">
+<span class="material-symbols-outlined" data-icon="login">login</span>
+</div>
+<div class="flex-grow">
+<p class="text-body-md font-medium text-on-surface">Novo Login Detectado</p>
+<p class="text-body-sm text-on-surface-variant">Login bem-sucedido a partir de novo endereço IP (192.168.1.102)</p>
+</div>
+<div class="text-right hidden md:block">
+<p class="text-body-sm font-medium">Hoje, 08:42 AM</p>
+<p class="text-label-md text-outline">Chrome / MacOS</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Footer Meta -->
+<footer class="mt-2xl flex flex-col md:flex-row justify-between items-center text-outline text-body-sm gap-md">
+<p>© 2024 Flowfy ITSM. Todos os direitos reservados.</p>
+<div class="flex gap-lg">
+<a class="hover:text-primary transition-colors" href="#">Termos de Uso</a>
+<a class="hover:text-primary transition-colors" href="#">Privacidade</a>
+<a class="hover:text-primary transition-colors" href="#">Status do Sistema</a>
+</div>
+</footer>
+</div>
+</main>
+<script>
+        // Micro-interactions and subtle effects
+        document.querySelectorAll('a, button').forEach(el => {
+            el.addEventListener('mousedown', () => {
+                el.style.transform = 'scale(0.96)';
+            });
+            el.addEventListener('mouseup', () => {
+                el.style.transform = '';
+            });
+            el.addEventListener('mouseleave', () => {
+                el.style.transform = '';
+            });
+        });
+
+        // Search bar focus effect
+        const searchInput = document.querySelector('input[type="text"]');
+        searchInput.addEventListener('focus', () => {
+            searchInput.parentElement.classList.add('ring-2', 'ring-primary/20');
+        });
+        searchInput.addEventListener('blur', () => {
+            searchInput.parentElement.classList.remove('ring-2', 'ring-primary/20');
+        });
+    </script>
+</body></html>

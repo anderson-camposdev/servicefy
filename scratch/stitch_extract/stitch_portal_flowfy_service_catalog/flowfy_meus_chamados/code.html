@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+
+<html class="light" lang="pt-br"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Meus Chamados | Flowfy ITSM</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;600;700;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "tertiary-fixed-dim": "#ffb596",
+                    "on-primary": "#ffffff",
+                    "background": "#faf8ff",
+                    "surface-container": "#eaedff",
+                    "primary-fixed": "#dbe1ff",
+                    "surface-tint": "#0053db",
+                    "primary-fixed-dim": "#b4c5ff",
+                    "on-surface-variant": "#434655",
+                    "on-tertiary-fixed": "#360f00",
+                    "on-secondary-fixed-variant": "#38485d",
+                    "on-error": "#ffffff",
+                    "surface": "#faf8ff",
+                    "inverse-primary": "#b4c5ff",
+                    "on-primary-fixed-variant": "#003ea8",
+                    "error": "#ba1a1a",
+                    "on-tertiary-fixed-variant": "#7d2d00",
+                    "tertiary-container": "#bc4800",
+                    "surface-container-lowest": "#ffffff",
+                    "on-primary-container": "#eeefff",
+                    "secondary-fixed-dim": "#b7c8e1",
+                    "tertiary-fixed": "#ffdbcd",
+                    "error-container": "#ffdad6",
+                    "surface-container-low": "#f2f3ff",
+                    "secondary-fixed": "#d3e4fe",
+                    "surface-dim": "#d2d9f4",
+                    "secondary-container": "#d0e1fb",
+                    "outline": "#737686",
+                    "outline-variant": "#c3c6d7",
+                    "on-secondary-container": "#54647a",
+                    "inverse-surface": "#283044",
+                    "primary": "#004ac6",
+                    "secondary": "#505f76",
+                    "on-error-container": "#93000a",
+                    "on-background": "#131b2e",
+                    "surface-container-highest": "#dae2fd",
+                    "surface-variant": "#dae2fd",
+                    "on-surface": "#131b2e",
+                    "on-tertiary-container": "#ffede6",
+                    "primary-container": "#2563eb",
+                    "on-primary-fixed": "#00174b",
+                    "inverse-on-surface": "#eef0ff",
+                    "on-tertiary": "#ffffff",
+                    "on-secondary-fixed": "#0b1c30",
+                    "surface-container-high": "#e2e7ff",
+                    "on-secondary": "#ffffff",
+                    "surface-bright": "#faf8ff",
+                    "tertiary": "#943700"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "sm": "8px",
+                    "base": "4px",
+                    "2xl": "48px",
+                    "md": "16px",
+                    "xs": "4px",
+                    "margin-mobile": "16px",
+                    "3xl": "64px",
+                    "margin-desktop": "40px",
+                    "xl": "32px",
+                    "lg": "24px",
+                    "gutter": "24px"
+            },
+            "fontFamily": {
+                    "headline-lg": ["Hanken Grotesk"],
+                    "label-md": ["Hanken Grotesk"],
+                    "body-sm": ["Hanken Grotesk"],
+                    "body-md": ["Hanken Grotesk"],
+                    "title-md": ["Hanken Grotesk"],
+                    "display-lg": ["Hanken Grotesk"],
+                    "headline-lg-mobile": ["Hanken Grotesk"]
+            },
+            "fontSize": {
+                    "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                    "label-md": ["12px", {"lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "600"}],
+                    "body-sm": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
+                    "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                    "title-md": ["20px", {"lineHeight": "28px", "fontWeight": "600"}],
+                    "display-lg": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                    "headline-lg-mobile": ["24px", {"lineHeight": "32px", "fontWeight": "600"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        body {
+            font-family: 'Hanken Grotesk', sans-serif;
+            background-color: #faf8ff;
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #c3c6d7; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #737686; }
+
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(195, 198, 215, 0.3);
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background min-h-screen flex overflow-hidden">
+<!-- SideNavBar (Desktop Only Anchor) -->
+<aside class="hidden md:flex flex-col h-full py-lg px-md gap-base border-r border-outline-variant bg-surface-container-low w-64 fixed left-0 top-0 z-50">
+<div class="flex items-center gap-md px-sm mb-xl">
+<div class="w-10 h-10 bg-primary-container rounded-lg flex items-center justify-center text-on-primary">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">flag</span>
+</div>
+<div>
+<h1 class="font-headline-lg text-headline-lg font-black text-primary leading-none">Flowfy</h1>
+<p class="font-label-md text-label-md text-on-surface-variant opacity-70">ITSM Portal</p>
+</div>
+</div>
+<nav class="flex-1 space-y-base">
+<a class="flex items-center gap-md px-md py-sm text-on-surface-variant hover:bg-surface-container-highest transition-all rounded-lg font-label-md text-label-md group active:translate-x-1 duration-200" href="#">
+<span class="material-symbols-outlined">home</span>
+                Home
+            </a>
+<a class="flex items-center gap-md px-md py-sm text-on-surface-variant hover:bg-surface-container-highest transition-all rounded-lg font-label-md text-label-md group active:translate-x-1 duration-200" href="#">
+<span class="material-symbols-outlined">apps</span>
+                Service Catalog
+            </a>
+<a class="flex items-center gap-md px-md py-sm bg-primary-container text-on-primary-container font-bold rounded-lg font-label-md text-label-md active:translate-x-1 duration-200 shadow-sm" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">confirmation_number</span>
+                My Tickets
+            </a>
+</nav>
+<div class="mt-auto pt-lg border-t border-outline-variant space-y-base">
+<a class="flex items-center gap-md px-md py-sm text-on-surface-variant hover:bg-surface-container-highest transition-all rounded-lg font-label-md text-label-md active:translate-x-1 duration-200" href="#">
+<span class="material-symbols-outlined">settings</span>
+                Settings
+            </a>
+<a class="flex items-center gap-md px-md py-sm text-on-surface-variant hover:bg-surface-container-highest transition-all rounded-lg font-label-md text-label-md active:translate-x-1 duration-200" href="#">
+<span class="material-symbols-outlined">logout</span>
+                Logout
+            </a>
+</div>
+</aside>
+<!-- Main Workspace -->
+<main class="flex-1 md:ml-64 flex flex-col h-screen relative">
+<!-- TopNavBar -->
+<header class="flex justify-between items-center w-full px-margin-desktop h-16 z-40 bg-surface border-b border-outline-variant shadow-sm sticky top-0">
+<div class="flex items-center gap-xl flex-1">
+<div class="md:hidden flex items-center">
+<span class="material-symbols-outlined text-primary text-headline-lg-mobile font-bold">flag</span>
+</div>
+<div class="relative w-full max-w-md hidden sm:block">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-body-md">search</span>
+<input class="w-full pl-10 pr-4 py-2 bg-surface-container-low border border-outline-variant rounded-full text-body-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all" placeholder="Search for tickets, help articles..." type="text"/>
+</div>
+</div>
+<div class="flex items-center gap-lg">
+<button class="w-10 h-10 flex items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container-low transition-colors active:scale-95 duration-150 relative">
+<span class="material-symbols-outlined">notifications</span>
+<span class="absolute top-2 right-2 w-2 h-2 bg-error rounded-full border-2 border-surface"></span>
+</button>
+<button class="w-10 h-10 flex items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container-low transition-colors active:scale-95 duration-150">
+<span class="material-symbols-outlined">help</span>
+</button>
+<div class="h-8 w-[1px] bg-outline-variant mx-2"></div>
+<div class="flex items-center gap-md">
+<div class="text-right hidden lg:block">
+<p class="font-label-md text-label-md text-on-surface font-bold">Alex Rivera</p>
+<p class="font-label-md text-[10px] text-on-surface-variant opacity-70">IT Analyst</p>
+</div>
+<img alt="User profile photo" class="w-10 h-10 rounded-full border border-outline-variant object-cover shadow-sm" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDcn4XdDr_A-yIkYo5zW7ujDcMu4I6ehnl5HgoyH22oeli13OfaFhWDPQJB5ziItNQwgC2VpIPq4ApzHxG-DRlbb0l1CNc0ilVGzlX_sUH7pvBgQ9TRFx4itVg834eo39kPSkNG4QYxRArXjeBwW5Jl-dg73yf30JpAQkBJeHGmmqoYDRv6nZg0PHsfVmnB0GpspOa_LnkDNpm0ZUN2epdYVLK-hV2f0qiS2viWC-5Ac9asXBckdYkjhcpXYuRaT0Kpm6Seyp0kE2c"/>
+</div>
+</div>
+</header>
+<!-- Screen Content -->
+<div class="flex-1 overflow-y-auto p-lg md:p-xl space-y-xl">
+<!-- Page Header & Actions -->
+<section class="flex flex-col md:flex-row md:items-end justify-between gap-lg">
+<div>
+<h2 class="font-headline-lg text-headline-lg text-on-background font-bold tracking-tight">Meus Chamados</h2>
+<p class="font-body-md text-body-md text-on-surface-variant">Acompanhe e gerencie seus pedidos de suporte.</p>
+</div>
+<button class="bg-primary hover:bg-primary/90 text-on-primary px-lg py-sm rounded-lg flex items-center gap-md shadow-lg transition-all active:scale-95 font-label-md">
+<span class="material-symbols-outlined">add</span>
+                    Novo Chamado
+                </button>
+</section>
+<!-- Filters Bar -->
+<section class="bg-surface-container-lowest border border-outline-variant rounded-xl p-md flex flex-wrap items-center gap-md shadow-sm">
+<div class="flex items-center gap-sm bg-surface-container-low px-md py-2 rounded-lg border border-outline-variant flex-1 min-w-[240px]">
+<span class="material-symbols-outlined text-outline">filter_list</span>
+<input class="bg-transparent border-none focus:ring-0 text-body-sm w-full" placeholder="Filtrar por ID ou assunto..." type="text"/>
+</div>
+<div class="flex items-center gap-sm overflow-x-auto pb-1 md:pb-0">
+<button class="whitespace-nowrap px-md py-2 rounded-full bg-primary-container text-on-primary-container font-bold text-label-md transition-all shadow-sm">Todos</button>
+<button class="whitespace-nowrap px-md py-2 rounded-full border border-outline-variant text-on-surface-variant hover:bg-surface-container-low text-label-md transition-all">Abertos</button>
+<button class="whitespace-nowrap px-md py-2 rounded-full border border-outline-variant text-on-surface-variant hover:bg-surface-container-low text-label-md transition-all">Em Andamento</button>
+<button class="whitespace-nowrap px-md py-2 rounded-full border border-outline-variant text-on-surface-variant hover:bg-surface-container-low text-label-md transition-all">Resolvidos</button>
+<button class="whitespace-nowrap px-md py-2 rounded-full border border-outline-variant text-on-surface-variant hover:bg-surface-container-low text-label-md transition-all">Cancelados</button>
+</div>
+<div class="ml-auto hidden xl:flex items-center gap-sm">
+<button class="p-2 text-on-surface-variant hover:bg-surface-container-low rounded-lg transition-colors"><span class="material-symbols-outlined">grid_view</span></button>
+<button class="p-2 text-primary bg-primary-container/20 rounded-lg transition-colors"><span class="material-symbols-outlined">view_list</span></button>
+</div>
+</section>
+<!-- Tickets Table -->
+<section class="bg-surface border border-outline-variant rounded-xl overflow-hidden shadow-sm">
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="bg-surface-container-low border-b border-outline-variant">
+<th class="px-lg py-md font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">ID / Chamado</th>
+<th class="px-lg py-md font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">Categoria</th>
+<th class="px-lg py-md font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">Status</th>
+<th class="px-lg py-md font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">Data</th>
+<th class="px-lg py-md font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">SLA</th>
+<th class="px-lg py-md font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">Ações</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-outline-variant/50">
+<!-- Ticket Row 1 -->
+<tr class="hover:bg-surface-container-low/50 transition-colors group">
+<td class="px-lg py-lg">
+<div class="flex flex-col">
+<span class="font-label-md text-primary font-bold">#FLW-1024</span>
+<span class="font-body-md text-on-surface font-semibold group-hover:text-primary transition-colors">Acesso ao VPN Corporativo</span>
+</div>
+</td>
+<td class="px-lg py-lg">
+<span class="px-sm py-1 rounded bg-secondary-container text-on-secondary-container font-label-md text-[11px] font-bold uppercase tracking-wide">Infraestrutura</span>
+</td>
+<td class="px-lg py-lg">
+<div class="flex items-center gap-sm">
+<span class="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
+<span class="text-on-surface-variant font-label-md">Em Andamento</span>
+</div>
+</td>
+<td class="px-lg py-lg">
+<span class="font-body-sm text-on-surface-variant">12 Mai, 2024</span>
+</td>
+<td class="px-lg py-lg w-48">
+<div class="flex flex-col gap-1">
+<div class="flex justify-between text-[10px] font-bold text-on-surface-variant">
+<span>75%</span>
+<span>2h restantes</span>
+</div>
+<div class="w-full bg-surface-container-highest h-1.5 rounded-full overflow-hidden">
+<div class="bg-primary h-full w-3/4 rounded-full"></div>
+</div>
+</div>
+</td>
+<td class="px-lg py-lg text-right">
+<button class="p-2 hover:bg-surface-container-highest rounded-full transition-all active:scale-90"><span class="material-symbols-outlined text-on-surface-variant">more_vert</span></button>
+</td>
+</tr>
+<!-- Ticket Row 2 -->
+<tr class="hover:bg-surface-container-low/50 transition-colors group">
+<td class="px-lg py-lg">
+<div class="flex flex-col">
+<span class="font-label-md text-primary font-bold">#FLW-0988</span>
+<span class="font-body-md text-on-surface font-semibold group-hover:text-primary transition-colors">Solicitação de Novo Laptop</span>
+</div>
+</td>
+<td class="px-lg py-lg">
+<span class="px-sm py-1 rounded bg-secondary-container text-on-secondary-container font-label-md text-[11px] font-bold uppercase tracking-wide">Hardware</span>
+</td>
+<td class="px-lg py-lg">
+<div class="flex items-center gap-sm">
+<span class="w-2 h-2 rounded-full bg-tertiary"></span>
+<span class="text-on-surface-variant font-label-md">Pendente</span>
+</div>
+</td>
+<td class="px-lg py-lg">
+<span class="font-body-sm text-on-surface-variant">10 Mai, 2024</span>
+</td>
+<td class="px-lg py-lg w-48">
+<div class="flex flex-col gap-1">
+<div class="flex justify-between text-[10px] font-bold text-on-surface-variant">
+<span>40%</span>
+<span>4d restantes</span>
+</div>
+<div class="w-full bg-surface-container-highest h-1.5 rounded-full overflow-hidden">
+<div class="bg-tertiary h-full w-2/5 rounded-full"></div>
+</div>
+</div>
+</td>
+<td class="px-lg py-lg text-right">
+<button class="p-2 hover:bg-surface-container-highest rounded-full transition-all active:scale-90"><span class="material-symbols-outlined text-on-surface-variant">more_vert</span></button>
+</td>
+</tr>
+<!-- Ticket Row 3 -->
+<tr class="hover:bg-surface-container-low/50 transition-colors group">
+<td class="px-lg py-lg">
+<div class="flex flex-col">
+<span class="font-label-md text-primary font-bold">#FLW-0852</span>
+<span class="font-body-md text-on-surface font-semibold group-hover:text-primary transition-colors">Erro ao carregar Dashboard</span>
+</div>
+</td>
+<td class="px-lg py-lg">
+<span class="px-sm py-1 rounded bg-secondary-container text-on-secondary-container font-label-md text-[11px] font-bold uppercase tracking-wide">Sistemas</span>
+</td>
+<td class="px-lg py-lg">
+<div class="flex items-center gap-sm">
+<span class="w-2 h-2 rounded-full bg-[#1b8d23]"></span>
+<span class="text-on-surface-variant font-label-md">Resolvido</span>
+</div>
+</td>
+<td class="px-lg py-lg">
+<span class="font-body-sm text-on-surface-variant">05 Mai, 2024</span>
+</td>
+<td class="px-lg py-lg w-48">
+<div class="flex flex-col gap-1">
+<div class="flex justify-between text-[10px] font-bold text-[#1b8d23]">
+<span>100%</span>
+<span>Concluído</span>
+</div>
+<div class="w-full bg-surface-container-highest h-1.5 rounded-full overflow-hidden">
+<div class="bg-[#1b8d23] h-full w-full rounded-full"></div>
+</div>
+</div>
+</td>
+<td class="px-lg py-lg text-right">
+<button class="p-2 hover:bg-surface-container-highest rounded-full transition-all active:scale-90"><span class="material-symbols-outlined text-on-surface-variant">more_vert</span></button>
+</td>
+</tr>
+<!-- Ticket Row 4 -->
+<tr class="hover:bg-surface-container-low/50 transition-colors group">
+<td class="px-lg py-lg">
+<div class="flex flex-col">
+<span class="font-label-md text-primary font-bold">#FLW-0844</span>
+<span class="font-body-md text-on-surface font-semibold group-hover:text-primary transition-colors">Problemas com Impressão</span>
+</div>
+</td>
+<td class="px-lg py-lg">
+<span class="px-sm py-1 rounded bg-secondary-container text-on-secondary-container font-label-md text-[11px] font-bold uppercase tracking-wide">Suporte</span>
+</td>
+<td class="px-lg py-lg">
+<div class="flex items-center gap-sm">
+<span class="w-2 h-2 rounded-full bg-error"></span>
+<span class="text-on-surface-variant font-label-md">Cancelado</span>
+</div>
+</td>
+<td class="px-lg py-lg">
+<span class="font-body-sm text-on-surface-variant">02 Mai, 2024</span>
+</td>
+<td class="px-lg py-lg w-48 opacity-40">
+<div class="flex flex-col gap-1">
+<div class="flex justify-between text-[10px] font-bold text-on-surface-variant">
+<span>--</span>
+<span>--</span>
+</div>
+<div class="w-full bg-surface-container-highest h-1.5 rounded-full overflow-hidden">
+<div class="bg-outline-variant h-full w-0 rounded-full"></div>
+</div>
+</div>
+</td>
+<td class="px-lg py-lg text-right">
+<button class="p-2 hover:bg-surface-container-highest rounded-full transition-all active:scale-90"><span class="material-symbols-outlined text-on-surface-variant">more_vert</span></button>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- Pagination / Load More -->
+<div class="p-lg flex flex-col md:flex-row items-center justify-between gap-md bg-surface-container-low/30">
+<p class="font-body-sm text-body-sm text-on-surface-variant">Exibindo 4 de 12 chamados ativos</p>
+<div class="flex items-center gap-base">
+<button class="w-10 h-10 flex items-center justify-center rounded-lg border border-outline-variant text-on-surface-variant hover:bg-surface hover:shadow-sm disabled:opacity-30" disabled="">
+<span class="material-symbols-outlined">chevron_left</span>
+</button>
+<button class="w-10 h-10 flex items-center justify-center rounded-lg border border-primary bg-primary text-on-primary font-bold shadow-md">1</button>
+<button class="w-10 h-10 flex items-center justify-center rounded-lg border border-outline-variant text-on-surface-variant hover:bg-surface hover:shadow-sm">2</button>
+<button class="w-10 h-10 flex items-center justify-center rounded-lg border border-outline-variant text-on-surface-variant hover:bg-surface hover:shadow-sm">3</button>
+<button class="w-10 h-10 flex items-center justify-center rounded-lg border border-outline-variant text-on-surface-variant hover:bg-surface hover:shadow-sm">
+<span class="material-symbols-outlined">chevron_right</span>
+</button>
+</div>
+</div>
+</section>
+<!-- Bottom Illustration/Info Area -->
+<section class="grid grid-cols-1 lg:grid-cols-3 gap-lg">
+<div class="glass-panel p-lg rounded-2xl flex items-center gap-lg">
+<div class="w-16 h-16 rounded-full bg-primary-container/20 flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-[32px]">speed</span>
+</div>
+<div>
+<p class="font-headline-lg-mobile text-headline-lg-mobile font-bold text-on-surface">98.5%</p>
+<p class="font-body-sm text-body-sm text-on-surface-variant">SLA Médio Mensal</p>
+</div>
+</div>
+<div class="glass-panel p-lg rounded-2xl flex items-center gap-lg">
+<div class="w-16 h-16 rounded-full bg-secondary-container/30 flex items-center justify-center text-secondary">
+<span class="material-symbols-outlined text-[32px]">timer</span>
+</div>
+<div>
+<p class="font-headline-lg-mobile text-headline-lg-mobile font-bold text-on-surface">1h 45m</p>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Tempo de Primeira Resposta</p>
+</div>
+</div>
+<div class="glass-panel p-lg rounded-2xl flex items-center gap-lg">
+<div class="w-16 h-16 rounded-full bg-tertiary-fixed/20 flex items-center justify-center text-tertiary">
+<span class="material-symbols-outlined text-[32px]">thumb_up</span>
+</div>
+<div>
+<p class="font-headline-lg-mobile text-headline-lg-mobile font-bold text-on-surface">4.8/5</p>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Satisfação do Usuário</p>
+</div>
+</div>
+</section>
+</div>
+<!-- Mobile Navigation Shell -->
+<nav class="md:hidden flex items-center justify-around w-full h-16 bg-surface border-t border-outline-variant z-50 fixed bottom-0 px-md">
+<button class="flex flex-col items-center gap-1 text-on-surface-variant">
+<span class="material-symbols-outlined">home</span>
+<span class="text-[10px] font-bold">Home</span>
+</button>
+<button class="flex flex-col items-center gap-1 text-on-surface-variant">
+<span class="material-symbols-outlined">apps</span>
+<span class="text-[10px] font-bold">Catálogo</span>
+</button>
+<button class="flex flex-col items-center gap-1 text-primary">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">confirmation_number</span>
+<span class="text-[10px] font-bold">Chamados</span>
+</button>
+<button class="flex flex-col items-center gap-1 text-on-surface-variant">
+<span class="material-symbols-outlined">settings</span>
+<span class="text-[10px] font-bold">Ajustes</span>
+</button>
+</nav>
+</main>
+<!-- Floating Action Button (FAB) logic -->
+<button class="fixed bottom-24 right-8 w-14 h-14 bg-primary text-on-primary rounded-full shadow-2xl flex items-center justify-center hover:scale-110 active:scale-95 transition-all md:hidden z-50">
+<span class="material-symbols-outlined">add</span>
+</button>
+<script>
+        // Simple filter interaction simulation
+        document.querySelectorAll('button[class*="rounded-full"]').forEach(btn => {
+            btn.addEventListener('click', function() {
+                // If it's a filter button
+                if (this.textContent !== 'Todos' && this.classList.contains('border')) {
+                    // Reset others
+                    document.querySelectorAll('button[class*="rounded-full"]').forEach(b => {
+                        b.classList.remove('bg-primary-container', 'text-on-primary-container', 'font-bold');
+                        b.classList.add('border', 'border-outline-variant', 'text-on-surface-variant');
+                    });
+                    // Select this one
+                    this.classList.remove('border', 'border-outline-variant', 'text-on-surface-variant');
+                    this.classList.add('bg-primary-container', 'text-on-primary-container', 'font-bold');
+                }
+            });
+        });
+    </script>
+</body></html>

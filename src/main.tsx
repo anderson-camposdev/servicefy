@@ -4,8 +4,7 @@ import './index.css'
 import App from './App.tsx'
 import { TenantProvider } from './tenant'
 import { AuthProvider } from './auth'
-import { ThemeProvider } from './theme'
-import { ToastProvider } from './context'
+import { ThemeProvider, ToastProvider } from './context'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

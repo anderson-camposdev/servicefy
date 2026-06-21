@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+
+<html class="light" lang="pt-BR"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Flowfy Portal - Hospitalar</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        body {
+            font-family: 'Hanken Grotesk', sans-serif;
+            background-color: #ffffff;
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .glass-panel {
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+        }
+        @keyframes slideIn {
+            from { transform: translateX(100%); }
+            to { transform: translateX(0); }
+        }
+        .animate-slide-in {
+            animation: slideIn 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #cbd5e1; }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#4f378a", /* Overridden by brand anchors usually, but keeping context */
+                        "primary-container": "#e0d2ff",
+                        "on-primary-container": "#22005d",
+                        "outline": "#7a7582",
+                        "outline-variant": "#cbc4d2",
+                        "surface": "#ffffff",
+                        "surface-container": "#f2ecf4",
+                        "surface-container-high": "#ece6ee",
+                        "on-surface": "#1d1b20",
+                        "on-surface-variant": "#494551",
+                        "medical-blue": "#005EB8",
+                        "seafoam-green": "#00A499"
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.25rem",
+                        "lg": "12px",
+                        "xl": "16px",
+                        "full": "9999px"
+                    },
+                    spacing: {
+                        "sidebar-width": "280px",
+                        "gutter": "24px",
+                        "unit": "4px",
+                        "container-padding": "32px",
+                        "stack-sm": "8px",
+                        "drawer-width": "480px",
+                        "stack-md": "16px",
+                        "stack-lg": "24px"
+                    },
+                    fontFamily: {
+                        "display-lg": ["Hanken Grotesk"],
+                        "body-lg": ["Hanken Grotesk"],
+                        "title-lg": ["Hanken Grotesk"],
+                        "headline-lg": ["Hanken Grotesk"],
+                        "label-sm": ["JetBrains Mono"],
+                        "label-md": ["JetBrains Mono"],
+                        "body-md": ["Hanken Grotesk"],
+                        "headline-md": ["Hanken Grotesk"]
+                    },
+                    fontSize: {
+                        "display-lg": ["48px", { "lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "title-lg": ["20px", { "lineHeight": "28px", "fontWeight": "500" }],
+                        "headline-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "600" }],
+                        "label-sm": ["10px", { "lineHeight": "14px", "fontWeight": "500" }],
+                        "label-md": ["12px", { "lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "500" }],
+                        "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+                        "headline-md": ["24px", { "lineHeight": "32px", "fontWeight": "600" }]
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-surface text-on-surface antialiased overflow-hidden">
+<!-- SideNavBar (Anchor) -->
+<aside class="w-sidebar-width h-screen fixed left-0 top-0 bg-surface-container border-r border-outline-variant flex flex-col py-stack-lg z-40">
+<div class="px-gutter mb-10">
+<h1 class="font-display-lg text-headline-md font-bold text-primary">Flowfy</h1>
+<p class="font-body-md text-on-surface-variant">Service Catalog</p>
+</div>
+<nav class="flex-1 px-4 space-y-2">
+<a class="flex items-center gap-4 px-4 py-3 rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-colors group" href="#">
+<span class="material-symbols-outlined">report_problem</span>
+<span class="font-body-md">Registrar um Incidente</span>
+</a>
+<a class="flex items-center gap-4 px-4 py-3 rounded-lg text-primary font-bold border-r-2 border-primary bg-surface-container-high transition-colors group" href="#">
+<span class="material-symbols-outlined">add_task</span>
+<span class="font-body-md">Solicitar uma Requisição</span>
+</a>
+</nav>
+<div class="px-gutter pt-10 border-t border-outline-variant">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-medical-blue flex items-center justify-center text-white font-bold">JD</div>
+<div>
+<p class="font-body-md font-bold">João Da Silva</p>
+<p class="text-[11px] text-on-surface-variant uppercase tracking-wider">Médico Residente</p>
+</div>
+</div>
+</div>
+</aside>
+<!-- TopNavBar (Anchor) -->
+<header class="h-16 fixed top-0 right-0 left-sidebar-width bg-surface border-b border-outline-variant flex items-center justify-between px-gutter z-30">
+<div class="flex items-center gap-4">
+<span class="font-headline-md font-semibold text-primary">Flowfy Catalog</span>
+<div class="h-4 w-[1px] bg-outline-variant"></div>
+<nav class="flex gap-6">
+<span class="font-title-lg text-primary font-bold cursor-default">Serviços de TI</span>
+<span class="font-title-lg text-on-surface-variant hover:text-primary transition-opacity cursor-pointer">Meus Chamados</span>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<div class="relative group">
+<span class="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-on-surface-variant">search</span>
+<input class="pl-10 pr-4 py-1.5 bg-surface-container rounded-full border-none focus:ring-2 focus:ring-medical-blue text-body-md w-64 transition-all" placeholder="Buscar serviço..." type="text"/>
+</div>
+<span class="material-symbols-outlined p-2 hover:bg-surface-container rounded-full cursor-pointer transition-colors">notifications</span>
+<span class="material-symbols-outlined p-2 hover:bg-surface-container rounded-full cursor-pointer transition-colors">help_outline</span>
+<span class="material-symbols-outlined p-2 hover:bg-surface-container rounded-full cursor-pointer transition-colors">account_circle</span>
+</div>
+</header>
+<!-- Main Canvas -->
+<main class="ml-sidebar-width mt-16 p-container-padding h-[calc(100vh-64px)] overflow-y-auto">
+<!-- Breadcrumbs / Hierarchy -->
+<div class="mb-stack-lg flex items-center gap-2 text-on-surface-variant font-body-md">
+<span class="hover:text-primary cursor-pointer">Categoria: Infraestrutura</span>
+<span class="material-symbols-outlined text-sm">chevron_right</span>
+<span class="hover:text-primary cursor-pointer">Subcategoria: Rede</span>
+<span class="material-symbols-outlined text-sm">chevron_right</span>
+<span class="text-on-surface font-bold">Catálogo de Itens</span>
+</div>
+<!-- Quick Actions Grid -->
+<div class="grid grid-cols-12 gap-stack-lg mb-12">
+<!-- Featured Card (Selected State) -->
+<div class="col-span-12 md:col-span-4 group relative bg-white border border-medical-blue ring-2 ring-medical-blue/20 p-stack-lg rounded-lg shadow-lg cursor-pointer transition-all hover:shadow-xl">
+<div class="flex justify-between items-start mb-4">
+<div class="w-12 h-12 bg-medical-blue/10 text-medical-blue rounded-xl flex items-center justify-center">
+<span class="material-symbols-outlined text-3xl">person_add</span>
+</div>
+<div class="flex flex-col items-end gap-1">
+<span class="px-2 py-0.5 bg-emerald-100 text-emerald-800 font-label-sm text-[10px] rounded-sm uppercase font-bold tracking-tight">SLA: Suporte 24/7</span>
+<span class="flex items-center gap-1 text-primary font-bold text-[10px] uppercase font-label-sm">
+<span class="material-symbols-outlined text-xs" style="font-variation-settings: 'FILL' 1;">diamond</span>
+                            Suporte VIP
+                        </span>
+</div>
+</div>
+<h3 class="font-headline-md text-title-lg text-on-surface mb-2">Criação de Usuário e E-mail</h3>
+<p class="font-body-md text-on-surface-variant line-clamp-2 mb-6">Solicite novos acessos para colaboradores, residentes e prestadores de serviço hospitalar.</p>
+<div class="flex items-center justify-between">
+<span class="text-medical-blue font-bold font-body-md flex items-center gap-1">
+                        Solicitar Agora
+                        <span class="material-symbols-outlined">arrow_forward</span>
+</span>
+<span class="text-[10px] text-on-surface-variant bg-surface-container px-2 py-1 rounded">ID: #RE-442</span>
+</div>
+</div>
+<!-- Card 2 -->
+<div class="col-span-12 md:col-span-4 group bg-white border border-outline-variant p-stack-lg rounded-lg shadow-sm cursor-pointer transition-all hover:shadow-lg hover:border-medical-blue/30">
+<div class="flex justify-between items-start mb-4">
+<div class="w-12 h-12 bg-surface-container text-on-surface-variant rounded-xl flex items-center justify-center group-hover:bg-medical-blue/10 group-hover:text-medical-blue transition-colors">
+<span class="material-symbols-outlined text-3xl">monitor</span>
+</div>
+<div class="flex flex-col items-end gap-1">
+<span class="px-2 py-0.5 bg-amber-100 text-amber-800 font-label-sm text-[10px] rounded-sm uppercase font-bold tracking-tight">SLA: 48 Horas</span>
+</div>
+</div>
+<h3 class="font-headline-md text-title-lg text-on-surface mb-2">Troca de Hardware</h3>
+<p class="font-body-md text-on-surface-variant line-clamp-2 mb-6">Substituição de mouse, teclados, monitores ou computadores danificados nos postos de enfermagem.</p>
+<div class="flex items-center justify-between">
+<span class="text-on-surface-variant group-hover:text-medical-blue font-bold font-body-md transition-colors">Ver Detalhes</span>
+</div>
+</div>
+<!-- Card 3 -->
+<div class="col-span-12 md:col-span-4 group bg-white border border-outline-variant p-stack-lg rounded-lg shadow-sm cursor-pointer transition-all hover:shadow-lg hover:border-seafoam-green/30">
+<div class="flex justify-between items-start mb-4">
+<div class="w-12 h-12 bg-surface-container text-on-surface-variant rounded-xl flex items-center justify-center group-hover:bg-seafoam-green/10 group-hover:text-seafoam-green transition-colors">
+<span class="material-symbols-outlined text-3xl">medical_information</span>
+</div>
+<div class="flex flex-col items-end gap-1">
+<span class="px-2 py-0.5 bg-emerald-100 text-emerald-800 font-label-sm text-[10px] rounded-sm uppercase font-bold tracking-tight">SLA: Suporte 24/7</span>
+<span class="flex items-center gap-1 text-seafoam-green font-bold text-[10px] uppercase font-label-sm">
+<span class="material-symbols-outlined text-xs" style="font-variation-settings: 'FILL' 1;">diamond</span>
+                            Suporte VIP
+                        </span>
+</div>
+</div>
+<h3 class="font-headline-md text-title-lg text-on-surface mb-2">Suporte ao Prontuário Eletrônico</h3>
+<p class="font-body-md text-on-surface-variant line-clamp-2 mb-6">Suporte técnico especializado para o sistema Tasy/MV. Erros de prescrição ou acesso a exames.</p>
+<div class="flex items-center justify-between">
+<span class="text-on-surface-variant group-hover:text-seafoam-green font-bold font-body-md transition-colors">Ver Detalhes</span>
+</div>
+</div>
+</div>
+<!-- Infrastructure Level 3 Grid -->
+<h2 class="font-headline-md text-headline-md mb-stack-md">Rede e Conectividade</h2>
+<div class="grid grid-cols-12 gap-stack-md">
+<div class="col-span-12 md:col-span-3 p-4 bg-surface-container/50 border border-outline-variant rounded-lg flex items-center gap-4 hover:bg-white hover:shadow-md transition-all cursor-pointer">
+<span class="material-symbols-outlined text-medical-blue">wifi_password</span>
+<div>
+<p class="font-body-md font-bold">Reset de Wi-Fi</p>
+<p class="text-label-md text-on-surface-variant">Auto-serviço</p>
+</div>
+</div>
+<div class="col-span-12 md:col-span-3 p-4 bg-surface-container/50 border border-outline-variant rounded-lg flex items-center gap-4 hover:bg-white hover:shadow-md transition-all cursor-pointer">
+<span class="material-symbols-outlined text-medical-blue">vpn_lock</span>
+<div>
+<p class="font-body-md font-bold">Acesso VPN</p>
+<p class="text-label-md text-on-surface-variant">Acesso Remoto</p>
+</div>
+</div>
+<div class="col-span-12 md:col-span-3 p-4 bg-surface-container/50 border border-outline-variant rounded-lg flex items-center gap-4 hover:bg-white hover:shadow-md transition-all cursor-pointer">
+<span class="material-symbols-outlined text-medical-blue">settings_ethernet</span>
+<div>
+<p class="font-body-md font-bold">Ponto de Rede</p>
+<p class="text-label-md text-on-surface-variant">Infra física</p>
+</div>
+</div>
+<div class="col-span-12 md:col-span-3 p-4 bg-surface-container/50 border border-outline-variant rounded-lg flex items-center gap-4 hover:bg-white hover:shadow-md transition-all cursor-pointer">
+<span class="material-symbols-outlined text-medical-blue">router</span>
+<div>
+<p class="font-body-md font-bold">Nova Instalação</p>
+<p class="text-label-md text-on-surface-variant">Projeto</p>
+</div>
+</div>
+</div>
+</main>
+<!-- NavigationDrawer (Anchor) -->
+<aside class="w-drawer-width h-screen fixed right-0 top-0 z-50 bg-white shadow-2xl animate-slide-in flex flex-col border-l border-outline-variant" id="drawer">
+<!-- Drawer Header -->
+<div class="p-container-padding bg-surface-container-high border-b border-outline-variant flex items-center justify-between">
+<div>
+<h2 class="font-title-lg text-on-surface font-bold">Service Details</h2>
+<p class="font-body-md text-on-surface-variant">Complete the form below</p>
+</div>
+<button class="p-2 hover:bg-surface-container rounded-full transition-colors" onclick="document.getElementById('drawer').classList.add('hidden')">
+<span class="material-symbols-outlined">close</span>
+</button>
+</div>
+<!-- Drawer Body (Form) -->
+<div class="flex-1 overflow-y-auto p-container-padding space-y-stack-lg">
+<div class="bg-medical-blue/5 border border-medical-blue/20 p-4 rounded-lg flex gap-4">
+<span class="material-symbols-outlined text-medical-blue">info</span>
+<p class="text-body-md text-medical-blue/90">A criação de usuário requer aprovação imediata do gestor da unidade via workflow automatizado.</p>
+</div>
+<!-- Field: Name -->
+<div class="space-y-stack-sm">
+<label class="font-label-md text-on-surface-variant">NOME COMPLETO DO COLABORADOR</label>
+<input class="w-full bg-transparent border border-outline-variant rounded-lg p-3 focus:ring-2 focus:ring-medical-blue/40 focus:border-medical-blue outline-none transition-all" placeholder="Ex: Mariana Vasconcelos" type="text"/>
+</div>
+<!-- Field: Department -->
+<div class="space-y-stack-sm">
+<label class="font-label-md text-on-surface-variant">DEPARTAMENTO / SETOR</label>
+<select class="w-full bg-transparent border border-outline-variant rounded-lg p-3 focus:ring-2 focus:ring-medical-blue/40 focus:border-medical-blue outline-none transition-all appearance-none cursor-pointer">
+<option value="">Selecione o setor...</option>
+<option value="pediatria">Pediatria - Bloco A</option>
+<option value="uti">UTI Geral - Bloco B</option>
+<option value="emergencia">Emergência / Triagem</option>
+<option value="adm">Administrativo Central</option>
+</select>
+</div>
+<!-- Field: File Upload -->
+<div class="space-y-stack-sm">
+<label class="font-label-md text-on-surface-variant">ANEXAR AUTORIZAÇÃO (PDF/IMG)</label>
+<div class="border-2 border-dashed border-outline-variant rounded-lg p-8 flex flex-col items-center justify-center gap-2 hover:border-medical-blue hover:bg-surface-container transition-all cursor-pointer">
+<span class="material-symbols-outlined text-outline">cloud_upload</span>
+<p class="font-body-md text-on-surface-variant">Arraste arquivos ou <span class="text-medical-blue font-bold">clique aqui</span></p>
+</div>
+</div>
+<!-- Field: Approvals -->
+<div class="space-y-stack-md pt-4">
+<label class="font-label-md text-on-surface-variant">TERMOS E RESPONSABILIDADE</label>
+<div class="space-y-4">
+<label class="flex items-start gap-3 cursor-pointer group">
+<div class="relative flex items-center mt-1">
+<input class="peer h-5 w-5 border-outline-variant rounded text-medical-blue focus:ring-medical-blue" type="checkbox"/>
+</div>
+<span class="text-body-md text-on-surface-variant group-hover:text-on-surface transition-colors">Declaro que o colaborador recebeu o treinamento de LGPD e segurança da informação.</span>
+</label>
+<label class="flex items-start gap-3 cursor-pointer group">
+<div class="relative flex items-center mt-1">
+<input class="peer h-5 w-5 border-outline-variant rounded text-medical-blue focus:ring-medical-blue" type="checkbox"/>
+</div>
+<span class="text-body-md text-on-surface-variant group-hover:text-on-surface transition-colors">Confirmo que o acesso ao Prontuário Eletrônico é pessoal e intransferível.</span>
+</label>
+</div>
+</div>
+</div>
+<!-- Drawer Footer -->
+<div class="p-container-padding border-t border-outline-variant bg-surface sticky bottom-0 flex gap-4">
+<button class="flex-1 py-3 px-6 rounded-lg font-body-md font-bold text-on-surface-variant hover:bg-surface-container-high transition-colors">
+                Cancelar
+            </button>
+<button class="flex-1 py-3 px-6 rounded-lg font-body-md font-bold bg-medical-blue text-white shadow-lg hover:shadow-xl transition-all scale-100 active:scale-95">
+                Submit Request
+            </button>
+</div>
+</aside>
+<!-- Overlay (for Drawer) -->
+<div class="fixed inset-0 bg-black/20 backdrop-blur-sm z-40" onclick="document.getElementById('drawer').classList.add('hidden')"></div>
+<script>
+        // Micro-interaction for drawer visibility
+        document.querySelectorAll('.group').forEach(card => {
+            card.addEventListener('click', () => {
+                const drawer = document.getElementById('drawer');
+                drawer.classList.remove('hidden');
+                // Potential to dynamically change drawer content based on card clicked
+            });
+        });
+    </script>
+</body></html>

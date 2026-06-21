@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+
+<html class="light" lang="pt-br"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Portal Flowfy - Catálogo de Serviços de TI</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "primary-fixed-dim": "#b4c5ff",
+                    "on-primary-fixed": "#00174b",
+                    "on-tertiary-container": "#ffede6",
+                    "secondary": "#505f76",
+                    "surface-container-high": "#e2e7ff",
+                    "primary": "#004ac6",
+                    "surface": "#faf8ff",
+                    "error-container": "#ffdad6",
+                    "surface-bright": "#faf8ff",
+                    "inverse-surface": "#283044",
+                    "on-secondary-fixed": "#0b1c30",
+                    "surface-dim": "#d2d9f4",
+                    "surface-container-highest": "#dae2fd",
+                    "secondary-fixed-dim": "#b7c8e1",
+                    "on-tertiary": "#ffffff",
+                    "on-secondary": "#ffffff",
+                    "on-tertiary-fixed-variant": "#7d2d00",
+                    "tertiary-fixed": "#ffdbcd",
+                    "on-primary-fixed-variant": "#003ea8",
+                    "inverse-on-surface": "#eef0ff",
+                    "outline": "#737686",
+                    "primary-fixed": "#dbe1ff",
+                    "on-surface-variant": "#434655",
+                    "inverse-primary": "#b4c5ff",
+                    "on-primary": "#ffffff",
+                    "on-background": "#131b2e",
+                    "on-primary-container": "#eeefff",
+                    "surface-container-low": "#f2f3ff",
+                    "tertiary-container": "#bc4800",
+                    "tertiary-fixed-dim": "#ffb596",
+                    "secondary-fixed": "#d3e4fe",
+                    "on-error": "#ffffff",
+                    "outline-variant": "#c3c6d7",
+                    "on-secondary-fixed-variant": "#38485d",
+                    "surface-container-lowest": "#ffffff",
+                    "primary-container": "#2563eb",
+                    "surface-variant": "#dae2fd",
+                    "on-tertiary-fixed": "#360f00",
+                    "on-secondary-container": "#54647a",
+                    "on-surface": "#131b2e",
+                    "on-error-container": "#93000a",
+                    "tertiary": "#943700",
+                    "background": "#faf8ff",
+                    "error": "#ba1a1a",
+                    "secondary-container": "#d0e1fb",
+                    "surface-container": "#eaedff",
+                    "surface-tint": "#0053db"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "sm": "8px",
+                    "xs": "4px",
+                    "base": "4px",
+                    "gutter": "24px",
+                    "2xl": "48px",
+                    "xl": "32px",
+                    "md": "16px",
+                    "3xl": "64px",
+                    "margin-mobile": "16px",
+                    "lg": "24px",
+                    "margin-desktop": "40px"
+            },
+            "fontFamily": {
+                    "label-md": ["Hanken Grotesk"],
+                    "display-lg": ["Hanken Grotesk"],
+                    "body-sm": ["Hanken Grotesk"],
+                    "body-md": ["Hanken Grotesk"],
+                    "title-md": ["Hanken Grotesk"],
+                    "headline-lg": ["Hanken Grotesk"],
+                    "headline-lg-mobile": ["Hanken Grotesk"]
+            },
+            "fontSize": {
+                    "label-md": ["12px", {"lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "600"}],
+                    "display-lg": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                    "body-sm": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
+                    "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                    "title-md": ["20px", {"lineHeight": "28px", "fontWeight": "600"}],
+                    "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                    "headline-lg-mobile": ["24px", {"lineHeight": "32px", "fontWeight": "600"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+      .material-symbols-outlined {
+        font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      }
+      .glass-card {
+        background: rgba(255, 255, 255, 0.8);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+      }
+      .hide-scrollbar::-webkit-scrollbar {
+        display: none;
+      }
+      .hide-scrollbar {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+      }
+      @keyframes float {
+        0% { transform: translateY(0px); }
+        50% { transform: translateY(-5px); }
+        100% { transform: translateY(0px); }
+      }
+      .animate-float {
+        animation: float 3s ease-in-out infinite;
+      }
+    </style>
+</head>
+<body class="bg-background text-on-background font-body-md min-h-screen selection:bg-primary-container selection:text-on-primary-container">
+<!-- TopNavBar -->
+<header class="fixed top-0 left-0 w-full z-50 bg-surface-container-lowest border-b border-outline-variant shadow-sm flex justify-between items-center px-margin-desktop h-16">
+<div class="flex items-center gap-md">
+<span class="font-headline-lg text-headline-lg font-bold text-primary">Portal Flowfy</span>
+<div class="h-6 w-px bg-outline-variant mx-sm"></div>
+<span class="text-on-surface-variant font-label-md">ITSM Catálogo</span>
+</div>
+<div class="flex items-center gap-lg">
+<div class="hidden md:flex gap-lg items-center font-body-md text-body-md">
+<a class="text-on-surface-variant hover:bg-surface-container-high transition-colors px-sm py-xs rounded-lg cursor-pointer active:scale-95 duration-150" href="#">Dashboard</a>
+<a class="text-on-surface-variant hover:bg-surface-container-high transition-colors px-sm py-xs rounded-lg cursor-pointer active:scale-95 duration-150" href="#">Analytics</a>
+<a class="text-on-surface-variant hover:bg-surface-container-high transition-colors px-sm py-xs rounded-lg cursor-pointer active:scale-95 duration-150" href="#">Equipe</a>
+</div>
+<div class="flex items-center gap-md">
+<button class="material-symbols-outlined text-primary cursor-pointer hover:bg-surface-container-high p-sm rounded-full transition-colors">notifications</button>
+<button class="material-symbols-outlined text-primary cursor-pointer hover:bg-surface-container-high p-sm rounded-full transition-colors">settings</button>
+<img alt="User avatar" class="w-10 h-10 rounded-full object-cover border-2 border-primary-container" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBKTwZZsyvJl0UTPQBhbdxFNJ4t7kIoYg5C3reVSN6k5s41j9udieZSzoIonEwjD8zLjezKLIto7lJ4nPTC58ZBuW4N1u6mHC9-mhc5uGTQzeuS0CEBnaysdw3mPoYstuJWPShAee9NSTAH6z1iX5VxzB7nwwUmHj_wKgG4nm6Z8lwoOv02YzCjaxA7sghwo5Mdc5USpySc3o_MB6PjlSThEeIM8A8ivzIr9PjA5ruDMbmB7tYg-3tiwkNIfpRncyapTu2SLApX9q4"/>
+</div>
+</div>
+</header>
+<!-- SideNavBar -->
+<aside class="fixed left-0 top-0 h-full w-64 z-40 bg-surface-container-low shadow-md flex flex-col pt-20 pb-lg px-md gap-sm">
+<div class="mb-lg px-md">
+<div class="flex items-center gap-sm">
+<span class="material-symbols-outlined text-primary text-3xl">terminal</span>
+<div>
+<h2 class="font-title-md text-title-md font-bold text-on-surface leading-tight">ServiceDesk</h2>
+<p class="text-label-md text-on-surface-variant">IT Operations</p>
+</div>
+</div>
+</div>
+<nav class="flex-1 space-y-1">
+<div class="flex items-center gap-md bg-primary-container text-on-primary-container rounded-lg px-md py-sm cursor-pointer transition-transform duration-200">
+<span class="material-symbols-outlined">home</span>
+<span class="font-label-md text-label-md">Home</span>
+</div>
+<div class="flex items-center gap-md text-on-surface-variant px-md py-sm hover:bg-surface-container-highest transition-all cursor-pointer rounded-lg">
+<span class="material-symbols-outlined">report_problem</span>
+<span class="font-label-md text-label-md">Incidentes</span>
+</div>
+<div class="flex items-center gap-md text-on-surface-variant px-md py-sm hover:bg-surface-container-highest transition-all cursor-pointer rounded-lg">
+<span class="material-symbols-outlined">add_shopping_cart</span>
+<span class="font-label-md text-label-md">Requisições</span>
+</div>
+<div class="flex items-center gap-md text-on-surface-variant px-md py-sm hover:bg-surface-container-highest transition-all cursor-pointer rounded-lg">
+<span class="material-symbols-outlined">confirmation_number</span>
+<span class="font-label-md text-label-md">Meus Chamados</span>
+</div>
+<div class="flex items-center gap-md text-on-surface-variant px-md py-sm hover:bg-surface-container-highest transition-all cursor-pointer rounded-lg">
+<span class="material-symbols-outlined">book</span>
+<span class="font-label-md text-label-md">Base de Conhecimento</span>
+</div>
+</nav>
+<div class="mt-auto space-y-md">
+<div class="bg-surface-container p-md rounded-xl border border-outline-variant/30">
+<h4 class="font-label-md text-on-surface-variant mb-xs">Suporte Rápido</h4>
+<p class="text-body-sm text-on-surface-variant mb-sm">Atendimento técnico emergencial disponível 24/7.</p>
+<button class="w-full py-xs bg-primary text-on-primary rounded-lg font-label-md hover:shadow-lg transition-all active:scale-95">Ligar Suporte</button>
+</div>
+<div class="pt-sm border-t border-outline-variant">
+<div class="flex items-center gap-md text-on-surface-variant px-md py-xs hover:text-primary transition-colors cursor-pointer">
+<span class="material-symbols-outlined">check_circle</span>
+<span class="font-label-md">Status dos Serviços</span>
+</div>
+</div>
+</div>
+</aside>
+<!-- Main Content -->
+<main class="ml-64 pt-16 min-h-screen">
+<div class="max-w-[1440px] mx-auto p-margin-desktop">
+<!-- Header & Breadcrumbs -->
+<div class="mb-xl">
+<nav class="flex text-label-md text-on-surface-variant gap-xs mb-sm">
+<span class="hover:text-primary cursor-pointer">Home</span>
+<span class="material-symbols-outlined text-[14px]">chevron_right</span>
+<span class="text-on-surface font-bold">Catálogo de Serviços</span>
+</nav>
+<div class="flex items-end justify-between">
+<div>
+<h1 class="font-headline-lg text-headline-lg text-on-surface mb-xs">Catálogo de Serviços de TI</h1>
+<p class="text-body-md text-on-surface-variant max-w-2xl">Acesso centralizado para solicitações técnicas, hardware e infraestrutura corporativa.</p>
+</div>
+<div class="hidden lg:flex items-center gap-sm bg-surface-container-high px-md py-sm rounded-full border border-outline-variant">
+<span class="material-symbols-outlined text-primary">search</span>
+<input class="bg-transparent border-none focus:ring-0 text-body-sm w-64 placeholder:text-outline" placeholder="Buscar serviço ou solução..." type="text"/>
+</div>
+</div>
+</div>
+<!-- Filters -->
+<div class="flex items-center gap-sm mb-lg overflow-x-auto pb-sm hide-scrollbar">
+<button class="px-lg py-sm bg-primary text-on-primary rounded-full font-label-md shadow-md transition-all">Todos</button>
+<button class="px-lg py-sm bg-surface-container-lowest text-on-surface-variant border border-outline-variant rounded-full font-label-md hover:border-primary hover:text-primary transition-all">Infraestrutura</button>
+<button class="px-lg py-sm bg-surface-container-lowest text-on-surface-variant border border-outline-variant rounded-full font-label-md hover:border-primary hover:text-primary transition-all">Software</button>
+<button class="px-lg py-sm bg-surface-container-lowest text-on-surface-variant border border-outline-variant rounded-full font-label-md hover:border-primary hover:text-primary transition-all">Acessos</button>
+<button class="px-lg py-sm bg-surface-container-lowest text-on-surface-variant border border-outline-variant rounded-full font-label-md hover:border-primary hover:text-primary transition-all">Equipamentos</button>
+<button class="px-lg py-sm bg-surface-container-lowest text-on-surface-variant border border-outline-variant rounded-full font-label-md hover:border-primary hover:text-primary transition-all">Cloud</button>
+</div>
+<!-- Service Grid -->
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-gutter">
+<!-- Service Card 1 -->
+<div class="group relative bg-surface-container-lowest p-lg rounded-xl border border-outline-variant hover:border-primary hover:shadow-xl transition-all duration-300 cursor-pointer overflow-hidden">
+<div class="absolute top-0 right-0 p-sm opacity-10 group-hover:opacity-20 transition-opacity">
+<span class="material-symbols-outlined text-6xl">vpn_lock</span>
+</div>
+<div class="flex justify-between items-start mb-md">
+<img alt="Request Access Icon" class="w-16 h-16 object-contain mb-4" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBvaXq4tMXTKlMSjcMSkgW2eG3EiQDYeoaqsog3ctz9icEJ3eId8aDkAkXDAdOe_9P5TxmLRPhXd-boNSGBEYuR4dAwC37AcEq1bqhUoOKLqADxTIZshQZHPk6kJ2LUGgGkdxmYdTzU-IzIHvV5wQ9pz2mpoa8aBrYn2HJrqJDcOHLeiYr6mLcRPURcbLRX40-j7oAN4UxACjNGQx-WAuEbInr4kCF4PqG63x1fxNzACgICJEbUWXmTcc8Et45CUroPyu2_luAABgM"/>
+<div class="flex flex-col items-end gap-xs">
+<span class="bg-error-container text-on-error-container text-label-md px-sm py-1 rounded-full flex items-center gap-1 font-bold">
+<span class="w-2 h-2 rounded-full bg-error animate-pulse"></span>
+                                SLA 2h - Crítico
+                            </span>
+</div>
+</div>
+<h3 class="font-title-md text-title-md text-on-surface mb-xs">Solicitação de Acesso (VPN/Rede)</h3>
+<p class="text-body-sm text-on-surface-variant mb-lg">Liberação de túnel VPN para trabalho remoto e permissões em pastas de rede corporativa.</p>
+<div class="flex items-center text-primary font-bold text-label-md gap-xs group-hover:translate-x-2 transition-transform">
+                        SOLICITAR ACESSO
+                        <span class="material-symbols-outlined text-[16px]">arrow_forward</span>
+</div>
+</div>
+<!-- Service Card 2 -->
+<div class="group bg-surface-container-lowest p-lg rounded-xl border border-outline-variant hover:border-primary hover:shadow-xl transition-all duration-300 cursor-pointer">
+<div class="flex justify-between items-start mb-md">
+<img alt="Hardware Provisioning Icon" class="w-16 h-16 object-contain mb-4" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDxuglw-3uXVvgr592h4zDHonadZFFxdtR3PcoBAwGhGW5JI1MrouF0Ic1c7PzWdKhQa0xP9_oQSbrVFFL-VyBV_ZLuFccghAy6mZvaA4Py_HJBF9H86MgCEW9Y2mYOvQJKY6UGSYwPra21wYjBd5JSpicA7dzNfa3tnUTcYPbejfMBkXjBQ2kNjcWaKRtvwoRoxxQROBu02OMuADK1QS7vmMZwhyhWq_KmmjgkWhnyX3zbAnU3MxsNrce1WBgNhWiOrOCl1FZr7jo"/>
+<span class="bg-surface-container-highest text-on-surface-variant text-label-md px-sm py-1 rounded-full">SLA 48h - Standard</span>
+</div>
+<h3 class="font-title-md text-title-md text-on-surface mb-xs">Provisionamento de Hardware (Laptop/Desktop)</h3>
+<p class="text-body-sm text-on-surface-variant mb-lg">Solicitação de novos equipamentos, upgrade de memória ou periféricos para estação de trabalho.</p>
+<div class="flex items-center text-primary font-bold text-label-md gap-xs group-hover:translate-x-2 transition-transform">
+                        SOLICITAR EQUIPAMENTO
+                        <span class="material-symbols-outlined text-[16px]">arrow_forward</span>
+</div>
+</div>
+<!-- Service Card 3 -->
+<div class="group bg-surface-container-lowest p-lg rounded-xl border border-outline-variant hover:border-primary hover:shadow-xl transition-all duration-300 cursor-pointer">
+<div class="flex justify-between items-start mb-md">
+<img alt="Reset Credentials Icon" class="w-16 h-16 object-contain mb-4" src="https://lh3.googleusercontent.com/aida-public/AB6AXuANBy8N29foaF9giL9vA54AGJ_V2T9dolbUtHFksJbYL7IJ1D8aC0szBhUtSZLRQyW9bHTtzKAU9wJwV_vRgXNUyxQPSadGYrUYSdsgcEeBThhzXpskc3o4m1WPkwdWY9k_nE85nL8S6RmRgR2Rz8Gtc-vTiU_pLvYTnTNCkMDn6UVGL5VxvHYKbaEsCNWnVHsmY5bSdqFL57ffNkwGUXaVwOk1dWiehuvvdDyMFq5yBHDsdszBnnbzCny8wdnekNZL_quZBanTLfw"/>
+<span class="bg-error-container text-on-error-container text-label-md px-sm py-1 rounded-full font-bold">SLA 15min</span>
+</div>
+<h3 class="font-title-md text-title-md text-on-surface mb-xs">Reset de Credenciais e MFA</h3>
+<p class="text-body-sm text-on-surface-variant mb-lg">Auto-atendimento para reset de senha AD e ressincronização de autenticação multifator.</p>
+<div class="flex items-center text-primary font-bold text-label-md gap-xs group-hover:translate-x-2 transition-transform">
+                        REDEFINIR AGORA
+                        <span class="material-symbols-outlined text-[16px]">arrow_forward</span>
+</div>
+</div>
+<!-- Stats Section -->
+<div class="col-span-1 md:col-span-2 lg:col-span-3 mt-lg bg-surface-container-high rounded-3xl p-xl overflow-hidden relative">
+<div class="absolute -right-20 -top-20 w-80 h-80 bg-primary opacity-5 rounded-full blur-3xl"></div>
+<div class="relative z-10 flex flex-col md:flex-row justify-between items-center gap-xl">
+<div class="max-w-md">
+<h2 class="font-title-md text-title-md text-on-surface mb-sm">Desempenho da TI</h2>
+<p class="text-body-sm text-on-surface-variant mb-md">Acompanhe os indicadores globais de disponibilidade e tempo de resposta do suporte de TI.</p>
+<div class="flex gap-md">
+<div class="bg-surface-container-lowest p-md rounded-xl flex-1 text-center border border-outline-variant/30">
+<p class="text-label-md text-on-surface-variant">Uptime Global</p>
+<p class="text-headline-lg font-bold text-primary">99.9%</p>
+</div>
+<div class="bg-surface-container-lowest p-md rounded-xl flex-1 text-center border border-outline-variant/30">
+<p class="text-label-md text-on-surface-variant">Chamados Abertos</p>
+<p class="text-headline-lg font-bold text-primary">124</p>
+</div>
+</div>
+</div>
+<div class="w-full md:w-auto flex-1 h-48 bg-surface-container-lowest rounded-2xl border border-outline-variant/30 p-md flex flex-col gap-sm">
+<div class="flex justify-between items-center mb-xs">
+<span class="font-label-md text-on-surface">Incidentes por Categoria</span>
+<span class="text-primary material-symbols-outlined">trending_down</span>
+</div>
+<div class="space-y-sm">
+<div class="space-y-1">
+<div class="flex justify-between text-[11px] font-bold uppercase tracking-wider text-on-surface-variant">
+<span class="">Redes</span>
+<span class="">75%</span>
+</div>
+<div class="w-full h-2 bg-surface-container rounded-full overflow-hidden">
+<div class="h-full bg-error w-3/4 rounded-full"></div>
+</div>
+</div>
+<div class="space-y-1">
+<div class="flex justify-between text-[11px] font-bold uppercase tracking-wider text-on-surface-variant">
+<span class="">Servidores</span>
+<span class="">42%</span>
+</div>
+<div class="w-full h-2 bg-surface-container rounded-full overflow-hidden">
+<div class="h-full bg-primary w-[42%] rounded-full"></div>
+</div>
+</div>
+<div class="space-y-1">
+<div class="flex justify-between text-[11px] font-bold uppercase tracking-wider text-on-surface-variant">
+<span class="">Aplicações</span>
+<span class="">15%</span>
+</div>
+<div class="w-full h-2 bg-surface-container rounded-full overflow-hidden">
+<div class="h-full bg-secondary w-[15%] rounded-full"></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- Theme Customizer -->
+<div class="fixed bottom-lg right-lg z-50 group" id="customizer">
+<div class="absolute bottom-16 right-0 w-64 bg-surface-container-lowest p-md rounded-2xl shadow-2xl border border-outline-variant transform translate-y-4 opacity-0 pointer-events-none group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-300">
+<h4 class="font-title-md text-sm font-bold mb-md">Personalizar Tema</h4>
+<div class="space-y-md">
+<div>
+<label class="text-label-md text-on-surface-variant block mb-sm">Modo de Visualização</label>
+<div class="flex gap-sm">
+<button class="flex-1 py-sm bg-surface-container text-on-surface rounded-lg text-[11px] border border-outline hover:bg-surface-container-high" onclick="document.documentElement.classList.remove('dark')">LIGHT</button>
+<button class="flex-1 py-sm bg-inverse-surface text-inverse-on-surface rounded-lg text-[11px] border border-transparent hover:opacity-90" onclick="document.documentElement.classList.add('dark')">DARK</button>
+</div>
+</div>
+<div class="pt-sm border-t border-outline-variant text-[10px] text-outline text-center">Portal Flowfy ITSM v2.4.0</div>
+</div>
+</div>
+<button class="w-14 h-14 bg-primary text-on-primary rounded-full shadow-2xl flex items-center justify-center hover:scale-110 active:scale-95 transition-all">
+<span class="material-symbols-outlined">palette</span>
+</button>
+</div>
+<!-- Background Decoration -->
+<div class="fixed top-0 right-0 -z-10 pointer-events-none overflow-hidden h-screen w-screen">
+<div class="absolute -top-1/4 -right-1/4 w-[800px] h-[800px] bg-primary opacity-[0.03] rounded-full blur-[120px]"></div>
+<div class="absolute top-1/2 -left-1/4 w-[600px] h-[600px] bg-secondary opacity-[0.02] rounded-full blur-[100px]"></div>
+</div>
+<script>
+        window.addEventListener('scroll', () => {
+            const header = document.querySelector('header');
+            if (window.scrollY > 20) {
+                header.classList.add('shadow-md');
+            } else {
+                header.classList.remove('shadow-md');
+            }
+        });
+    </script>
+</body></html>

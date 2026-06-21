@@ -1,5 +1,5 @@
-import { useState, useMemo, useEffect, useCallback } from 'react'
-import { Users, Plus, UserPlus, Settings, Clock } from 'lucide-react'
+import { useState, useMemo, useEffect } from 'react'
+import { Plus, Settings, Clock, ShieldAlert, ClipboardList, AlertOctagon, RefreshCw, Home, Code2, BarChart3 } from 'lucide-react'
 import { useToast } from './context'
 import type { AppView, User, Company, Role } from './types'
 import {
@@ -9,19 +9,15 @@ import {
 import { useIncidents } from './hooks/useIncidents'
 import { useAppData, useProblems, useChanges } from './hooks/useDbData'
 import { usePersistentState } from './hooks/usePersistentState'
-import type { ProblemRow, ChangeRow, CompanyRow, ProfileRow, AssignmentGroupRow, IncidentRow, PortalTicketDetail } from './lib/database.types'
-import { incidentsService, companiesService, profilesService, cioService, assignmentGroupsService } from './lib/services'
+import type { ProblemRow, ChangeRow, CompanyRow, ProfileRow, IncidentRow, IncidentHistoryRow, PortalTicketDetail, TicketPriority, IncidentCategory, ChangeType, ChangeRisk } from './lib/database.types'
+import { incidentsService, cioService, problemsService, changesService } from './lib/services'
 import { translateState } from './lib/statusLabels'
 import { useTenant } from './tenant'
+import { setTenantOverride } from './tenant/resolveTenant'
 import { useAuth } from './auth'
-import { UserPortalLayout, AdminPortalSettings, AnalystCockpit, TicketManagementDashboard, WorkspaceLayout, ServiceCatalog, TicketChat } from './pages'
-import CatalogManager from './pages/CatalogManager'
+import { UserPortalLayout, AdminPortalSettings, AnalystCockpit, TicketManagementDashboard, WorkspaceLayout, ServiceCatalog, TicketChat, SettingsGovernance, FlowfyBI } from './pages'
 
-const ADMIN_ACTIVE_TAB_STORAGE_KEY = 'flowfy_admin_active_tab'
 const ACTIVE_VIEW_STORAGE_KEY = 'flowfy_active_view'
-
-const ADMIN_TABS = ['tenants', 'users', 'groups', 'catalog_incidents', 'catalog_requests', 'form_templates'] as const
-type AdminTab = (typeof ADMIN_TABS)[number]
 
 const PERSISTED_APP_VIEWS: readonly AppView[] = [
   'dashboard_incidents',
@@ -30,11 +26,9 @@ const PERSISTED_APP_VIEWS: readonly AppView[] = [
   'dashboard_changes',
   'user_portal',
   'api_docs',
-  'admin_dashboard',
+  'settings_governance',
+  'flowfy_bi',
 ]
-
-const isAdminTab = (value: unknown): value is AdminTab =>
-  typeof value === 'string' && ADMIN_TABS.includes(value as AdminTab)
 
 const isPersistedAppView = (value: unknown): value is AppView =>
   typeof value === 'string' && PERSISTED_APP_VIEWS.includes(value as AppView)
@@ -55,6 +49,7 @@ const mapCompany = (row: CompanyRow): Company => {
   return {
     id: row.id,
     name: row.name,
+    slug: row.slug ?? undefined,
     domain: row.domain,
     active: row.active,
     createdAt: row.created_at,
@@ -70,6 +65,17 @@ const mapCompany = (row: CompanyRow): Company => {
       backgroundColor: row.bg_color,
       welcomeTitle: row.welcome_title,
       welcomeSubtitle: row.welcome_subtitle,
+      titleColor: row.title_color ?? undefined,
+      titleFont: row.title_font ?? undefined,
+      titleSize: row.title_size ?? undefined,
+      subtitleColor: row.subtitle_color ?? undefined,
+      subtitleFont: row.subtitle_font ?? undefined,
+      subtitleSize: row.subtitle_size ?? undefined,
+      catalogHeadline: row.catalog_headline ?? undefined,
+      catalogHeadlineColor: row.catalog_headline_color ?? undefined,
+      catalogHeadlineSize: row.catalog_headline_size ?? undefined,
+      greetingPrefix: row.greeting_prefix ?? undefined,
+      greetingColor: row.greeting_color ?? undefined,
     },
     authConfig: {
       companyId: row.id,
@@ -108,7 +114,8 @@ const priorityBadge: Record<string, string> = {
   'P1 - Critical': 'bg-red-50 text-red-600 border border-red-200 font-bold',
   'P2 - High':     'bg-orange-50 text-orange-600 border border-orange-200 font-bold',
   'P3 - Moderate': 'bg-amber-50 text-amber-600 border border-amber-200 font-bold',
-  'P4 - Low':      'bg-slate-100 text-slate-500 border border-slate-200 font-semibold',
+  'P4 - Low':      'bg-sky-50 text-sky-600 border border-sky-200 font-semibold',
+  'P5 - Planning': 'bg-slate-100 text-slate-500 border border-slate-200 font-semibold',
 }
 
 const stateDot: Record<string, string> = {
@@ -173,7 +180,7 @@ const formatPortalValue = (value: unknown) => {
 
 // ─── Shared Components ────────────────────────────────────────
 
-function StatCard({ label, value, accent, icon }: { label: string; value: number | string; accent: string; icon: React.ReactNode }) {
+export function StatCard({ label, value, accent, icon }: { label: string; value: number | string; accent: string; icon: React.ReactNode }) {
   return (
     <div className="bg-white rounded-2xl border border-slate-200 p-5 flex flex-col gap-3 shadow-sm hover:shadow-md hover:border-slate-300 transition-all">
       <div className="flex items-center justify-between">
@@ -199,6 +206,34 @@ function InfoBlock({ label, value, mono }: { label: string; value: string; mono?
     <div>
       <div className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-1">{label}</div>
       <div className={`text-sm ${mono ? 'font-mono text-slate-600 bg-slate-50 p-3 rounded-xl border border-slate-200 whitespace-pre-wrap leading-relaxed' : 'text-slate-700 font-medium'}`}>{value}</div>
+    </div>
+  )
+}
+
+// Campos de formulário reutilizáveis (modais de abertura de Problema/Mudança).
+function FieldText({ label, value, onChange, placeholder }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string }) {
+  return (
+    <div>
+      <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">{label}</label>
+      <input value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-700 outline-none focus:ring-2 focus:ring-indigo-300" />
+    </div>
+  )
+}
+function FieldArea({ label, value, onChange, placeholder }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string }) {
+  return (
+    <div>
+      <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">{label}</label>
+      <textarea rows={3} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-700 outline-none focus:ring-2 focus:ring-indigo-300 resize-none" />
+    </div>
+  )
+}
+function FieldSelect({ label, value, onChange, options }: { label: string; value: string; onChange: (v: string) => void; options: string[] }) {
+  return (
+    <div>
+      <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">{label}</label>
+      <select value={value} onChange={e => onChange(e.target.value)} className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-white text-slate-700 font-medium outline-none focus:ring-2 focus:ring-indigo-300">
+        {options.map(o => <option key={o} value={o}>{o}</option>)}
+      </select>
     </div>
   )
 }
@@ -262,9 +297,22 @@ function LoginScreen() {
   const errorMessage = localError || authError
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-100 via-white to-slate-50 flex items-center justify-center p-6 relative">
-      <div className="absolute inset-0 bg-[radial-gradient(#e2e8f0_1px,transparent_1px)] bg-[size:24px_24px] opacity-60" />
-      <div className="absolute inset-0 bg-gradient-to-br from-slate-900/5 via-transparent to-slate-100/50" />
+    <div 
+      className="min-h-screen flex items-center justify-center p-6 relative" 
+      style={{ 
+        background: branding.backgroundColor || '#f8fafc',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat',
+        backgroundAttachment: 'fixed'
+      }}
+    >
+      {(!branding.backgroundColor || (!branding.backgroundColor.includes('url(') && !branding.backgroundColor.includes('gradient'))) && (
+        <>
+          <div className="absolute inset-0 bg-[radial-gradient(#e2e8f0_1px,transparent_1px)] bg-[size:24px_24px] opacity-60 pointer-events-none" />
+          <div className="absolute inset-0 bg-gradient-to-br from-slate-900/5 via-transparent to-slate-100/50 pointer-events-none" />
+        </>
+      )}
 
       <div className="relative w-full max-w-md">
         {/* Logo and Brand (white-label via tenant) */}
@@ -281,8 +329,26 @@ function LoginScreen() {
             </div>
             <span className="text-2xl font-black tracking-tight text-slate-800">{brandName}</span>
           </div>
-          <h1 className="text-slate-800 font-extrabold text-lg transition-all">{welcomeTitle}</h1>
-          <p className="text-slate-500 text-xs mt-1 transition-all">{welcomeSubtitle}</p>
+          <h1 
+            className="text-slate-800 font-extrabold text-lg transition-all"
+            style={{ 
+              color: branding.titleColor || undefined,
+              fontFamily: branding.titleFont || undefined,
+              fontSize: branding.titleSize || undefined
+            }}
+          >
+            {welcomeTitle}
+          </h1>
+          <p 
+            className="text-slate-500 text-xs mt-1 transition-all"
+            style={{
+              color: branding.subtitleColor || undefined,
+              fontFamily: branding.subtitleFont || undefined,
+              fontSize: branding.subtitleSize || undefined
+            }}
+          >
+            {welcomeSubtitle}
+          </p>
         </div>
 
         {/* Form Card */}
@@ -340,7 +406,7 @@ function LoginScreen() {
 
 // ─── PAGE HEADER ──────────────────────────────────────────────
 
-function PageHeader({ title, subtitle }: { title: string; subtitle: string }) {
+export function PageHeader({ title, subtitle }: { title: string; subtitle: string }) {
   return (
     <div className="mb-6">
       <h1 className="text-2xl font-bold text-slate-800 tracking-tight">{title}</h1>
@@ -374,14 +440,45 @@ function TableHead({ cols }: { cols: string[] }) {
 // ─── PROBLEM DASHBOARD ────────────────────────────────────────
 
 function ProblemDashboard({ companyId }: { companyId: string }) {
+  const { toast } = useToast()
   const [detail, setDetail] = useState<ProblemRow | null>(null)
-  const { problems: base, kpis: stats, loading, error } = useProblems(companyId)
+  const { problems: base, kpis: stats, loading, error, refetch } = useProblems(companyId)
+  const [showNew, setShowNew] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [form, setForm] = useState({ short: '', description: '', priority: 'P3 - Moderate', category: 'Software' })
+
+  const submitNew = async () => {
+    if (!form.short.trim()) { toast.error('Informe a descrição curta do problema.'); return }
+    setSaving(true)
+    try {
+      await problemsService.create({
+        companyId,
+        shortDescription: form.short.trim(),
+        description: form.description.trim() || undefined,
+        priority: form.priority as TicketPriority,
+        category: form.category as IncidentCategory,
+      })
+      toast.success('Problema registrado com sucesso.')
+      setShowNew(false)
+      setForm({ short: '', description: '', priority: 'P3 - Moderate', category: 'Software' })
+      refetch()
+    } catch (e) {
+      toast.error(`Falha ao registrar problema: ${e instanceof Error ? e.message : 'erro'}`)
+    } finally {
+      setSaving(false)
+    }
+  }
 
   if (error) return <div className="text-red-500 text-sm p-4">{error}</div>
 
   return (
     <div>
-      <PageHeader title="Gerenciamento de Problemas" subtitle="Análise de Causa Raiz e KEDB — ITIL v4" />
+      <div className="flex items-start justify-between gap-4">
+        <PageHeader title="Gerenciamento de Problemas" subtitle="Análise de Causa Raiz e KEDB — ITIL v4" />
+        <button onClick={() => setShowNew(true)} className="mt-1 flex items-center gap-1.5 px-3.5 py-2 bg-teal-600 hover:bg-teal-700 text-white text-sm font-bold rounded-xl shadow-sm transition-all shrink-0">
+          <Plus className="w-4 h-4" /> Novo Problema
+        </button>
+      </div>
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <StatCard label="Total" value={loading ? '…' : stats.total} accent="bg-slate-100 text-slate-500" icon={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg>} />
         <StatCard label="Problemas Ativos" value={loading ? '…' : stats.active} accent="bg-orange-50 text-orange-500" icon={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>} />
@@ -434,19 +531,70 @@ function ProblemDashboard({ companyId }: { companyId: string }) {
           </div>
         </Modal>
       )}
+
+      {showNew && (
+        <Modal title="Novo Problema" subtitle="Registro de Problema — ITIL v4" onClose={() => setShowNew(false)}>
+          <div className="space-y-4">
+            <FieldText label="Descrição Curta *" value={form.short} onChange={v => setForm(f => ({ ...f, short: v }))} placeholder="Resumo do problema recorrente…" />
+            <FieldArea label="Descrição / Detalhes" value={form.description} onChange={v => setForm(f => ({ ...f, description: v }))} placeholder="Contexto, incidentes relacionados, sintomas…" />
+            <div className="grid grid-cols-2 gap-4">
+              <FieldSelect label="Prioridade" value={form.priority} onChange={v => setForm(f => ({ ...f, priority: v }))} options={['P1 - Critical', 'P2 - High', 'P3 - Moderate', 'P4 - Low', 'P5 - Planning']} />
+              <FieldSelect label="Categoria" value={form.category} onChange={v => setForm(f => ({ ...f, category: v }))} options={['Hardware', 'Software', 'Network', 'Database', 'Security', 'Inquiry', 'Other']} />
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <button onClick={() => setShowNew(false)} className="px-4 py-2 rounded-xl text-sm font-semibold text-slate-600 border border-slate-200 hover:bg-slate-50">Cancelar</button>
+              <button onClick={submitNew} disabled={saving} className="px-5 py-2 rounded-xl text-sm font-bold text-white bg-teal-600 hover:bg-teal-700 disabled:opacity-50">{saving ? 'Salvando…' : 'Registrar Problema'}</button>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   )
 }
 
 function ChangeDashboard({ companyId }: { companyId: string }) {
+  const { toast } = useToast()
+  const { profile } = useAuth()
   const [detail, setDetail] = useState<ChangeRow | null>(null)
-  const { changes: base, kpis: stats, loading, error } = useChanges(companyId)
+  const { changes: base, kpis: stats, loading, error, refetch } = useChanges(companyId)
+  const [showNew, setShowNew] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [form, setForm] = useState({ short: '', description: '', type: 'Normal', risk: 'Medium' })
+
+  const submitNew = async () => {
+    if (!form.short.trim()) { toast.error('Informe a descrição curta da mudança.'); return }
+    setSaving(true)
+    try {
+      await changesService.create({
+        companyId,
+        shortDescription: form.short.trim(),
+        description: form.description.trim() || undefined,
+        type: form.type as ChangeType,
+        risk: form.risk as ChangeRisk,
+        requestedByName: profile?.name ?? 'Sistema',
+        requestedById: profile?.id,
+      })
+      toast.success('Mudança registrada com sucesso.')
+      setShowNew(false)
+      setForm({ short: '', description: '', type: 'Normal', risk: 'Medium' })
+      refetch()
+    } catch (e) {
+      toast.error(`Falha ao registrar mudança: ${e instanceof Error ? e.message : 'erro'}`)
+    } finally {
+      setSaving(false)
+    }
+  }
 
   if (error) return <div className="text-red-500 text-sm p-4">{error}</div>
 
   return (
     <div>
-      <PageHeader title="Change Enablement" subtitle="Controle de Mudanças com aprovação CAB — ITIL v4" />
+      <div className="flex items-start justify-between gap-4">
+        <PageHeader title="Change Enablement" subtitle="Controle de Mudanças com aprovação CAB — ITIL v4" />
+        <button onClick={() => setShowNew(true)} className="mt-1 flex items-center gap-1.5 px-3.5 py-2 bg-violet-600 hover:bg-violet-700 text-white text-sm font-bold rounded-xl shadow-sm transition-all shrink-0">
+          <Plus className="w-4 h-4" /> Nova Mudança
+        </button>
+      </div>
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
         <StatCard label="Total" value={loading ? '…' : stats.total} accent="bg-slate-100 text-slate-500" icon={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" /></svg>} />
         <StatCard label="Aguardando CAB" value={loading ? '…' : stats.awaitingCAB} accent="bg-amber-50 text-amber-500" icon={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" /></svg>} />
@@ -518,6 +666,23 @@ function ChangeDashboard({ companyId }: { companyId: string }) {
           })()}
         </Modal>
       )}
+
+      {showNew && (
+        <Modal title="Nova Mudança" subtitle="Change Enablement — ITIL v4" onClose={() => setShowNew(false)}>
+          <div className="space-y-4">
+            <FieldText label="Descrição Curta *" value={form.short} onChange={v => setForm(f => ({ ...f, short: v }))} placeholder="Resumo da mudança planejada…" />
+            <FieldArea label="Justificativa / Descrição" value={form.description} onChange={v => setForm(f => ({ ...f, description: v }))} placeholder="Motivo, escopo e impacto esperado…" />
+            <div className="grid grid-cols-2 gap-4">
+              <FieldSelect label="Tipo" value={form.type} onChange={v => setForm(f => ({ ...f, type: v }))} options={['Standard', 'Normal', 'Emergency']} />
+              <FieldSelect label="Risco" value={form.risk} onChange={v => setForm(f => ({ ...f, risk: v }))} options={['Low', 'Medium', 'High', 'Critical']} />
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <button onClick={() => setShowNew(false)} className="px-4 py-2 rounded-xl text-sm font-semibold text-slate-600 border border-slate-200 hover:bg-slate-50">Cancelar</button>
+              <button onClick={submitNew} disabled={saving} className="px-5 py-2 rounded-xl text-sm font-bold text-white bg-violet-600 hover:bg-violet-700 disabled:opacity-50">{saving ? 'Salvando…' : 'Registrar Mudança'}</button>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   )
 }
@@ -531,7 +696,8 @@ function UserPortal({ currentUser, company }: { currentUser: User; company: Comp
   const [ticketDetail, setTicketDetail] = useState<PortalTicketDetail | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
 
-  const [detailTab, setDetailTab] = useState<'overview' | 'chat'>('overview')
+  const [detailTab, setDetailTab] = useState<'overview' | 'chat' | 'timeline'>('overview')
+  const [historyRows, setHistoryRows] = useState<IncidentHistoryRow[]>([])
   const [showReopenModal, setShowReopenModal] = useState(false)
   const [reopenJustification, setReopenJustification] = useState('')
   const [submittingReopen, setSubmittingReopen] = useState(false)
@@ -569,6 +735,16 @@ function UserPortal({ currentUser, company }: { currentUser: User; company: Comp
     }
   }, [chatIncident?.id, company.id])
 
+  // Linha do tempo: histórico PÚBLICO do chamado (abertura → status atual).
+  useEffect(() => {
+    if (!chatIncident) { setHistoryRows([]); return }
+    let cancelled = false
+    incidentsService.listPublicHistory(chatIncident.id, company.id)
+      .then(rows => { if (!cancelled) setHistoryRows(rows) })
+      .catch(() => { if (!cancelled) setHistoryRows([]) })
+    return () => { cancelled = true }
+  }, [chatIncident?.id, company.id])
+
   useEffect(() => {
     if (!chatIncident) return
     const updated = dbIncidents.find(incident => incident.id === chatIncident.id)
@@ -590,7 +766,7 @@ function UserPortal({ currentUser, company }: { currentUser: User; company: Comp
   const brandName = company.branding.brandName || company.name
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor, fontFamily: 'system-ui, sans-serif' }}>
+    <div className="min-h-screen" style={{ background: backgroundColor, backgroundSize: 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat', backgroundAttachment: 'fixed', fontFamily: 'system-ui, sans-serif' }}>
       {/* Branded Header */}
       <header className="px-6 py-4 flex items-center justify-between shadow-sm" style={{ backgroundColor: primaryColor }}>
         <div className="flex items-center gap-3">
@@ -620,9 +796,30 @@ function UserPortal({ currentUser, company }: { currentUser: User; company: Comp
       </header>
 
       {/* Welcome Banner */}
-      <div className="px-6 py-10 text-center" style={{ background: `linear-gradient(135deg, ${primaryColor}18, ${accentColor}10, ${backgroundColor})` }}>
-        <h1 className="text-2xl font-bold mb-1.5" style={{ color: primaryColor }}>{company.branding.welcomeTitle}</h1>
-        <p className="text-slate-500 text-sm">{company.branding.welcomeSubtitle}</p>
+      <div className="px-6 py-10 md:py-14 text-center" style={{ background: `linear-gradient(135deg, ${primaryColor}18, ${accentColor}10, ${backgroundColor})` }}>
+        <p className="text-base md:text-lg font-semibold mb-2" style={{ color: primaryColor }}>
+          Olá, {currentUser.name.split(' ')[0]}! 👋
+        </p>
+        <h1
+          className="text-3xl md:text-4xl font-extrabold mb-3 tracking-tight drop-shadow-sm"
+          style={{
+            color: company.branding.titleColor || primaryColor,
+            fontFamily: company.branding.titleFont || undefined,
+            fontSize: company.branding.titleSize || undefined
+          }}
+        >
+          {company.branding.welcomeTitle}
+        </h1>
+        <p
+          className="text-slate-500 text-base md:text-lg font-medium"
+          style={{
+            color: company.branding.subtitleColor || undefined,
+            fontFamily: company.branding.subtitleFont || undefined,
+            fontSize: company.branding.subtitleSize || undefined
+          }}
+        >
+          {company.branding.welcomeSubtitle}
+        </p>
       </div>
 
       {/* Content */}
@@ -645,7 +842,13 @@ function UserPortal({ currentUser, company }: { currentUser: User; company: Comp
             currentUserId={currentUser.id}
             currentUserName={currentUser.name}
             primaryColor={primaryColor}
+            catalogHeadline={company.branding.catalogHeadline}
+            catalogHeadlineColor={company.branding.catalogHeadlineColor}
+            catalogHeadlineSize={company.branding.catalogHeadlineSize}
+            greetingPrefix={company.branding.greetingPrefix}
+            greetingColor={company.branding.greetingColor}
             onCreated={upsertIncident}
+            onNavigateToTickets={() => setActiveTab('my_tickets')}
           />
         )}
 
@@ -843,6 +1046,16 @@ function UserPortal({ currentUser, company }: { currentUser: User; company: Comp
                   >
                     💬 Acompanhamento / Chat
                   </button>
+                  <button
+                    onClick={() => setDetailTab('timeline')}
+                    className={`px-4 py-2 text-xs font-bold border-b-2 transition-all cursor-pointer -mb-px ${
+                      detailTab === 'timeline'
+                        ? 'border-indigo-600 text-indigo-600'
+                        : 'border-transparent text-slate-500 hover:text-slate-700'
+                    }`}
+                  >
+                    🕓 Histórico do Chamado
+                  </button>
                 </div>
 
                 {/* Aba 1: Visão Geral */}
@@ -898,6 +1111,43 @@ function UserPortal({ currentUser, company }: { currentUser: User; company: Comp
                       hideInternal={true}
                       locked={status === 'Closed'}
                     />
+                  </div>
+                )}
+
+                {/* Aba 3: Histórico do Chamado (linha do tempo pública) */}
+                {detailTab === 'timeline' && (
+                  <div className="space-y-4">
+                    {historyRows.length === 0 ? (
+                      <div className="text-center py-12 text-slate-400 text-sm">Nenhum registro de histórico ainda.</div>
+                    ) : (
+                      <div className="relative border-l-2 border-slate-200 ml-3 pl-6 space-y-5 py-2">
+                        {historyRows.map(h => {
+                          const isOpen = ['Criação', 'Abertura', 'created'].includes(h.field_name)
+                          const isStart = h.field_name === 'Início de Atendimento'
+                          const isComment = h.field_name === 'comment'
+                          const isState = h.field_name === 'state'
+                          let title = 'Atualização do chamado'
+                          let body = ''
+                          if (isOpen) { title = 'Chamado aberto'; body = h.comment ?? 'Solicitação registrada no portal.' }
+                          else if (isStart) { title = 'Atendimento iniciado'; body = h.comment ?? 'Um analista assumiu o chamado.' }
+                          else if (isComment) { title = 'Mensagem do analista'; body = h.comment ?? '' }
+                          else if (isState) { title = 'Status atualizado'; body = `${h.old_value ? translateState(h.old_value) + ' → ' : ''}${translateState(h.new_value)}` }
+                          else { title = h.field_name; body = `${h.old_value ?? ''}${h.old_value ? ' → ' : ''}${h.new_value ?? ''}` }
+                          const dot = isOpen ? 'bg-emerald-500' : isStart ? 'bg-sky-500' : isState ? 'bg-indigo-500' : isComment ? 'bg-violet-500' : 'bg-slate-400'
+                          return (
+                            <div key={h.id} className="relative">
+                              <span className={`absolute -left-[31px] top-1 w-3.5 h-3.5 rounded-full border-2 border-white shadow ${dot}`} />
+                              <div className="flex items-center justify-between gap-2 flex-wrap">
+                                <span className="text-sm font-bold text-slate-700">{title}</span>
+                                <span className="text-[10px] text-slate-400 font-mono">{new Date(h.created_at).toLocaleString('pt-BR')}</span>
+                              </div>
+                              {body && <p className="text-xs text-slate-500 mt-0.5 whitespace-pre-wrap leading-relaxed">{body}</p>}
+                              {h.changed_by_name && <p className="text-[10px] text-slate-400 mt-1">por {h.changed_by_name}</p>}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -1060,592 +1310,6 @@ function ApiDocs() {
   )
 }
 
-// ─── ASSIGNMENT GROUPS ADMIN ──────────────────────────────────
-
-function AssignmentGroupsAdmin({ currentCompany, rawProfiles }: { currentCompany: Company; rawProfiles: ProfileRow[] }) {
-  const [groups, setGroups] = useState<AssignmentGroupRow[]>([])
-  const [loading, setLoading] = useState(true)
-  const [selectedGroup, setSelectedGroup] = useState<AssignmentGroupRow | null>(null)
-  const [members, setMembers] = useState<ProfileRow[]>([])
-  const [loadingMembers, setLoadingMembers] = useState(false)
-
-  // Form for new group
-  const [newGroupName, setNewGroupName] = useState('')
-  const [newGroupDesc, setNewGroupDesc] = useState('')
-  const [savingGroup, setSavingGroup] = useState(false)
-
-  // Select analyst to add
-  const [selectedAnalystId, setSelectedAnalystId] = useState('')
-  const [addingMember, setAddingMember] = useState(false)
-
-  // Fetch groups
-  const fetchGroups = useCallback(async () => {
-    setLoading(true)
-    try {
-      const data = await assignmentGroupsService.list(currentCompany.id)
-      setGroups(data)
-      // Se não houver grupo selecionado, seleciona o primeiro
-      if (data.length > 0 && !selectedGroup) {
-        setSelectedGroup(data[0])
-      } else if (selectedGroup) {
-        // Atualiza a referência do grupo selecionado com os dados frescos
-        const updated = data.find(g => g.id === selectedGroup.id)
-        if (updated) setSelectedGroup(updated)
-      }
-    } catch (err) {
-      console.error(err)
-    } finally {
-      setLoading(false)
-    }
-  }, [currentCompany.id, selectedGroup])
-
-  useEffect(() => {
-    fetchGroups()
-  }, [])
-
-  // Fetch members when selectedGroup changes
-  useEffect(() => {
-    if (!selectedGroup) {
-      setMembers([])
-      return
-    }
-    let cancelled = false
-    setLoadingMembers(true)
-    assignmentGroupsService.listMembers(selectedGroup.id)
-      .then(res => {
-        if (!cancelled) setMembers(res)
-      })
-      .catch(console.error)
-      .finally(() => {
-        if (!cancelled) setLoadingMembers(false)
-      })
-    return () => { cancelled = true }
-  }, [selectedGroup?.id])
-
-  // Handle group creation
-  const handleCreateGroup = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!newGroupName.trim()) return
-    setSavingGroup(true)
-    try {
-      const newGrp = await assignmentGroupsService.create({
-        companyId: currentCompany.id,
-        name: newGroupName.trim(),
-        description: newGroupDesc.trim() || undefined
-      })
-      setNewGroupName('')
-      setNewGroupDesc('')
-      alert('Equipe solucionadora criada com sucesso!')
-
-      // We need to fetch groups first, then set selectedGroup to the new one
-      const data = await assignmentGroupsService.list(currentCompany.id)
-      setGroups(data)
-      const found = data.find(g => g.id === newGrp.id)
-      if (found) setSelectedGroup(found)
-    } catch (err: any) {
-      alert('Erro ao criar equipe: ' + err.message)
-    } finally {
-      setSavingGroup(false)
-    }
-  }
-
-  // Handle group toggle is_active
-  const handleToggleActive = async (group: AssignmentGroupRow) => {
-    try {
-      const updated = await assignmentGroupsService.update(group.id, { is_active: !group.is_active })
-      setGroups(prev => prev.map(g => g.id === group.id ? updated : g))
-      if (selectedGroup?.id === group.id) {
-        setSelectedGroup(updated)
-      }
-    } catch (err: any) {
-      alert('Erro ao atualizar status do grupo: ' + err.message)
-    }
-  }
-
-  // Handle member addition
-  const handleAddMember = async () => {
-    if (!selectedGroup || !selectedAnalystId) return
-    setAddingMember(true)
-    try {
-      await assignmentGroupsService.addMember(selectedGroup.id, selectedAnalystId)
-      const updatedMembers = await assignmentGroupsService.listMembers(selectedGroup.id)
-      setMembers(updatedMembers)
-      setSelectedAnalystId('')
-    } catch (err: any) {
-      alert('Erro ao vincular analista: ' + err.message)
-    } finally {
-      setAddingMember(false)
-    }
-  }
-
-  // Handle member removal
-  const handleRemoveMember = async (userId: string) => {
-    if (!selectedGroup) return
-    try {
-      await assignmentGroupsService.removeMember(selectedGroup.id, userId)
-      const updatedMembers = await assignmentGroupsService.listMembers(selectedGroup.id)
-      setMembers(updatedMembers)
-    } catch (err: any) {
-      alert('Erro ao desvincular analista: ' + err.message)
-    }
-  }
-
-  // Profiles of this company that are NOT currently members and not end-users
-  const companyProfiles = useMemo(() => {
-    return rawProfiles.filter(p => p.company_id === currentCompany.id && p.active && p.role !== 'end_user')
-  }, [rawProfiles, currentCompany.id])
-
-  const availableAnalysts = useMemo(() => {
-    const memberIds = new Set(members.map(m => m.id))
-    return companyProfiles.filter(p => !memberIds.has(p.id))
-  }, [companyProfiles, members])
-
-  return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      {/* Coluna 1: Lista de Equipes e Formulário de Criação */}
-      <div className="lg:col-span-2 space-y-6">
-        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-6 space-y-4">
-          <h3 className="text-slate-800 font-bold text-sm uppercase tracking-widest border-b border-slate-100 pb-3 flex items-center gap-2">
-            <Users className="w-4 h-4 text-indigo-600" /> Equipes Solucionadoras (Assignment Groups)
-          </h3>
-          {loading ? (
-            <div className="text-sm text-slate-400 animate-pulse text-center py-6">Carregando equipes...</div>
-          ) : groups.length === 0 ? (
-            <div className="text-sm text-slate-400 text-center py-6">Nenhuma equipe cadastrada.</div>
-          ) : (
-            <div className="divide-y divide-slate-100 overflow-y-auto max-h-[400px] space-y-1 pr-1">
-              {groups.map(g => (
-                <div
-                  key={g.id}
-                  onClick={() => setSelectedGroup(g)}
-                  className={`p-3 flex items-center justify-between gap-4 cursor-pointer transition-colors rounded-xl border ${selectedGroup?.id === g.id ? 'bg-indigo-50/50 border-indigo-200' : 'hover:bg-slate-50 border-slate-100 bg-white'}`}
-                >
-                  <div className="min-w-0">
-                    <div className="text-xs font-extrabold text-slate-800 flex items-center gap-2 flex-wrap">
-                      <span>{g.name}</span>
-                      {!g.is_active && (
-                        <span className="bg-red-50 text-red-600 border border-red-200 text-[9px] font-bold px-1.5 py-0.5 rounded">Inativo</span>
-                      )}
-                    </div>
-                    {g.description && <div className="text-[10px] text-slate-400 mt-1 truncate">{g.description}</div>}
-                  </div>
-                  <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
-                    <button
-                      onClick={() => handleToggleActive(g)}
-                      className={`text-[10px] px-2.5 py-1 rounded-md font-bold transition-all border shadow-xs cursor-pointer ${g.is_active ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100' : 'bg-red-50 text-red-700 border-red-200 hover:bg-red-100'}`}
-                    >
-                      {g.is_active ? 'Desativar' : 'Reativar'}
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Cadastro de nova equipe */}
-        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-6">
-          <h3 className="text-slate-800 font-bold text-sm uppercase tracking-widest border-b border-slate-100 pb-3 mb-4 flex items-center gap-2">
-            <Plus className="w-4 h-4 text-indigo-600" /> Nova Equipe Solucionadora
-          </h3>
-          <form onSubmit={handleCreateGroup} className="space-y-4">
-            <div>
-              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Nome da Equipe</label>
-              <input
-                required
-                type="text"
-                value={newGroupName}
-                onChange={e => setNewGroupName(e.target.value)}
-                className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-xs text-slate-700 bg-white focus:ring-2 focus:ring-indigo-500 outline-none"
-                placeholder="Ex: Nível 1 - Suporte, Redes, Segurança"
-              />
-            </div>
-            <div>
-              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Descrição</label>
-              <textarea
-                value={newGroupDesc}
-                onChange={e => setNewGroupDesc(e.target.value)}
-                className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-xs text-slate-700 bg-white focus:ring-2 focus:ring-indigo-500 outline-none"
-                rows={2}
-                placeholder="Descrição resumida das responsabilidades do grupo..."
-              />
-            </div>
-            <button
-              type="submit"
-              disabled={savingGroup || !newGroupName.trim()}
-              className="w-full py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs disabled:opacity-50 transition-colors cursor-pointer"
-            >
-              {savingGroup ? 'Criando...' : 'Criar Equipe'}
-            </button>
-          </form>
-        </div>
-      </div>
-
-      {/* Coluna 2: Membros da Equipe Selecionada */}
-      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-6 flex flex-col h-full min-h-[400px]">
-        {selectedGroup ? (
-          <>
-            <div className="border-b border-slate-100 pb-3 mb-4 flex items-center justify-between">
-              <div>
-                <h3 className="text-slate-800 font-bold text-sm uppercase tracking-widest">Membros de {selectedGroup.name}</h3>
-                <p className="text-[10px] text-slate-400 mt-0.5">Gerencie os analistas associados a esta equipe</p>
-              </div>
-              <Settings className="w-4 h-4 text-slate-400" />
-            </div>
-
-            {/* Vinculação de novos analistas */}
-            <div className="mb-6 bg-slate-50 border border-slate-100 rounded-xl p-3.5 space-y-3">
-              <h4 className="text-[10px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
-                <UserPlus className="w-3.5 h-3.5 text-indigo-600" /> Vincular Analista à Equipe
-              </h4>
-              <div className="flex gap-2">
-                <select
-                  value={selectedAnalystId}
-                  onChange={e => setSelectedAnalystId(e.target.value)}
-                  className="flex-1 border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-slate-700 bg-white focus:ring-2 focus:ring-indigo-500 outline-none"
-                >
-                  <option value="">Selecione um analista...</option>
-                  {availableAnalysts.map(p => (
-                    <option key={p.id} value={p.id}>{p.name} ({p.role})</option>
-                  ))}
-                </select>
-                <button
-                  onClick={handleAddMember}
-                  disabled={addingMember || !selectedAnalystId}
-                  className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-lg disabled:opacity-50 cursor-pointer transition-colors"
-                >
-                  {addingMember ? 'Vinculando...' : 'Vincular'}
-                </button>
-              </div>
-            </div>
-
-            {/* Lista de membros atuais */}
-            {loadingMembers ? (
-              <div className="text-xs text-slate-400 animate-pulse text-center py-6">Carregando analistas da equipe...</div>
-            ) : members.length === 0 ? (
-              <div className="text-xs text-slate-400 text-center py-8 italic bg-slate-50/50 rounded-xl border border-dashed border-slate-200">
-                Nenhum analista vinculado a esta equipe.
-              </div>
-            ) : (
-              <div className="space-y-2 overflow-y-auto max-h-[350px] pr-1">
-                {members.map(p => (
-                  <div key={p.id} className="flex items-center justify-between p-2.5 bg-slate-50 hover:bg-slate-100/50 border border-slate-100 rounded-xl text-xs transition-colors">
-                    <div className="flex items-center gap-2.5">
-                      <img src={p.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${p.name}`} className="w-6 h-6 rounded-full border border-slate-200 bg-white" alt={p.name} />
-                      <div>
-                        <div className="font-bold text-slate-800">{p.name}</div>
-                        <div className="text-[9px] text-slate-400 font-mono mt-0.5">{p.role}</div>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => handleRemoveMember(p.id)}
-                      className="text-red-600 hover:text-red-800 font-bold hover:underline cursor-pointer"
-                    >
-                      Remover
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </>
-        ) : (
-          <div className="text-sm text-slate-400 text-center py-12 italic border border-dashed border-slate-200 rounded-2xl">
-            Selecione uma equipe na lista para gerenciar seus membros.
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
-
-// ─── ADMIN DASHBOARD ──────────────────────────────────────────
-
-function AdminDashboard({ refetchAppData, currentCompany }: { refetchAppData?: () => Promise<void>; currentCompany: Company }) {
-  const [activeAdminTab, setActiveAdminTab] = usePersistentState<AdminTab>(
-    ADMIN_ACTIVE_TAB_STORAGE_KEY,
-    'tenants',
-    isAdminTab,
-  )
-
-  const handleAdminTabChange = (tab: AdminTab) => {
-    try {
-      localStorage.setItem(ADMIN_ACTIVE_TAB_STORAGE_KEY, JSON.stringify(tab))
-    } catch {
-      // The state change still keeps navigation working when storage is unavailable.
-    }
-    setActiveAdminTab(tab)
-  }
-  
-  // States for tenant onboarding
-  const [tenantName, setTenantName] = useState('')
-  const [tenantDomain, setTenantDomain] = useState('')
-  const [tenantLogo, setTenantLogo] = useState('')
-  const [tenantPrimary, setTenantPrimary] = useState('#2563EB')
-  const [tenantAccent, setTenantAccent] = useState('#3B82F6')
-  const [tenantBg, _setTenantBg] = useState('#EFF6FF')
-  const [tenantWelcomeTitle, _setTenantWelcomeTitle] = useState('Central de Serviços')
-  const [tenantWelcomeSubtitle, _setTenantWelcomeSubtitle] = useState('Como podemos te ajudar hoje?')
-  const [tenantLocalLogin, _setTenantLocalLogin] = useState(true)
-  const [tenantSchema, setTenantSchema] = useState('')
-  const [tenantSaving, setTenantSaving] = useState(false)
-  
-  // States for user onboarding
-  const [usrName, setUsrName] = useState('')
-  const [usrEmail, setUsrEmail] = useState('')
-  const [usrRole, setUsrRole] = useState<Role>('end_user')
-  const [usrDept, setUsrDept] = useState('')
-  const [usrCompanyId, setUsrCompanyId] = useState(currentCompany.id)
-  const [usrSaving, setUsrSaving] = useState(false)
-  
-  // Empresa-alvo do construtor de catálogo (Tree View)
-  const [catCompanyId, setCatCompanyId] = useState(currentCompany.id)
-
-  // Fetch all companies and profiles for administration lists
-  const { companies: rawCompanies, profiles: rawProfiles } = useAppData()
-
-  const handleSaveTenant = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setTenantSaving(true)
-    try {
-      const payload: any = {
-        name: tenantName,
-        domain: tenantDomain,
-        logo_url: tenantLogo || null,
-        primary_color: tenantPrimary,
-        accent_color: tenantAccent,
-        bg_color: tenantBg,
-        welcome_title: tenantWelcomeTitle,
-        welcome_subtitle: tenantWelcomeSubtitle,
-        allow_local_login: tenantLocalLogin,
-        schema_name: tenantSchema || null,
-        sso_providers: [
-          { id: 'msft', type: 'microsoft', label: 'Microsoft Entra ID', tenantId: `${tenantDomain}-tenant`, enabled: true }
-        ],
-        active: true,
-      }
-      await companiesService.create(payload)
-      alert('Empresa cadastrada com sucesso!')
-      setTenantName('')
-      setTenantDomain('')
-      setTenantLogo('')
-      setTenantSchema('')
-      if (refetchAppData) await refetchAppData()
-    } catch (err: any) {
-      alert('Erro ao cadastrar empresa: ' + err.message)
-    } finally {
-      setTenantSaving(false)
-    }
-  }
-
-  const handleSaveUser = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setUsrSaving(true)
-    try {
-      const payload: any = {
-        name: usrName,
-        email: usrEmail,
-        role: usrRole,
-        department: usrDept || null,
-        company_id: usrCompanyId,
-        avatar_url: `https://api.dicebear.com/7.x/avataaars/svg?seed=${usrName.split(' ')[0]}`,
-        active: true,
-      }
-      await profilesService.create(payload)
-      alert('Usuário cadastrado com sucesso!')
-      setUsrName('')
-      setUsrEmail('')
-      setUsrDept('')
-      if (refetchAppData) await refetchAppData()
-    } catch (err: any) {
-      alert('Erro ao cadastrar usuário: ' + err.message)
-    } finally {
-      setUsrSaving(false)
-    }
-  }
-
-  return (
-    <div>
-      <PageHeader title="Governança Global (Admin)" subtitle="Administração Central de Tenants, Usuários e Portais Flowfy" />
-
-      <div className="grid items-start gap-6 lg:grid-cols-[240px_minmax(0,1fr)]">
-        <aside className="sticky top-20 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
-          <div className="px-3 pb-2 pt-1 text-[10px] font-bold uppercase tracking-widest text-slate-400">Governança</div>
-        {[
-          ['tenants', 'Gestão de Clientes'],
-          ['users', 'Usuários & RBAC'],
-          ['groups', 'Equipes Solucionadoras'],
-        ].map(([tab, label]) => (
-          <button key={tab} onClick={() => handleAdminTabChange(tab as AdminTab)}
-            className={`mb-1 w-full rounded-xl px-3 py-2.5 text-left text-sm font-semibold transition-all ${activeAdminTab === tab ? 'bg-slate-900 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'}`}>
-            {label}
-          </button>
-        ))}
-          <div className="mx-2 my-3 border-t border-slate-100" />
-          <div className="px-3 pb-2 text-[10px] font-bold uppercase tracking-widest text-slate-400">Design de Serviços</div>
-          {[
-            ['catalog_incidents', 'Catálogo de Incidentes'],
-            ['catalog_requests', 'Catálogo de Requisições'],
-            ['form_templates', 'Biblioteca de Formulários'],
-          ].map(([tab, label]) => (
-            <button key={tab} onClick={() => handleAdminTabChange(tab as AdminTab)}
-              className={`mb-1 w-full rounded-xl px-3 py-2.5 text-left text-sm font-semibold transition-all ${activeAdminTab === tab ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-600 hover:bg-indigo-50 hover:text-indigo-700'}`}>
-              {label}
-            </button>
-          ))}
-        </aside>
-
-        <div className="min-w-0">
-
-      {activeAdminTab === 'tenants' && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 bg-white border border-slate-200 rounded-2xl shadow-sm p-6 space-y-4">
-            <h3 className="text-slate-800 font-bold text-sm uppercase tracking-widest border-b border-slate-100 pb-3">Empresas Cadastradas (Tenants)</h3>
-            <div className="divide-y divide-slate-100 overflow-y-auto max-h-[500px]">
-              {rawCompanies.map(c => (
-                <div key={c.id} className="py-3 flex items-center justify-between gap-4">
-                  <div className="flex items-center gap-3">
-                    <img src={c.logo_url || ''} className="w-8 h-8 rounded-lg" alt={c.name} />
-                    <div>
-                      <div className="text-xs font-bold text-slate-800">{c.name}</div>
-                      <div className="text-[10px] text-slate-400 font-mono">{c.domain} · Schema: {c.schema_name || 'public'}</div>
-                    </div>
-                  </div>
-                  <span className="text-[10px] bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded border border-emerald-200 font-semibold uppercase">Ativo</span>
-                </div>
-              ))}
-            </div>
-          </div>
-          <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-6">
-            <h3 className="text-slate-800 font-bold text-sm uppercase tracking-widest border-b border-slate-100 pb-3 mb-4">Onboarding de Novo Cliente</h3>
-            <form onSubmit={handleSaveTenant} className="space-y-3">
-              <div>
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Nome da Empresa</label>
-                <input required type="text" value={tenantName} onChange={e => setTenantName(e.target.value)} className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-700 bg-white" placeholder="ex: Globex IT" />
-              </div>
-              <div>
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Domínio de E-mail</label>
-                <input required type="text" value={tenantDomain} onChange={e => setTenantDomain(e.target.value)} className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-700 bg-white" placeholder="ex: globex.io" />
-              </div>
-              <div>
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">URL da Logo</label>
-                <input type="text" value={tenantLogo} onChange={e => setTenantLogo(e.target.value)} className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-700 bg-white" placeholder="ex: https://logo.com" />
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Cor Primária</label>
-                  <input required type="text" value={tenantPrimary} onChange={e => setTenantPrimary(e.target.value)} className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-700 bg-white" />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Cor Secundária</label>
-                  <input required type="text" value={tenantAccent} onChange={e => setTenantAccent(e.target.value)} className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-700 bg-white" />
-                </div>
-              </div>
-              <div>
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Instância DB Schema (Postgres)</label>
-                <input type="text" value={tenantSchema} onChange={e => setTenantSchema(e.target.value)} className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-700 bg-white" placeholder="ex: tenant_globex (deixe em branco para public)" />
-              </div>
-              <button type="submit" disabled={tenantSaving} className="w-full py-2.5 rounded-xl bg-slate-800 text-white font-bold text-xs mt-3 disabled:opacity-50">
-                {tenantSaving ? 'Salvando...' : 'Onboard Company'}
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {activeAdminTab === 'users' && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 bg-white border border-slate-200 rounded-2xl shadow-sm p-6 space-y-4">
-            <h3 className="text-slate-800 font-bold text-sm uppercase tracking-widest border-b border-slate-100 pb-3">Usuários & Matriz de Acessos</h3>
-            <div className="divide-y divide-slate-100 overflow-y-auto max-h-[500px]">
-              {rawProfiles.map(p => (
-                <div key={p.id} className="py-3 flex items-center justify-between gap-4">
-                  <div className="flex items-center gap-3">
-                    <img src={p.avatar_url || ''} className="w-7 h-7 rounded-full" alt={p.name} />
-                    <div>
-                      <div className="text-xs font-bold text-slate-800">{p.name}</div>
-                      <div className="text-[10px] text-slate-400 font-mono">{p.email} · {p.department || 'Operações'}</div>
-                    </div>
-                  </div>
-                  <span className="text-[9px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded font-bold uppercase">{p.role}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-          <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-6">
-            <h3 className="text-slate-800 font-bold text-sm uppercase tracking-widest border-b border-slate-100 pb-3 mb-4">Adicionar Novo Colaborador</h3>
-            <form onSubmit={handleSaveUser} className="space-y-3">
-              <div>
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Nome Completo</label>
-                <input required type="text" value={usrName} onChange={e => setUsrName(e.target.value)} className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-700 bg-white" placeholder="ex: Ana Silva" />
-              </div>
-              <div>
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">E-mail Corporativo</label>
-                <input required type="email" value={usrEmail} onChange={e => setUsrEmail(e.target.value)} className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-700 bg-white" placeholder="ex: ana@acme.com" />
-              </div>
-              <div>
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Departamento</label>
-                <input type="text" value={usrDept} onChange={e => setUsrDept(e.target.value)} className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-700 bg-white" placeholder="ex: TI" />
-              </div>
-              <div>
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Papel de Acesso (RBAC)</label>
-                <select value={usrRole} onChange={e => setUsrRole(e.target.value as Role)} className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-700 bg-white">
-                  <option value="end_user">EndUser (Usuário Final)</option>
-                  <option value="technician">Technician (Analista)</option>
-                  <option value="area_manager">AreaManager (Gerente de Área)</option>
-                  <option value="it_manager">ITManager (Gerente de TI)</option>
-                  <option value="client_manager">ClientManager (Gestor Cliente)</option>
-                  <option value="cio">CIO (Executivo de TI)</option>
-                  <option value="sysadmin">SysAdmin (Admin Global)</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Empresa / Tenant</label>
-                <select value={usrCompanyId} onChange={e => setUsrCompanyId(e.target.value)} className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-700 bg-white">
-                  {rawCompanies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
-              </div>
-              <button type="submit" disabled={usrSaving} className="w-full py-2.5 rounded-xl bg-slate-800 text-white font-bold text-xs mt-3 disabled:opacity-50">
-                {usrSaving ? 'Salvando...' : 'Create Profile'}
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {activeAdminTab === 'groups' && (
-        <AssignmentGroupsAdmin currentCompany={currentCompany} rawProfiles={rawProfiles} />
-      )}
-
-      {(['catalog_incidents', 'catalog_requests', 'form_templates'] as AdminTab[]).includes(activeAdminTab) && (
-        <div className="space-y-4">
-          <div className="flex items-center gap-3 flex-wrap">
-            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Empresa</span>
-            <select value={catCompanyId} onChange={e => setCatCompanyId(e.target.value)} className="border border-slate-200 rounded-lg px-3 py-1.5 text-sm bg-white outline-none focus:ring-2 focus:ring-indigo-500">
-              {rawCompanies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
-            <span className="text-xs text-slate-400">
-              {activeAdminTab === 'catalog_incidents' && 'Árvore exclusiva: Categoria › Serviço › Sintoma'}
-              {activeAdminTab === 'catalog_requests' && 'Árvore exclusiva: Categoria › Item de Requisição'}
-              {activeAdminTab === 'form_templates' && 'Formulários reutilizáveis para todas as esteiras'}
-            </span>
-          </div>
-          <CatalogManager
-            companyId={catCompanyId}
-            section={
-              activeAdminTab === 'catalog_requests'
-                ? 'request'
-                : activeAdminTab === 'form_templates'
-                  ? 'templates'
-                  : 'incident'
-            }
-          />
-        </div>
-      )}
-        </div>
-      </div>
-    </div>
-  )
-}
 
 // ─── CIO DASHBOARD ───────────────────────────────────────────
 
@@ -1974,6 +1638,7 @@ function TechnicianDashboard({ companyId, currentUser, ticketType }: { companyId
 // ─── MAIN APP ─────────────────────────────────────────────────
 
 export default function App() {
+  const { tenant: resolvedTenant } = useTenant()
   const { companies: dbCompanies, loading: dbLoading, error: dbError } = useAppData()
   const { status: authStatus, profile, company: authCompany, isProvider, signOut } = useAuth()
 
@@ -1982,7 +1647,15 @@ export default function App() {
 
   // Identidade derivada da sessão real do Supabase Auth (não mais de listas públicas).
   const currentUser = useMemo(() => (profile ? mapUser(profile) : null), [profile])
-  const currentCompany = useMemo(() => (authCompany ? mapCompany(authCompany) : null), [authCompany])
+  
+  // Se o usuário for Provedor MSP e existir um tenant forçado na URL/LocalStorage (resolvedTenant),
+  // assume o tenant simulado. Caso contrário, usa a empresa original dele (authCompany).
+  const currentCompany = useMemo(() => {
+    if (isProvider && resolvedTenant) {
+      return mapCompany(resolvedTenant)
+    }
+    return authCompany ? mapCompany(authCompany) : null
+  }, [authCompany, isProvider, resolvedTenant])
 
   // View ativa e papel simulado PERSISTIDOS (imunes a reload/Tab Discarding).
   const [activeView, setActiveView] = usePersistentState<AppView>(
@@ -2095,8 +1768,8 @@ export default function App() {
                     setSimulatedRole(r)
                     if (r === 'end_user') {
                       setActiveView('user_portal')
-                    } else if (r === 'sysadmin') {
-                      setActiveView('admin_dashboard')
+                    } else if (r === 'sysadmin' || r === 'company_admin' || r === 'cio' || r === 'it_manager' || r === 'area_manager' || r === 'client_manager') {
+                      setActiveView('settings_governance')
                     } else {
                       setActiveView('dashboard_incidents')
                     }
@@ -2113,7 +1786,7 @@ export default function App() {
                   <option value="end_user">EndUser (Usuário Final)</option>
                 </select>
               </div>
-              <button onClick={() => { setSimulatedRole('sysadmin'); setActiveView('admin_dashboard') }} className="px-3 py-1.5 rounded-xl bg-white border border-slate-200 text-slate-600 text-xs font-semibold hover:bg-slate-50 hover:border-slate-300 transition-all cursor-pointer shadow-sm">
+              <button onClick={() => { setSimulatedRole('sysadmin'); setActiveView('settings_governance') }} className="px-3 py-1.5 rounded-xl bg-white border border-slate-200 text-slate-600 text-xs font-semibold hover:bg-slate-50 hover:border-slate-300 transition-all cursor-pointer shadow-sm">
                 ← Painel do Agente
               </button>
             </>
@@ -2126,24 +1799,33 @@ export default function App() {
   }
 
   const navItems: { view: AppView; label: string; icon: React.ReactNode }[] = [
-    { view: 'dashboard_incidents', label: 'Incidentes', icon: <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg> },
-    { view: 'dashboard_requests', label: 'Requisições', icon: <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg> },
-    { view: 'dashboard_problems', label: 'Problemas', icon: <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg> },
-    { view: 'dashboard_changes', label: 'Mudanças', icon: <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" /></svg> },
-    { view: 'user_portal', label: 'Portal do Usuário', icon: <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg> },
-    { view: 'api_docs', label: 'API de Integração', icon: <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" /></svg> },
+    { view: 'dashboard_incidents', label: 'Incidentes', icon: <ShieldAlert className="w-5 h-5" /> },
+    { view: 'dashboard_requests', label: 'Requisições', icon: <ClipboardList className="w-5 h-5" /> },
+    { view: 'dashboard_problems', label: 'Problemas', icon: <AlertOctagon className="w-5 h-5" /> },
+    { view: 'dashboard_changes', label: 'Mudanças', icon: <RefreshCw className="w-5 h-5" /> },
+    { view: 'user_portal', label: 'Portal do Usuário', icon: <Home className="w-5 h-5" /> },
+    { view: 'api_docs', label: 'API de Integração', icon: <Code2 className="w-5 h-5" /> },
   ]
 
-  if (activeRole === 'sysadmin') {
-    navItems.push({ view: 'admin_dashboard', label: 'Governança Admin', icon: <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0m-5 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" /></svg> })
+  // O Flowfy BI fica disponível para todos os perfis gerenciais/técnicos que alcançam esta tela
+  navItems.push({ view: 'flowfy_bi', label: 'Flowfy BI Analytics', icon: <BarChart3 className="w-5 h-5" /> })
+
+  // Apenas papéis administrativos e CIO têm acesso ao menu Configurações
+  const isConfigEligible = ['sysadmin', 'company_admin', 'cio', 'it_manager', 'area_manager', 'client_manager'].includes(activeRole)
+  if (isConfigEligible) {
+    navItems.push({
+      view: 'settings_governance',
+      label: 'Configurações',
+      icon: <Settings className="w-5 h-5" />
+    })
   }
 
   const customDashRoles: Role[] = ['cio', 'client_manager', 'it_manager', 'area_manager', 'technician']
   const showWorkspace = (activeView === 'dashboard_incidents' || activeView === 'dashboard_requests') && (isProvider || !customDashRoles.includes(activeRole))
 
   const renderActiveDashboard = () => {
-    if (activeView === 'admin_dashboard' && activeRole === 'sysadmin') {
-      return <AdminDashboard refetchAppData={async () => {}} currentCompany={currentCompany} />
+    if (activeView === 'settings_governance') {
+      return <SettingsGovernance companyId={currentCompany.id} activeRole={activeRole} />
     }
     
     // Customize layout if viewing the default dashboard view based on active role
@@ -2171,41 +1853,63 @@ export default function App() {
     if (activeView === 'dashboard_problems') return <ProblemDashboard companyId={currentCompany.id} />
     if (activeView === 'dashboard_changes') return <ChangeDashboard companyId={currentCompany.id} />
     if (activeView === 'api_docs') return <ApiDocs />
+    if (activeView === 'flowfy_bi') return <FlowfyBI />
 
     return <WorkspaceLayout companyId={currentCompany.id} isProvider={isProvider} companies={companies} />
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-800 flex flex-col">
+    <div className="min-h-screen text-on-surface flex flex-col" style={{ background: currentCompany.branding.backgroundColor || 'var(--color-bg-primary)', backgroundSize: 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat', backgroundAttachment: 'fixed' }}>
       {/* Top Header */}
-      <header className="sticky top-0 z-40 bg-white border-b border-slate-200 shadow-sm px-4 lg:px-6 py-3 flex items-center gap-3">
+      <header className="sticky top-0 z-40 bg-surface border-b border-outline-variant shadow-sm px-4 lg:px-6 py-3 flex items-center gap-3">
         {/* Logo */}
         <div className="flex items-center gap-2.5 shrink-0">
           <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-emerald-500 to-teal-400 flex items-center justify-center shadow-md shadow-emerald-500/25">
             <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
           </div>
-          <span className="text-lg font-black tracking-tight text-slate-800 hidden sm:block">Flowfy</span>
-          <span className="text-[9px] text-slate-400 uppercase font-bold tracking-widest hidden sm:block">ITSM</span>
+          <span className="text-lg font-black tracking-tight text-on-surface hidden sm:block">Flowfy</span>
+          <span className="text-[9px] text-on-surface-variant uppercase font-bold tracking-widest hidden sm:block">ITSM</span>
         </div>
 
-        <div className="w-px h-6 bg-slate-200 mx-1 hidden sm:block" />
+        <div className="w-px h-6 bg-outline-variant mx-1 hidden sm:block" />
 
         {/* Tenant Indicator (+ selo de Provedor MSP) */}
-        <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-700 shadow-sm shrink-0">
+        <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl border border-outline-variant bg-surface text-xs font-semibold text-on-surface shadow-sm shrink-0">
           {currentCompany.branding.logoUrl && (
             <img src={currentCompany.branding.logoUrl} alt={currentCompany.name} className="w-5 h-5 rounded-md" />
           )}
-          <span className="hidden sm:block">{currentCompany.name}</span>
+          <select 
+            value={currentCompany.slug || currentCompany.domain || ''}
+            onChange={e => {
+              const slug = e.target.value;
+              if (slug) {
+                setTenantOverride(slug);
+                window.location.href = `/?tenant=${slug}`;
+              }
+            }}
+            className="hidden sm:block bg-transparent text-xs font-bold text-slate-800 border-none outline-none cursor-pointer hover:text-indigo-600 focus:ring-0 p-0 m-0 w-auto appearance-none pr-4 relative"
+            style={{ 
+              width: `${Math.max(currentCompany.name.length + 3, 10)}ch`,
+              backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`,
+              backgroundRepeat: 'no-repeat',
+              backgroundPosition: 'right center',
+              backgroundSize: '1em'
+            }}
+          >
+            {companies.map(c => (
+              <option key={c.id} value={c.slug || c.domain || c.name}>{c.name}</option>
+            ))}
+          </select>
           {isProvider && (
-            <span className="ml-1 px-1.5 py-0.5 rounded bg-sky-50 text-sky-700 border border-sky-100 text-[9px] uppercase tracking-wider font-bold">
+            <span className="ml-1 px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-400 border border-sky-500/20 text-[9px] uppercase tracking-wider font-bold">
               Provedor MSP
             </span>
           )}
         </div>
 
         {/* Role Simulator Dropdown */}
-        <div className="flex items-center gap-1.5 border border-slate-200 bg-white rounded-xl px-2 py-1 shadow-sm shrink-0">
-          <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider hidden md:inline">Simular Papel:</span>
+        <div className="flex items-center gap-1.5 border border-outline-variant bg-surface rounded-xl px-2 py-1 shadow-sm shrink-0">
+          <span className="text-[10px] text-on-surface-variant font-bold uppercase tracking-wider hidden md:inline">Simular Papel:</span>
           <select
             value={activeRole}
             onChange={e => {
@@ -2213,13 +1917,13 @@ export default function App() {
               setSimulatedRole(r)
               if (r === 'end_user') {
                 setActiveView('user_portal')
-              } else if (r === 'sysadmin') {
-                setActiveView('admin_dashboard')
+              } else if (r === 'sysadmin' || r === 'company_admin' || r === 'cio' || r === 'it_manager' || r === 'area_manager' || r === 'client_manager') {
+                setActiveView('settings_governance')
               } else {
                 setActiveView('dashboard_incidents')
               }
             }}
-            className="text-xs font-semibold text-slate-700 bg-white border-none outline-none cursor-pointer focus:ring-0"
+            className="text-xs font-semibold text-on-surface bg-surface border-none outline-none cursor-pointer focus:ring-0"
           >
             <option value="sysadmin">SysAdmin (Admin Global)</option>
             <option value="company_admin">CompanyAdmin (Admin Tenant)</option>
@@ -2237,34 +1941,34 @@ export default function App() {
 
         {/* User Menu (perfil real autenticado) */}
         <div className="relative">
-          <button onClick={() => setIsUserMenuOpen(v => !v)} className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 hover:border-slate-300 transition-all cursor-pointer shadow-sm">
+          <button onClick={() => setIsUserMenuOpen(v => !v)} className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl border border-outline-variant bg-surface hover:bg-surface-container hover:border-outline transition-all cursor-pointer shadow-sm">
             <img src={currentUser.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(currentUser.name)}&size=48`} alt={currentUser.name} className="w-6 h-6 rounded-full" />
             <div className="hidden sm:block text-left">
-              <div className="text-xs font-bold text-slate-700">{currentUser.name.split(' ')[0]}</div>
-              <div className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">{currentUser.role.replace('_', ' ')}</div>
+              <div className="text-xs font-bold text-on-surface">{currentUser.name.split(' ')[0]}</div>
+              <div className="text-[9px] text-on-surface-variant font-bold uppercase tracking-wider">{currentUser.role.replace('_', ' ')}</div>
             </div>
-            <svg className={`w-3.5 h-3.5 text-slate-400 transition-transform ${isUserMenuOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
+            <svg className={`w-3.5 h-3.5 text-on-surface-variant transition-transform ${isUserMenuOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
           </button>
           {isUserMenuOpen && (
-            <div className="absolute top-full mt-1.5 right-0 bg-white border border-slate-200 rounded-2xl shadow-xl w-64 z-50 overflow-hidden">
-              <div className="px-4 py-3 border-b border-slate-100">
-                <div className="text-sm font-bold text-slate-800 truncate">{currentUser.name}</div>
-                <div className="text-[11px] text-slate-400 truncate">{currentUser.email}</div>
+            <div className="absolute top-full mt-1.5 right-0 bg-surface border border-outline-variant rounded-2xl shadow-xl w-64 z-50 overflow-hidden">
+              <div className="px-4 py-3 border-b border-outline-variant">
+                <div className="text-sm font-bold text-on-surface truncate">{currentUser.name}</div>
+                <div className="text-[11px] text-on-surface-variant truncate">{currentUser.email}</div>
                 <div className="mt-1.5 flex items-center gap-1.5 flex-wrap">
-                  <span className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 text-[9px] uppercase tracking-wider font-bold">{currentUser.role.replace('_', ' ')}</span>
-                  <span className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 text-[9px] font-semibold">{currentCompany.name}</span>
-                  {isProvider && <span className="px-1.5 py-0.5 rounded bg-sky-50 text-sky-700 border border-sky-100 text-[9px] uppercase tracking-wider font-bold">Provedor MSP</span>}
+                  <span className="px-1.5 py-0.5 rounded bg-surface-container-high text-on-surface-variant text-[9px] uppercase tracking-wider font-bold">{currentUser.role.replace('_', ' ')}</span>
+                  <span className="px-1.5 py-0.5 rounded bg-surface-container-high text-on-surface-variant text-[9px] font-semibold">{currentCompany.name}</span>
+                  {isProvider && <span className="px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-400 border border-sky-500/20 text-[9px] uppercase tracking-wider font-bold">Provedor MSP</span>}
                 </div>
               </div>
               <div className="p-2">
-                <button onClick={handleLogout} className="w-full text-left px-3 py-2 text-xs text-red-500 hover:bg-red-50 rounded-xl transition-all cursor-pointer font-semibold">Encerrar Sessão</button>
+                <button onClick={handleLogout} className="w-full text-left px-3 py-2 text-xs text-red-500 hover:bg-red-50/10 rounded-xl transition-all cursor-pointer font-semibold">Encerrar Sessão</button>
               </div>
             </div>
           )}
         </div>
 
         {/* Notification Bell */}
-        <button className="relative p-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-all cursor-pointer">
+        <button className="relative p-2 rounded-xl text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all cursor-pointer">
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
           {unreadNotifs > 0 && <span className="absolute top-1.5 right-1.5 flex h-2 w-2"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" /><span className="relative inline-flex rounded-full h-2 w-2 bg-red-500" /></span>}
         </button>
@@ -2273,40 +1977,40 @@ export default function App() {
       {/* Layout */}
       <div className="flex flex-1 overflow-hidden">
         {/* Sidebar */}
-        <aside className="w-56 bg-white border-r border-slate-200 shrink-0 hidden lg:flex flex-col py-4">
+        <aside className="w-56 bg-surface border-r border-outline-variant shrink-0 hidden lg:flex flex-col py-4">
           <div className="px-3 space-y-0.5">
-            <div className="text-[9px] text-slate-400 font-bold uppercase tracking-widest px-3 py-2">Módulos ITIL v4</div>
+            <div className="text-[9px] text-on-surface-variant font-bold uppercase tracking-widest px-3 py-2">Módulos ITIL v4</div>
             {navItems.slice(0, 4).map(item => (
               <button key={item.view} onClick={() => handleViewChange(item.view)}
-                className={`w-full text-left flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all cursor-pointer ${activeView === item.view ? 'bg-slate-800 text-white shadow-sm' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100'}`}>
-                <span className={activeView === item.view ? 'text-emerald-400' : 'text-slate-400'}>{item.icon}</span>
+                className={`w-full text-left flex items-center gap-2.5 px-3 py-2.5 rounded-r-none rounded-l-xl text-sm font-semibold transition-all cursor-pointer border-r-2 ${activeView === item.view ? 'bg-surface-container-high text-primary border-primary' : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container border-transparent'}`}>
+                <span className={activeView === item.view ? 'text-primary' : 'text-on-surface-variant'}>{item.icon}</span>
                 {item.label}
               </button>
             ))}
           </div>
-          <div className="px-3 space-y-0.5 mt-4 pt-4 border-t border-slate-100">
-            <div className="text-[9px] text-slate-400 font-bold uppercase tracking-widest px-3 py-2">Acesso</div>
+          <div className="px-3 space-y-0.5 mt-4 pt-4 border-t border-outline-variant">
+            <div className="text-[9px] text-on-surface-variant font-bold uppercase tracking-widest px-3 py-2">Acesso</div>
             {navItems.slice(4).map(item => (
               <button key={item.view} onClick={() => handleViewChange(item.view)}
-                className={`w-full text-left flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all cursor-pointer ${activeView === item.view ? 'bg-slate-800 text-white shadow-sm' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100'}`}>
-                <span className={activeView === item.view ? 'text-emerald-400' : 'text-slate-400'}>{item.icon}</span>
+                className={`w-full text-left flex items-center gap-2.5 px-3 py-2.5 rounded-r-none rounded-l-xl text-sm font-semibold transition-all cursor-pointer border-r-2 ${activeView === item.view ? 'bg-surface-container-high text-primary border-primary' : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container border-transparent'}`}>
+                <span className={activeView === item.view ? 'text-primary' : 'text-on-surface-variant'}>{item.icon}</span>
                 {item.label}
               </button>
             ))}
           </div>
           {/* Active Company Card */}
           <div className="mt-auto px-3 pb-2">
-            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3 text-center">
-              <div className="text-[9px] text-slate-400 uppercase tracking-widest font-bold mb-2">Tenant Ativo</div>
-              <img src={currentCompany.branding.logoUrl} alt={currentCompany.name} className="w-9 h-9 rounded-xl mx-auto mb-1.5 shadow-sm" />
-              <div className="text-[11px] text-slate-700 font-bold">{currentCompany.name}</div>
-              <div className="text-[9px] text-slate-400 mt-0.5">{currentCompany.domain}</div>
+            <div className="bg-surface-container border border-outline-variant rounded-2xl p-3 text-center">
+              <div className="text-[9px] text-on-surface-variant uppercase tracking-widest font-bold mb-2">Tenant Ativo</div>
+              <img src={currentCompany.branding.logoUrl} alt={currentCompany.name} className="w-9 h-9 rounded-xl mx-auto mb-1.5 shadow-sm animate-pulse" />
+              <div className="text-[11px] text-on-surface font-bold">{currentCompany.name}</div>
+              <div className="text-[9px] text-on-surface-variant mt-0.5">{currentCompany.domain}</div>
             </div>
           </div>
         </aside>
 
         {/* Main Content */}
-        <main className="flex-1 min-h-0 overflow-y-auto bg-slate-50" onClick={() => setIsUserMenuOpen(false)}>
+        <main className="flex-1 min-h-0 overflow-y-auto bg-background" onClick={() => setIsUserMenuOpen(false)}>
           {showWorkspace ? (
             renderActiveDashboard()
           ) : (
@@ -2318,10 +2022,10 @@ export default function App() {
       </div>
 
       {/* Footer */}
-      <footer className="bg-white border-t border-slate-100 py-3 px-6 flex items-center justify-between">
-        <span className="text-[10px] text-slate-400">© {new Date().getFullYear()} Flowfy ITSM · ITIL v4 · Multi-Tenant</span>
-        <span className="flex items-center gap-1.5 text-[10px] text-slate-400">
-          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+      <footer className="bg-surface border-t border-outline-variant py-3 px-6 flex items-center justify-between">
+        <span className="text-[10px] text-on-surface-variant">© {new Date().getFullYear()} Flowfy ITSM · ITIL v4 · Multi-Tenant</span>
+        <span className="flex items-center gap-1.5 text-[10px] text-on-surface-variant">
+          <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
           Todos os sistemas operacionais
         </span>
       </footer>

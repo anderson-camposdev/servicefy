@@ -14,3 +14,11 @@ export {
   type ToastType,
   type ToastItem,
 } from './ToastContext'
+
+export {
+  ThemeProvider,
+  useTheme,
+  THEME_PRESETS,
+  type ThemeColors,
+  type ThemePreset,
+} from './ThemeContext'

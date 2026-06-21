@@ -8,15 +8,16 @@ import { createClient } from '@supabase/supabase-js'
 import { supabase } from './supabase'
 import type {
   CompanyRow, ProfileRow, IncidentRow, IncidentHistoryRow, PortalTicketDetail, TicketMessageRow,
-  ServiceRequestRow, ProblemRow, ChangeRow, CatalogItemRow, CatalogCategoryRow,
+  ProblemRow, ChangeRow, CatalogItemRow, CatalogCategoryRow,
   CatalogServiceRow, SystemSymptomRow, CatalogServiceSymptomRow,
   RequestCategoryRow, RequestItemRow, RequestFormField, FormTemplateRow,
   TicketPriority, IncidentState, IncidentCategory,
-  RequestState, ChangeType, ChangeRisk, ChangeState,
+  ChangeType, ChangeRisk, ChangeState,
   IncidentCatalogItemRow, IncidentCatalogSubitemRow, IncidentCatalogSymptomRow,
   RequestCatalogItemRow, RequestCatalogSubitemRow, ApprovalTokenRow,
   ActiveSessionRow, ChatbotWhitelistRow, ChatbotMessageRow, ChatbotConfigRow,
-  AssignmentGroupRow, ProfileRow as _ProfileRow,
+  AssignmentGroupRow, PendingReasonRow,
+  SlaCalendarRow, SlaCalendarShiftRow, SlaCalendarHolidayRow, SLAPolicyRow, SlaEventRow,
 } from './database.types'
 
 const url  = import.meta.env.VITE_SUPABASE_URL  as string
@@ -88,6 +89,15 @@ export const companiesService = {
       .select()
       .single()
     return throwIfError(data, error)
+  },
+
+  async uploadBrandAsset(companyId: string, file: File): Promise<string> {
+    const ext = (file.name.split('.').pop() || 'png').toLowerCase()
+    const path = `brands/${companyId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
+    const { error } = await supabase.storage.from('catalog-icons').upload(path, file, { upsert: true, contentType: file.type || undefined })
+    if (error) throw error
+    const { data } = supabase.storage.from('catalog-icons').getPublicUrl(path)
+    return data.publicUrl
   },
 }
 
@@ -200,6 +210,17 @@ export const incidentsService = {
     return { ...inc!, history: hist ?? [] }
   },
 
+  /** Histórico PÚBLICO do chamado (linha do tempo p/ o solicitante, sem notas internas). */
+  async listPublicHistory(incidentId: string, companyId: string): Promise<IncidentHistoryRow[]> {
+    const { data, error } = await getClientForCompany(companyId)
+      .from('incident_history')
+      .select('*')
+      .eq('incident_id', incidentId)
+      .eq('is_public', true)
+      .order('created_at', { ascending: true })
+    return throwIfError(data, error)
+  },
+
   /** User-facing one-page detail with catalog context. */
   async getPortalDetail(id: string, companyId: string): Promise<PortalTicketDetail> {
     const client = getClientForCompany(companyId)
@@ -306,6 +327,67 @@ export const incidentsService = {
     return throwIfError(data, error)
   },
 
+  /**
+   * Abertura MANUAL (atendimento telefônico/direto) por um analista.
+   * Numeração INC/REQ e auditoria de 'Criação' (mensagem manual) são
+   * geradas por triggers. O grupo solucionador herdado do catálogo é
+   * gravado e NÃO é alterado (governança de roteamento).
+   */
+  async openManual(payload: {
+    companyId: string
+    ticketType: 'incident' | 'request'
+    callerId: string | null
+    callerName: string
+    shortDescription: string
+    description?: string | null
+    catalogServiceId?: string | null
+    symptomId?: string | null
+    requestItemId?: string | null
+    assignmentGroupId?: string | null
+    assignmentGroupName?: string | null
+    slaHours?: number | null
+    impact?: string | null
+    urgency?: string | null
+    priority?: string | null
+    formData?: Record<string, unknown> | null
+    startNow: boolean
+    analystId: string
+    analystName: string
+  }): Promise<IncidentRow> {
+    const now = new Date().toISOString()
+    const slaDeadline = payload.slaHours ? new Date(Date.now() + payload.slaHours * 3600 * 1000).toISOString() : null
+    const { data, error } = await getClientForCompany(payload.companyId)
+      .from('incidents')
+      .insert({
+        company_id:          payload.companyId,
+        ticket_type:         payload.ticketType,
+        short_description:   payload.shortDescription,
+        description:         payload.description ?? null,
+        category:            'Inquiry',
+        caller_id:           payload.callerId ?? null,
+        caller_name:         payload.callerName,
+        catalog_service_id:  payload.catalogServiceId ?? null,
+        symptom_id:          payload.symptomId ?? null,
+        request_item_id:     payload.requestItemId ?? null,
+        // Governança: grupo solucionador herdado do catálogo (imutável).
+        assignment_group_id: payload.assignmentGroupId ?? null,
+        assigned_group_name: payload.assignmentGroupName ?? null,
+        sla_deadline:        slaDeadline,
+        impact:              payload.impact ?? null,
+        urgency:             payload.urgency ?? null,
+        priority:            payload.priority ?? 'P3 - Moderate',
+        form_data:           payload.formData ?? null,
+        // SLA de Resposta liquidado + atribuição imediata quando "Iniciar já".
+        state:               payload.startNow ? 'In Progress' : 'New',
+        assigned_to_id:      payload.startNow ? payload.analystId : null,
+        assigned_to_name:    payload.startNow ? payload.analystName : null,
+        responded_at:        payload.startNow ? now : null,
+      })
+      .select()
+      .single()
+    return throwIfError(data, error)
+  },
+
   /** Update incident fields and log to incident_history */
   async update(
     id: string,
@@ -361,7 +443,7 @@ export const incidentsService = {
     id: string,
     companyId: string,
     payload: {
-      changes: Partial<Pick<IncidentRow, 'state' | 'assigned_to_id' | 'assigned_to_name' | 'assigned_group_name' | 'assignment_group_id' | 'close_code' | 'close_notes' | 'resolved_at' | 'closed_at' | 'priority' | 'impact' | 'urgency'>>,
+      changes: Partial<Pick<IncidentRow, 'state' | 'assigned_to_id' | 'assigned_to_name' | 'assigned_group_name' | 'assignment_group_id' | 'close_code' | 'close_notes' | 'resolved_at' | 'closed_at' | 'priority' | 'impact' | 'urgency' | 'pending_reason' | 'pending_reason_id'>>,
       comment?: string,
       isInternal?: boolean,
       senderId?: string | null,
@@ -690,71 +772,212 @@ export const assignmentGroupsService = {
   },
 }
 
-// ─── SERVICE REQUESTS ────────────────────────────────────────
+// ─── PENDING REASONS (Motivos de Pendência — Governança SLA) ──
 
-export const requestsService = {
-  async list(companyId: string, requesterId?: string): Promise<ServiceRequestRow[]> {
-    let q = getClientForCompany(companyId)
-      .from('service_requests')
+export const pendingReasonsService = {
+  /** Lista os motivos de pendência ativos do tenant (migration 035). */
+  async list(companyId: string): Promise<PendingReasonRow[]> {
+    const { data, error } = await getClientForCompany(companyId)
+      .from('pending_reasons')
       .select('*')
       .eq('company_id', companyId)
-      .order('created_at', { ascending: false })
-    if (requesterId) q = q.eq('requester_id', requesterId)
-    const { data, error } = await q
+      .eq('active', true)
+      .order('name')
     return throwIfError(data, error)
   },
 
-  async getKPIs(companyId: string) {
+  /** Lista TODOS os motivos (inclui inativos) — uso administrativo. */
+  async listAll(companyId: string): Promise<PendingReasonRow[]> {
     const { data, error } = await getClientForCompany(companyId)
-      .from('service_requests')
-      .select('state, cost')
+      .from('pending_reasons')
+      .select('*')
       .eq('company_id', companyId)
-    if (error) throw error
-    const rows = data ?? []
-    return {
-      total:     rows.length,
-      awaiting:  rows.filter((r: any) => r.state === 'Awaiting Approval').length,
-      fulfilled: rows.filter((r: any) => r.state === 'Fulfilled').length,
-      cost:      rows.reduce((sum: number, r: any) => sum + (r.cost ?? 0), 0),
-    }
+      .order('name')
+    return throwIfError(data, error)
   },
 
   async create(payload: {
-    companyId: string
-    catalogItemName: string
-    catalogItemId?: string
-    requesterName: string
-    requesterId?: string
-    priority?: TicketPriority
-    formData?: Record<string, unknown>
-    cost?: number
-  }): Promise<ServiceRequestRow> {
+    companyId: string; name: string; slug: string; requiresCustomerAction: boolean
+  }): Promise<PendingReasonRow> {
     const { data, error } = await getClientForCompany(payload.companyId)
-      .from('service_requests')
+      .from('pending_reasons')
       .insert({
-        company_id:       payload.companyId,
-        catalog_item_name: payload.catalogItemName,
-        catalog_item_id:  payload.catalogItemId ?? null,
-        requester_name:   payload.requesterName,
-        requester_id:     payload.requesterId ?? null,
-        priority:         payload.priority ?? 'P3 - Moderate',
-        form_data:        payload.formData ?? {},
-        cost:             payload.cost ?? null,
+        company_id: payload.companyId,
+        name: payload.name,
+        slug: payload.slug,
+        requires_customer_action: payload.requiresCustomerAction,
       })
       .select()
       .single()
     return throwIfError(data, error)
   },
 
-  async updateState(id: string, companyId: string, state: RequestState, actorName: string, comment?: string): Promise<ServiceRequestRow> {
-    const client = getClientForCompany(companyId)
-    const updates: Partial<ServiceRequestRow> = { state }
-    if (state === 'Approved') updates.approved_at = new Date().toISOString()
-    if (state === 'Fulfilled') updates.fulfilled_at = new Date().toISOString()
-    const { data, error } = await client.from('service_requests').update(updates).eq('id', id).select().single()
+  async update(
+    id: string,
+    companyId: string,
+    patch: Partial<Pick<PendingReasonRow, 'name' | 'slug' | 'requires_customer_action' | 'active'>>,
+  ): Promise<PendingReasonRow> {
+    const { data, error } = await getClientForCompany(companyId)
+      .from('pending_reasons')
+      .update(patch)
+      .eq('id', id)
+      .select()
+      .single()
+    return throwIfError(data, error)
+  },
+
+  async remove(id: string, companyId: string): Promise<void> {
+    const { error } = await getClientForCompany(companyId)
+      .from('pending_reasons')
+      .delete()
+      .eq('id', id)
     if (error) throw error
-    await client.from('request_history').insert({ request_id: id, changed_by_name: actorName, field_name: 'state', new_value: state, comment: comment ?? null, is_public: true })
-    return data!
+  },
+}
+
+// ─── SLA POLICIES (Políticas de prazo por prioridade) ────────
+
+export const slaPolicyService = {
+  /** Lista as políticas do tenant ordenadas por prioridade (1..5). */
+  async list(companyId: string): Promise<SLAPolicyRow[]> {
+    const { data, error } = await getClientForCompany(companyId)
+      .from('sla_policies')
+      .select('*')
+      .eq('company_id', companyId)
+      .order('priority')
+    return throwIfError(data, error)
+  },
+
+  async update(
+    id: string,
+    companyId: string,
+    patch: Partial<Pick<SLAPolicyRow, 'response_time_minutes' | 'resolution_time_minutes' | 'active'>>,
+  ): Promise<SLAPolicyRow> {
+    const { data, error } = await getClientForCompany(companyId)
+      .from('sla_policies')
+      .update({ ...patch, updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .select()
+      .single()
+    return throwIfError(data, error)
+  },
+}
+
+// ─── SLA CALENDARS (Calendário útil + turnos + feriados) ─────
+
+export const slaCalendarsService = {
+  async list(companyId: string): Promise<SlaCalendarRow[]> {
+    const { data, error } = await getClientForCompany(companyId)
+      .from('sla_calendars')
+      .select('*')
+      .eq('company_id', companyId)
+      .order('name')
+    return throwIfError(data, error)
+  },
+
+  async create(payload: {
+    companyId: string; name: string; timezone?: string; is24x7?: boolean
+  }): Promise<SlaCalendarRow> {
+    const { data, error } = await getClientForCompany(payload.companyId)
+      .from('sla_calendars')
+      .insert({
+        company_id: payload.companyId,
+        name: payload.name,
+        timezone: payload.timezone ?? 'America/Sao_Paulo',
+        is_24x7: payload.is24x7 ?? false,
+      })
+      .select()
+      .single()
+    return throwIfError(data, error)
+  },
+
+  async update(
+    id: string,
+    companyId: string,
+    patch: Partial<Pick<SlaCalendarRow, 'name' | 'timezone' | 'is_24x7' | 'active'>>,
+  ): Promise<SlaCalendarRow> {
+    const { data, error } = await getClientForCompany(companyId)
+      .from('sla_calendars')
+      .update({ ...patch, updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .select()
+      .single()
+    return throwIfError(data, error)
+  },
+
+  async remove(id: string, companyId: string): Promise<void> {
+    const { error } = await getClientForCompany(companyId)
+      .from('sla_calendars')
+      .delete()
+      .eq('id', id)
+    if (error) throw error
+  },
+
+  // ─ Turnos ─
+  async listShifts(calendarId: string, companyId: string): Promise<SlaCalendarShiftRow[]> {
+    const { data, error } = await getClientForCompany(companyId)
+      .from('sla_calendar_shifts')
+      .select('*')
+      .eq('calendar_id', calendarId)
+      .order('weekday')
+    return throwIfError(data, error)
+  },
+
+  async addShift(payload: {
+    companyId: string; calendarId: string; weekday: number; startTime: string; endTime: string
+  }): Promise<SlaCalendarShiftRow> {
+    const { data, error } = await getClientForCompany(payload.companyId)
+      .from('sla_calendar_shifts')
+      .insert({
+        calendar_id: payload.calendarId,
+        weekday: payload.weekday,
+        start_time: payload.startTime,
+        end_time: payload.endTime,
+      })
+      .select()
+      .single()
+    return throwIfError(data, error)
+  },
+
+  async removeShift(id: string, companyId: string): Promise<void> {
+    const { error } = await getClientForCompany(companyId)
+      .from('sla_calendar_shifts')
+      .delete()
+      .eq('id', id)
+    if (error) throw error
+  },
+
+  // ─ Feriados ─
+  async listHolidays(calendarId: string, companyId: string): Promise<SlaCalendarHolidayRow[]> {
+    const { data, error } = await getClientForCompany(companyId)
+      .from('sla_calendar_holidays')
+      .select('*')
+      .eq('calendar_id', calendarId)
+      .order('holiday')
+    return throwIfError(data, error)
+  },
+
+  async addHoliday(payload: {
+    companyId: string; calendarId: string; holiday: string; name?: string | null
+  }): Promise<SlaCalendarHolidayRow> {
+    const { data, error } = await getClientForCompany(payload.companyId)
+      .from('sla_calendar_holidays')
+      .insert({
+        calendar_id: payload.calendarId,
+        holiday: payload.holiday,
+        name: payload.name ?? null,
+      })
+      .select()
+      .single()
+    return throwIfError(data, error)
+  },
+
+  async removeHoliday(id: string, companyId: string): Promise<void> {
+    const { error } = await getClientForCompany(companyId)
+      .from('sla_calendar_holidays')
+      .delete()
+      .eq('id', id)
+    if (error) throw error
   },
 }
 
@@ -1758,3 +1981,153 @@ export const messagesService = {
       .subscribe()
   },
 }
+
+// ============================================================
+// EVENTOS DE SLA (livro-caixa auditável)
+// Tabela sla_events (migration 035) — com Supabase Realtime.
+// ============================================================
+
+export const slaEventsService = {
+  /** Lista os eventos de SLA de um chamado em ordem cronológica. */
+  async list(incidentId: string): Promise<SlaEventRow[]> {
+    const { data, error } = await supabase
+      .from('sla_events')
+      .select('*')
+      .eq('incident_id', incidentId)
+      .order('created_at', { ascending: true })
+    return throwIfError(data, error)
+  },
+
+  /** Assina inserts em tempo real para eventos de SLA de um chamado. */
+  subscribeToIncident(incidentId: string, onInsert: (row: SlaEventRow) => void) {
+    return supabase
+      .channel(`sla_events:${incidentId}`)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'sla_events', filter: `incident_id=eq.${incidentId}` },
+        (payload: any) => onInsert(payload.new as SlaEventRow),
+      )
+      .subscribe()
+  },
+}
+
+// ============================================================
+// SERVIÇOS DO FLOWFY BI & ANALYTICS
+// ============================================================
+export const biService = {
+  /** Busca métricas e formata a série temporal para gráficos dinâmicos do BI. */
+  async getMetricsAndChartData(companyId: string, period: string, metricType: string) {
+    let days = 30
+    if (period === 'today') days = 0
+    else if (period === 'last_7_days') days = 7
+    else if (period === 'last_15_days') days = 15
+    else if (period === 'last_30_days') days = 30
+
+    const startDate = new Date()
+    startDate.setDate(startDate.getDate() - days)
+    startDate.setHours(0, 0, 0, 0)
+
+    // Provedor MSP enxerga todos os clientes (cross-company via RLS);
+    // tenant comum só os próprios chamados.
+    const isMSP = companyId === '44444444-4444-4444-4444-444444444444'
+    const client = getClientForCompany(companyId)
+
+    // Consulta otimizada trazendo apenas as colunas úteis (+ company_id real).
+    let query = client
+      .from('incidents')
+      .select(`
+        id, number, short_description, description, created_at, resolved_at, closed_at, updated_at, state, ticket_type, sla_breached, is_response_breached, priority_level, impact, urgency, assigned_group_name, assigned_to_name, category, company_id,
+        catalog_services:catalog_service_id(name),
+        system_symptoms:symptom_id(name),
+        caller_name
+      `)
+      .gte('created_at', startDate.toISOString())
+
+    if (!isMSP) {
+      query = query.eq('company_id', companyId)
+    }
+
+    if (metricType === 'incidents') {
+      query = query.eq('ticket_type', 'incident')
+    } else if (metricType === 'requests') {
+      query = query.eq('ticket_type', 'request')
+    }
+
+    const { data: tickets, error } = await query
+    if (error) throw error
+
+    const list = tickets || []
+
+    // 1. Totalizadores
+    const total = list.length
+
+    // 2. MTTR (Mean Time to Resolution) em horas
+    const resolved = list.filter((t: any) => t.resolved_at && t.state === 'Resolved')
+    let totalHours = 0
+    resolved.forEach((t: any) => {
+      const diff = new Date(t.resolved_at).getTime() - new Date(t.created_at).getTime()
+      totalHours += diff / (1000 * 60 * 60)
+    })
+    const mttr = resolved.length > 0 ? Number((totalHours / resolved.length).toFixed(1)) : 0
+
+    // 3. SLA Compliance Rate
+    const metSLA = resolved.filter((t: any) => !t.sla_breached).length
+    const slaCompliance = resolved.length > 0 ? Number(((metSLA / resolved.length) * 100).toFixed(1)) : 100
+
+    // 4. Agrupamento temporal diário para o gráfico
+    const dailyVolume: Record<string, { date: string; count: number; resolvedCount: number }> = {}
+    
+    // Inicializar os dias no range
+    for (let i = days; i >= 0; i--) {
+      const d = new Date()
+      d.setDate(d.getDate() - i)
+      const key = d.toISOString().split('T')[0]
+      dailyVolume[key] = { date: key, count: 0, resolvedCount: 0 }
+    }
+
+    list.forEach((t: any) => {
+      const key = new Date(t.created_at).toISOString().split('T')[0]
+      if (dailyVolume[key]) {
+        dailyVolume[key].count++
+        if (t.state === 'Resolved') {
+          dailyVolume[key].resolvedCount++
+        }
+      }
+    })
+
+    const chartData = Object.values(dailyVolume).sort((a, b) => a.date.localeCompare(b.date))
+
+    return {
+      total,
+      mttr,
+      slaCompliance,
+      chartData,
+      tickets: list,
+    }
+  },
+
+  /** Salva um modelo de relatório na tabela public.bi_saved_reports */
+  async saveReport(payload: { company_id: string; name: string; chart_type: string; query_config: any; created_by: string; is_public: boolean }) {
+    const { data, error } = await supabase.from('bi_saved_reports').insert(payload).select().single()
+    return throwIfError(data, error)
+  },
+
+  /** Lista os relatórios salvos da companhia */
+  async listReports(companyId: string) {
+    const { data, error } = await supabase
+      .from('bi_saved_reports')
+      .select('*')
+      .eq('company_id', companyId)
+      .order('created_at', { ascending: false })
+    return throwIfError(data, error)
+  },
+
+  /** Deleta um modelo de relatório */
+  async deleteReport(id: string) {
+    const { error } = await supabase.from('bi_saved_reports').delete().eq('id', id)
+    if (error) throw error
+    return true
+  },
+}
+
+

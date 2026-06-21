@@ -20,6 +20,12 @@ export interface TenantBranding {
   backgroundColor: string
   welcomeTitle: string
   welcomeSubtitle: string
+  titleColor: string | null
+  titleFont: string | null
+  titleSize: string | null
+  subtitleColor: string | null
+  subtitleFont: string | null
+  subtitleSize: string | null
 }
 
 /** Branding padrão do produto (Flowfy) — usado fora de um tenant resolvido. */
@@ -32,6 +38,12 @@ export const DEFAULT_BRANDING: TenantBranding = {
   backgroundColor: '#f8fafc',
   welcomeTitle: 'Flowfy ITSM Enterprise',
   welcomeSubtitle: 'Plataforma ITSM multi-tenant baseada no ITIL v4',
+  titleColor: null,
+  titleFont: null,
+  titleSize: null,
+  subtitleColor: null,
+  subtitleFont: null,
+  subtitleSize: null,
 }
 
 /** Monta o branding a partir da linha de `companies`, com fallbacks seguros. */
@@ -45,6 +57,12 @@ export function brandingFromCompany(row: CompanyRow): TenantBranding {
     backgroundColor: row.bg_color || DEFAULT_BRANDING.backgroundColor,
     welcomeTitle: row.welcome_title || DEFAULT_BRANDING.welcomeTitle,
     welcomeSubtitle: row.welcome_subtitle || DEFAULT_BRANDING.welcomeSubtitle,
+    titleColor: row.title_color ?? null,
+    titleFont: row.title_font ?? null,
+    titleSize: row.title_size ?? null,
+    subtitleColor: row.subtitle_color ?? null,
+    subtitleFont: row.subtitle_font ?? null,
+    subtitleSize: row.subtitle_size ?? null,
   }
 }
 
@@ -71,6 +89,42 @@ export function applyBranding(branding: TenantBranding): void {
   root.style.setProperty('--brand-primary', branding.primaryColor)
   root.style.setProperty('--brand-accent', branding.accentColor)
   root.style.setProperty('--brand-bg', branding.backgroundColor)
+  
+  if (branding.titleColor) {
+    root.style.setProperty('--brand-title-color', branding.titleColor)
+  } else {
+    root.style.removeProperty('--brand-title-color')
+  }
+
+  if (branding.titleFont) {
+    root.style.setProperty('--brand-title-font', branding.titleFont)
+  } else {
+    root.style.removeProperty('--brand-title-font')
+  }
+
+  if (branding.titleSize) {
+    root.style.setProperty('--brand-title-size', branding.titleSize)
+  } else {
+    root.style.removeProperty('--brand-title-size')
+  }
+
+  if (branding.subtitleColor) {
+    root.style.setProperty('--brand-subtitle-color', branding.subtitleColor)
+  } else {
+    root.style.removeProperty('--brand-subtitle-color')
+  }
+
+  if (branding.subtitleFont) {
+    root.style.setProperty('--brand-subtitle-font', branding.subtitleFont)
+  } else {
+    root.style.removeProperty('--brand-subtitle-font')
+  }
+
+  if (branding.subtitleSize) {
+    root.style.setProperty('--brand-subtitle-size', branding.subtitleSize)
+  } else {
+    root.style.removeProperty('--brand-subtitle-size')
+  }
 
   document.title = branding.welcomeTitle || branding.name
   setFavicon(branding.faviconUrl)

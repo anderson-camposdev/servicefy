@@ -55,12 +55,24 @@ export interface CompanyBranding {
   backgroundColor: string;
   welcomeTitle: string;
   welcomeSubtitle: string;
+  titleColor?: string;
+  titleFont?: string;
+  titleSize?: string;
+  subtitleColor?: string;
+  subtitleFont?: string;
+  subtitleSize?: string;
+  catalogHeadline?: string;
+  catalogHeadlineColor?: string;
+  catalogHeadlineSize?: string;
+  greetingPrefix?: string;
+  greetingColor?: string;
   faviconUrl?: string;
 }
 
 export interface Company {
   id: string;
   name: string;
+  slug?: string;
   domain: string;         // ex: 'acmecorp.com'
   branding: CompanyBranding;
   authConfig: AuthConfig;
@@ -91,7 +103,7 @@ export interface User {
 
 // ─── Shared Ticket Fields ────────────────────────────────────
 
-export type TicketPriority = 'P1 - Critical' | 'P2 - High' | 'P3 - Moderate' | 'P4 - Low';
+export type TicketPriority = 'P1 - Critical' | 'P2 - High' | 'P3 - Moderate' | 'P4 - Low' | 'P5 - Planning';
 
 export interface Comment {
   id: string;
@@ -338,7 +350,9 @@ export type AppView =
   | 'dashboard_changes'
   | 'user_portal'
   | 'api_docs'
-  | 'admin_dashboard';
+  | 'admin_dashboard'
+  | 'settings_governance'
+  | 'flowfy_bi';
 
 // ─── Catálogo Hierárquico de Incidentes (3 Níveis + SLA) ─────
 

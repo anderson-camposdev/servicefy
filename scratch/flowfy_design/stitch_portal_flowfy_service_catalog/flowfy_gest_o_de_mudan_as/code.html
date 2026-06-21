@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+
+<html class="light" lang="pt-BR"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Flowfy - Gestão de Mudanças</title>
+<!-- Fonts and Icons -->
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;600;700;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Tailwind Config -->
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "on-error-container": "#93000a",
+                    "on-error": "#ffffff",
+                    "on-tertiary": "#ffffff",
+                    "on-secondary": "#ffffff",
+                    "on-tertiary-fixed": "#360f00",
+                    "error-container": "#ffdad6",
+                    "on-tertiary-container": "#ffede6",
+                    "on-primary-container": "#eeefff",
+                    "tertiary-fixed": "#ffdbcd",
+                    "surface-dim": "#d2d9f4",
+                    "surface-container-lowest": "#ffffff",
+                    "inverse-surface": "#283044",
+                    "background": "#faf8ff",
+                    "surface-container-highest": "#dae2fd",
+                    "on-surface-variant": "#434655",
+                    "on-secondary-fixed-variant": "#38485d",
+                    "secondary-fixed-dim": "#b7c8e1",
+                    "on-primary": "#ffffff",
+                    "on-primary-fixed": "#00174b",
+                    "surface-container": "#eaedff",
+                    "secondary": "#505f76",
+                    "on-tertiary-fixed-variant": "#7d2d00",
+                    "tertiary": "#943700",
+                    "primary-fixed-dim": "#b4c5ff",
+                    "primary-container": "#2563eb",
+                    "surface-bright": "#faf8ff",
+                    "outline-variant": "#c3c6d7",
+                    "on-primary-fixed-variant": "#003ea8",
+                    "primary": "#004ac6",
+                    "surface-variant": "#dae2fd",
+                    "surface-tint": "#0053db",
+                    "secondary-fixed": "#d3e4fe",
+                    "on-secondary-container": "#54647a",
+                    "on-surface": "#131b2e",
+                    "tertiary-container": "#bc4800",
+                    "on-background": "#131b2e",
+                    "primary-fixed": "#dbe1ff",
+                    "inverse-on-surface": "#eef0ff",
+                    "surface-container-low": "#f2f3ff",
+                    "secondary-container": "#d0e1fb",
+                    "inverse-primary": "#b4c5ff",
+                    "tertiary-fixed-dim": "#ffb596",
+                    "outline": "#737686",
+                    "on-secondary-fixed": "#0b1c30",
+                    "error": "#ba1a1a",
+                    "surface-container-high": "#e2e7ff",
+                    "surface": "#faf8ff"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "xl": "32px",
+                    "md": "16px",
+                    "margin-desktop": "40px",
+                    "lg": "24px",
+                    "2xl": "48px",
+                    "xs": "4px",
+                    "margin-mobile": "16px",
+                    "gutter": "24px",
+                    "base": "4px",
+                    "sm": "8px",
+                    "3xl": "64px"
+            },
+            "fontFamily": {
+                    "headline-lg": ["Hanken Grotesk"],
+                    "title-md": ["Hanken Grotesk"],
+                    "label-md": ["Hanken Grotesk"],
+                    "headline-lg-mobile": ["Hanken Grotesk"],
+                    "body-sm": ["Hanken Grotesk"],
+                    "display-lg": ["Hanken Grotesk"],
+                    "body-md": ["Hanken Grotesk"]
+            },
+            "fontSize": {
+                    "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                    "title-md": ["20px", {"lineHeight": "28px", "fontWeight": "600"}],
+                    "label-md": ["12px", {"lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "600"}],
+                    "headline-lg-mobile": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+                    "body-sm": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
+                    "display-lg": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                    "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        body { font-family: 'Hanken Grotesk', sans-serif; }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .fill-icon { font-variation-settings: 'FILL' 1; }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #c3c6d7; border-radius: 10px; }
+    </style>
+</head>
+<body class="bg-background text-on-background min-h-screen">
+<!-- SideNavBar Shell -->
+<aside class="fixed left-0 top-0 h-full w-64 flex flex-col p-4 border-r border-outline-variant bg-surface shadow-sm z-50">
+<div class="mb-8 px-2 flex items-center gap-3">
+<div class="w-10 h-10 bg-primary-container rounded-xl flex items-center justify-center text-on-primary-container shadow-lg shadow-primary-container/20">
+<span class="material-symbols-outlined font-black text-2xl" data-icon="published_with_changes">published_with_changes</span>
+</div>
+<div>
+<h1 class="font-headline-lg text-headline-lg font-black text-primary">Flowfy</h1>
+<p class="text-[10px] uppercase tracking-widest text-outline font-bold">ITSM Portal</p>
+</div>
+</div>
+<nav class="flex-1 space-y-1">
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container-high transition-colors rounded-xl group" href="#">
+<span class="material-symbols-outlined text-xl" data-icon="dashboard">dashboard</span>
+<span class="font-body-md text-body-md">Dashboard</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 bg-primary-container text-on-primary-container rounded-xl font-bold shadow-md shadow-primary/20" href="#">
+<span class="material-symbols-outlined text-xl" data-icon="published_with_changes">published_with_changes</span>
+<span class="font-body-md text-body-md">Mudanças</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container-high transition-colors rounded-xl group" href="#">
+<span class="material-symbols-outlined text-xl" data-icon="report_problem">report_problem</span>
+<span class="font-body-md text-body-md">Problemas</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container-high transition-colors rounded-xl group" href="#">
+<span class="material-symbols-outlined text-xl" data-icon="settings">settings</span>
+<span class="font-body-md text-body-md">Configurações</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container-high transition-colors rounded-xl group" href="#">
+<span class="material-symbols-outlined text-xl" data-icon="person">person</span>
+<span class="font-body-md text-body-md">Perfil</span>
+</a>
+</nav>
+<div class="mt-auto space-y-1 pt-4 border-t border-outline-variant">
+<button class="w-full flex items-center justify-center gap-2 py-3 bg-primary text-white rounded-xl font-bold mb-4 hover:opacity-90 transition-all active:scale-95">
+<span class="material-symbols-outlined" data-icon="add">add</span>
+                Novo Chamado
+            </button>
+<a class="flex items-center gap-3 px-4 py-2 text-on-surface-variant hover:text-primary transition-colors" href="#">
+<span class="material-symbols-outlined text-xl" data-icon="help">help</span>
+<span class="font-body-sm text-body-sm">Suporte</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-2 text-on-surface-variant hover:text-error transition-colors" href="#">
+<span class="material-symbols-outlined text-xl" data-icon="logout">logout</span>
+<span class="font-body-sm text-body-sm">Sair</span>
+</a>
+</div>
+</aside>
+<!-- TopNavBar Shell -->
+<header class="fixed top-0 right-0 left-64 z-40 flex justify-between items-center h-16 px-margin-desktop bg-background/80 backdrop-blur-md border-b border-outline-variant">
+<div class="flex items-center flex-1 max-w-xl">
+<div class="relative w-full">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline" data-icon="search">search</span>
+<input class="w-full bg-surface-container-low border-none rounded-full pl-10 pr-4 py-2 focus:ring-2 focus:ring-primary/20 text-body-sm" placeholder="Pesquisar mudanças..." type="text"/>
+</div>
+</div>
+<div class="flex items-center gap-6">
+<div class="hidden md:flex gap-6 items-center">
+<a class="text-on-surface-variant hover:text-primary transition-colors font-title-md text-title-md" href="#">Visão Geral</a>
+<a class="text-primary font-bold border-b-2 border-primary pb-1 font-title-md text-title-md" href="#">Relatórios</a>
+</div>
+<div class="flex items-center gap-2">
+<button class="hover:bg-surface-container-low rounded-full p-2 transition-all relative">
+<span class="material-symbols-outlined text-on-surface-variant" data-icon="notifications">notifications</span>
+<span class="absolute top-2 right-2 w-2 h-2 bg-error rounded-full"></span>
+</button>
+<button class="hover:bg-surface-container-low rounded-full p-2 transition-all">
+<span class="material-symbols-outlined text-on-surface-variant" data-icon="history">history</span>
+</button>
+</div>
+<div class="flex items-center gap-3 pl-4 border-l border-outline-variant">
+<div class="text-right hidden lg:block">
+<p class="font-bold text-sm leading-none">Ricardo Silva</p>
+<p class="text-[10px] text-outline">Gestor de Mudanças</p>
+</div>
+<img alt="Foto de Perfil do Usuário" class="w-10 h-10 rounded-full border-2 border-primary/10" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCx9BVmxr7zVE75rgVCvjYh4lo2OeemLWdBiVjSsYjHtcFXxtEe8qwhkmCLVyHAA5L-sZCR9RtvuunDQtcNjO-gdRbn6vpujFobUif3CB_T9ikK4WxOeTEHj5kFdPNTXtsW_U-oWIfzf-WMKgG_MeLbLhQoeul-YCL-vD0Fl46uNJ3SS-Vmc2wZFN8W5F0wJV8VLWpXo5PNOcJRBxnrSXpAmBBTLmaXMXz6gMHVfoKpb_6zJeZms2-K4nLkRX3xI77nxC5PyucSZyA"/>
+</div>
+</div>
+</header>
+<!-- Main Content Canvas -->
+<main class="ml-64 pt-16 p-margin-desktop">
+<!-- Header & Action Row -->
+<div class="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-xl">
+<div>
+<h2 class="font-headline-lg text-headline-lg text-on-surface mb-xs">Gestão de Mudanças</h2>
+<p class="text-on-surface-variant font-body-md text-body-md">Controle e planejamento de alterações na infraestrutura.</p>
+</div>
+<div class="flex gap-sm">
+<button class="px-lg py-2.5 bg-surface border border-outline-variant rounded-xl font-bold flex items-center gap-2 hover:bg-surface-container-low transition-all">
+<span class="material-symbols-outlined text-xl" data-icon="filter_list">filter_list</span>
+                    Filtrar
+                </button>
+<button class="px-lg py-2.5 bg-primary text-white rounded-xl font-bold flex items-center gap-2 hover:shadow-lg hover:shadow-primary/20 transition-all">
+<span class="material-symbols-outlined text-xl" data-icon="add_circle">add_circle</span>
+                    Solicitar Mudança
+                </button>
+</div>
+</div>
+<!-- KPI Bento Grid -->
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-lg mb-xl">
+<!-- Mudanças Pendentes -->
+<div class="bg-surface p-lg rounded-xl border border-outline-variant flex flex-col gap-sm shadow-sm hover:shadow-md transition-shadow">
+<div class="flex justify-between items-center">
+<span class="p-2 bg-surface-container-highest rounded-lg">
+<span class="material-symbols-outlined text-primary" data-icon="pending_actions">pending_actions</span>
+</span>
+<span class="text-xs font-bold text-outline">+12% vs mês ant.</span>
+</div>
+<h3 class="text-on-surface-variant font-label-md text-label-md uppercase tracking-wider">Mudanças Pendentes</h3>
+<p class="font-display-lg text-display-lg text-on-surface">24</p>
+</div>
+<!-- Mudanças Agendadas -->
+<div class="bg-surface p-lg rounded-xl border border-outline-variant flex flex-col gap-sm shadow-sm hover:shadow-md transition-shadow">
+<div class="flex justify-between items-center">
+<span class="p-2 bg-secondary-container rounded-lg">
+<span class="material-symbols-outlined text-secondary" data-icon="calendar_month">calendar_month</span>
+</span>
+<span class="text-xs font-bold text-outline">Próximos 7 dias</span>
+</div>
+<h3 class="text-on-surface-variant font-label-md text-label-md uppercase tracking-wider">Mudanças Agendadas</h3>
+<p class="font-display-lg text-display-lg text-on-surface">18</p>
+</div>
+<!-- Mudanças em Execução -->
+<div class="bg-primary-container p-lg rounded-xl flex flex-col gap-sm shadow-lg shadow-primary/10 hover:scale-[1.02] transition-all">
+<div class="flex justify-between items-center">
+<span class="p-2 bg-white/20 rounded-lg">
+<span class="material-symbols-outlined text-white" data-icon="sync">sync</span>
+</span>
+<span class="text-xs font-bold text-white/80">Janela Ativa</span>
+</div>
+<h3 class="text-white/80 font-label-md text-label-md uppercase tracking-wider">Em Execução</h3>
+<p class="font-display-lg text-display-lg text-white">05</p>
+</div>
+<!-- Mudanças com Falha -->
+<div class="bg-surface p-lg rounded-xl border border-outline-variant flex flex-col gap-sm shadow-sm hover:shadow-md transition-shadow">
+<div class="flex justify-between items-center">
+<span class="p-2 bg-error-container rounded-lg">
+<span class="material-symbols-outlined text-error" data-icon="error">error</span>
+</span>
+<span class="text-xs font-bold text-error">-3 vs mês ant.</span>
+</div>
+<h3 class="text-on-surface-variant font-label-md text-label-md uppercase tracking-wider">Mudanças com Falha</h3>
+<p class="font-display-lg text-display-lg text-on-surface">02</p>
+</div>
+</div>
+<!-- Main Technical Table Container -->
+<div class="bg-surface rounded-2xl border border-outline-variant overflow-hidden shadow-sm">
+<div class="px-lg py-md bg-surface-container-low border-b border-outline-variant flex justify-between items-center">
+<h4 class="font-title-md text-title-md text-on-surface">Log Técnico de Mudanças</h4>
+<div class="flex gap-2">
+<button class="p-2 hover:bg-surface-container-high rounded-lg transition-all">
+<span class="material-symbols-outlined text-on-surface-variant" data-icon="download">download</span>
+</button>
+<button class="p-2 hover:bg-surface-container-high rounded-lg transition-all">
+<span class="material-symbols-outlined text-on-surface-variant" data-icon="more_vert">more_vert</span>
+</button>
+</div>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="bg-surface text-on-surface-variant font-label-md text-label-md uppercase tracking-wider border-b border-outline-variant">
+<th class="px-lg py-4">ID da Mudança</th>
+<th class="px-lg py-4">Título</th>
+<th class="px-lg py-4">Solicitante</th>
+<th class="px-lg py-4">Tipo</th>
+<th class="px-lg py-4">Data de Execução</th>
+<th class="px-lg py-4 text-center">Status</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-outline-variant/50">
+<!-- Row 1 -->
+<tr class="hover:bg-surface-container-low transition-colors group">
+<td class="px-lg py-5 font-bold text-primary">CHG-2940</td>
+<td class="px-lg py-5">
+<div class="flex flex-col">
+<span class="font-bold text-on-surface">Update Database Core API</span>
+<span class="text-xs text-outline">Ambiente: Produção</span>
+</div>
+</td>
+<td class="px-lg py-5">
+<div class="flex items-center gap-2">
+<img alt="Avatar" class="w-6 h-6 rounded-full" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDBKnD8dvuU2MxjrWT-58wuCv8ZObLqf1iiZOsLSNS0_NkGO2f3oZvfmaZLVjK1Z7UFjb0OZXXWFuXtgSCl2Mg5vfkWoeczeYAwYDpip3r658xxEZgb7jI2XEf1_JkDFsScRXcDmIZsqJN_tiwiKx8-edHa56Pn0pW574TSOtnQHwd3yrWYTaqjMWe9M-CATh-kLwD-wpR0-ofgvuE7FWGibOoeXKOPBcOAIZuWEpm8-XubadxuT86wHqI3PMhv3ZofdpuQukIW4vs"/>
+<span class="text-body-sm text-on-surface">Ana Martins</span>
+</div>
+</td>
+<td class="px-lg py-5">
+<span class="px-3 py-1 bg-surface-container-highest text-primary font-bold text-[10px] uppercase rounded-full">Padrão</span>
+</td>
+<td class="px-lg py-5 text-body-sm text-on-surface-variant">24 Out, 2023 22:00</td>
+<td class="px-lg py-5">
+<div class="flex justify-center">
+<span class="px-3 py-1 bg-secondary-container text-secondary font-bold text-[10px] uppercase rounded-full flex items-center gap-1">
+<span class="w-1.5 h-1.5 bg-secondary rounded-full"></span>
+                                        Agendada
+                                    </span>
+</div>
+</td>
+</tr>
+<!-- Row 2 -->
+<tr class="hover:bg-surface-container-low transition-colors">
+<td class="px-lg py-5 font-bold text-primary">CHG-2941</td>
+<td class="px-lg py-5">
+<div class="flex flex-col">
+<span class="font-bold text-on-surface">Patch de Segurança Zero-Day</span>
+<span class="text-xs text-outline">Ambiente: Todos</span>
+</div>
+</td>
+<td class="px-lg py-5">
+<div class="flex items-center gap-2">
+<img alt="Avatar" class="w-6 h-6 rounded-full" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD1QxLLiHJfLHMZhhWvqXeWt9hS6Hs0IHxOsb84mat33aoqw0Sm98NXmu5BsAYz5HDPe1LT79VOV7gjhkZ24YlddFSXSNetOfmMUFezzZEKu6322T9udUfbDiL9MsB7Yc_hxFJuxm3JvqqWYovFbfmywWd_ezT41PlcqYh6Gu59OfU2tVdkQz0iFwZL8uyZ2UKZCUkV7LueClbY-S1wDDRm-w2IyNbFxkjqvEoQYmiAnyNqn4kBZG_tb2KYobMfXuuvXdlc8dYKWLQ"/>
+<span class="text-body-sm text-on-surface">Marcos Souza</span>
+</div>
+</td>
+<td class="px-lg py-5">
+<span class="px-3 py-1 bg-error-container text-error font-bold text-[10px] uppercase rounded-full">Emergencial</span>
+</td>
+<td class="px-lg py-5 text-body-sm text-on-surface-variant">Imediato</td>
+<td class="px-lg py-5">
+<div class="flex justify-center">
+<span class="px-3 py-1 bg-primary-container text-white font-bold text-[10px] uppercase rounded-full flex items-center gap-1 animate-pulse">
+<span class="w-1.5 h-1.5 bg-white rounded-full"></span>
+                                        Em Progresso
+                                    </span>
+</div>
+</td>
+</tr>
+<!-- Row 3 -->
+<tr class="hover:bg-surface-container-low transition-colors">
+<td class="px-lg py-5 font-bold text-primary">CHG-2938</td>
+<td class="px-lg py-5">
+<div class="flex flex-col">
+<span class="font-bold text-on-surface">Redimensionamento de Cluster K8s</span>
+<span class="text-xs text-outline">Ambiente: Staging</span>
+</div>
+</td>
+<td class="px-lg py-5">
+<div class="flex items-center gap-2">
+<img alt="Avatar" class="w-6 h-6 rounded-full" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDxY9LzCq8GU0S8U00DyyA_3qr8aBuy9YwDc7-p88bmCIFLFlhT5Yi4PggkHPmCT9xxWXLsTJhP6H2nyh7HMutKd24wqABvWR4ZElQJStUhpZaT5GGMpzfS6cD2DkvlpNsOpcuVzT1UXmXa9lnQpknsKZq54aSgKW023lsSfmc1JVM4D5AgojatjgTXkn1RI9h8wNuhOvtViVwUsUCyOZcNUUATxM_Be0k65-HonFvVx7KcFI-Bh_GLx1R2FBKY5GDFQjTZ4BgBf7Y"/>
+<span class="text-body-sm text-on-surface">Julia Lima</span>
+</div>
+</td>
+<td class="px-lg py-5">
+<span class="px-3 py-1 bg-surface-container-highest text-primary font-bold text-[10px] uppercase rounded-full">Padrão</span>
+</td>
+<td class="px-lg py-5 text-body-sm text-on-surface-variant">23 Out, 2023 14:30</td>
+<td class="px-lg py-5">
+<div class="flex justify-center">
+<span class="px-3 py-1 bg-surface-container-highest text-on-surface-variant font-bold text-[10px] uppercase rounded-full flex items-center gap-1">
+<span class="w-1.5 h-1.5 bg-outline rounded-full"></span>
+                                        Concluída
+                                    </span>
+</div>
+</td>
+</tr>
+<!-- Row 4 -->
+<tr class="hover:bg-surface-container-low transition-colors">
+<td class="px-lg py-5 font-bold text-primary">CHG-2942</td>
+<td class="px-lg py-5">
+<div class="flex flex-col">
+<span class="font-bold text-on-surface">Troca de Switch Core Rack 04</span>
+<span class="text-xs text-outline">Ambiente: Data Center</span>
+</div>
+</td>
+<td class="px-lg py-5">
+<div class="flex items-center gap-2">
+<img alt="Avatar" class="w-6 h-6 rounded-full" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAdspPJ-QYb3EsTWbMZWlNahsbS881N17L3oskSRAzlhPI-DtDBNM9v9ZqDJqTvdkr688YrIgdrKUrHh5IUmlFy_FqAg6zjzF8Wqg2xnD_A4hm3mUcdKr3XpsEp4lszlgGjtxLkqkVdMKAPG8UW9nBf-m0KGYNQslSBTOTghnEWZYJhVLck1zxMw3Fgpa1GyrugqjZiLvYZaJ1k8NJBvlOm24LxgcjppeIQkLfp4XWViyAulBtEXOS3-Rhe_uSIsCQqxhr8L0FJYhU"/>
+<span class="text-body-sm text-on-surface">Roberto Costa</span>
+</div>
+</td>
+<td class="px-lg py-5">
+<span class="px-3 py-1 bg-surface-container-highest text-primary font-bold text-[10px] uppercase rounded-full">Padrão</span>
+</td>
+<td class="px-lg py-5 text-body-sm text-on-surface-variant">26 Out, 2023 02:00</td>
+<td class="px-lg py-5">
+<div class="flex justify-center">
+<span class="px-3 py-1 bg-tertiary-fixed text-tertiary font-bold text-[10px] uppercase rounded-full flex items-center gap-1">
+<span class="w-1.5 h-1.5 bg-tertiary rounded-full"></span>
+                                        Aguardando Aprovação
+                                    </span>
+</div>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- Table Footer/Pagination -->
+<div class="px-lg py-md border-t border-outline-variant flex items-center justify-between">
+<p class="text-body-sm text-outline">Mostrando 4 de 124 mudanças</p>
+<div class="flex gap-2">
+<button class="p-1.5 rounded-lg border border-outline-variant hover:bg-surface-container-low transition-all">
+<span class="material-symbols-outlined text-sm" data-icon="chevron_left">chevron_left</span>
+</button>
+<button class="px-3 py-1 rounded-lg bg-primary text-white text-sm font-bold">1</button>
+<button class="px-3 py-1 rounded-lg border border-outline-variant hover:bg-surface-container-low text-sm">2</button>
+<button class="px-3 py-1 rounded-lg border border-outline-variant hover:bg-surface-container-low text-sm">3</button>
+<button class="p-1.5 rounded-lg border border-outline-variant hover:bg-surface-container-low transition-all">
+<span class="material-symbols-outlined text-sm" data-icon="chevron_right">chevron_right</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Upcoming Maintenance Card (Extra Professional Touch) -->
+<div class="mt-xl bg-gradient-to-r from-primary to-primary-container p-xl rounded-3xl text-white relative overflow-hidden flex flex-col md:flex-row items-center gap-xl">
+<div class="absolute right-0 top-0 w-64 h-64 bg-white/10 rounded-full -mr-20 -mt-20 blur-3xl"></div>
+<div class="z-10 flex-1">
+<h3 class="font-headline-lg text-headline-lg font-bold mb-xs">Janela de Manutenção Próxima</h3>
+<p class="text-white/80 font-body-md text-body-md max-w-lg">A próxima janela programada para atualizações de infraestrutura crítica ocorrerá no Sábado às 23:00. Certifique-se de validar todos os rollbacks.</p>
+</div>
+<div class="z-10 bg-white/20 backdrop-blur-md p-md rounded-2xl flex flex-col items-center">
+<span class="text-xs font-bold uppercase tracking-widest text-white/60 mb-2">Contagem Regressiva</span>
+<span class="text-3xl font-black tabular-nums">02d : 14h : 45m</span>
+</div>
+</div>
+</main>
+<!-- FAB for Quick Actions (Suppressed on Details but active here as it's a list view) -->
+<button class="fixed bottom-8 right-8 w-14 h-14 bg-primary text-white rounded-full shadow-2xl flex items-center justify-center hover:scale-110 active:scale-95 transition-all z-50 group">
+<span class="material-symbols-outlined text-3xl" data-icon="add">add</span>
+<div class="absolute right-16 bg-inverse-surface text-white px-4 py-2 rounded-xl text-sm font-bold opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
+            Nova Solicitação
+        </div>
+</button>
+<script>
+        // Simple Interaction logic
+        document.querySelectorAll('tr').forEach(row => {
+            row.addEventListener('click', () => {
+                // Future implementation: Open CHG details
+                console.log('Opening change record...');
+            });
+        });
+
+        // Search highlight effect
+        const searchInput = document.querySelector('input[type="text"]');
+        searchInput.addEventListener('focus', () => {
+            searchInput.parentElement.classList.add('ring-2', 'ring-primary/20');
+        });
+        searchInput.addEventListener('blur', () => {
+            searchInput.parentElement.classList.remove('ring-2', 'ring-primary/20');
+        });
+    </script>
+</body></html>

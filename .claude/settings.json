@@ -1,7 +1,12 @@
 {
   "permissions": {
     "allow": [
-      "Bash(npx --yes supabase@latest --version)"
+      "Bash(npx --yes supabase@latest --version)",
+      "Bash(cd \"c:/Users/Anderson Campos/flowfy\" && npm run build >/tmp/b.log 2>&1; echo \"EXIT: $?\"; grep -iE \"error TS|error:\" /tmp/b.log | head; tail -2 /tmp/b.log)",
+      "Read(//tmp/**)",
+      "Bash(cd \"c:/Users/Anderson Campos/flowfy\" && npm run build >/tmp/b.log 2>&1; echo \"EXIT: $?\"; grep -iE \"error TS|error:\" /tmp/b.log | head -30; tail -2 /tmp/b.log)",
+      "Bash(cd \"c:/Users/Anderson Campos/flowfy\" && npm run build >/tmp/b.log 2>&1; echo \"EXIT: $?\"; grep -iE \"error TS|error:\" /tmp/b.log | head -20; tail -2 /tmp/b.log)",
+      "Bash(cd \"c:/Users/Anderson Campos/flowfy\" && npm run build >/tmp/b.log 2>&1; echo \"EXIT: $?\"; grep -iE \"error TS|error:|✗|Build failed\" /tmp/b.log | head; tail -3 /tmp/b.log)"
     ]
   }
 }
