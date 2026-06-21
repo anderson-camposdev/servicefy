@@ -4,7 +4,7 @@ ADD COLUMN IF NOT EXISTS catalog_ui_config jsonb DEFAULT '{}'::jsonb;
 
 -- Example payload:
 -- {
---   "layout_style": "sephora_3d",
+--   "layout_style": "modern_3d",
 --   "background": {
 --     "type": "image",
 --     "value": "url_to_image"

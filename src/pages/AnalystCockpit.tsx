@@ -11,6 +11,7 @@ import { useToast } from '../context'
 import type { IncidentRow, IncidentHistoryRow, IncidentState, TicketMessageRow, AssignmentGroupRow, ProfileRow, PendingReasonRow } from '../lib/database.types'
 import type { WorkspaceTicket } from './workspace.types'
 import SlaEventTimeline from './SlaEventTimeline'
+import TicketTasksPanel from '../components/TicketTasksPanel'
 import { priorityString, IMPACT_OPTIONS, URGENCY_OPTIONS } from '../lib/priority'
 
 /**
@@ -752,7 +753,16 @@ const AnalystCockpit = ({ ticket = FALLBACK_TICKET }: { ticket?: WorkspaceTicket
       </div>
 
       {activeContext === 'historico' && <EmptyContext icon={<History className="w-7 h-7" />} title="Histórico de Chamados" desc="Outros chamados deste solicitante e empresa aparecerão aqui." />}
-      {activeContext === 'subchamados' && <EmptyContext icon={<ListTree className="w-7 h-7" />} title="Sub Chamados" desc="Tarefas filhas e chamados derivados serão gerenciados aqui." />}
+      {activeContext === 'subchamados' && (
+        <div className="max-w-7xl mx-auto p-6">
+          <TicketTasksPanel 
+            companyId={ticket.companyId!} 
+            ticketId={ticket.incidentId!} 
+            ticketType={(detail?.ticket_type ?? ticket.ticketType) === 'request' ? 'request' : 'incident'}
+            groups={activeGroups}
+          />
+        </div>
+      )}
       {activeContext === 'relacionamentos' && <EmptyContext icon={<Link2 className="w-7 h-7" />} title="Relacionamentos" desc="Incidentes, problemas e mudanças relacionados serão exibidos aqui." />}
 
       {activeContext === 'detalhes' && (

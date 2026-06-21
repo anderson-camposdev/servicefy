@@ -1664,6 +1664,31 @@ export const chatbotService = {
 }
 
 // ============================================================
+// DEPARTMENTS (Nível 0 do catálogo) — migration 046
+// ============================================================
+
+export const departmentsService = {
+  async list(companyId: string, opts?: { activeOnly?: boolean }): Promise<DepartmentRow[]> {
+    let q = supabase.from('departments').select('*').eq('company_id', companyId)
+    if (opts?.activeOnly) q = q.eq('is_active', true)
+    const { data, error } = await q.order('sort_order')
+    return throwIfError(data, error)
+  },
+  async create(payload: Partial<DepartmentRow>): Promise<DepartmentRow> {
+    const { data, error } = await supabase.from('departments').insert(payload).select().single()
+    return throwIfError(data, error)
+  },
+  async update(id: string, payload: Partial<DepartmentRow>): Promise<DepartmentRow> {
+    const { data, error } = await supabase.from('departments').update(payload).eq('id', id).select().single()
+    return throwIfError(data, error)
+  },
+  async delete(id: string): Promise<void> {
+    const { error } = await supabase.from('departments').delete().eq('id', id)
+    if (error) throw error
+  },
+}
+
+// ============================================================
 // SERVICE CATALOG (categorias + itens) — migration 019
 // Modelo unificado: requisições viram incidents (ticket_type='request').
 // ============================================================
@@ -1864,13 +1889,36 @@ export const serviceCatalogService = {
     if (error) throw error
   },
 
-  // ─ Itens de Requisição (Nível 2) ─
+  // ─ Subcategorias de Requisição (Nível 2) ─
+  async listRequestSubcategories(companyId: string, opts?: { categoryId?: string; activeOnly?: boolean }): Promise<RequestSubcategoryRow[]> {
+    let q = supabase.from('request_subcategories').select('*').eq('company_id', companyId)
+    if (opts?.categoryId) q = q.eq('category_id', opts.categoryId)
+    if (opts?.activeOnly) q = q.eq('active', true)
+    const { data, error } = await q.order('sort_order')
+    return throwIfError(data, error)
+  },
+  async createRequestSubcategory(payload: Partial<RequestSubcategoryRow>): Promise<RequestSubcategoryRow> {
+    const { data, error } = await supabase.from('request_subcategories').insert(payload).select().single()
+    return throwIfError(data, error)
+  },
+  async updateRequestSubcategory(id: string, payload: Partial<RequestSubcategoryRow>): Promise<RequestSubcategoryRow> {
+    const { data, error } = await supabase.from('request_subcategories').update(payload).eq('id', id).select().single()
+    return throwIfError(data, error)
+  },
+  async deleteRequestSubcategory(id: string): Promise<void> {
+    const { error } = await supabase.from('request_subcategories').delete().eq('id', id)
+    if (error) throw error
+  },
+
+  // ─ Itens de Requisição (Nível 3) ─
   async listRequestItems(companyId: string, opts?: { categoryId?: string; activeOnly?: boolean }): Promise<RequestItemRow[]> {
     let q = supabase
       .from('request_items')
       .select('*, group:assignment_groups(id,name)')
       .eq('company_id', companyId)
     if (opts?.categoryId) q = q.eq('request_category_id', opts.categoryId)
+    // Se tiver request_subcategory_id, podemos filtrar (migração 047)
+    if ((opts as any)?.subcategoryId) q = q.eq('request_subcategory_id', (opts as any).subcategoryId)
     if (opts?.activeOnly) q = q.eq('active', true)
     const { data, error } = await q.order('sort_order')
     return throwIfError(data, error)
@@ -1891,7 +1939,7 @@ export const serviceCatalogService = {
   // ─ Abertura de Requisição via item (roteia p/ assignment_group_id) ─
   async openServiceRequest(payload: {
     companyId: string
-    item: Pick<RequestItemRow, 'id' | 'name' | 'assignment_group_id'> & { groupName?: string | null }
+    item: Pick<RequestItemRow, 'id' | 'name' | 'assignment_group_id' | 'request_subcategory_id'> & { groupName?: string | null }
     formData?: Record<string, unknown>
     description?: string
     callerId?: string | null
@@ -1909,6 +1957,7 @@ export const serviceCatalogService = {
         caller_id:           payload.callerId ?? null,
         ticket_type:         'request',
         request_item_id:     payload.item.id,
+        request_subcategory_id: payload.item.request_subcategory_id ?? null,
         assignment_group_id: payload.item.assignment_group_id ?? null,
         assigned_group_name: payload.item.groupName ?? null,
         form_data:           payload.formData ?? null,
@@ -2131,3 +2180,41 @@ export const biService = {
 }
 
 
+// ============================================================
+// TICKET TASKS (Tarefas Filhas e Subtarefas) — migration 048
+// ============================================================
+export const ticketTasksService = {
+  async listForTicket(ticketId: string, ticketType: 'incident' | 'request'): Promise<TicketTaskRow[]> {
+    const col = ticketType === 'incident' ? 'incident_id' : 'request_id'
+    const { data, error } = await supabase
+      .from('ticket_tasks')
+      .select('*, assigned_to:profiles!ticket_tasks_assigned_to_id_fkey(name), assigned_group:assignment_groups!ticket_tasks_assigned_group_id_fkey(name)')
+      .eq(col, ticketId)
+      .order('created_at', { ascending: true })
+    return throwIfError(data, error)
+  },
+
+  async listSubtasks(parentTaskId: string): Promise<TicketTaskRow[]> {
+    const { data, error } = await supabase
+      .from('ticket_tasks')
+      .select('*, assigned_to:profiles!ticket_tasks_assigned_to_id_fkey(name), assigned_group:assignment_groups!ticket_tasks_assigned_group_id_fkey(name)')
+      .eq('parent_task_id', parentTaskId)
+      .order('created_at', { ascending: true })
+    return throwIfError(data, error)
+  },
+
+  async create(payload: Partial<TicketTaskRow>): Promise<TicketTaskRow> {
+    const { data, error } = await supabase.from('ticket_tasks').insert(payload).select().single()
+    return throwIfError(data, error)
+  },
+
+  async update(id: string, payload: Partial<TicketTaskRow>): Promise<TicketTaskRow> {
+    const { data, error } = await supabase.from('ticket_tasks').update(payload).eq('id', id).select().single()
+    return throwIfError(data, error)
+  },
+
+  async delete(id: string): Promise<void> {
+    const { error } = await supabase.from('ticket_tasks').delete().eq('id', id)
+    if (error) throw error
+  },
+}

@@ -134,8 +134,9 @@ export interface IncidentRow {
   // Roteamento do catálogo 3 níveis (migration 023)
   catalog_service_id?: string | null
   symptom_id?: string | null
-  // Esteira de requisições (migration 024)
+  // Esteira de requisições (migration 024 + 047)
   request_item_id?: string | null
+  request_subcategory_id?: string | null
   form_data?: Json | null
   // Motor de SLA: prioridade numérica + prazos projetados (migration 033)
   priority_level?: number | null
@@ -213,6 +214,63 @@ export interface PortalTicketDetail extends IncidentRow {
 }
 
 // ─── Motor de SLA: Calendário Útil por cliente (migration 032) ──
+export interface KnowledgeArticleFeedbackRow {
+  id: string
+  article_id: string
+  company_id: string
+  user_id: string
+  is_helpful: boolean
+  comments: string | null
+  created_at: string
+}
+
+// ─── Departamentos e Tarefas (Migrations 046, 047, 048) ──────
+
+export interface DepartmentRow {
+  id: string
+  company_id: string
+  name: string
+  description: string | null
+  icon: string | null
+  is_active: boolean
+  sort_order: number
+  visible_to_groups?: string[] | null
+  ui_config?: Json | null
+  created_at: string
+  updated_at: string
+}
+
+export interface RequestSubcategoryRow {
+  id: string
+  company_id: string
+  category_id: string
+  name: string
+  description: string | null
+  icon: string | null
+  active: boolean
+  sort_order: number
+  ui_config?: Json | null
+  created_at: string
+  updated_at: string
+}
+
+export interface TicketTaskRow {
+  id: string
+  company_id: string
+  incident_id?: string | null
+  request_id?: string | null
+  parent_task_id?: string | null
+  number: string
+  short_description: string
+  description: string | null
+  state: 'Pending' | 'Work in Progress' | 'Closed' | 'Canceled'
+  assigned_group_id?: string | null
+  assigned_to_id?: string | null
+  created_at: string
+  updated_at: string
+  closed_at?: string | null
+}
+
 export interface SlaCalendarRow {
   id: string
   company_id: string
@@ -307,15 +365,17 @@ export interface CatalogItemRow {
   created_at: string
 }
 
-/** Categoria da vitrine do Service Catalog (migration 019). */
+/** Categoria da vitrine do Service Catalog (migration 019 + 046). */
 export interface CatalogCategoryRow {
   id: string
   company_id: string
+  department_id?: string | null
   name: string
   description: string | null
   icon: string
   sort_order: number
   is_active: boolean
+  ui_config?: Json | null
   created_at: string
 }
 
@@ -329,6 +389,7 @@ export interface CatalogServiceRow {
   icon: string
   sort_order: number
   is_active: boolean
+  ui_config?: Json | null
   created_at: string
 }
 
@@ -380,23 +441,26 @@ export interface FormTemplateRow {
   updated_at: string
 }
 
-/** Esteira de Requisições — Nível 1 (migration 024). */
+/** Esteira de Requisições — Nível 1 (migration 024 + 046). */
 export interface RequestCategoryRow {
   id: string
   company_id: string
+  department_id?: string | null
   name: string
   description: string | null
   icon: string | null
   active: boolean
   sort_order: number
+  ui_config?: Json | null
   created_at: string
 }
 
-/** Esteira de Requisições — Nível 2 (migration 024). */
+/** Esteira de Requisições — Nível 3 (migration 024 + 047). */
 export interface RequestItemRow {
   id: string
   company_id: string
-  request_category_id: string
+  request_category_id?: string | null
+  request_subcategory_id?: string | null
   name: string
   description: string | null
   icon: string | null

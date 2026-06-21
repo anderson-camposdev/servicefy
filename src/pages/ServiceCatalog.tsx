@@ -1,20 +1,21 @@
 import { useState, useEffect, useMemo } from 'react'
 import { AlertTriangle, ShoppingCart, ChevronLeft, Search, Check, Ticket, ArrowLeft, ShieldCheck } from 'lucide-react'
-import { serviceCatalogService } from '../lib/services'
+import { serviceCatalogService, departmentsService } from '../lib/services'
 import { buildLabeledFormData, isEmptyFormValue, parseFormFields } from '../lib/catalogFormFields'
 import { parseCatalogUiConfig } from '../lib/catalogUiConfig'
 import { IMPACT_OPTIONS, URGENCY_OPTIONS } from '../lib/priority'
 import CatalogIcon from './CatalogIcon'
 import DynamicFormFields from './DynamicFormFields'
+import ServiceCard from './ServiceCard'
 import type {
   CatalogCategoryRow, CatalogServiceRow, CatalogServiceSymptomRow,
-  RequestCategoryRow, RequestItemRow, RequestFormField, IncidentRow,
+  RequestCategoryRow, RequestSubcategoryRow, RequestItemRow, RequestFormField, IncidentRow, DepartmentRow
 } from '../lib/database.types'
 import type { FormAnswers, FormFieldValue } from '../lib/catalogFormFields'
 import { useTenant } from '../tenant/TenantContext'
 
 export type CatalogUiConfig = {
-  layout_style?: 'sephora_3d' | 'striped_3d' | 'default'
+  layout_style?: 'modern_3d' | 'striped_3d' | 'default'
   background?: { type: 'image' | 'color' | 'pattern'; value: string }
   cards?: {
     id: string
@@ -81,13 +82,16 @@ export default function ServiceCatalog({ companyId, currentUserId, currentUserNa
   const [loading, setLoading] = useState(true)
 
   // Índice em memória (alimenta jornada + busca)
+  const [departments, setDepartments] = useState<DepartmentRow[]>([])
   const [categories, setCategories] = useState<CatalogCategoryRow[]>([])
   const [services, setServices] = useState<CatalogServiceRow[]>([])
   const [serviceSymptoms, setServiceSymptoms] = useState<CatalogServiceSymptomRow[]>([])
   const [reqCategories, setReqCategories] = useState<RequestCategoryRow[]>([])
+  const [reqSubcategories, setReqSubcategories] = useState<RequestSubcategoryRow[]>([])
   const [reqItems, setReqItems] = useState<RequestItemRow[]>([])
 
   // Seleções
+  const [department, setDepartment] = useState<DepartmentRow | null>(null)
   const [category, setCategory] = useState<CatalogCategoryRow | null>(null)
   const [service, setService] = useState<CatalogServiceRow | null>(null)
   const [symptom, setSymptom] = useState<CatalogServiceSymptomRow | null>(null)
@@ -98,6 +102,7 @@ export default function ServiceCatalog({ companyId, currentUserId, currentUserNa
   const [incidentFieldErrors, setIncidentFieldErrors] = useState<Record<string, string>>({})
 
   const [reqCategory, setReqCategory] = useState<RequestCategoryRow | null>(null)
+  const [reqSubcategory, setReqSubcategory] = useState<RequestSubcategoryRow | null>(null)
   const [reqItem, setReqItem] = useState<RequestItemRow | null>(null)
   const [answers, setAnswers] = useState<FormAnswers>({})
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
@@ -110,22 +115,28 @@ export default function ServiceCatalog({ companyId, currentUserId, currentUserNa
     let c = false
     setLoading(true); setError(null)
     Promise.all([
+      departmentsService.list(companyId, { activeOnly: true }),
       serviceCatalogService.listCategories(companyId, { activeOnly: true }),
       serviceCatalogService.listServices(companyId, { activeOnly: true }),
       serviceCatalogService.listAllServiceSymptoms(companyId, { activeOnly: true }),
       serviceCatalogService.listRequestCategories(companyId, { activeOnly: true }),
+      serviceCatalogService.listRequestSubcategories(companyId, { activeOnly: true }),
       serviceCatalogService.listRequestItems(companyId, { activeOnly: true }),
-    ]).then(([cats, svcs, syms, rcats, ritems]) => {
+    ]).then(([depts, cats, svcs, syms, rcats, rsubcats, ritems]) => {
       if (c) return
-      setCategories(cats); setServices(svcs); setServiceSymptoms(syms); setReqCategories(rcats); setReqItems(ritems)
+      setDepartments(depts); setCategories(cats); setServices(svcs); setServiceSymptoms(syms); setReqCategories(rcats); setReqSubcategories(rsubcats); setReqItems(ritems)
     }).catch(e => { if (!c) setError(getMsg(e)) }).finally(() => { if (!c) setLoading(false) })
     return () => { c = true }
   }, [companyId])
 
   // Derivações da jornada (filtragem em memória — instantâneo)
+  const incCategoriesForDept = useMemo(() => department ? categories.filter(c => c.department_id === department.id) : [], [categories, department])
   const servicesForCat = useMemo(() => category ? services.filter(s => s.category_id === category.id) : [], [services, category])
   const symptomsForSvc = useMemo(() => service ? serviceSymptoms.filter(ss => ss.service_id === service.id) : [], [serviceSymptoms, service])
-  const itemsForReqCat = useMemo(() => reqCategory ? reqItems.filter(it => it.request_category_id === reqCategory.id) : [], [reqItems, reqCategory])
+  
+  const reqCategoriesForDept = useMemo(() => department ? reqCategories.filter(c => c.department_id === department.id) : [], [reqCategories, department])
+  const subcategoriesForReqCat = useMemo(() => reqCategory ? reqSubcategories.filter(s => s.category_id === reqCategory.id) : [], [reqSubcategories, reqCategory])
+  const itemsForReqSubcat = useMemo(() => reqSubcategory ? reqItems.filter(it => it.request_subcategory_id === reqSubcategory.id) : [], [reqItems, reqSubcategory])
 
   // Índices de busca
   const incIndex = useMemo(() => {
@@ -139,27 +150,34 @@ export default function ServiceCatalog({ companyId, currentUserId, currentUserNa
   }, [serviceSymptoms, services, categories])
 
   const reqIndex = useMemo(() => {
+    const subcatById = new Map(reqSubcategories.map(c => [c.id, c]))
     const catById = new Map(reqCategories.map(c => [c.id, c]))
-    return reqItems.map(it => ({ it, cat: catById.get(it.request_category_id), label: it.name, sub: catById.get(it.request_category_id)?.name ?? '' }))
-      .filter(r => r.cat)
-  }, [reqItems, reqCategories])
+    return reqItems.map(it => {
+      const subcat = it.request_subcategory_id ? subcatById.get(it.request_subcategory_id) : undefined
+      const cat = subcat ? catById.get(subcat.category_id) : undefined
+      return { it, subcat, cat, label: it.name, sub: `${cat?.name ?? ''} > ${subcat?.name ?? ''}` }
+    }).filter(r => r.subcat && r.cat)
+  }, [reqItems, reqSubcategories, reqCategories])
 
   const q = query.trim().toLowerCase()
   const incHits = q.length < 2 ? [] : incIndex.filter(r => `${r.label} ${r.sub}`.toLowerCase().includes(q)).slice(0, 6)
   const reqHits = q.length < 2 ? [] : reqIndex.filter(r => `${r.label} ${r.sub} ${r.it.description ?? ''}`.toLowerCase().includes(q)).slice(0, 6)
 
   const resetAll = () => {
-    setMode(null); setCategory(null); setService(null); setSymptom(null); setIncDescription(''); setImpact('Low'); setUrgency('Low')
+    setDepartment(null); setMode(null)
+    setCategory(null); setService(null); setSymptom(null); setIncDescription(''); setImpact('Low'); setUrgency('Low')
     setIncidentAnswers({}); setIncidentFieldErrors({})
-    setReqCategory(null); setReqItem(null); setAnswers({}); setFieldErrors({})
+    setReqCategory(null); setReqSubcategory(null); setReqItem(null); setAnswers({}); setFieldErrors({})
   }
   const closeSearch = () => { setQuery(''); setShowResults(false) }
   const jumpIncident = (r: { ss: CatalogServiceSymptomRow; svc?: CatalogServiceRow; cat?: CatalogCategoryRow }) => {
+    setDepartment(departments.find(d => d.id === r.cat?.department_id) ?? null)
     setMode('incident'); setCategory(r.cat ?? null); setService(r.svc ?? null); setSymptom(r.ss)
     setIncidentAnswers({}); setIncidentFieldErrors({}); setError(null); closeSearch()
   }
-  const jumpRequest = (r: { it: RequestItemRow; cat?: RequestCategoryRow }) => {
-    setMode('request'); setReqCategory(r.cat ?? null); setReqItem(r.it); setAnswers({}); setFieldErrors({}); setError(null); closeSearch()
+  const jumpRequest = (r: { it: RequestItemRow; subcat?: RequestSubcategoryRow; cat?: RequestCategoryRow }) => {
+    setDepartment(departments.find(d => d.id === r.cat?.department_id) ?? null)
+    setMode('request'); setReqCategory(r.cat ?? null); setReqSubcategory(r.subcat ?? null); setReqItem(r.it); setAnswers({}); setFieldErrors({}); setError(null); closeSearch()
   }
 
   const incidentFields = useMemo(
@@ -216,7 +234,7 @@ export default function ServiceCatalog({ companyId, currentUserId, currentUserNa
     setSubmitting(true); setError(null)
     try {
       const inc = await serviceCatalogService.openServiceRequest({
-        companyId, item: { id: reqItem.id, name: reqItem.name, assignment_group_id: reqItem.assignment_group_id, groupName: reqItem.group?.name ?? null },
+        companyId, item: { id: reqItem.id, name: reqItem.name, assignment_group_id: reqItem.assignment_group_id, groupName: reqItem.group?.name ?? null, request_subcategory_id: reqItem.request_subcategory_id },
         formData, callerId: currentUserId, callerName: currentUserName,
       })
       onCreated?.(inc)
@@ -343,10 +361,23 @@ export default function ServiceCatalog({ companyId, currentUserId, currentUserNa
       {loading && <div className="text-center py-12 text-slate-400 animate-pulse">Carregando catálogo…</div>}
 
       {!loading && (
-        // ─── PASSO 1: escolher a jornada ───
-        !mode ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            {uiConfig?.cards && uiConfig.cards.length > 0 ? (
+        // ─── PASSO 1: escolher o departamento ───
+        !department ? (
+          <div className="space-y-4">
+            <h2 className="text-xl font-bold text-slate-800 text-center mb-6">Qual área você precisa acessar?</h2>
+            <Grid>
+              {departments.map(d => (
+                <ServiceCard key={d.id} iconName={d.icon} title={d.name} description={d.description} onClick={() => setDepartment(d)} fallbackAccentColor={primaryColor} defaultTheme={uiConfig.layout_style === 'modern_3d' ? 'modern_3d' : 'minimalist'} uiConfig={d.ui_config} />
+              ))}
+              {departments.length === 0 && <Empty>Nenhum departamento configurado.</Empty>}
+            </Grid>
+          </div>
+        ) : !mode ? (
+          <div className="space-y-4">
+            <BackBtn onClick={() => setDepartment(null)} />
+            <h2 className="text-xl font-bold text-slate-800 text-center mb-6">Departamento: {department.name}</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              {uiConfig?.cards && uiConfig.cards.length > 0 ? (
               uiConfig.cards.map((card, idx) => {
                 if (card.style === 'pill_label') {
                   return (
@@ -355,8 +386,8 @@ export default function ServiceCatalog({ companyId, currentUserId, currentUserNa
                       onClick={() => setMode(card.action)}
                       className="group relative flex flex-col items-center justify-center bg-white rounded-3xl border-2 border-slate-100 shadow-sm hover:shadow-2xl hover:-translate-y-1 hover:border-slate-300 transition-all overflow-hidden h-[300px]"
                     >
-                      {/* Efeito de listras padrão no fundo do card se for sephora_3d */}
-                      {uiConfig.layout_style === 'sephora_3d' && (
+                      {/* Efeito de listras padrão no fundo do card se for modern_3d */}
+                      {uiConfig.layout_style === 'modern_3d' && (
                         <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 10px, #000 10px, #000 20px)' }} />
                       )}
                       
@@ -408,13 +439,13 @@ export default function ServiceCatalog({ companyId, currentUserId, currentUserNa
         ) : mode === 'incident' ? (
           // ─── INCIDENTE ───
           <div className="space-y-2">
-            <BackBtn onClick={() => (category ? (service ? (symptom ? setSymptom(null) : setService(null)) : setCategory(null)) : resetAll())} />
+            <BackBtn onClick={() => (category ? (service ? (symptom ? setSymptom(null) : setService(null)) : setCategory(null)) : setMode(null))} />
             {!category ? (
-              <Grid>{categories.map(c => <Card key={c.id} icon={c.icon} name={c.name} desc={c.description} onClick={() => setCategory(c)} color={primaryColor} />)}{categories.length === 0 && <Empty>Nenhuma categoria de incidente.</Empty>}</Grid>
+              <Grid>{incCategoriesForDept.map(c => <ServiceCard key={c.id} iconName={c.icon} title={c.name} description={c.description} onClick={() => setCategory(c)} fallbackAccentColor={primaryColor} defaultTheme={uiConfig.layout_style === 'modern_3d' ? 'modern_3d' : 'minimalist'} uiConfig={c.ui_config} />)}{incCategoriesForDept.length === 0 && <Empty>Nenhuma categoria de incidente.</Empty>}</Grid>
             ) : !service ? (
-              <Grid>{servicesForCat.map(s => <Card key={s.id} icon={s.icon} name={s.name} desc={s.description} onClick={() => setService(s)} color={primaryColor} />)}{servicesForCat.length === 0 && <Empty>Nenhum serviço nesta categoria.</Empty>}</Grid>
+              <Grid>{servicesForCat.map(s => <ServiceCard key={s.id} iconName={s.icon} title={s.name} description={s.description} onClick={() => setService(s)} fallbackAccentColor={primaryColor} defaultTheme={uiConfig.layout_style === 'modern_3d' ? 'modern_3d' : 'minimalist'} uiConfig={s.ui_config} />)}{servicesForCat.length === 0 && <Empty>Nenhum serviço nesta categoria.</Empty>}</Grid>
             ) : !symptom ? (
-              <Grid>{symptomsForSvc.map(ss => <Card key={ss.id} icon={ss.symptom?.icon} name={ss.symptom?.name ?? ''} desc={`SLA ${ss.sla_hours}h${ss.group?.name ? ` · ${ss.group.name}` : ''}`} uiConfig={ss.ui_config} onClick={() => { setSymptom(ss); setIncidentAnswers({}); setIncidentFieldErrors({}); setError(null) }} color={primaryColor} />)}{symptomsForSvc.length === 0 && <Empty>Nenhum sintoma configurado.</Empty>}</Grid>
+              <Grid>{symptomsForSvc.map(ss => <ServiceCard key={ss.id} iconName={ss.symptom?.icon} title={ss.symptom?.name ?? ''} description={`SLA ${ss.sla_hours}h${ss.group?.name ? ` · ${ss.group.name}` : ''}`} uiConfig={ss.ui_config} onClick={() => { setSymptom(ss); setIncidentAnswers({}); setIncidentFieldErrors({}); setError(null) }} fallbackAccentColor={primaryColor} defaultTheme={uiConfig.layout_style === 'modern_3d' ? 'modern_3d' : 'minimalist'} />)}{symptomsForSvc.length === 0 && <Empty>Nenhum sintoma configurado.</Empty>}</Grid>
             ) : (
               <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-4">
                 <h2 className="text-lg font-bold text-slate-800">{service.name} — {symptom.symptom?.name}</h2>
@@ -446,11 +477,13 @@ export default function ServiceCatalog({ companyId, currentUserId, currentUserNa
         ) : (
           // ─── REQUISIÇÃO ───
           <div className="space-y-2">
-            <BackBtn onClick={() => (reqCategory ? (reqItem ? setReqItem(null) : setReqCategory(null)) : resetAll())} />
+            <BackBtn onClick={() => (reqCategory ? (reqSubcategory ? (reqItem ? setReqItem(null) : setReqSubcategory(null)) : setReqCategory(null)) : setMode(null))} />
             {!reqCategory ? (
-              <Grid>{reqCategories.map(c => <Card key={c.id} icon={c.icon} name={c.name} desc={c.description} onClick={() => setReqCategory(c)} color={primaryColor} />)}{reqCategories.length === 0 && <Empty>Nenhuma categoria de requisição.</Empty>}</Grid>
+              <Grid>{reqCategoriesForDept.map(c => <ServiceCard key={c.id} iconName={c.icon} title={c.name} description={c.description} onClick={() => setReqCategory(c)} fallbackAccentColor={primaryColor} defaultTheme={uiConfig.layout_style === 'modern_3d' ? 'modern_3d' : 'minimalist'} uiConfig={c.ui_config} />)}{reqCategoriesForDept.length === 0 && <Empty>Nenhuma categoria de requisição.</Empty>}</Grid>
+            ) : !reqSubcategory ? (
+              <Grid>{subcategoriesForReqCat.map(s => <ServiceCard key={s.id} iconName={s.icon} title={s.name} description={s.description} onClick={() => setReqSubcategory(s)} fallbackAccentColor={primaryColor} defaultTheme={uiConfig.layout_style === 'modern_3d' ? 'modern_3d' : 'minimalist'} uiConfig={s.ui_config} />)}{subcategoriesForReqCat.length === 0 && <Empty>Nenhuma subcategoria configurada.</Empty>}</Grid>
             ) : !reqItem ? (
-              <Grid>{itemsForReqCat.map(it => <Card key={it.id} icon={it.icon} name={it.name} desc={it.description} uiConfig={it.ui_config} onClick={() => { setReqItem(it); setAnswers({}); setFieldErrors({}); setError(null) }} color={primaryColor} />)}{itemsForReqCat.length === 0 && <Empty>Nenhum item nesta categoria.</Empty>}</Grid>
+              <Grid>{itemsForReqSubcat.map(it => <ServiceCard key={it.id} iconName={it.icon} title={it.name} description={it.description} uiConfig={it.ui_config} onClick={() => { setReqItem(it); setAnswers({}); setFieldErrors({}); setError(null) }} fallbackAccentColor={primaryColor} defaultTheme={uiConfig.layout_style === 'modern_3d' ? 'modern_3d' : 'minimalist'} />)}{itemsForReqSubcat.length === 0 && <Empty>Nenhum item nesta subcategoria.</Empty>}</Grid>
             ) : (
               <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-4">
                 <div className="flex items-center gap-4">
@@ -517,43 +550,7 @@ function Empty({ children }: { children: React.ReactNode }) { return <div classN
 function BackBtn({ onClick }: { onClick: () => void }) {
   return <button onClick={onClick} className="inline-flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-slate-800 mb-1"><ChevronLeft className="w-4 h-4" /> Voltar</button>
 }
-function Card({ icon, name, desc, onClick, color, uiConfig }: { icon?: string | null; name: string; desc?: string | null; onClick: () => void; color: string; uiConfig?: CatalogServiceSymptomRow['ui_config'] | RequestItemRow['ui_config'] }) {
-  const config = parseCatalogUiConfig(uiConfig)
-  const buttonSizeClass = config.buttonSize === 'lg'
-    ? 'px-5 py-2.5 text-sm'
-    : config.buttonSize === 'md'
-      ? 'px-4 py-2 text-sm'
-      : 'px-3 py-1.5 text-xs'
-  const buttonStyle = config.buttonStyle === 'solid'
-    ? { backgroundColor: color, borderColor: color, color: '#fff' }
-    : config.buttonStyle === 'outline'
-      ? { backgroundColor: '#fff', borderColor: color, color }
-      : { backgroundColor: 'transparent', borderColor: 'transparent', color }
 
-  return (
-    <button
-      onClick={onClick}
-      style={{ minHeight: Math.max(180, config.iconSize + 60) }}
-      className={`group flex w-full items-center gap-5 rounded-2xl border border-slate-200 bg-white p-6 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-lg ${config.buttonPosition === 'bottom' ? 'flex-wrap' : ''}`}
-    >
-      <CatalogIcon icon={icon} name={name} size={config.iconSize} />
-      <div className="min-w-0 flex-1">
-        <div className="text-lg font-bold text-slate-800">{name}</div>
-        {desc && <div className="mt-1 line-clamp-2 text-sm leading-relaxed text-slate-500">{desc}</div>}
-        {config.buttonPosition === 'bottom' && (
-          <span className={`mt-3 inline-flex items-center rounded-lg border font-bold transition-transform group-hover:translate-x-0.5 ${buttonSizeClass}`} style={buttonStyle}>
-            {config.buttonLabel} →
-          </span>
-        )}
-      </div>
-      {config.buttonPosition === 'right' && (
-        <span className={`shrink-0 rounded-lg border font-bold transition-transform group-hover:translate-x-0.5 ${buttonSizeClass}`} style={buttonStyle}>
-          {config.buttonLabel} →
-        </span>
-      )}
-    </button>
-  )
-}
 function SelectField({ label, value, onChange, options }: { label: string; value: string; onChange: (v: string) => void; options: [string, string][] }) {
   return (
     <div>
