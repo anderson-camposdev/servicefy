@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 /**
- * driver.mjs — Flowfy ITSM dev-server driver
+ * driver.mjs — ServiceFY ITSM dev-server driver
  *
  * Usage:
- *   node .claude/skills/run-flowfy/driver.mjs [command] [args...]
+ *   node .claude/skills/run-servicefy/driver.mjs [command] [args...]
  *
  * Commands:
  *   screenshot [outfile]          — screenshot the home page (portal screen)
@@ -13,7 +13,7 @@
  *   flow-incident [outfile]       — walk the incident-reporting flow, screenshot done screen
  *   smoke                         — quick sanity check: portal loads, no console errors
  *
- * All screenshots land in .claude/skills/run-flowfy/shots/ by default.
+ * All screenshots land in .claude/skills/run-servicefy/shots/ by default.
  * Dev server must already be running on http://localhost:5173
  */
 

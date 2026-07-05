@@ -1,5 +1,5 @@
 // ============================================================
-// Flowfy ITSM — Workflow Builder v2 (Motor de Automação)
+// ServiceFY ITSM — Workflow Builder v2 (Motor de Automação)
 // Conectado ao banco: workflow_rules / workflow_execution_log
 // via workflowService (src/lib/services.ts). O motor de execução
 // real roda em Postgres (migrations 055-060) — esta UI só edita
@@ -176,7 +176,7 @@ const VARIABLES_GROUPS = [
     { token: '{{chamado.estado}}',     desc: 'Estado atual',           example: 'In Progress' },
     { token: '{{chamado.categoria}}',  desc: 'Categoria',              example: 'Hardware' },
     { token: '{{chamado.origem}}',     desc: 'Canal de abertura',      example: 'portal / email / api' },
-    { token: '{{chamado.url}}',        desc: 'Link direto ao chamado', example: 'https://app.flowfy.com/...' },
+    { token: '{{chamado.url}}',        desc: 'Link direto ao chamado', example: 'https://app.servicefy.com/...' },
   ]},
   { label: 'Solicitante', icon: '👤', vars: [
     { token: '{{usuario.nome}}',         desc: 'Nome completo',  example: 'João Silva' },

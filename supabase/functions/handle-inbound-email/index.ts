@@ -1,5 +1,5 @@
 // ============================================================
-// Flowfy ITSM — Edge Function: handle-inbound-email (Inbound Loop)
+// ServiceFY ITSM — Edge Function: handle-inbound-email (Inbound Loop)
 //
 // Endpoint do Inbound Email Webhook (Resend/SendGrid/Postmark...).
 // Recebe o e-mail de resposta do solicitante, extrai o nº do chamado

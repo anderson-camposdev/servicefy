@@ -1,5 +1,5 @@
 // ============================================================
-// Flowfy BI v2 — Catálogo de dimensões e medidas
+// ServiceFY BI v2 — Catálogo de dimensões e medidas
 // Lê bi_dimensions / bi_measures (whitelist global, migration 062)
 // e as dimensões dinâmicas de formulário do tenant
 // (bi_form_dimensions). Cache em memória por sessão.

@@ -1,5 +1,5 @@
 // ============================================================
-// Flowfy ITSM — Motor White-Label (ThemeProvider)
+// ServiceFY ITSM — Motor White-Label (ThemeProvider)
 //
 // Injeta as cores da empresa ativa em CSS Variables no :root.
 // Empresa efetiva = a do usuário AUTENTICADO (useAuth) tem

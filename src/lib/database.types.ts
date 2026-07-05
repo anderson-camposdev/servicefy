@@ -1,5 +1,5 @@
 // ============================================================
-// Flowfy ITSM — Database Type Definitions
+// ServiceFY ITSM — Database Type Definitions
 // Auto-maintained: keep in sync with Supabase schema
 // ============================================================
 

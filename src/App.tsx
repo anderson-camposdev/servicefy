@@ -258,7 +258,7 @@ function LoginScreen() {
   const brandColor = branding.primaryColor
   const brandLogo =
     branding.logoUrl ||
-    'https://ui-avatars.com/api/?name=Flowfy&background=10b981&color=fff&size=64&bold=true'
+    'https://ui-avatars.com/api/?name=ServiceFY&background=10b981&color=fff&size=64&bold=true'
   const brandName = tenant?.name || branding.name
   const welcomeTitle = branding.welcomeTitle
   const welcomeSubtitle = branding.welcomeSubtitle
@@ -551,13 +551,13 @@ function ApiDocs() {
 
   return (
     <div>
-      <PageHeader title="API de Integração" subtitle="Referência REST para integrações externas com o Flowfy ITSM" />
+      <PageHeader title="API de Integração" subtitle="Referência REST para integrações externas com o ServiceFY ITSM" />
 
       {/* Info Bar */}
       <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-4 flex flex-wrap items-center gap-3 mb-6">
         <div className="flex items-center gap-2 text-xs font-mono bg-slate-50 border border-slate-200 rounded-xl px-3 py-2">
           <span className="text-slate-400">Base URL:</span>
-          <span className="text-emerald-600 font-semibold">https://api.flowfy.com</span>
+          <span className="text-emerald-600 font-semibold">https://api.servicefy.com</span>
         </div>
         <div className="flex items-center gap-2 text-xs font-mono bg-slate-50 border border-slate-200 rounded-xl px-3 py-2">
           <span className="text-slate-400">Auth:</span>
@@ -1131,8 +1131,8 @@ export default function App() {
     { view: 'api_docs', label: 'API de Integração', icon: <Code2 className="w-5 h-5" /> },
   ]
 
-  // O Flowfy BI fica disponível para todos os perfis gerenciais/técnicos que alcançam esta tela
-  navItems.push({ view: 'flowfy_bi', label: 'Flowfy BI Analytics', icon: <BarChart3 className="w-5 h-5" /> })
+  // O ServiceFY BI fica disponível para todos os perfis gerenciais/técnicos que alcançam esta tela
+  navItems.push({ view: 'flowfy_bi', label: 'ServiceFY BI Analytics', icon: <BarChart3 className="w-5 h-5" /> })
   navItems.push({ view: 'workflow_builder', label: 'Motor de Automação', icon: <Zap className="w-5 h-5" /> })
 
   // Apenas papéis administrativos e CIO têm acesso ao menu Configurações
@@ -1194,7 +1194,7 @@ export default function App() {
           <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-emerald-500 to-teal-400 flex items-center justify-center shadow-md shadow-emerald-500/25">
             <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
           </div>
-          <span className="text-lg font-black tracking-tight text-on-surface hidden sm:block">Flowfy</span>
+          <span className="text-lg font-black tracking-tight text-on-surface hidden sm:block">ServiceFY</span>
           <span className="text-[9px] text-on-surface-variant uppercase font-bold tracking-widest hidden sm:block">ITSM</span>
         </div>
 
@@ -1352,7 +1352,7 @@ export default function App() {
 
       {/* Footer */}
       <footer className="bg-surface border-t border-outline-variant py-3 px-6 flex items-center justify-between">
-        <span className="text-[10px] text-on-surface-variant">© {new Date().getFullYear()} Flowfy ITSM · ITIL v4 · Multi-Tenant</span>
+        <span className="text-[10px] text-on-surface-variant">© {new Date().getFullYear()} ServiceFY ITSM · ITIL v4 · Multi-Tenant</span>
         <span className="flex items-center gap-1.5 text-[10px] text-on-surface-variant">
           <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
           Todos os sistemas operacionais

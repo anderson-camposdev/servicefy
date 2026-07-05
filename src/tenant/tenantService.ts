@@ -1,5 +1,5 @@
 // ============================================================
-// Flowfy ITSM — Multi-Tenant (White-Label)
+// ServiceFY ITSM — Multi-Tenant (White-Label)
 // ETAPA 2 — Acesso aos dados do tenant no Supabase
 //
 // Busca a empresa (tenant) e seu branding. Roda ANTES do login,

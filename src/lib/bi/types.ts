@@ -1,5 +1,5 @@
 // ============================================================
-// Flowfy BI v2 — Tipos do motor analítico
+// ServiceFY BI v2 — Tipos do motor analítico
 // Espelha o contrato das RPCs bi_cube / bi_drilldown / catálogo
 // (migrations 061–064).
 // ============================================================

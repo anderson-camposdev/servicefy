@@ -1,4 +1,4 @@
-# ROADMAP ITSM — Flowfy Enterprise
+# ROADMAP ITSM — ServiceFY Enterprise
 
 > Estado atual: MVP funcional com fila de incidentes, catálogo de serviços, motor de automação e portal white-label.
 > Este documento mapeia as lacunas para competir no segmento enterprise de ITSM (ServiceNow, Jira Service Management, Freshservice).
@@ -59,7 +59,7 @@
 
 | # | Funcionalidade | Impacto | Complexidade |
 |---|----------------|---------|--------------|
-| 3.1 | **Parser de e-mail → ticket** — e-mail recebido em endereço dedicado (`suporte@cliente.flowfy.io`) cria chamado com remetente como solicitante | Crítico | Alta |
+| 3.1 | **Parser de e-mail → ticket** — e-mail recebido em endereço dedicado (`suporte@cliente.servicefy.io`) cria chamado com remetente como solicitante | Crítico | Alta |
 | 3.2 | **Respostas por e-mail** — analista responde no sistema e o e-mail vai para o solicitante; resposta do solicitante por e-mail adiciona mensagem no ticket | Crítico | Alta |
 | 3.3 | **Detecção de duplicatas** — e-mails com mesmo `Message-ID` ou `In-Reply-To` são associados ao ticket existente | Alto | Média |
 | 3.4 | **Triagem automática** — automações classificam prioridade e categoria com base em palavras-chave no subject/body | Médio | Média |

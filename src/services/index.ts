@@ -1,5 +1,5 @@
 // ============================================================
-// FLOWFY ITSM — Mock Data Services
+// SERVICEFY ITSM — Mock Data Services
 // Multi-Tenant | ITIL v4 | RBAC | Service Catalog | API Docs
 // ============================================================
 
@@ -104,7 +104,7 @@ export const mockGroups: Group[] = [
 
 export const mockUsers: User[] = [
   // SysAdmin (global)
-  { id: 'u-sys-1', name: 'Anderson Campos', email: 'anderson@flowfy.com', role: 'sysadmin', companyId: 'co-acme', groupIds: [], department: 'Plataforma', active: true, avatarUrl: 'https://ui-avatars.com/api/?name=Anderson+Campos&background=10b981&color=fff' },
+  { id: 'u-sys-1', name: 'Anderson Campos', email: 'anderson@servicefy.com', role: 'sysadmin', companyId: 'co-acme', groupIds: [], department: 'Plataforma', active: true, avatarUrl: 'https://ui-avatars.com/api/?name=Anderson+Campos&background=10b981&color=fff' },
   // Acme Corp
   { id: 'u-acme-admin', name: 'Carla Mendes', email: 'carla.mendes@acmecorp.com', role: 'company_admin', companyId: 'co-acme', groupIds: [], department: 'TI', active: true, avatarUrl: 'https://ui-avatars.com/api/?name=Carla+Mendes&background=1D4ED8&color=fff' },
   { id: 'u-acme-ag1', name: 'Bruno Alves', email: 'bruno.alves@acmecorp.com', role: 'agent', companyId: 'co-acme', groupIds: ['grp-acme-sd', 'grp-acme-net'], department: 'TI', active: true, avatarUrl: 'https://ui-avatars.com/api/?name=Bruno+Alves&background=2563EB&color=fff' },
@@ -311,8 +311,8 @@ export const mockApiEndpoints: ApiEndpoint[] = [
   },
   {
     id: 'api-webhook', method: 'POST', path: '/api/v1/webhooks', summary: 'Registrar Webhook', description: 'Registra uma URL de callback para receber notificações em tempo real (incident.created, change.approved, etc.).', module: 'companies',
-    requestBody: { url: 'https://seu-sistema.com/flowfy-webhook', events: ['incident.created', 'incident.resolved', 'change.approved'], secret: 'string (HMAC signature secret)' },
-    responseExample: { id: 'wh-1', url: 'https://seu-sistema.com/flowfy-webhook', events: ['incident.created'], active: true },
+    requestBody: { url: 'https://seu-sistema.com/servicefy-webhook', events: ['incident.created', 'incident.resolved', 'change.approved'], secret: 'string (HMAC signature secret)' },
+    responseExample: { id: 'wh-1', url: 'https://seu-sistema.com/servicefy-webhook', events: ['incident.created'], active: true },
     requiresAuth: true, authScopes: ['webhooks:write'],
   },
 ];

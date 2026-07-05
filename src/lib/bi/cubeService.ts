@@ -1,5 +1,5 @@
 // ============================================================
-// Flowfy BI v2 — Chamadas às RPCs analíticas (bi_cube etc.)
+// ServiceFY BI v2 — Chamadas às RPCs analíticas (bi_cube etc.)
 // As RPCs vivem no schema public e aplicam o guard de tenant no
 // servidor: para MSP passamos p_company_id = null (cross-tenant)
 // ou o tenant selecionado; para usuários comuns o servidor força

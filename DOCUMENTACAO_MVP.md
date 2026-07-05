@@ -1,12 +1,12 @@
-# Documentação do MVP — Flowfy ITSM Enterprise
+# Documentação do MVP — ServiceFY ITSM Enterprise
 
-Esta documentação fornece uma visão clara do estado atual de maturidade técnica e funcional do Flowfy ITSM, categorizada em módulos concluídos, em andamento e gaps arquiteturais e operacionais para atingir competitividade contra players de mercado (ex: ServiceNow, Jira Service Management, Freshservice).
+Esta documentação fornece uma visão clara do estado atual de maturidade técnica e funcional do ServiceFY ITSM, categorizada em módulos concluídos, em andamento e gaps arquiteturais e operacionais para atingir competitividade contra players de mercado (ex: ServiceNow, Jira Service Management, Freshservice).
 
 ---
 
 ## 1. Mapeamento de Módulos (Estado Atual)
 
-O Flowfy ITSM está estruturado como uma aplicação multi-tenant com autenticação do Supabase. Abaixo estão os módulos de frontend identificados:
+O ServiceFY ITSM está estruturado como uma aplicação multi-tenant com autenticação do Supabase. Abaixo estão os módulos de frontend identificados:
 
 ### 1.1 Portal do Usuário / Catálogo de Serviços
 * **Status:** ✅ **Completo (Frontend)**
@@ -36,9 +36,9 @@ O Flowfy ITSM está estruturado como uma aplicação multi-tenant com autentica�
   * Configuração de **Condições** lógicas (ex: Se prioridade for Crítica, Se categoria for Infraestrutura).
   * Mapeamento de **Ações** (ex: Enviar e-mail de alerta, Atribuir a grupo, Chamar Webhook).
 
-### 1.4 BI & Analytics (FlowfyBI)
+### 1.4 ServiceFY BI & Analytics
 * **Status:** ✅ **Completo (Frontend)**
-* **Localização:** `src/pages/FlowfyBI.tsx`
+* **Localização:** `src/features/bi/BiApp.tsx`
 * **Funcionalidades Prontas:**
   * Gráficos interativos para volumetria de chamados (abertos vs. resolvidos).
   * Distribuição de chamados por prioridade, categoria e analista.
@@ -56,7 +56,7 @@ O Flowfy ITSM está estruturado como uma aplicação multi-tenant com autentica�
 
 ## 2. Gaps Funcionais Críticos (Comparado ao Mercado)
 
-Para se posicionar como uma ferramenta ITSM Enterprise, o Flowfy precisa resolver as seguintes lacunas de infraestrutura e backend:
+Para se posicionar como uma ferramenta ITSM Enterprise, o ServiceFY precisa resolver as seguintes lacunas de infraestrutura e backend:
 
 ### 🔴 GAP 1 — Motor de SLA Backend (Engine Ativa)
 * **Status:** ❌ **Inexistente no Backend**

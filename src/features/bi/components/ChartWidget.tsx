@@ -1,5 +1,5 @@
 // ============================================================
-// Flowfy BI v2 — Widget de gráfico genérico
+// ServiceFY BI v2 — Widget de gráfico genérico
 // Recebe linhas agregadas do bi_cube e o tipo visual do widget e
 // monta a option ECharts correspondente. Clique numa categoria
 // dispara onDrill com a dimensão/valor clicado (drill-down).

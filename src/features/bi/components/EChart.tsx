@@ -1,5 +1,5 @@
 // ============================================================
-// Flowfy BI v2 — Wrapper fino do ECharts para React 19
+// ServiceFY BI v2 — Wrapper fino do ECharts para React 19
 // Sem echarts-for-react (sem release ativa p/ React 19): init via
 // ref + ResizeObserver + setOption em effect, com imports
 // tree-shaken de echarts/core.

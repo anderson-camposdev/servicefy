@@ -1,5 +1,5 @@
 // ============================================================
-// Flowfy BI v2 — Tema ECharts derivado do motor white-label
+// ServiceFY BI v2 — Tema ECharts derivado do motor white-label
 // Gera uma option base (cores, texto, tooltip) a partir do tema
 // do tenant (theme-engine): paleta harmônica ancorada na cor
 // primária + modo claro/escuro conforme DARK_THEMES.

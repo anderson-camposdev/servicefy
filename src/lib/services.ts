@@ -1,5 +1,5 @@
 // ============================================================
-// Flowfy ITSM — Supabase Data Services
+// ServiceFY ITSM — Supabase Data Services
 // All CRUD + real-time subscriptions for ITIL modules
 // Supports PostgreSQL schema-based tenant isolation & views
 // ============================================================
@@ -2254,7 +2254,7 @@ export const workflowService = {
 }
 
 // ============================================================
-// SERVIÇOS DO FLOWFY BI & ANALYTICS
+// SERVIÇOS DO SERVICEFY BI & ANALYTICS
 // ============================================================
 export const biService = {
   /** Busca métricas e formata a série temporal para gráficos dinâmicos do BI. */

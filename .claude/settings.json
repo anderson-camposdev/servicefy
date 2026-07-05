@@ -2,11 +2,11 @@
   "permissions": {
     "allow": [
       "Bash(npx --yes supabase@latest --version)",
-      "Bash(cd \"c:/Users/Anderson Campos/flowfy\" && npm run build >/tmp/b.log 2>&1; echo \"EXIT: $?\"; grep -iE \"error TS|error:\" /tmp/b.log | head; tail -2 /tmp/b.log)",
+      "Bash(cd \"c:/Users/Anderson Campos/servicefy\" && npm run build >/tmp/b.log 2>&1; echo \"EXIT: $?\"; grep -iE \"error TS|error:\" /tmp/b.log | head; tail -2 /tmp/b.log)",
       "Read(//tmp/**)",
-      "Bash(cd \"c:/Users/Anderson Campos/flowfy\" && npm run build >/tmp/b.log 2>&1; echo \"EXIT: $?\"; grep -iE \"error TS|error:\" /tmp/b.log | head -30; tail -2 /tmp/b.log)",
-      "Bash(cd \"c:/Users/Anderson Campos/flowfy\" && npm run build >/tmp/b.log 2>&1; echo \"EXIT: $?\"; grep -iE \"error TS|error:\" /tmp/b.log | head -20; tail -2 /tmp/b.log)",
-      "Bash(cd \"c:/Users/Anderson Campos/flowfy\" && npm run build >/tmp/b.log 2>&1; echo \"EXIT: $?\"; grep -iE \"error TS|error:|✗|Build failed\" /tmp/b.log | head; tail -3 /tmp/b.log)",
+      "Bash(cd \"c:/Users/Anderson Campos/servicefy\" && npm run build >/tmp/b.log 2>&1; echo \"EXIT: $?\"; grep -iE \"error TS|error:\" /tmp/b.log | head -30; tail -2 /tmp/b.log)",
+      "Bash(cd \"c:/Users/Anderson Campos/servicefy\" && npm run build >/tmp/b.log 2>&1; echo \"EXIT: $?\"; grep -iE \"error TS|error:\" /tmp/b.log | head -20; tail -2 /tmp/b.log)",
+      "Bash(cd \"c:/Users/Anderson Campos/servicefy\" && npm run build >/tmp/b.log 2>&1; echo \"EXIT: $?\"; grep -iE \"error TS|error:|✗|Build failed\" /tmp/b.log | head; tail -3 /tmp/b.log)",
       "Bash(ls \"C:\\\\Users\\\\Anderson Campos\\\\Downloads\\\\Análise visual do Flowfy.zip\" 2>&1 && echo \"EXISTS\")",
       "Read(//c/Users/Anderson Campos/Downloads/**)",
       "Read(//c/Users/Anderson Campos/AppData/Local/Temp/claude/c--Users-Anderson-Campos-flowfy/789dbbe8-7c7e-4be3-87f9-e4babb2255f8/scratchpad/design-zip/handoff/**)",
@@ -24,28 +24,28 @@
       "Read(//c/Users/Anderson Campos/.cache/**)",
       "Bash(node -e \"const pw = require\\('@playwright/test'\\); console.log\\(pw\\)\")",
       "Bash(node -e ' *)",
-      "Bash(mkdir -p \"c:\\\\Users\\\\Anderson Campos\\\\flowfy\\\\.claude\\\\skills\\\\run-flowfy\" && echo \"created\")",
-      "Edit(/.claude/skills/run-flowfy/**)",
-      "Bash(node .claude/skills/run-flowfy/driver.mjs smoke)",
-      "Bash(node .claude/skills/run-flowfy/driver.mjs screenshot portal-home)",
-      "Bash(node .claude/skills/run-flowfy/driver.mjs flow-incident)",
-      "Bash(node .claude/skills/run-flowfy/driver.mjs screenshot-admin admin-home)",
+      "Bash(mkdir -p \"c:\\\\Users\\\\Anderson Campos\\\\flowfy\\\\.claude\\\\skills\\\\run-servicefy\" && echo \"created\")",
+      "Edit(/.claude/skills/run-servicefy/**)",
+      "Bash(node .claude/skills/run-servicefy/driver.mjs smoke)",
+      "Bash(node .claude/skills/run-servicefy/driver.mjs screenshot portal-home)",
+      "Bash(node .claude/skills/run-servicefy/driver.mjs flow-incident)",
+      "Bash(node .claude/skills/run-servicefy/driver.mjs screenshot-admin admin-home)",
       "Bash(pkill -f \"vite --port 5173\")",
-      "Bash(node .claude/skills/run-flowfy/driver.mjs screenshot portal-branding-home)",
-      "Bash(node .claude/skills/run-flowfy/driver.mjs navigate /admin/portal-settings portal-admin-settings)",
-      "Bash(node .claude/skills/run-flowfy/driver.mjs screenshot-admin catalog-admin-check)",
-      "Bash(node .claude/skills/run-flowfy/shots/_tmp_catalog_check.mjs)",
-      "Bash(rm -f .claude/skills/run-flowfy/shots/_tmp_catalog_check.mjs .claude/skills/run-flowfy/shots/tenant-detail.png .claude/skills/run-flowfy/shots/catalog-tree-check.png .claude/skills/run-flowfy/shots/settings-landing.png .claude/skills/run-flowfy/shots/catalog-admin-check.png)",
+      "Bash(node .claude/skills/run-servicefy/driver.mjs screenshot portal-branding-home)",
+      "Bash(node .claude/skills/run-servicefy/driver.mjs navigate /admin/portal-settings portal-admin-settings)",
+      "Bash(node .claude/skills/run-servicefy/driver.mjs screenshot-admin catalog-admin-check)",
+      "Bash(node .claude/skills/run-servicefy/shots/_tmp_catalog_check.mjs)",
+      "Bash(rm -f .claude/skills/run-servicefy/shots/_tmp_catalog_check.mjs .claude/skills/run-servicefy/shots/tenant-detail.png .claude/skills/run-servicefy/shots/catalog-tree-check.png .claude/skills/run-servicefy/shots/settings-landing.png .claude/skills/run-servicefy/shots/catalog-admin-check.png)",
       "mcp__claude_ai_Supabase__list_projects",
       "mcp__claude_ai_Supabase__execute_sql",
       "mcp__claude_ai_Supabase__apply_migration",
       "mcp__claude_ai_Supabase__deploy_edge_function",
-      "Bash(node .claude/skills/run-flowfy/driver.mjs navigate / workflow-check)",
-      "Bash(node .claude/skills/run-flowfy/shots/_tmp_workflow_check.mjs)",
-      "Bash(rm -f .claude/skills/run-flowfy/shots/_tmp_workflow_check.mjs .claude/skills/run-flowfy/shots/workflow-builder-check.png)"
+      "Bash(node .claude/skills/run-servicefy/driver.mjs navigate / workflow-check)",
+      "Bash(node .claude/skills/run-servicefy/shots/_tmp_workflow_check.mjs)",
+      "Bash(rm -f .claude/skills/run-servicefy/shots/_tmp_workflow_check.mjs .claude/skills/run-servicefy/shots/workflow-builder-check.png)"
     ],
     "additionalDirectories": [
-      "c:\\Users\\Anderson Campos\\flowfy\\.claude\\skills"
+      "c:\\Users\\Anderson Campos\\servicefy\\.claude\\skills"
     ]
   }
 }

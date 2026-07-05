@@ -1,4 +1,4 @@
-# Flowfy ITSM — Roadmap de Gaps Arquiteturais
+# ServiceFY ITSM — Roadmap de Gaps Arquiteturais
 
 > Varredura técnica do repositório realizada em 25/06/2026.
 > Documenta o que **já existe**, o que **falta** e a **ordem de prioridade** para um ITSM de mercado.
@@ -17,7 +17,7 @@
 | Gestão de Requisições (ITIL) | ✅ Completo | Integrado ao dashboard |
 | Gestão de Problemas (ITIL) | ✅ Completo | Integrado ao dashboard |
 | Gestão de Mudanças / CAB (ITIL) | ✅ Completo | Integrado ao dashboard |
-| FlowfyBI (Dashboards gerenciais) | ✅ Completo | `src/pages/FlowfyBI.tsx` |
+| ServiceFY BI (dashboards gerenciais) | ✅ Completo | `src/features/bi/BiApp.tsx` |
 | Workflow Builder visual (Motor de Automação) | ✅ Completo | `src/pages/WorkflowBuilder.tsx` |
 | Configurações de Governança (SLA, Branding) | ✅ Parcial | `src/pages/SettingsGovernance.tsx` |
 | Motor de SLA (cálculo de deadlines) | ⚠️ Parcial | Regras de UI existem, falta engine backend |
@@ -165,7 +165,7 @@ O módulo de Mudanças já tem conceito de "CAB Approval" nos tipos, mas não ex
 ### 🔵 GAP 7 — Relatórios e Exportação (Prioridade: BAIXA-MÉDIA)
 
 **O que falta:**
-O FlowfyBI tem dashboards visuais mas não exporta dados:
+O ServiceFY BI tem dashboards visuais mas não exporta dados:
 - Exportação para PDF dos relatórios (aging, SLA compliance, volume por categoria)
 - Exportação CSV das tabelas de chamados filtradas
 - Relatórios agendados por e-mail (parcialmente endereçado pelo Workflow Builder com o template "Relatório Diário")
@@ -220,7 +220,7 @@ tests/e2e/
 
 - [x] Autenticação e isolamento de sessão por tenant
 - [x] Portal do usuário responsivo e funcional
-- [x] FlowfyBI com filtros dinâmicos
+- [x] ServiceFY BI com filtros dinâmicos
 - [x] Workflow Builder visual com gatilhos por origem
 - [x] Estrutura de testes E2E com mock de autenticação
 - [ ] Motor de SLA backend (deadlines reais)

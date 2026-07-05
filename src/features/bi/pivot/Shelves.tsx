@@ -1,5 +1,5 @@
 // ============================================================
-// Flowfy BI v2 — Shelves do PivotExplorer
+// ServiceFY BI v2 — Shelves do PivotExplorer
 // Zonas Linhas / Colunas / Medidas / Filtros como chips removíveis.
 // O chip de filtro abre um editor com operador + valores sugeridos
 // (RPC bi_dimension_values).

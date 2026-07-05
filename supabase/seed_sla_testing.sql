@@ -1,5 +1,5 @@
 -- ============================================================
--- Flowfy ITSM — SEED DE HOMOLOGAÇÃO MULTI-TENANT DO MOTOR DE SLA
+-- ServiceFY ITSM — SEED DE HOMOLOGAÇÃO MULTI-TENANT DO MOTOR DE SLA
 -- Arquivo: supabase/seed_sla_testing.sql
 --
 -- Ambiente completo de simulação expandido (Hiper-realista):
@@ -39,13 +39,13 @@ INSERT INTO public.companies (
   welcome_title, welcome_subtitle, allow_local_login, sso_providers,
   concurrent_licenses, license_plan, license_alert_threshold
 ) VALUES
-  ('5e1a0001-1111-1111-1111-111111111111', 'Alpha Tech', 'alpha-sla.flowfy.app', 'alpha-sla',
+  ('5e1a0001-1111-1111-1111-111111111111', 'Alpha Tech', 'alpha-sla.servicefy.app', 'alpha-sla',
    false, true,
    'https://dummyimage.com/180x48/2563eb/ffffff&text=Alpha+Tech', 'Alpha Tech',
    '#2563EB', '#E0E7FF', '#0EA5E9', '#F8FAFC',
    'Central de Engenharia Alpha', 'Suporte técnico para o time de engenharia', true, '[]'::jsonb,
    25, 'pro', 80),
-  ('5e1a0002-2222-2222-2222-222222222222', 'Beta Hospital', 'beta-sla.flowfy.app', 'beta-sla',
+  ('5e1a0002-2222-2222-2222-222222222222', 'Beta Hospital', 'beta-sla.servicefy.app', 'beta-sla',
    false, true,
    'https://dummyimage.com/180x48/ffffff/0d9488&text=Beta+Hospital', 'Beta Hospital',
    '#0D9488', '#CCFBF1', '#14B8A6', '#F0FDFA',

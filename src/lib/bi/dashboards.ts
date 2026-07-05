@@ -1,5 +1,5 @@
 // ============================================================
-// Flowfy BI v2 — Definições dos dashboards prontos (ServiceNow-like)
+// ServiceFY BI v2 — Definições dos dashboards prontos (ServiceNow-like)
 // Cada widget declara sua consulta ao cubo (dimensões/medidas) e o
 // tipo visual; DashboardPage executa e renderiza genericamente.
 // Os filtros globais (período, grupo, prioridade) são combinados

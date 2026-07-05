@@ -1,5 +1,5 @@
 // ============================================================
-// Flowfy BI v2 — Catálogo de campos do PivotExplorer
+// ServiceFY BI v2 — Catálogo de campos do PivotExplorer
 // Lista TODAS as dimensões (padrão, tempo e campos de formulário
 // do tenant) e as medidas, com busca. Clique adiciona ao shelf
 // escolhido (Linhas / Colunas / Filtros / Medidas).

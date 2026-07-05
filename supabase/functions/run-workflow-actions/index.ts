@@ -1,5 +1,5 @@
 // ============================================================
-// Flowfy ITSM — Edge Function: run-workflow-actions (Motor de Automação)
+// ServiceFY ITSM — Edge Function: run-workflow-actions (Motor de Automação)
 //
 // Drena public.workflow_action_queue (ações assíncronas do Motor
 // de Automação: send_email, webhook, delay) a cada minuto via
@@ -30,7 +30,7 @@
 //   );
 // Secrets necessários (mesmos da send-ticket-notification):
 //   supabase secrets set RESEND_API_KEY=...
-//   supabase secrets set OUTBOUND_FROM="Flowfy ITSM <no-reply@seu-dominio.com>"
+//   supabase secrets set OUTBOUND_FROM="ServiceFY ITSM <no-reply@seu-dominio.com>"
 // ============================================================
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
@@ -38,7 +38,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY') ?? ''
-const FROM_ADDRESS = Deno.env.get('OUTBOUND_FROM') ?? 'Flowfy ITSM <no-reply@seu-dominio.com>'
+const FROM_ADDRESS = Deno.env.get('OUTBOUND_FROM') ?? 'ServiceFY ITSM <no-reply@seu-dominio.com>'
 
 const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
   auth: { persistSession: false },
@@ -84,7 +84,7 @@ async function processEmail(row: QueueRow, incident: any): Promise<{ ok: boolean
   const to = fillTemplate(params.recipients ?? '', incident) || incident.caller_email
   if (!to) return { ok: false, error: 'no recipient email' }
 
-  const subject = fillTemplate(params.subject ?? `[Flowfy] ${incident.number}`, incident)
+  const subject = fillTemplate(params.subject ?? `[ServiceFY] ${incident.number}`, incident)
   const html = `<div style="font-family:system-ui,sans-serif;color:#0f172a">${fillTemplate(params.body ?? params.message ?? '', incident, true)}</div>`
 
   if (!RESEND_API_KEY) {
@@ -115,6 +115,7 @@ async function processWebhook(row: QueueRow, incident: any): Promise<{ ok: boole
     const body = JSON.stringify({ incident, rule_id: row.rule_id })
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
+      'X-ServiceFY-Event': 'workflow.action',
       'X-Flowfy-Event': 'workflow.action',
     }
     if (params.secret) {
@@ -123,7 +124,9 @@ async function processWebhook(row: QueueRow, incident: any): Promise<{ ok: boole
         { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'],
       )
       const signature = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(body))
-      headers['X-Flowfy-Signature'] = `sha256=${Array.from(new Uint8Array(signature)).map(b => b.toString(16).padStart(2, '0')).join('')}`
+      const signatureHeader = `sha256=${Array.from(new Uint8Array(signature)).map(b => b.toString(16).padStart(2, '0')).join('')}`
+      headers['X-ServiceFY-Signature'] = signatureHeader
+      headers['X-Flowfy-Signature'] = signatureHeader
     }
     const resp = await fetch(params.url, {
       method: params.method ?? 'POST',

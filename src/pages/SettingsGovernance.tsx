@@ -876,7 +876,7 @@ export default function SettingsGovernance({ companyId, activeRole }: { companyI
                     : bgVal.includes('url(')
                       ? (bgVal.match(/url\(['"]?([^'")\s]+)['"]?\)/) || [])[1] || ''
                       : 'https://images.unsplash.com/photo-1497366216548-37526070297c?w=800&q=80'
-                  const brandLabel = appearanceForm.brand_name || currentCompanyRow?.name || 'Flowfy'
+                  const brandLabel = appearanceForm.brand_name || currentCompanyRow?.name || 'ServiceFY'
                   
                   const logoSize = appearanceForm.catalog_ui_config?.logo_size || 'large'
                   const LOGO_PREVIEW_MAP: Record<string, string> = {

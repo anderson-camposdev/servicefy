@@ -1,5 +1,5 @@
 // ============================================================
-// Flowfy ITSM — Multi-Tenant (White-Label)
+// ServiceFY ITSM — Multi-Tenant (White-Label)
 // ETAPA 5 — Provisionamento automatizado de novos clientes
 //
 // Wrapper do RPC public.provision_tenant. A autorização é feita
@@ -11,7 +11,7 @@ import { supabase } from '../lib/supabase'
 import type { CompanyRow } from '../lib/database.types'
 
 export interface ProvisionTenantInput {
-  /** Identificador do subdomínio (acme.flowfy.app). Normalizado no banco. */
+  /** Identificador do subdomínio (acme.servicefy.app). Normalizado no banco. */
   slug: string
   name: string
   /** Domínio de e-mail corporativo (acme.com) usado na linkagem de profiles. */

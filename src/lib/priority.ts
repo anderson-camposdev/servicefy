@@ -1,5 +1,5 @@
 // ============================================================
-// Flowfy ITSM — Regra de Prioridade (padrão ServiceNow)
+// ServiceFY ITSM — Regra de Prioridade (padrão ServiceNow)
 //
 // FONTE ÚNICA da regra Priority = Impacto × Urgência.
 //

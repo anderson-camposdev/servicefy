@@ -1,5 +1,5 @@
 // ============================================================
-// Flowfy ITSM — Localização (PT-BR) dos estados do chamado
+// ServiceFY ITSM — Localização (PT-BR) dos estados do chamado
 // Os valores no banco permanecem em inglês; aqui só a EXIBIÇÃO.
 // ============================================================
 

@@ -35,6 +35,7 @@ test('escalation notifica gestão, grupo ou responsável', () => {
 
 test('webhooks têm timeout e assinatura HMAC opcional', () => {
   assert.match(worker, /AbortSignal\.timeout\(10_000\)/)
+  assert.match(worker, /X-ServiceFY-Signature/)
   assert.match(worker, /X-Flowfy-Signature/)
   assert.match(worker, /name: 'HMAC'/)
 })

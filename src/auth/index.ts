@@ -1,5 +1,5 @@
 // ============================================================
-// Flowfy ITSM — Autenticação (Supabase Auth real)
+// ServiceFY ITSM — Autenticação (Supabase Auth real)
 // Barrel de exports do módulo de auth.
 // ============================================================
 

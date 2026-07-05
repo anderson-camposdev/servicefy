@@ -1,5 +1,5 @@
 // ============================================================
-// Flowfy ITSM — Multi-Tenant (White-Label)
+// ServiceFY ITSM — Multi-Tenant (White-Label)
 // ETAPA 2 — Aplicação do branding (cores, logo, favicon, título)
 //
 // Converte uma linha de `companies` num objeto de branding e o
@@ -36,15 +36,15 @@ export interface TenantBranding {
   fontScale: string
 }
 
-/** Branding padrão do produto (Flowfy) — usado fora de um tenant resolvido. */
+/** Branding padrão do produto (ServiceFY) — usado fora de um tenant resolvido. */
 export const DEFAULT_BRANDING: TenantBranding = {
-  name: 'Flowfy',
+  name: 'ServiceFY',
   logoUrl: null,
   faviconUrl: null,
   primaryColor: '#10b981',
   accentColor: '#00a3e0',
   backgroundColor: '#f8fafc',
-  welcomeTitle: 'Flowfy ITSM Enterprise',
+  welcomeTitle: 'ServiceFY ITSM Enterprise',
   welcomeSubtitle: 'Plataforma ITSM multi-tenant baseada no ITIL v4',
   titleColor: null,
   titleFont: null,

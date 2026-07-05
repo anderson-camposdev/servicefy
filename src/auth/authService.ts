@@ -1,5 +1,5 @@
 // ============================================================
-// Flowfy ITSM — Autenticação (Supabase Auth real)
+// ServiceFY ITSM — Autenticação (Supabase Auth real)
 // ETAPA 3 — Serviço de sessão + perfil do usuário logado
 // ============================================================
 

@@ -1,7 +1,7 @@
 // ============================================================
-// Flowfy BI v2 — Relatórios salvos (bi_saved_reports)
+// ServiceFY BI v2 — Relatórios salvos (bi_saved_reports)
 // CRUD do formato v2 (PivotConfig) + conversor lazy dos relatórios
-// v1 do FlowfyBI antigo (migrateV1Config). Ao salvar, sempre grava
+// v1 do módulo de BI antigo (migrateV1Config). Ao salvar, sempre grava
 // schema_version = 2.
 // ============================================================
 

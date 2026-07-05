@@ -1,16 +1,16 @@
-# Flowfy ITSM — Arquitetura Multi-Tenant (White-Label / MSP)
+# ServiceFY ITSM — Arquitetura Multi-Tenant (White-Label / MSP)
 
 Guia de onboarding de um novo cliente e visão geral da fundação multi-tenant.
 
 ## Visão geral
 
-O Flowfy é uma SPA (Vite + React) sobre Supabase, com isolamento por **tenant**
+O ServiceFY é uma SPA (Vite + React) sobre Supabase, com isolamento por **tenant**
 (`companies`). Há um tenant **provedor** (consultoria MSP) com superpoderes sobre
 todos os clientes, e os demais tenants ficam estritamente isolados via RLS.
 
 | Camada | Mecanismo | Arquivos |
 |---|---|---|
-| Identificação do tenant | Subdomínio `*.flowfy.app` → slug (com fallback `?tenant=` / localStorage) | [`src/tenant/resolveTenant.ts`](../src/tenant/resolveTenant.ts) |
+| Identificação do tenant | Subdomínio `*.servicefy.app` → slug (com fallback `?tenant=` / localStorage) | [`src/tenant/resolveTenant.ts`](../src/tenant/resolveTenant.ts) |
 | White-label | Branding (cores/logo/título) vindo de `companies`, aplicado via CSS vars | [`src/tenant/TenantContext.tsx`](../src/tenant/TenantContext.tsx), [`applyBranding.ts`](../src/tenant/applyBranding.ts) |
 | Autenticação | Supabase Auth real; profile linkado por `auth_id` | [`src/auth/`](../src/auth/) |
 | Isolamento | RLS por `company_id`; provedor via `is_provider_tenant`/`sysadmin` | migrations `010`, `011` |
@@ -34,7 +34,7 @@ Autenticado como usuário do provedor MSP, chame o wrapper:
 import { provisionTenant } from './tenant'
 
 await provisionTenant({
-  slug: 'acme',            // vira acme.flowfy.app
+  slug: 'acme',            // vira acme.servicefy.app
   name: 'Acme Corp',
   domain: 'acme.com',      // domínio de e-mail dos usuários
   primaryColor: '#7c3aed',
@@ -50,7 +50,7 @@ await provisionTenant({
 > `is_current_user_msp_admin()`). É idempotente por `slug` (reexecutar atualiza o branding).
 
 ### 2. Apontar o subdomínio
-Configure o DNS de `acme.flowfy.app` para o app. Ao acessar, o `resolveTenant`
+Configure o DNS de `acme.servicefy.app` para o app. Ao acessar, o `resolveTenant`
 extrai o slug `acme` e o `TenantContext` carrega o branding antes do login.
 
 ### 3. Criar o usuário administrador do cliente
@@ -77,4 +77,5 @@ Sem subdomínio, fixe o tenant por query param ou storage:
 ```
 http://localhost:5173/?tenant=acme
 ```
-ou no console: `localStorage.setItem('flowfy.tenant', 'acme')`.
+ou no console: `localStorage.setItem('flowfy.tenant', 'acme')`. A chave mantém
+o prefixo anterior por compatibilidade com sessões já existentes.

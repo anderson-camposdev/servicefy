@@ -1,5 +1,5 @@
 // ============================================================
-// Flowfy ITSM — Multi-Tenant (White-Label)
+// ServiceFY ITSM — Multi-Tenant (White-Label)
 // Barrel de exports do módulo de tenant.
 // ============================================================
 

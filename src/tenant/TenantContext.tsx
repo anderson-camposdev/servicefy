@@ -1,5 +1,5 @@
 // ============================================================
-// Flowfy ITSM — Multi-Tenant (White-Label)
+// ServiceFY ITSM — Multi-Tenant (White-Label)
 // ETAPA 2 — Contexto React do Tenant
 //
 // Resolve o tenant (Etapa 1) → busca a empresa no Supabase →
@@ -37,7 +37,7 @@ export interface TenantContextValue {
   source: TenantSource
   /** Linha completa da empresa (ou null se não resolvido). */
   tenant: CompanyRow | null
-  /** Branding em uso — sempre preenchido (cai no padrão Flowfy). */
+  /** Branding em uso — sempre preenchido (cai no padrão ServiceFY). */
   branding: TenantBranding
   /** Mensagem de erro, quando status === 'error'. */
   error: string | null

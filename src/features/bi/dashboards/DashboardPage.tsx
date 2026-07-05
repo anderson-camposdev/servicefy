@@ -1,5 +1,5 @@
 // ============================================================
-// Flowfy BI v2 — Página de dashboard pronto
+// ServiceFY BI v2 — Página de dashboard pronto
 // Executa as consultas do cubo declaradas na definição do
 // dashboard (dashboards.ts), combina filtros globais e renderiza
 // KPIs, charts e o drill-down. KPIs sem filtro próprio são

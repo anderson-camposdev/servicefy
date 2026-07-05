@@ -1,5 +1,5 @@
 // ============================================================
-// Flowfy ITSM — Edge Function: send-ticket-notification (Outbound)
+// ServiceFY ITSM — Edge Function: send-ticket-notification (Outbound)
 //
 // Disparada pelo trigger trg_notify_ticket_message (migration 013)
 // quando um analista insere um comentário PÚBLICO. Envia e-mail ao
@@ -19,7 +19,7 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY') ?? ''
 const REPLY_TO = Deno.env.get('INBOUND_REPLY_TO') ?? 'chamados@seu-dominio.com'
-const FROM_ADDRESS = Deno.env.get('OUTBOUND_FROM') ?? 'Flowfy ITSM <no-reply@seu-dominio.com>'
+const FROM_ADDRESS = Deno.env.get('OUTBOUND_FROM') ?? 'ServiceFY ITSM <no-reply@seu-dominio.com>'
 
 const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
   auth: { persistSession: false },
@@ -59,7 +59,7 @@ Deno.serve(async (req) => {
     }
 
     // 3) Montar o e-mail — a TAG no assunto é o que fecha o loop de entrada.
-    const subject = `[Flowfy] Atualização no Chamado #${incident.number}`
+    const subject = `[ServiceFY] Atualização no Chamado #${incident.number}`
     const html = `
       <div style="font-family:system-ui,sans-serif;color:#0f172a">
         <p>Olá ${incident.caller_name ?? ''},</p>

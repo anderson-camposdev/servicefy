@@ -1,5 +1,5 @@
 // ============================================================
-// Flowfy ITSM — Workspace (abas internas do analista)
+// ServiceFY ITSM — Workspace (abas internas do analista)
 // Tipo compartilhado de ticket usado entre a Gestão de Tickets
 // (lista/kanban) e o Cockpit (detalhe em aba).
 // ============================================================

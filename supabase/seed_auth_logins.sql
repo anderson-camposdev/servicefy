@@ -1,5 +1,5 @@
 -- ============================================================
--- Flowfy ITSM — SEED DE LOGINS (auth.users) PARA HOMOLOGAÇÃO
+-- ServiceFY ITSM — SEED DE LOGINS (auth.users) PARA HOMOLOGAÇÃO
 -- Arquivo: supabase/seed_auth_logins.sql
 --
 -- Cria usuários reais no Supabase Auth para TODOS os perfis do

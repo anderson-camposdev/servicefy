@@ -1,7 +1,7 @@
 # Handoff: Servicefy Portal do Usuário
 > **Para o Claude Code:** implemente as tarefas abaixo em ordem. Toque **somente** nos arquivos listados em cada tarefa.
 >
-> ⚠️ **NÃO ALTERE** nenhum destes arquivos: `AnalystCockpit.tsx`, `TicketManagementDashboard.tsx`, `WorkspaceLayout.tsx`, `FlowfyBI.tsx`, `AdminDashboard.tsx`, `CatalogManager.tsx` e qualquer outro arquivo não listado abaixo.
+> ⚠️ **NÃO ALTERE** nenhum destes arquivos: `AnalystCockpit.tsx`, `TicketManagementDashboard.tsx`, `WorkspaceLayout.tsx`, `ServiceFYBI.tsx`, `AdminDashboard.tsx`, `CatalogManager.tsx` e qualquer outro arquivo não listado abaixo.
 
 ---
 

@@ -1,5 +1,5 @@
 // ============================================================
-// FLOWFY ITSM — Type Definitions
+// SERVICEFY ITSM — Type Definitions
 // ITIL v4 | Multi-Tenant | RBAC | SSO | Service Catalog | API
 // ============================================================
 

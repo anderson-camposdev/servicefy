@@ -1,7 +1,7 @@
 /**
  * smoke.spec.ts
  *
- * Teste Smoke (E2E) para o Portal do Usuário do Flowfy ITSM.
+ * Teste Smoke (E2E) para o Portal do Usuário do ServiceFY ITSM.
  * Valida a carga inicial do Portal e o fluxo completo de criação de um ticket via catálogo.
  */
 
@@ -30,7 +30,7 @@ const MOCK_SERVICES = [
     id: 'svc-smoke-1',
     category_id: 'cat-smoke-1',
     company_id: 'company-a-uuid',
-    name: 'ERP Flowfy',
+    name: 'ERP ServiceFY',
     description: 'Incidentes relacionados ao ERP corporativo.',
     icon: 'Cpu',
     is_active: true,
@@ -53,7 +53,7 @@ const MOCK_SYMPTOMS = [
     },
     service: {
       id: 'svc-smoke-1',
-      name: 'ERP Flowfy',
+      name: 'ERP ServiceFY',
       category_id: 'cat-smoke-1',
       icon: 'Cpu',
     }
@@ -129,7 +129,7 @@ async function navigateToPortal(page: Page) {
   }
 }
 
-test.describe('Flowfy ITSM — Smoke Test E2E', () => {
+test.describe('ServiceFY ITSM — Smoke Test E2E', () => {
   test('Deve carregar o Portal do Usuário e criar um chamado via formulário', async ({ page }) => {
     test.setTimeout(60_000)
 
@@ -165,8 +165,8 @@ test.describe('Flowfy ITSM — Smoke Test E2E', () => {
     await catCard.click()
     await page.waitForTimeout(1_000)
 
-    // 4. Nível 2: Clica no serviço "ERP Flowfy"
-    const svcCard = page.getByText(/ERP Flowfy/i).first()
+    // 4. Nível 2: Clica no serviço "ERP ServiceFY"
+    const svcCard = page.getByText(/ERP ServiceFY/i).first()
     await expect(svcCard).toBeVisible({ timeout: 5_000 })
     await svcCard.click()
     await page.waitForTimeout(1_000)

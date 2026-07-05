@@ -1,5 +1,5 @@
 // ============================================================
-// Flowfy BI v2 — Painel de drill-down
+// ServiceFY BI v2 — Painel de drill-down
 // Clicou num KPI/fatia/barra -> lista paginada dos tickets por
 // trás do número (RPC bi_drilldown), com os filtros herdados.
 // ============================================================

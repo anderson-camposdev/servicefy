@@ -1,5 +1,5 @@
 // ============================================================
-// Flowfy BI v2 — PivotExplorer (self-service)
+// ServiceFY BI v2 — PivotExplorer (self-service)
 // O usuário monta qualquer visão: escolhe tipos de registro,
 // período, arrasta qualquer campo (incluindo campos de formulário
 // do catálogo) para Linhas/Colunas/Filtros, escolhe medidas e o

@@ -15,7 +15,7 @@ test.describe('Autenticação — Tela de Login', () => {
     await page.goto('/')
 
     // Aguarda a tela carregar e o estado de auth resolver para "unauthenticated"
-    await expect(page).toHaveTitle(/flowfy/i)
+    await expect(page).toHaveTitle(/servicefy/i)
 
     // O app deve exibir campos de e-mail e senha
     const emailInput = page.getByRole('textbox', { name: /e-mail|email/i })

@@ -1,5 +1,5 @@
 // ============================================================
-// Flowfy BI v2 — Tabela pivô
+// ServiceFY BI v2 — Tabela pivô
 // Renderiza o PivotModel (agregados já pivotados no client) com
 // até 2 níveis de linha, colunas dinâmicas, totais e drill-down
 // ao clicar numa célula.

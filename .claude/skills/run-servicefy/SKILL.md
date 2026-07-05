@@ -1,13 +1,13 @@
 ---
-name: run-flowfy
-description: Build, run, start, screenshot, and drive the Flowfy ITSM web app. Use when asked to start Flowfy, run its dev server, take a screenshot of any screen, test the portal, build the app, or interact with the running UI.
+name: run-servicefy
+description: Build, run, start, screenshot, and drive the ServiceFY ITSM web app. Use when asked to start ServiceFY, run its dev server, take a screenshot of any screen, test the portal, build the app, or interact with the running UI.
 ---
 
-Flowfy ITSM is a multi-tenant ITSM SaaS built with Vite + React 19 + TypeScript + Tailwind v4. Drive it via **`.claude/skills/run-flowfy/driver.mjs`** against a running dev server — it uses Playwright's Node API directly (no `chromium-cli`).
+ServiceFY ITSM is a multi-tenant ITSM SaaS built with Vite + React 19 + TypeScript + Tailwind v4. Drive it via **`.claude/skills/run-servicefy/driver.mjs`** against a running dev server — it uses Playwright's Node API directly (no `chromium-cli`).
 
-Screenshots land in `.claude/skills/run-flowfy/shots/`.
+Screenshots land in `.claude/skills/run-servicefy/shots/`.
 
-All paths are relative to the repo root (`c:\Users\Anderson Campos\flowfy\`).
+All paths are relative to the repo root (`c:\Users\Anderson Campos\servicefy\`).
 
 ## Prerequisites
 
@@ -58,7 +58,7 @@ kill $(cat /tmp/vite.pid) 2>/dev/null || pkill -f "vite --port 5173"
 ### 2. Drive with the driver
 
 ```bash
-node .claude/skills/run-flowfy/driver.mjs <command> [args]
+node .claude/skills/run-servicefy/driver.mjs <command> [args]
 ```
 
 | Command | What it does |
@@ -76,7 +76,7 @@ All screenshots default to `shots/<name>.png` inside the skill dir.
 ```bash
 npx vite --port 5173 > /tmp/vite.log 2>&1 &
 timeout 20 bash -c 'until curl -sf http://localhost:5173 >/dev/null; do sleep 1; done'
-node .claude/skills/run-flowfy/driver.mjs screenshot
+node .claude/skills/run-servicefy/driver.mjs screenshot
 kill %1
 ```
 

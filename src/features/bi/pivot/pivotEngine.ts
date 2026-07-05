@@ -1,5 +1,5 @@
 // ============================================================
-// Flowfy BI v2 — Motor de pivô client-side
+// ServiceFY BI v2 — Motor de pivô client-side
 // Recebe as tuplas ACHATADAS e já agregadas do bi_cube (linhas +
 // coluna) e monta o modelo de tabela dinâmica: chaves de linha
 // (até 2 níveis), chaves de coluna, células e subtotais.

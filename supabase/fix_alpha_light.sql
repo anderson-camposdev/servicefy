@@ -1,5 +1,5 @@
 -- ============================================================
--- Flowfy ITSM — HOTFIX: Alpha Tech para tema CLARO técnico
+-- ServiceFY ITSM — HOTFIX: Alpha Tech para tema CLARO técnico
 -- Arquivo: supabase/fix_alpha_light.sql
 --
 -- Remove o tema escuro da Alpha Tech atualizando as cores white-label

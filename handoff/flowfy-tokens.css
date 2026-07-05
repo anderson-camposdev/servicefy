@@ -1,5 +1,5 @@
 /* ============================================================
-   Flowfy — Tokens unificados v2
+   ServiceFY — Tokens unificados v2
    Cole no topo de src/index.css, substituindo o bloco :root e @theme existentes.
 
    O que isto corrige:
@@ -20,7 +20,7 @@
   /* ── MARCA (white-label) ────────────────────────────────────
      Estes são os únicos tokens que o ThemeProvider/applyBranding
      deve gravar. Agora o @theme os lê corretamente.           */
-  --brand-primary:   #10b981;   /* semente padrão Flowfy (esmeralda) */
+  --brand-primary:   #10b981;   /* semente padrão ServiceFY (esmeralda) */
   --brand-secondary: #00a3e0;
   --brand-accent:    #00a3e0;
   --brand-bg:        #f8fafc;

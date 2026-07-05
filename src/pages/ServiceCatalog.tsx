@@ -352,7 +352,7 @@ export default function ServiceCatalog({ companyId, currentUserId, currentUserNa
 
           {/* Rodapé */}
           <div className="px-8 py-3 border-t border-slate-100 flex items-center justify-between text-[10px] text-slate-400">
-            <span className="flex items-center gap-1"><ShieldCheck className="w-3 h-3" /> Flowfy Security Protocol Active</span>
+            <span className="flex items-center gap-1"><ShieldCheck className="w-3 h-3" /> ServiceFY Security Protocol Active</span>
             <span className="font-mono">Ref ID: {done.ref}</span>
           </div>
         </div>

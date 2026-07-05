@@ -1,5 +1,5 @@
 // ============================================================
-// Flowfy BI v2 — Scorecard (KPI) com delta vs período anterior
+// ServiceFY BI v2 — Scorecard (KPI) com delta vs período anterior
 // ============================================================
 
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react'

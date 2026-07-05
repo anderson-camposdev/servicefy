@@ -1,5 +1,5 @@
 // ============================================================
-// Flowfy ITSM — Autenticação (Supabase Auth real)
+// ServiceFY ITSM — Autenticação (Supabase Auth real)
 // ETAPA 3 — Contexto React de sessão/usuário
 //
 // Observa a sessão do Supabase Auth, carrega o profile vinculado

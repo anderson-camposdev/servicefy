@@ -1,20 +1,23 @@
 // ============================================================
-// Flowfy ITSM — Multi-Tenant (White-Label)
+// ServiceFY ITSM — Multi-Tenant (White-Label)
 // ETAPA 1 — Identificação do Tenant (lado do cliente)
 //
-// Como o Flowfy é uma SPA (Vite + React, sem servidor Node),
+// Como o ServiceFY é uma SPA (Vite + React, sem servidor Node),
 // não existe "middleware" de servidor. A resolução do tenant
 // acontece no navegador, ANTES do app montar, a partir de:
-//   1) Subdomínio em produção  → acme.flowfy.app  → "acme"
+//   1) Subdomínio em produção  → acme.servicefy.app  → "acme"
 //   2) Query param (?tenant=)  → previews / staging / links diretos
 //   3) localStorage            → desenvolvimento local (localhost)
 //   4) Subdomínio em localhost → acme.localhost:5173 → "acme"
 // ============================================================
 
 /** Domínio base de produção. Subdomínios deste host viram tenants. */
-export const BASE_DOMAIN = 'flowfy.app'
+export const BASE_DOMAIN = 'servicefy.app'
 
-/** Chave usada para fixar o tenant em desenvolvimento local. */
+/** Domínio anterior aceito durante a transição de marca. */
+export const LEGACY_BASE_DOMAIN = 'flowfy.app'
+
+/** Chave legada mantida para não perder o tenant salvo no navegador. */
 export const TENANT_STORAGE_KEY = 'flowfy.tenant'
 
 /** Nome do query param que sobrescreve o tenant (staging/previews). */
@@ -54,7 +57,7 @@ function normalizeSlug(raw: string | null | undefined): string | null {
 
 /**
  * Extrai o slug a partir do hostname.
- * Suporta produção (`*.flowfy.app`) e dev (`*.localhost`).
+ * Suporta produção (`*.servicefy.app`) e dev (`*.localhost`).
  * Retorna null para o domínio raiz, IPs, localhost puro ou subdomínios reservados.
  */
 export function extractSlugFromHostname(hostname: string): string | null {
@@ -65,12 +68,19 @@ export function extractSlugFromHostname(hostname: string): string | null {
 
   let candidate: string | null = null
 
-  if (host === BASE_DOMAIN || host === `www.${BASE_DOMAIN}`) {
-    candidate = null
-  } else if (host.endsWith(`.${BASE_DOMAIN}`)) {
-    // acme.flowfy.app → "acme"  |  acme.staging.flowfy.app → "acme"
-    candidate = host.slice(0, -(`.${BASE_DOMAIN}`.length)).split('.')[0]
-  } else if (host.endsWith('.localhost')) {
+  for (const domain of [BASE_DOMAIN, LEGACY_BASE_DOMAIN]) {
+    if (host === domain || host === `www.${domain}`) {
+      candidate = null
+      break
+    }
+    if (host.endsWith(`.${domain}`)) {
+      // acme.servicefy.app (ou domínio legado) → "acme"
+      candidate = host.slice(0, -(`.${domain}`.length)).split('.')[0]
+      break
+    }
+  }
+
+  if (candidate === null && host.endsWith('.localhost')) {
     // acme.localhost → "acme" (dev com subdomínio)
     candidate = host.slice(0, -('.localhost'.length)).split('.')[0]
   }

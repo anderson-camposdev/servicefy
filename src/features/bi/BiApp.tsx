@@ -1,5 +1,5 @@
 // ============================================================
-// Flowfy BI v2 — Shell do módulo de Analytics
+// ServiceFY BI v2 — Shell do módulo de Analytics
 // Três abas:
 //   Dashboards — painéis prontos ServiceNow-like por módulo ITIL
 //   Explorar   — pivot self-service sobre TODOS os campos (cubo)
@@ -88,7 +88,7 @@ export default function BiApp({ companyId, themeName }: BiAppProps) {
           <BarChart3 size={20} />
         </div>
         <div>
-          <h1 className="text-xl font-bold" style={{ color: theme.textColor }}>Flowfy Analytics</h1>
+          <h1 className="text-xl font-bold" style={{ color: theme.textColor }}>ServiceFY Analytics</h1>
           <p className="text-xs" style={{ color: theme.mutedColor }}>
             Performance Analytics — incidentes, solicitações, problemas e mudanças
           </p>

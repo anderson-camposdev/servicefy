@@ -1,5 +1,5 @@
 // ============================================================
-// Flowfy BI v2 — Barra de filtros globais dos dashboards
+// ServiceFY BI v2 — Barra de filtros globais dos dashboards
 // Período (presets), grupo solucionador e prioridade. Os valores
 // selecionados são combinados às consultas de todos os widgets.
 // ============================================================
