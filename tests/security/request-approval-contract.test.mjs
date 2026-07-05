@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url'
 import { dirname, resolve } from 'node:path'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..')
-const migration = readFileSync(resolve(root, 'supabase/migrations/072_unified_request_approvals.sql'), 'utf8')
+const migration = readFileSync(resolve(root, 'supabase/migrations/20260705203002_072_unified_request_approvals.sql'), 'utf8')
 const services = readFileSync(resolve(root, 'src/lib/services.ts'), 'utf8')
 const portal = readFileSync(resolve(root, 'src/pages/UserPortalLayout.tsx'), 'utf8')
 

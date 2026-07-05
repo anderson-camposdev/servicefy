@@ -7,7 +7,7 @@ import { dirname, resolve } from 'node:path'
 const here = dirname(fileURLToPath(import.meta.url))
 const root = resolve(here, '..', '..')
 const migration = readFileSync(
-  resolve(root, 'supabase/migrations/071_rbac_and_cab_hardening.sql'),
+  resolve(root, 'supabase/migrations/20260705203001_071_rbac_and_cab_hardening.sql'),
   'utf8',
 )
 const services = readFileSync(resolve(root, 'src/lib/services.ts'), 'utf8')

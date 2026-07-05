@@ -1,5 +1,15 @@
 # Recuperação segura do baseline Supabase
 
+## Estado atual (recuperado em 2026-07-05)
+
+O diretorio `supabase/migrations` agora reproduz o historico timestampado real
+do projeto remoto, incluindo as migrations 071-081. Os arquivos numericos
+anteriores foram preservados em `supabase/legacy_migrations` apenas para
+auditoria e nao devem ser executados pela CLI.
+
+Antes de publicar novas migrations, execute `supabase db push --linked --dry-run`.
+O resultado esperado deve listar somente migrations novas.
+
 O repositório não contém a criação das tabelas core (`companies`, `profiles`,
 `incidents`, `problems`, `changes` e históricos). Por isso, `supabase db reset`
 em um ambiente vazio não é confiável, mesmo com as migrations incrementais.

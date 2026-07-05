@@ -218,9 +218,9 @@ CREATE POLICY knowledge_tenant_read ON public.knowledge_articles FOR SELECT TO a
 CREATE POLICY knowledge_admin_write ON public.knowledge_articles FOR ALL TO authenticated
   USING (public.is_settings_admin(company_id)) WITH CHECK (public.is_settings_admin(company_id));
 CREATE POLICY knowledge_categories_admin ON public.knowledge_categories FOR ALL TO authenticated
+  USING (public.is_settings_admin(company_id)) WITH CHECK (public.is_settings_admin(company_id));
 CREATE POLICY knowledge_categories_tenant_read ON public.knowledge_categories FOR SELECT TO authenticated
   USING (company_id=public.get_current_user_company_id() OR public.is_current_user_msp_admin());
-  USING (public.is_settings_admin(company_id)) WITH CHECK (public.is_settings_admin(company_id));
 CREATE POLICY knowledge_feedback_tenant ON public.knowledge_article_feedback FOR INSERT TO authenticated
   WITH CHECK (company_id=public.get_current_user_company_id() AND profile_id=public.get_current_profile_id());
 CREATE POLICY agent_actions_admin ON public.virtual_agent_actions FOR ALL TO authenticated

@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url'
 import { dirname, resolve } from 'node:path'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..')
-const migration = readFileSync(resolve(root, 'supabase/migrations/074_csat_and_response_macros.sql'), 'utf8')
+const migration = readFileSync(resolve(root, 'supabase/migrations/20260705203004_074_csat_and_response_macros.sql'), 'utf8')
 const portal = readFileSync(resolve(root, 'src/pages/UserPortalLayout.tsx'), 'utf8')
 const cockpit = readFileSync(resolve(root, 'src/pages/AnalystCockpit.tsx'), 'utf8')
 

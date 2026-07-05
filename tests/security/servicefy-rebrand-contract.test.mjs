@@ -4,7 +4,7 @@ import test from 'node:test'
 
 const branding = readFileSync('src/tenant/applyBranding.ts', 'utf8')
 const resolver = readFileSync('src/tenant/resolveTenant.ts', 'utf8')
-const migration = readFileSync('supabase/migrations/075_rebrand_servicefy.sql', 'utf8')
+const migration = readFileSync('supabase/migrations/20260705203005_075_rebrand_servicefy.sql', 'utf8')
 const worker = readFileSync('supabase/functions/run-workflow-actions/index.ts', 'utf8')
 
 test('ServiceFY é a marca padrão do produto', () => {

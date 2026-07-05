@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url'
 import { dirname, resolve } from 'node:path'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..')
-const migration = readFileSync(resolve(root, 'supabase/migrations/073_workflow_reliability.sql'), 'utf8')
+const migration = readFileSync(resolve(root, 'supabase/migrations/20260705203003_073_workflow_reliability.sql'), 'utf8')
 const worker = readFileSync(resolve(root, 'supabase/functions/run-workflow-actions/index.ts'), 'utf8')
 
 test('delay agenda ações posteriores em uma cadeia ordenada', () => {
