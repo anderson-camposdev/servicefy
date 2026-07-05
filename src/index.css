@@ -1,280 +1,190 @@
-@import url("https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap");
+/* ============================================================
+   Servicefy — Tokens unificados v2
+   Cole no topo de src/index.css, substituindo o bloco :root e @theme existentes.
+
+   O que isto corrige:
+     F1 — Hanken Grotesk conectada como font-sans e base do app
+     F2 — --color-primary agora lê o token que o motor grava (--brand-primary)
+     F3 — Escala tipográfica nomeada pronta para uso nos componentes
+     F4 — Paleta semântica centralizada (prioridade, status, SLA) — fixa, nunca white-label
+   ============================================================ */
+
+/* Fontes — mantém o import que já existe */
+@import url("https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap");
 @import "tailwindcss";
 
 /* ============================================================
-   Multi-Tenant (White-Label) — Tokens de marca e design (Stitch)
+   :root — Tokens globais
    ============================================================ */
-
 :root {
-  /* Variáveis Dinâmicas de Tema (White-label) */
-  --color-bg-primary: #f8fafc;
-  --color-surface: #ffffff;
-  --color-text-main: #1e293b;
-  --color-brand-primary: #2563eb;
-
-  /* Defaults do Flowfy (Light Mode) */
-  --brand-primary: #10b981;
+  /* ── MARCA (white-label) ────────────────────────────────────
+     Estes são os únicos tokens que o ThemeProvider/applyBranding
+     deve gravar. Agora o @theme os lê corretamente.           */
+  --brand-primary:   #10b981;   /* semente padrão Servicefy (esmeralda) */
   --brand-secondary: #00a3e0;
-  --brand-accent: #00a3e0;
-  --brand-bg: #f8fafc;
+  --brand-accent:    #00a3e0;
+  --brand-bg:        #f8fafc;
 
-  --color-surface: #ffffff;
-  --color-surface-dim: #f1f5f9;
-  --color-surface-bright: #ffffff;
-  --color-on-surface: #0f172a;
-  --color-on-background: #0f172a;
-  --color-on-primary: #ffffff;
-  --color-primary-container: #d1fae5;
-  --color-on-primary-container: #065f46;
-  --color-outline: #64748b;
-  --color-outline-variant: #e2e8f0;
-  
-  --color-surface-container-lowest: #ffffff;
-  --color-surface-container-low: #f8fafc;
-  --color-surface-container: #f1f5f9;
-  --color-surface-container-high: #e2e8f0;
-  --color-surface-container-highest: #cbd5e1;
-  
-  --color-secondary-container: #f1f5f9;
-  --color-on-secondary: #0f172a;
-  --color-on-secondary-container: #1e293b;
-  --color-on-surface-variant: #475569;
-  
-  --color-error: #ef4444;
-  --color-error-container: #fee2e2;
-  --color-on-error: #ffffff;
-  --color-on-error-container: #991b1b;
+  /* ── NEUTROS (fixos, slate levemente frio) ─────────────────  */
+  --color-surface:                    #ffffff;
+  --color-surface-dim:                #f8fafc;
+  --color-surface-container-lowest:   #ffffff;
+  --color-surface-container-low:      #f8fafc;
+  --color-surface-container:          #f1f5f9;
+  --color-surface-container-high:     #e2e8f0;
+  --color-surface-container-highest:  #cbd5e1;
+  --color-on-surface:                 #0f172a;
+  --color-on-surface-variant:         #475569;
+  --color-outline:                    #64748b;
+  --color-outline-variant:            #e2e8f0;
+  --color-on-primary:                 #ffffff;
+  --color-primary-container:          color-mix(in srgb, var(--brand-primary) 15%, #ffffff);
+  --color-on-primary-container:       color-mix(in srgb, var(--brand-primary) 80%, #000000);
+  --color-secondary-container:        #f1f5f9;
+  --color-on-secondary:               #0f172a;
+  --color-on-secondary-container:     #1e293b;
 
-  --color-tertiary: #f59e0b;
-  --color-tertiary-container: #fef3c7;
-  --color-on-tertiary: #ffffff;
+  /* ── SEMÂNTICO — PRIORIDADE (fixa, nunca white-label) ───────
+     Vermelho → Laranja → Amarelo → Azul → Verde
+     Separação máxima de hue para leitura instantânea na fila.  */
+  --sem-p1:        #dc2626;  --sem-p1-bg: #fee2e2;  --sem-p1-fg: #991b1b;
+  --sem-p2:        #ea580c;  --sem-p2-bg: #ffedd5;  --sem-p2-fg: #c2410c;
+  --sem-p3:        #eab308;  --sem-p3-bg: #fef9c3;  --sem-p3-fg: #713f12;
+  --sem-p4:        #2563eb;  --sem-p4-bg: #dbeafe;  --sem-p4-fg: #1d4ed8;
+  --sem-p5:        #16a34a;  --sem-p5-bg: #dcfce7;  --sem-p5-fg: #166534;
 
-  --color-medical-blue: #005EB8;
-  --color-seafoam-green: #00A499;
+  /* ── SEMÂNTICO — STATUS ─────────────────────────────────────
+     Usa cor fixa, nunca --brand-primary.
+     O badge de status no cockpit deve referenciar estas vars,
+     não bg-primary-container / text-on-primary-container.      */
+  --sem-new:       #2563eb;  --sem-new-bg:       #dbeafe;  --sem-new-fg:       #1d4ed8;
+  --sem-progress:  #d97706;  --sem-progress-bg:  #fef3c7;  --sem-progress-fg:  #b45309;
+  --sem-hold:      #7c3aed;  --sem-hold-bg:      #ede9fe;  --sem-hold-fg:      #6d28d9;
+  --sem-resolved:  #059669;  --sem-resolved-bg:  #d1fae5;  --sem-resolved-fg:  #047857;
+  --sem-closed:    #64748b;  --sem-closed-bg:    #f1f5f9;  --sem-closed-fg:    #475569;
 
+  /* ── SEMÂNTICO — SAÚDE DO SLA ───────────────────────────────  */
+  --sem-sla-ok:      #059669;
+  --sem-sla-risk:    #d97706;
+  --sem-sla-breach:  #dc2626;
+
+  /* ── TIPOGRAFIA ─────────────────────────────────────────────  */
+  --font-family-sans: "Hanken Grotesk", sans-serif;
+  --font-family-mono: "JetBrains Mono", monospace;
+
+  /* ── BORDAS ─────────────────────────────────────────────────  */
   --radius-default-val: 8px;
-  --radius-lg-val: 12px;
-  --radius-xl-val: 16px;
-
-  --font-family-display-val: "Inter";
-  --font-family-mono-val: monospace;
+  --radius-lg-val:      12px;
+  --radius-xl-val:      16px;
 }
 
-/* ------------------------------------------------------------
-   Alpha Tech (Stitch Light Theme - Engenharia/Técnico)
-   Tema CLARO técnico (azul de engenharia sobre superfícies claras).
-   ------------------------------------------------------------ */
-:root[data-tenant="alpha-sla"] {
-  --brand-primary: #2563eb;
-  --brand-secondary: #e0e7ff;
-  --brand-accent: #0ea5e9;
-  --brand-bg: #f8fafc;
-
-  --color-surface: #ffffff;
-  --color-surface-dim: #f1f5f9;
-  --color-surface-bright: #ffffff;
-  --color-on-surface: #0f172a;
-  --color-on-background: #0f172a;
-  --color-on-primary: #ffffff;
-  --color-primary-container: #dbeafe;
-  --color-on-primary-container: #1e3a8a;
-  --color-outline: #64748b;
-  --color-outline-variant: #e2e8f0;
-
-  --color-surface-container-lowest: #ffffff;
-  --color-surface-container-low: #f8fafc;
-  --color-surface-container: #f1f5f9;
-  --color-surface-container-high: #e2e8f0;
-  --color-surface-container-highest: #cbd5e1;
-
-  --color-secondary-container: #eef2ff;
-  --color-on-secondary: #0f172a;
-  --color-on-secondary-container: #1e293b;
-  --color-on-surface-variant: #475569;
-
-  --color-error: #ef4444;
-  --color-error-container: #fee2e2;
-  --color-on-error: #ffffff;
-  --color-on-error-container: #991b1b;
-
-  --color-tertiary: #f59e0b;
-  --color-tertiary-container: #fef3c7;
-  --color-on-tertiary: #ffffff;
-
-  --radius-default-val: 8px;
-  --radius-lg-val: 12px;
-  --radius-xl-val: 16px;
-
-  --font-family-display-val: "Hanken Grotesk";
-  --font-family-mono-val: "JetBrains Mono";
-}
-
-/* ------------------------------------------------------------
-   Beta Hospital (Stitch Light Theme - Hospitalar)
-   ------------------------------------------------------------ */
-:root[data-tenant="beta-sla"] {
-  --brand-primary: #4f378a;
-  --brand-secondary: #f2ecf4;
-  --brand-accent: #14b8a6;
-  --brand-bg: #ffffff;
-
-  --color-surface: #ffffff;
-  --color-surface-dim: #f8fafc;
-  --color-surface-bright: #ffffff;
-  --color-on-surface: #1d1b20;
-  --color-on-background: #1d1b20;
-  --color-on-primary: #ffffff;
-  --color-primary-container: #e0d2ff;
-  --color-on-primary-container: #22005d;
-  --color-outline: #7a7582;
-  --color-outline-variant: #cbc4d2;
-
-  --color-surface-container-lowest: #ffffff;
-  --color-surface-container-low: #f8fafc;
-  --color-surface-container: #f2ecf4;
-  --color-surface-container-high: #ece6ee;
-  --color-surface-container-highest: #e2d7e6;
-
-  --color-secondary-container: #f2ecf4;
-  --color-on-secondary: #1d1b20;
-  --color-on-secondary-container: #22005d;
-  --color-on-surface-variant: #494551;
-
-  --color-error: #b3261e;
-  --color-error-container: #f9dedc;
-  --color-on-error: #ffffff;
-  --color-on-error-container: #410e0b;
-
-  --color-medical-blue: #005EB8;
-  --color-seafoam-green: #00A499;
-
-  --radius-default-val: 4px; /* 0.25rem */
-  --radius-lg-val: 12px;
-  --radius-xl-val: 16px;
-
-  --font-family-display-val: "Hanken Grotesk";
-  --font-family-mono-val: "JetBrains Mono";
-}
-
-/* ------------------------------------------------------------
-   Configuração do Tema TailwindCSS v4
-   ------------------------------------------------------------ */
+/* ============================================================
+   @theme — Tailwind v4
+   Agora --color-primary lê --brand-primary (o token do motor).
+   ============================================================ */
 @theme {
-  /* Font Families */
-  --font-display-lg: var(--font-family-display-val), sans-serif;
-  --font-body-lg: var(--font-family-display-val), sans-serif;
-  --font-title-lg: var(--font-family-display-val), sans-serif;
-  --font-headline-lg: var(--font-family-display-val), sans-serif;
-  --font-label-sm: var(--font-family-mono-val), monospace;
-  --font-label-md: var(--font-family-mono-val), monospace;
-  --font-body-md: var(--font-family-display-val), sans-serif;
-  --font-headline-md: var(--font-family-display-val), sans-serif;
+  /* ── Fontes ─────────────────────────────────────────────────
+     font-sans e font-mono agora apontam para as fontes de marca.
+     Todos os componentes que usam font-sans passam a renderizar
+     em Hanken Grotesk automaticamente, sem alterar classes.    */
+  --font-sans:     var(--font-family-sans);
+  --font-mono:     var(--font-family-mono);
 
-  /* Font Sizes & Typography Sub-properties */
-  --text-display-lg: 48px;
-  --text-display-lg--line-height: 56px;
-  --text-display-lg--letter-spacing: -0.02em;
-  --text-display-lg--font-weight: 700;
+  --font-display-lg:   var(--font-family-sans);
+  --font-headline-lg:  var(--font-family-sans);
+  --font-headline-md:  var(--font-family-sans);
+  --font-title-lg:     var(--font-family-sans);
+  --font-body-lg:      var(--font-family-sans);
+  --font-body-md:      var(--font-family-sans);
+  --font-label-md:     var(--font-family-mono);
+  --font-label-sm:     var(--font-family-mono);
 
-  --text-body-lg: 16px;
-  --text-body-lg--line-height: 24px;
-  --text-body-lg--font-weight: 400;
+  /* ── Escala tipográfica ─────────────────────────────────────  */
+  --text-display-lg: 48px;   --text-display-lg--line-height: 56px;  --text-display-lg--font-weight: 800;  --text-display-lg--letter-spacing: -0.025em;
+  --text-headline-lg: 32px;  --text-headline-lg--line-height: 40px; --text-headline-lg--font-weight: 700; --text-headline-lg--letter-spacing: -0.02em;
+  --text-headline-md: 24px;  --text-headline-md--line-height: 32px; --text-headline-md--font-weight: 700; --text-headline-md--letter-spacing: -0.015em;
+  --text-title-lg: 20px;     --text-title-lg--line-height: 28px;    --text-title-lg--font-weight: 600;
+  --text-body-lg: 16px;      --text-body-lg--line-height: 24px;     --text-body-lg--font-weight: 400;
+  --text-body-md: 14px;      --text-body-md--line-height: 20px;     --text-body-md--font-weight: 400;
+  --text-label-md: 12px;     --text-label-md--line-height: 16px;    --text-label-md--font-weight: 600;  --text-label-md--letter-spacing: 0.05em;
+  --text-label-sm: 11px;     --text-label-sm--line-height: 14px;    --text-label-sm--font-weight: 600;  --text-label-sm--letter-spacing: 0.04em;
 
-  --text-title-lg: 20px;
-  --text-title-lg--line-height: 28px;
-  --text-title-lg--font-weight: 500;
+  /* ── CORREÇÃO F2: primary/background agora leem o motor ─────
+     Antes: --color-primary: var(--color-brand-primary) [nunca atualizado]
+     Depois: --color-primary: var(--brand-primary)      [atualizado pelo ThemeProvider] */
+  --color-primary:            var(--brand-primary);
+  --color-accent:             var(--brand-accent);
+  --color-background:         var(--brand-bg);
+  --color-brand-primary:      var(--brand-primary);   /* alias para retrocompat. */
+  --color-bg-primary:         var(--brand-bg);
 
-  --text-headline-lg: 32px;
-  --text-headline-lg--line-height: 40px;
-  --text-headline-lg--letter-spacing: -0.01em;
-  --text-headline-lg--font-weight: 600;
-
-  --text-label-sm: 10px;
-  --text-label-sm--line-height: 14px;
-  --text-label-sm--font-weight: 500;
-
-  --text-label-md: 12px;
-  --text-label-md--line-height: 16px;
-  --text-label-md--letter-spacing: 0.05em;
-  --text-label-md--font-weight: 500;
-
-  --text-body-md: 14px;
-  --text-body-md--line-height: 20px;
-  --text-body-md--font-weight: 400;
-
-  --text-headline-md: 24px;
-  --text-headline-md--line-height: 32px;
-  --text-headline-md--font-weight: 600;
-
-  /* Spacing */
-  --spacing-sidebar-width: 280px;
-  --spacing-gutter: 24px;
-  --spacing-unit: 4px;
-  --spacing-container-padding: 32px;
-  --spacing-stack-sm: 8px;
-  --spacing-drawer-width: 480px;
-  --spacing-stack-md: 16px;
-  --spacing-stack-lg: 24px;
-
-  /* Border Radius */
-  --radius: var(--radius-default-val);
-  --radius-lg: var(--radius-lg-val);
-  --radius-xl: var(--radius-xl-val);
-  --radius-full: 9999px;
-
-  /* Colors */
-  --color-primary: var(--color-brand-primary);
-  --color-brand-primary: var(--color-brand-primary);
-  --color-secondary: var(--brand-secondary);
-  --color-accent: var(--brand-accent);
-  --color-background: var(--color-bg-primary);
-  --color-brand-bg: var(--color-bg-primary);
-  --color-bg-primary: var(--color-bg-primary);
-
-  --color-surface: var(--color-surface);
-  --color-surface-dim: var(--color-surface-dim);
-  --color-surface-bright: var(--color-surface-bright);
-  --color-on-surface: var(--color-text-main);
-  --color-on-background: var(--color-text-main);
-  --color-text-main: var(--color-text-main);
-  --color-on-primary: var(--color-on-primary);
-  --color-primary-container: var(--color-primary-container);
+  --color-secondary:          var(--brand-secondary);
+  --color-on-primary:         var(--color-on-primary);
+  --color-primary-container:  var(--color-primary-container);
   --color-on-primary-container: var(--color-on-primary-container);
-  --color-outline: var(--color-outline);
-  --color-outline-variant: var(--color-outline-variant);
 
-  --color-surface-container-lowest: var(--color-surface-container-lowest);
-  --color-surface-container-low: var(--color-surface-container-low);
-  --color-surface-container: var(--color-surface-container);
-  --color-surface-container-high: var(--color-surface-container-high);
-  --color-surface-container-highest: var(--color-surface-container-highest);
-
-  --color-secondary-container: var(--color-secondary-container);
-  --color-on-secondary: var(--color-on-secondary);
-  --color-on-secondary-container: var(--color-on-secondary-container);
+  --color-surface:            var(--color-surface);
+  --color-surface-dim:        var(--color-surface-dim);
+  --color-surface-bright:     var(--color-surface);
+  --color-on-surface:         var(--color-on-surface);
+  --color-on-background:      var(--color-on-surface);
+  --color-text-main:          var(--color-on-surface);
+  --color-outline:            var(--color-outline);
+  --color-outline-variant:    var(--color-outline-variant);
   --color-on-surface-variant: var(--color-on-surface-variant);
 
-  --color-error: var(--color-error);
-  --color-error-container: var(--color-error-container);
-  --color-on-error: var(--color-on-error);
-  --color-on-error-container: var(--color-on-error-container);
+  --color-surface-container-lowest:  var(--color-surface-container-lowest);
+  --color-surface-container-low:     var(--color-surface-container-low);
+  --color-surface-container:         var(--color-surface-container);
+  --color-surface-container-high:    var(--color-surface-container-high);
+  --color-surface-container-highest: var(--color-surface-container-highest);
 
-  --color-tertiary: var(--color-tertiary);
-  --color-tertiary-container: var(--color-tertiary-container);
-  --color-on-tertiary: var(--color-on-tertiary);
+  --color-secondary-container:       var(--color-secondary-container);
+  --color-on-secondary:              var(--color-on-secondary);
+  --color-on-secondary-container:    var(--color-on-secondary-container);
 
-  --color-medical-blue: var(--color-medical-blue);
-  --color-seafoam-green: var(--color-seafoam-green);
+  --color-error:              #dc2626;   /* = --sem-p1 */
+  --color-error-container:    #fee2e2;
+  --color-on-error:           #ffffff;
+  --color-on-error-container: #991b1b;
 
-  /* Legados / Retrocompatibilidade */
-  --color-brand-accent: var(--brand-accent);
+  /* ── Semântico — prioridade exposto como utilities ──────────
+     Uso: text-p1, bg-p1-bg, text-p1-fg etc.                   */
+  --color-p1:      var(--sem-p1);      --color-p1-bg:      var(--sem-p1-bg);      --color-p1-fg:      var(--sem-p1-fg);
+  --color-p2:      var(--sem-p2);      --color-p2-bg:      var(--sem-p2-bg);      --color-p2-fg:      var(--sem-p2-fg);
+  --color-p3:      var(--sem-p3);      --color-p3-bg:      var(--sem-p3-bg);      --color-p3-fg:      var(--sem-p3-fg);
+  --color-p4:      var(--sem-p4);      --color-p4-bg:      var(--sem-p4-bg);      --color-p4-fg:      var(--sem-p4-fg);
+  --color-p5:      var(--sem-p5);      --color-p5-bg:      var(--sem-p5-bg);      --color-p5-fg:      var(--sem-p5-fg);
+
+  /* ── Semântico — status exposto como utilities ──────────────
+     Uso: bg-new-bg, text-new-fg, bg-progress-bg etc.          */
+  --color-new:          var(--sem-new);       --color-new-bg:       var(--sem-new-bg);       --color-new-fg:       var(--sem-new-fg);
+  --color-progress:     var(--sem-progress);  --color-progress-bg:  var(--sem-progress-bg);  --color-progress-fg:  var(--sem-progress-fg);
+  --color-hold:         var(--sem-hold);      --color-hold-bg:      var(--sem-hold-bg);       --color-hold-fg:      var(--sem-hold-fg);
+  --color-resolved:     var(--sem-resolved);  --color-resolved-bg:  var(--sem-resolved-bg);  --color-resolved-fg:  var(--sem-resolved-fg);
+  --color-closed:       var(--sem-closed);    --color-closed-bg:    var(--sem-closed-bg);     --color-closed-fg:    var(--sem-closed-fg);
+
+  --color-sla-ok:     var(--sem-sla-ok);
+  --color-sla-risk:   var(--sem-sla-risk);
+  --color-sla-breach: var(--sem-sla-breach);
+
+  /* ── Espaçamentos ───────────────────────────────────────────  */
+  --spacing-sidebar-width:     280px;
+  --spacing-gutter:            24px;
+  --spacing-unit:              4px;
+  --spacing-container-padding: 32px;
+  --spacing-stack-sm:          8px;
+  --spacing-stack-md:          16px;
+  --spacing-stack-lg:          24px;
+  --spacing-drawer-width:      480px;
+
+  /* ── Bordas ─────────────────────────────────────────────────  */
+  --radius:      var(--radius-default-val);
+  --radius-lg:   var(--radius-lg-val);
+  --radius-xl:   var(--radius-xl-val);
+  --radius-full: 9999px;
 }
 
-/* Oculta a barra de rolagem mantendo o scroll (fileiras de filtros, abas). */
-.hide-scrollbar {
-  -ms-overflow-style: none; /* IE/Edge */
-  scrollbar-width: none;  /* Firefox */
-}
-.hide-scrollbar::-webkit-scrollbar {
-  display: none; /* Chrome/Safari */
-}
+/* Oculta scrollbar mantendo o scroll */
+.hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+.hide-scrollbar::-webkit-scrollbar { display: none; }

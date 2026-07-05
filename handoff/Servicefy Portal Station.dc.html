@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden}
+body{font-family:'Hanken Grotesk',sans-serif;-webkit-font-smoothing:antialiased}
+::-webkit-scrollbar{width:6px}
+::-webkit-scrollbar-thumb{background:rgba(100,116,139,.25);border-radius:3px}
+input::placeholder,textarea::placeholder{color:#94a3b8}
+a,button{cursor:pointer}
+button{border:none;background:none;font-family:'Hanken Grotesk',sans-serif}
+select,textarea{font-family:'Hanken Grotesk',sans-serif}
+</style>
+</helmet>
+
+<div style="width:100%;height:100vh;display:flex;overflow:hidden">
+
+  <!-- ─── SIDEBAR ─── -->
+  <div style="width:268px;flex:none;background:{{ sbBg }};display:flex;flex-direction:column;overflow:hidden">
+    <div style="padding:18px 20px 14px;border-bottom:1px solid {{ sbBorder }};text-align:center">
+      <div style="display:flex;justify-content:center;width:100%;margin-bottom:12px">{{ logoSlot }}</div>
+      <div style="font:800 17px 'Hanken Grotesk';color:{{ sbText }};letter-spacing:-.02em;line-height:1.2">{{ companyName }}</div>
+      <div style="font:500 11px 'JetBrains Mono';color:{{ sbMuted }};letter-spacing:.04em;margin-top:2px">{{ portalTitle }}</div>
+    </div>
+
+    <nav style="padding:12px 12px 0;flex:none">
+      <a style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;background:{{ navActiveBg }};color:{{ brand }};font:600 14px 'Hanken Grotesk';text-decoration:none;margin-bottom:3px">
+        <span style="font-size:16px">🏠</span>Início
+      </a>
+      <a style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;color:{{ sbMuted }};font:600 14px 'Hanken Grotesk';text-decoration:none;margin-bottom:3px;transition:background .12s,color .12s" style-hover="background:{{ sbNavHover }};color:{{ sbText }}">
+        <span style="font-size:16px">🎫</span>Meus Chamados
+        <span style="margin-left:auto;font:700 11px 'JetBrains Mono';background:#dc2626;color:#fff;padding:1px 7px;border-radius:999px;flex:none">3</span>
+      </a>
+      <a style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;color:{{ sbMuted }};font:600 14px 'Hanken Grotesk';text-decoration:none;margin-bottom:3px;transition:background .12s,color .12s" style-hover="background:{{ sbNavHover }};color:{{ sbText }}">
+        <span style="font-size:16px">📚</span>Base de Conhecimento
+      </a>
+      <a style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;color:{{ sbMuted }};font:600 14px 'Hanken Grotesk';text-decoration:none;transition:background .12s,color .12s" style-hover="background:{{ sbNavHover }};color:{{ sbText }}">
+        <span style="font-size:16px">📊</span>Histórico
+      </a>
+    </nav>
+
+    <div style="margin:12px 16px 0;border-top:1px solid {{ sbBorder }};padding-top:12px;flex:none">
+      <div style="font:700 9px 'JetBrains Mono';color:{{ sbMuted }};text-transform:uppercase;letter-spacing:.1em;margin-bottom:10px;padding:0 4px">Chamados Ativos</div>
+      <div style="display:flex;flex-direction:column;gap:7px">
+        <sc-for list="{{ tickets }}" as="t" hint-placeholder-count="3">
+          <a style="display:block;padding:10px 11px;background:{{ sbItemBg }};border:1px solid {{ sbBorder }};border-radius:9px;text-decoration:none;transition:background .12s" style-hover="background:{{ sbNavHover }}">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:3px">
+              <span style="font:600 11px 'JetBrains Mono';color:{{ brand }}">{{ t.id }}</span>
+              <span style="width:7px;height:7px;border-radius:50%;background:{{ t.dot }};flex:none"></span>
+            </div>
+            <div style="font:600 13px 'Hanken Grotesk';color:{{ sbItemText }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ t.title }}</div>
+          </a>
+        </sc-for>
+      </div>
+    </div>
+
+    <div style="margin:12px 16px 0;flex:none">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div style="padding:10px;background:rgba(220,38,38,.1);border:1px solid rgba(220,38,38,.18);border-radius:9px;text-align:center">
+          <div style="font:800 22px/1 'Hanken Grotesk';color:#ef4444">1</div>
+          <div style="font:700 9px 'Hanken Grotesk';color:#ef4444;text-transform:uppercase;letter-spacing:.05em;margin-top:4px">Crítico P1</div>
+        </div>
+        <div style="padding:10px;background:rgba(5,150,105,.1);border:1px solid rgba(5,150,105,.18);border-radius:9px;text-align:center">
+          <div style="font:800 22px/1 'Hanken Grotesk';color:#10b981">92%</div>
+          <div style="font:700 9px 'Hanken Grotesk';color:#10b981;text-transform:uppercase;letter-spacing:.05em;margin-top:4px">SLA OK</div>
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-top:auto;padding:14px 16px;border-top:1px solid {{ sbBorder }};display:flex;align-items:center;gap:10px">
+      <div style="width:36px;height:36px;border-radius:50%;background:{{ brand }};display:flex;align-items:center;justify-content:center;font:700 13px 'Hanken Grotesk';color:#fff;flex:none">AS</div>
+      <div>
+        <div style="font:600 13px 'Hanken Grotesk';color:{{ sbText }}">Anderson Silva</div>
+        <div style="font:400 11px 'Hanken Grotesk';color:{{ sbMuted }}">Analista de TI</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── MAIN ─── -->
+  <div style="flex:1;min-width:0;display:flex;flex-direction:column;background:#f8fafc;overflow:hidden">
+
+    <!-- TOP BAR -->
+    <div style="flex:none;background:#fff;border-bottom:1px solid #e2e8f0;padding:16px 28px">
+      <div style="font:400 13px 'Hanken Grotesk';color:#94a3b8;margin-bottom:2px">{{ greeting }}</div>
+      <div style="font:800 25px/1.1 'Hanken Grotesk';letter-spacing:-.025em;color:#0f172a">{{ topBarTitle }}</div>
+    </div>
+
+    <!-- SEARCH (só na home) -->
+    <sc-if value="{{ isHome }}" hint-placeholder-val="{{ true }}">
+    <div style="flex:none;padding:14px 28px;background:#fff;border-bottom:1px solid #e2e8f0;position:relative;z-index:40">
+      <div style="position:relative">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2" stroke-linecap="round" style="position:absolute;left:15px;top:50%;transform:translateY(-50%);width:17px;height:17px;pointer-events:none"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.35-4.35"></path></svg>
+        <input type="text" placeholder="Busque um problema ou serviço… (ex: VPN, senha, notebook)" value="{{ searchQ }}" onChange="{{ onSearchChange }}" onFocus="{{ onSearchFocus }}" onBlur="{{ onSearchBlur }}" style="width:100%;height:48px;padding:0 18px 0 46px;border:2px solid #e2e8f0;border-radius:13px;background:#f8fafc;font:400 15px 'Hanken Grotesk';outline:none" />
+        <sc-if value="{{ showResults }}" hint-placeholder-val="{{ false }}">
+        <div style="position:absolute;top:calc(100% + 6px);left:0;right:0;background:#fff;border:1px solid #e2e8f0;border-radius:14px;box-shadow:0 8px 32px rgba(15,23,42,.12);overflow:hidden;z-index:50">
+          <sc-for list="{{ searchResults }}" as="r" hint-placeholder-count="4">
+            <button onClick="{{ r.onSelect }}" style="display:flex;align-items:center;gap:12px;width:100%;padding:11px 16px;background:none;text-align:left;border-bottom:1px solid #f1f5f9;transition:background .1s" style-hover="background:#f8fafc">
+              <span style="font-size:17px;flex:none">{{ r.emoji }}</span>
+              <div style="flex:1;min-width:0">
+                <div style="font:600 14px 'Hanken Grotesk';color:#0f172a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ r.label }}</div>
+                <div style="font:400 12px 'Hanken Grotesk';color:#94a3b8">{{ r.sub }}</div>
+              </div>
+              <span style="font:600 11px 'JetBrains Mono';padding:2px 8px;border-radius:5px;flex:none;background:{{ r.tagBg }};color:{{ r.tagFg }}">{{ r.tag }}</span>
+            </button>
+          </sc-for>
+        </div>
+        </sc-if>
+      </div>
+    </div>
+    </sc-if>
+
+    <!-- HOME: GRID -->
+    <sc-if value="{{ isHomeGrid }}" hint-placeholder-val="{{ true }}">
+    <div style="flex:1;overflow-y:auto;padding:22px 28px">
+      <h2 style="font:700 17px 'Hanken Grotesk';color:#0f172a;margin-bottom:13px">O que você precisa?</h2>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:24px">
+        <button onClick="{{ openIncident }}" style="display:flex;flex-direction:column;gap:11px;padding:20px;background:#fff;border:2px solid #fecaca;border-radius:14px;text-align:left;box-shadow:0 1px 3px rgba(220,38,38,.07);transition:transform .15s,box-shadow .15s,border-color .15s" style-hover="transform:translateY(-2px);box-shadow:0 8px 20px rgba(220,38,38,.13);border-color:#fca5a5">
+          <div style="display:flex;align-items:center;gap:11px"><div style="width:44px;height:44px;border-radius:12px;background:#fee2e2;display:flex;align-items:center;justify-content:center;font-size:22px;flex:none">⚠️</div><div style="font:700 16px 'Hanken Grotesk';color:#dc2626">Reportar Problema</div></div>
+          <div style="font:400 13.5px/1.5 'Hanken Grotesk';color:#64748b">Algo está com erro, lento ou fora do ar. Diagnosticamos em 3 passos.</div>
+          <div style="font:700 13px 'Hanken Grotesk';color:#dc2626">Abrir incidente →</div>
+        </button>
+        <button onClick="{{ openRequest }}" style="display:flex;flex-direction:column;gap:11px;padding:20px;background:#fff;border:2px solid {{ brandBorder }};border-radius:14px;text-align:left;box-shadow:0 1px 3px rgba(15,23,42,.05);transition:transform .15s,box-shadow .15s" style-hover="transform:translateY(-2px);box-shadow:0 8px 20px rgba(15,23,42,.1)">
+          <div style="display:flex;align-items:center;gap:11px"><div style="width:44px;height:44px;border-radius:12px;background:{{ brandWash }};display:flex;align-items:center;justify-content:center;font-size:22px;flex:none">✅</div><div style="font:700 16px 'Hanken Grotesk';color:{{ brand }}">Solicitar Serviço</div></div>
+          <div style="font:400 13.5px/1.5 'Hanken Grotesk';color:#64748b">Peça equipamentos, acessos, softwares ou outros serviços do catálogo.</div>
+          <div style="font:700 13px 'Hanken Grotesk';color:{{ brand }}">Ver catálogo →</div>
+        </button>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:13px"><span style="font:600 11px 'Hanken Grotesk';color:#94a3b8;text-transform:uppercase;letter-spacing:.06em;white-space:nowrap">Ou explore por categoria</span><div style="flex:1;height:1px;background:#e2e8f0"></div></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:16px">
+        <sc-for list="{{ cats }}" as="c" hint-placeholder-count="3">
+          <button style="display:flex;flex-direction:column;align-items:flex-start;gap:9px;padding:15px;background:#fff;border:1.5px solid #e2e8f0;border-radius:13px;text-align:left;box-shadow:0 1px 2px rgba(15,23,42,.03);transition:transform .15s,box-shadow .15s,border-color .15s" style-hover="transform:translateY(-2px);box-shadow:0 4px 14px rgba(15,23,42,.08);border-color:#cbd5e1">
+            <div style="width:44px;height:44px;border-radius:11px;background:{{ c.iconBg }};display:flex;align-items:center;justify-content:center;font-size:22px">{{ c.emoji }}</div>
+            <div><div style="font:700 15px 'Hanken Grotesk';color:#0f172a;margin-bottom:3px">{{ c.name }}</div><div style="font:400 12.5px/1.4 'Hanken Grotesk';color:#94a3b8">{{ c.desc }}</div></div>
+          </button>
+        </sc-for>
+      </div>
+      <div style="padding:12px 14px;background:#fffbeb;border:1px solid #fde68a;border-radius:11px;display:flex;gap:9px;align-items:flex-start"><span style="font-size:14px;flex:none;margin-top:1px">⚠️</span><p style="font:400 13px/1.5 'Hanken Grotesk';color:#92400e">Problema recorrente? <a style="font-weight:700;color:#b45309;text-decoration:underline">Reabra seu último chamado</a> em vez de abrir um novo.</p></div>
+    </div>
+    </sc-if>
+
+    <!-- HOME: LIST -->
+    <sc-if value="{{ isHomeList }}" hint-placeholder-val="{{ false }}">
+    <div style="flex:1;overflow-y:auto;padding:22px 28px">
+      <h2 style="font:700 17px 'Hanken Grotesk';color:#0f172a;margin-bottom:13px">O que você precisa?</h2>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:24px">
+        <button onClick="{{ openIncident }}" style="display:flex;flex-direction:column;gap:11px;padding:20px;background:#fff;border:2px solid #fecaca;border-radius:14px;text-align:left;box-shadow:0 1px 3px rgba(220,38,38,.07);transition:transform .15s,box-shadow .15s" style-hover="transform:translateY(-2px);box-shadow:0 8px 20px rgba(220,38,38,.13)">
+          <div style="display:flex;align-items:center;gap:11px"><div style="width:44px;height:44px;border-radius:12px;background:#fee2e2;display:flex;align-items:center;justify-content:center;font-size:22px;flex:none">⚠️</div><div style="font:700 16px 'Hanken Grotesk';color:#dc2626">Reportar Problema</div></div>
+          <div style="font:400 13.5px/1.5 'Hanken Grotesk';color:#64748b">Algo está com erro, lento ou fora do ar. Diagnosticamos em 3 passos.</div>
+          <div style="font:700 13px 'Hanken Grotesk';color:#dc2626">Abrir incidente →</div>
+        </button>
+        <button onClick="{{ openRequest }}" style="display:flex;flex-direction:column;gap:11px;padding:20px;background:#fff;border:2px solid {{ brandBorder }};border-radius:14px;text-align:left;box-shadow:0 1px 3px rgba(15,23,42,.05);transition:transform .15s,box-shadow .15s" style-hover="transform:translateY(-2px);box-shadow:0 8px 20px rgba(15,23,42,.1)">
+          <div style="display:flex;align-items:center;gap:11px"><div style="width:44px;height:44px;border-radius:12px;background:{{ brandWash }};display:flex;align-items:center;justify-content:center;font-size:22px;flex:none">✅</div><div style="font:700 16px 'Hanken Grotesk';color:{{ brand }}">Solicitar Serviço</div></div>
+          <div style="font:400 13.5px/1.5 'Hanken Grotesk';color:#64748b">Peça equipamentos, acessos, softwares ou outros serviços do catálogo.</div>
+          <div style="font:700 13px 'Hanken Grotesk';color:{{ brand }}">Ver catálogo →</div>
+        </button>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:13px"><span style="font:600 11px 'Hanken Grotesk';color:#94a3b8;text-transform:uppercase;letter-spacing:.06em;white-space:nowrap">Ou explore por categoria</span><div style="flex:1;height:1px;background:#e2e8f0"></div></div>
+      <div style="display:flex;flex-direction:column;gap:9px;margin-bottom:16px">
+        <sc-for list="{{ cats }}" as="c" hint-placeholder-count="3">
+          <button style="display:flex;align-items:center;gap:15px;padding:14px 16px;background:#fff;border:1.5px solid #e2e8f0;border-radius:13px;text-align:left;width:100%;box-shadow:0 1px 2px rgba(15,23,42,.03);transition:transform .15s,box-shadow .15s,border-color .15s" style-hover="transform:translateY(-2px);box-shadow:0 4px 14px rgba(15,23,42,.08);border-color:#cbd5e1">
+            <div style="width:48px;height:48px;border-radius:12px;background:{{ c.iconBg }};display:flex;align-items:center;justify-content:center;font-size:24px;flex:none">{{ c.emoji }}</div>
+            <div style="flex:1;min-width:0"><div style="font:700 15.5px 'Hanken Grotesk';color:#0f172a;margin-bottom:2px">{{ c.name }}</div><div style="font:400 13px 'Hanken Grotesk';color:#64748b">{{ c.desc }}</div></div>
+            <span style="font-size:17px;color:{{ brand }};flex:none">→</span>
+          </button>
+        </sc-for>
+      </div>
+      <div style="padding:12px 14px;background:#fffbeb;border:1px solid #fde68a;border-radius:11px;display:flex;gap:9px;align-items:flex-start"><span style="font-size:14px;flex:none;margin-top:1px">⚠️</span><p style="font:400 13px/1.5 'Hanken Grotesk';color:#92400e">Problema recorrente? <a style="font-weight:700;color:#b45309;text-decoration:underline">Reabra seu último chamado</a> em vez de abrir um novo.</p></div>
+    </div>
+    </sc-if>
+
+    <!-- FLOW SCREEN -->
+    <sc-if value="{{ isFlow }}" hint-placeholder-val="{{ false }}">
+    <div style="flex:1;display:flex;flex-direction:column;overflow:hidden">
+      <!-- Back bar -->
+      <div style="flex:none;padding:12px 28px;background:#fff;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;justify-content:space-between">
+        <div style="display:flex;align-items:center;gap:14px">
+          <button onClick="{{ goBack }}" style="display:flex;align-items:center;gap:6px;padding:7px 13px;border:1.5px solid #e2e8f0;border-radius:9px;font:600 13px 'Hanken Grotesk';color:#475569;background:#fff" style-hover="background:#f8fafc;border-color:#cbd5e1">← Voltar</button>
+          <span style="font:500 13px 'Hanken Grotesk';color:#94a3b8">{{ flowBreadcrumb }}</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px">
+          <div style="width:8px;height:8px;border-radius:50%;background:{{ dot1 }}"></div>
+          <div style="width:20px;height:1px;background:#e2e8f0"></div>
+          <div style="width:8px;height:8px;border-radius:50%;background:{{ dot2 }}"></div>
+          <div style="width:20px;height:1px;background:#e2e8f0"></div>
+          <div style="width:8px;height:8px;border-radius:50%;background:{{ dot3 }}"></div>
+        </div>
+      </div>
+
+      <div style="flex:1;overflow-y:auto;padding:26px 28px">
+
+        <!-- INC: Categorias -->
+        <sc-if value="{{ isStepIncCats }}" hint-placeholder-val="{{ false }}">
+        <div>
+          <h2 style="font:700 20px 'Hanken Grotesk';color:#0f172a;margin-bottom:6px">Qual área está com problema?</h2>
+          <p style="font:400 14px 'Hanken Grotesk';color:#94a3b8;margin-bottom:20px">Selecione a categoria mais próxima do que está acontecendo.</p>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+            <sc-for list="{{ incCats }}" as="c" hint-placeholder-count="4">
+              <button onClick="{{ c.onSelect }}" style="display:flex;align-items:center;gap:14px;padding:18px;background:#fff;border:1.5px solid #e2e8f0;border-radius:14px;text-align:left;box-shadow:0 1px 2px rgba(15,23,42,.04);transition:transform .15s,box-shadow .15s,border-color .15s" style-hover="transform:translateY(-2px);box-shadow:0 6px 18px rgba(15,23,42,.09);border-color:#c8d0da">
+                <div style="width:52px;height:52px;border-radius:14px;background:{{ c.bg }};display:flex;align-items:center;justify-content:center;font-size:26px;flex:none">{{ c.emoji }}</div>
+                <div style="min-width:0"><div style="font:700 15px 'Hanken Grotesk';color:#0f172a">{{ c.name }}</div><div style="font:400 12px 'Hanken Grotesk';color:#94a3b8;margin-top:2px">{{ c.count }} sintomas</div></div>
+              </button>
+            </sc-for>
+          </div>
+        </div>
+        </sc-if>
+
+        <!-- INC: Sintomas -->
+        <sc-if value="{{ isStepIncSymptoms }}" hint-placeholder-val="{{ false }}">
+        <div>
+          <h2 style="font:700 20px 'Hanken Grotesk';color:#0f172a;margin-bottom:6px">O que está acontecendo?</h2>
+          <p style="font:400 14px 'Hanken Grotesk';color:#94a3b8;margin-bottom:20px">Selecione o sintoma que melhor descreve o problema.</p>
+          <div style="display:flex;flex-direction:column;gap:9px">
+            <sc-for list="{{ symptoms }}" as="s" hint-placeholder-count="4">
+              <button onClick="{{ s.onSelect }}" style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:15px 18px;background:#fff;border:1.5px solid #e2e8f0;border-radius:13px;text-align:left;width:100%;box-shadow:0 1px 2px rgba(15,23,42,.03);transition:transform .15s,box-shadow .15s,border-color .15s" style-hover="transform:translateY(-1px);box-shadow:0 4px 12px rgba(15,23,42,.08);border-color:#c8d0da">
+                <div style="display:flex;align-items:center;gap:11px">
+                  <div style="width:8px;height:8px;border-radius:50%;background:#e2e8f0;flex:none"></div>
+                  <span style="font:600 14.5px 'Hanken Grotesk';color:#0f172a">{{ s.label }}</span>
+                </div>
+                <span style="font-size:15px;color:#94a3b8;flex:none">→</span>
+              </button>
+            </sc-for>
+          </div>
+        </div>
+        </sc-if>
+
+        <!-- INC: Formulário -->
+        <sc-if value="{{ isStepIncForm }}" hint-placeholder-val="{{ false }}">
+        <div style="max-width:560px">
+          <h2 style="font:700 20px 'Hanken Grotesk';color:#0f172a;margin-bottom:6px">Detalhes do incidente</h2>
+          <p style="font:400 14px 'Hanken Grotesk';color:#94a3b8;margin-bottom:20px">Informe o impacto para calcularmos a prioridade automaticamente.</p>
+          <div style="padding:13px 16px;background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:11px;display:flex;align-items:center;gap:10px;margin-bottom:22px">
+            <span style="font-size:16px">⚠️</span>
+            <div style="flex:1;min-width:0"><div style="font:600 13.5px 'Hanken Grotesk';color:#0f172a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ selSymptom }}</div><div style="font:400 12px 'Hanken Grotesk';color:#94a3b8;margin-top:1px">{{ selCatName }}</div></div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:18px">
+            <div>
+              <label style="display:block;font:700 11px 'Hanken Grotesk';text-transform:uppercase;letter-spacing:.05em;color:#64748b;margin-bottom:7px">Impacto</label>
+              <select value="{{ impact }}" onChange="{{ onImpactChange }}" style="width:100%;padding:10px 13px;border:1.5px solid #e2e8f0;border-radius:10px;font:500 14px 'Hanken Grotesk';color:#0f172a;background:#fff;outline:none">
+                <option value="Low">Apenas eu</option>
+                <option value="Media">Meu departamento</option>
+                <option value="High">Toda a empresa</option>
+              </select>
+            </div>
+            <div>
+              <label style="display:block;font:700 11px 'Hanken Grotesk';text-transform:uppercase;letter-spacing:.05em;color:#64748b;margin-bottom:7px">Urgência</label>
+              <select value="{{ urgency }}" onChange="{{ onUrgencyChange }}" style="width:100%;padding:10px 13px;border:1.5px solid #e2e8f0;border-radius:10px;font:500 14px 'Hanken Grotesk';color:#0f172a;background:#fff;outline:none">
+                <option value="Low">Consigo trabalhar</option>
+                <option value="Media">Tarefa importante parada</option>
+                <option value="High">Completamente travado</option>
+              </select>
+            </div>
+          </div>
+          <div style="display:inline-flex;align-items:center;gap:7px;padding:6px 14px;border-radius:999px;background:{{ prioBg }};margin-bottom:20px">
+            <div style="width:8px;height:8px;border-radius:50%;background:{{ prioColor }}"></div>
+            <span style="font:700 13px 'Hanken Grotesk';color:{{ prioColor }}">Prioridade calculada: {{ incidentPriority }}</span>
+          </div>
+          <div style="margin-bottom:22px">
+            <label style="display:block;font:700 11px 'Hanken Grotesk';text-transform:uppercase;letter-spacing:.05em;color:#64748b;margin-bottom:7px">Descrição adicional <span style="color:#cbd5e1;font-weight:400">(opcional)</span></label>
+            <textarea value="{{ desc }}" onChange="{{ onDescChange }}" rows="4" placeholder="Descreva o que está acontecendo, desde quando, se há mensagem de erro…" style="width:100%;padding:12px 14px;border:1.5px solid #e2e8f0;border-radius:11px;font:400 14px 'Hanken Grotesk';color:#0f172a;background:#fff;outline:none;resize:none;line-height:1.5"></textarea>
+          </div>
+          <button onClick="{{ submit }}" style="width:100%;padding:14px;background:#dc2626;border-radius:12px;font:700 15px 'Hanken Grotesk';color:#fff;transition:opacity .15s" style-hover="opacity:.88">Abrir Incidente →</button>
+        </div>
+        </sc-if>
+
+        <!-- REQ: Categorias -->
+        <sc-if value="{{ isStepReqCats }}" hint-placeholder-val="{{ false }}">
+        <div>
+          <h2 style="font:700 20px 'Hanken Grotesk';color:#0f172a;margin-bottom:6px">O que você quer solicitar?</h2>
+          <p style="font:400 14px 'Hanken Grotesk';color:#94a3b8;margin-bottom:20px">Selecione a categoria da solicitação.</p>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+            <sc-for list="{{ reqCats }}" as="c" hint-placeholder-count="3">
+              <button onClick="{{ c.onSelect }}" style="display:flex;align-items:center;gap:14px;padding:18px;background:#fff;border:1.5px solid #e2e8f0;border-radius:14px;text-align:left;box-shadow:0 1px 2px rgba(15,23,42,.04);transition:transform .15s,box-shadow .15s,border-color .15s" style-hover="transform:translateY(-2px);box-shadow:0 6px 18px rgba(15,23,42,.09);border-color:#c8d0da">
+                <div style="width:52px;height:52px;border-radius:14px;background:{{ c.bg }};display:flex;align-items:center;justify-content:center;font-size:26px;flex:none">{{ c.emoji }}</div>
+                <div style="min-width:0"><div style="font:700 15px 'Hanken Grotesk';color:#0f172a">{{ c.name }}</div><div style="font:400 12px 'Hanken Grotesk';color:#94a3b8;margin-top:2px">{{ c.count }} itens</div></div>
+              </button>
+            </sc-for>
+          </div>
+        </div>
+        </sc-if>
+
+        <!-- REQ: Itens -->
+        <sc-if value="{{ isStepReqItems }}" hint-placeholder-val="{{ false }}">
+        <div>
+          <h2 style="font:700 20px 'Hanken Grotesk';color:#0f172a;margin-bottom:6px">{{ selCatName }}</h2>
+          <p style="font:400 14px 'Hanken Grotesk';color:#94a3b8;margin-bottom:20px">Selecione o item desejado.</p>
+          <div style="display:flex;flex-direction:column;gap:9px">
+            <sc-for list="{{ reqItems }}" as="i" hint-placeholder-count="4">
+              <button onClick="{{ i.onSelect }}" style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:15px 18px;background:#fff;border:1.5px solid #e2e8f0;border-radius:13px;text-align:left;width:100%;box-shadow:0 1px 2px rgba(15,23,42,.03);transition:transform .15s,box-shadow .15s,border-color .15s" style-hover="transform:translateY(-1px);box-shadow:0 4px 12px rgba(15,23,42,.08);border-color:#c8d0da">
+                <span style="font:600 14.5px 'Hanken Grotesk';color:#0f172a">{{ i.label }}</span>
+                <span style="font-size:15px;color:#94a3b8;flex:none">→</span>
+              </button>
+            </sc-for>
+          </div>
+        </div>
+        </sc-if>
+
+        <!-- REQ: Formulário -->
+        <sc-if value="{{ isStepReqForm }}" hint-placeholder-val="{{ false }}">
+        <div style="max-width:560px">
+          <h2 style="font:700 20px 'Hanken Grotesk';color:#0f172a;margin-bottom:6px">Detalhes da requisição</h2>
+          <p style="font:400 14px 'Hanken Grotesk';color:#94a3b8;margin-bottom:20px">Confirme o item e adicione detalhes.</p>
+          <div style="padding:13px 16px;background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:11px;display:flex;align-items:center;gap:10px;margin-bottom:22px">
+            <span style="font-size:16px">✅</span>
+            <div style="flex:1;min-width:0"><div style="font:600 13.5px 'Hanken Grotesk';color:#0f172a">{{ selItem }}</div><div style="font:400 12px 'Hanken Grotesk';color:#94a3b8;margin-top:1px">{{ selCatName }}</div></div>
+          </div>
+          <div style="margin-bottom:22px">
+            <label style="display:block;font:700 11px 'Hanken Grotesk';text-transform:uppercase;letter-spacing:.05em;color:#64748b;margin-bottom:7px">Justificativa <span style="color:#cbd5e1;font-weight:400">(opcional)</span></label>
+            <textarea value="{{ desc }}" onChange="{{ onDescChange }}" rows="4" placeholder="Explique por que você precisa deste item, configurações específicas, prazo…" style="width:100%;padding:12px 14px;border:1.5px solid #e2e8f0;border-radius:11px;font:400 14px 'Hanken Grotesk';color:#0f172a;background:#fff;outline:none;resize:none;line-height:1.5"></textarea>
+          </div>
+          <button onClick="{{ submit }}" style="width:100%;padding:14px;background:{{ brand }};border-radius:12px;font:700 15px 'Hanken Grotesk';color:#fff;transition:opacity .15s" style-hover="opacity:.88">Enviar Requisição →</button>
+        </div>
+        </sc-if>
+
+      </div>
+    </div>
+    </sc-if>
+
+    <!-- DONE SCREEN -->
+    <sc-if value="{{ isDone }}" hint-placeholder-val="{{ false }}">
+    <div style="flex:1;display:flex;align-items:center;justify-content:center;padding:40px;background:#f8fafc">
+      <div style="background:#fff;border:1px solid #e2e8f0;border-radius:20px;box-shadow:0 2px 8px rgba(15,23,42,.05),0 24px 64px rgba(15,23,42,.08);width:100%;max-width:480px;overflow:hidden">
+        <div style="height:4px;background:{{ brand }}"></div>
+        <div style="padding:40px 36px;text-align:center">
+          <div style="width:72px;height:72px;border-radius:50%;background:{{ brandWash }};display:flex;align-items:center;justify-content:center;margin:0 auto 22px;font-size:32px">✅</div>
+          <h2 style="font:800 24px/1.2 'Hanken Grotesk';letter-spacing:-.02em;color:#0f172a;margin-bottom:10px">Chamado aberto com sucesso!</h2>
+          <p style="font:400 14px/1.55 'Hanken Grotesk';color:#64748b;margin-bottom:24px">Nossa equipe já recebeu e está analisando. Você será notificado por e-mail.</p>
+          <div style="display:inline-flex;align-items:center;gap:8px;padding:10px 20px;background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:10px;margin-bottom:28px">
+            <span style="font:700 14px 'JetBrains Mono';color:{{ brand }}">{{ ticketNum }}</span>
+            <span style="font:400 13px 'Hanken Grotesk';color:#94a3b8">· Anote este número</span>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <button onClick="{{ goHome }}" style="width:100%;padding:13px;background:{{ brand }};border-radius:11px;font:700 14px 'Hanken Grotesk';color:#fff;transition:opacity .15s" style-hover="opacity:.88">Abrir novo chamado</button>
+            <button onClick="{{ goHome }}" style="width:100%;padding:13px;background:#fff;border:1.5px solid #e2e8f0;border-radius:11px;font:600 14px 'Hanken Grotesk';color:#475569;transition:background .12s" style-hover="background:#f8fafc">Ir para Meus Chamados</button>
+          </div>
+        </div>
+        <div style="padding:12px 28px;border-top:1px solid #f1f5f9;display:flex;align-items:center;justify-content:space-between">
+          <span style="font:500 11px 'Hanken Grotesk';color:#94a3b8;display:flex;align-items:center;gap:5px">🔒 Servicefy Security Protocol</span>
+          <span style="font:500 11px 'JetBrains Mono';color:#94a3b8">{{ ticketNum }}-sfy</span>
+        </div>
+      </div>
+    </div>
+    </sc-if>
+
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{
+  &quot;$preview&quot;: {&quot;width&quot;:1280,&quot;height&quot;:820},
+  &quot;brandColor&quot;: {&quot;editor&quot;:&quot;color&quot;,&quot;default&quot;:&quot;#10b981&quot;,&quot;section&quot;:&quot;Identidade Visual&quot;},
+  &quot;sidebarBg&quot;:  {&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;pearl&quot;,&quot;options&quot;:[&quot;white&quot;,&quot;pearl&quot;,&quot;mist&quot;,&quot;fog&quot;,&quot;storm&quot;,&quot;steel&quot;,&quot;navy&quot;,&quot;indigo&quot;],&quot;tsType&quot;:&quot;\&quot;white\&quot;|\&quot;pearl\&quot;|\&quot;mist\&quot;|\&quot;fog\&quot;|\&quot;storm\&quot;|\&quot;steel\&quot;|\&quot;navy\&quot;|\&quot;indigo\&quot;&quot;,&quot;section&quot;:&quot;Identidade Visual&quot;},
+  &quot;cardLayout&quot;: {&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;grid&quot;,&quot;options&quot;:[&quot;grid&quot;,&quot;list&quot;],&quot;tsType&quot;:&quot;\&quot;grid\&quot;|\&quot;list\&quot;&quot;,&quot;section&quot;:&quot;Layout&quot;},
+  &quot;companyName&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;Allied IT&quot;,&quot;section&quot;:&quot;Conteúdo&quot;},
+  &quot;portalTitle&quot;: {&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;Portal do Usuário&quot;,&quot;section&quot;:&quot;Conteúdo&quot;}
+}">
+class Component extends DCLogic {
+  state = { screen:'home', flowType:null, selCat:null, selSymptom:null, selItem:null, desc:'', impact:'Media', urgency:'Media', ticketNum:null, searchQ:'', searchOpen:false, logoDataUrl:null };
+
+  INC = [
+    { id:'net', name:'Redes e Conectividade',  emoji:'🌐', bg:'#eff6ff', symptoms:['Link de internet fora do ar','VPN não conecta','Wi-Fi lento ou instável','Sem acesso à rede interna'] },
+    { id:'sys', name:'Sistemas e Aplicações',  emoji:'💻', bg:'#ecfdf5', symptoms:['ERP com lentidão extrema','Erro ao acessar o sistema','Sistema totalmente indisponível','Falha ao gerar relatórios'] },
+    { id:'hw',  name:'Hardware e Periféricos', emoji:'🖥', bg:'#f5f3ff', symptoms:['Computador não liga','Monitor com defeito','Impressora sem resposta','Teclado ou mouse com falha'] },
+    { id:'sec', name:'Segurança e Acessos',    emoji:'🔐', bg:'#fef9c3', symptoms:['Senha bloqueada','Código 2FA não chega','Sem permissão de acesso','Atividade suspeita na conta'] },
+  ];
+  REQ = [
+    { id:'soft',   name:'Software e Licenças',      emoji:'📦', bg:'#eff6ff', items:['Nova licença Office / M365','Instalar software específico','Atualizar aplicação','Antivírus / segurança'] },
+    { id:'hw',     name:'Hardware e Equipamentos',  emoji:'🖥', bg:'#ecfdf5', items:['Notebook novo','Monitor adicional','Teclado e/ou mouse','Headset para reuniões'] },
+    { id:'access', name:'Acessos e Contas',         emoji:'🔑', bg:'#f5f3ff', items:['Acesso a sistema interno','VPN corporativa','Conta de e-mail profissional','Criação de usuário'] },
+  ];
+  PRIO = {
+    'High-High':'P1 — Crítica','High-Media':'P2 — Alta','Media-High':'P2 — Alta',
+    'High-Low':'P3 — Moderada','Low-High':'P3 — Moderada','Media-Media':'P3 — Moderada',
+    'Media-Low':'P4 — Baixa','Low-Media':'P4 — Baixa','Low-Low':'P4 — Baixa',
+  };
+
+  componentDidMount() { const s = localStorage.getItem('servicefy-portal-logo'); if(s) this.setState({logoDataUrl:s}); }
+  handleLogoChange(e) { const f=e.target.files&&e.target.files[0]; if(!f) return; const r=new FileReader(); r.onload=ev=>{const d=ev.target.result;localStorage.setItem('servicefy-portal-logo',d);this.setState({logoDataUrl:d});}; r.readAsDataURL(f); }
+  clearLogo(e) { e.stopPropagation(); localStorage.removeItem('servicefy-portal-logo'); this.setState({logoDataUrl:null}); }
+
+  goBack() {
+    const s=this.state;
+    if(['inc-cats','req-cats'].includes(s.screen)) this.setState({screen:'home',flowType:null,selCat:null});
+    else if(s.screen==='inc-symptoms') this.setState({screen:'inc-cats',selCat:null});
+    else if(s.screen==='inc-form') this.setState({screen:'inc-symptoms',selSymptom:null});
+    else if(s.screen==='req-items') this.setState({screen:'req-cats',selCat:null});
+    else if(s.screen==='req-form') this.setState({screen:'req-items',selItem:null});
+  }
+  submit() {
+    const pre=this.state.flowType==='incident'?'INC':'REQ';
+    this.setState({screen:'done',ticketNum:`${pre}-0${Math.floor(9000+Math.random()*1000)}`});
+  }
+  goHome() { this.setState({screen:'home',flowType:null,selCat:null,selSymptom:null,selItem:null,desc:'',impact:'Media',urgency:'Media',ticketNum:null}); }
+
+  renderVals() {
+    const st=this.state;
+    const brand   = this.props.brandColor  ?? '#10b981';
+    const sbKey   = this.props.sidebarBg   ?? 'pearl';
+    const layout  = this.props.cardLayout  ?? 'grid';
+    const company = this.props.companyName ?? 'Allied IT';
+    const title   = this.props.portalTitle ?? 'Portal do Usuário';
+    const sbs = {
+      white: {bg:'#ffffff', border:'rgba(15,23,42,.08)', itemBg:'rgba(15,23,42,.03)', muted:'#94a3b8',text:'#0f172a',itemText:'#334155',hoverBg:'rgba(15,23,42,.05)',dark:true},
+      pearl: {bg:'#f5f7fa', border:'rgba(15,23,42,.08)', itemBg:'rgba(15,23,42,.04)', muted:'#94a3b8',text:'#0f172a',itemText:'#334155',hoverBg:'rgba(15,23,42,.05)',dark:true},
+      mist:  {bg:'#e2e8f0', border:'rgba(15,23,42,.10)', itemBg:'rgba(15,23,42,.05)', muted:'#64748b',text:'#0f172a',itemText:'#1e293b',hoverBg:'rgba(15,23,42,.06)',dark:true},
+      fog:   {bg:'#d0d7e4', border:'rgba(15,23,42,.12)', itemBg:'rgba(15,23,42,.06)', muted:'#64748b',text:'#0f172a',itemText:'#1e293b',hoverBg:'rgba(15,23,42,.07)',dark:true},
+      storm: {bg:'#6b7a8f', border:'rgba(255,255,255,.12)',itemBg:'rgba(255,255,255,.08)',muted:'#c8d0d9',text:'#ffffff',itemText:'#f0f2f5',hoverBg:'rgba(255,255,255,.10)',dark:false},
+      steel: {bg:'#1a2744', border:'rgba(255,255,255,.07)',itemBg:'rgba(255,255,255,.05)',muted:'#64748b',text:'#f1f5f9',itemText:'#e2e8f0',hoverBg:'rgba(255,255,255,.07)',dark:false},
+      navy:  {bg:'#0f172a', border:'rgba(255,255,255,.05)',itemBg:'rgba(255,255,255,.04)',muted:'#475569',text:'#f1f5f9',itemText:'#e2e8f0',hoverBg:'rgba(255,255,255,.06)',dark:false},
+      indigo:{bg:'#1e1b4b', border:'rgba(255,255,255,.06)',itemBg:'rgba(255,255,255,.04)',muted:'#818cf8',text:'#e0e7ff',itemText:'#e0e7ff',hoverBg:'rgba(255,255,255,.07)',dark:false},
+    };
+    const sb=sbs[sbKey]||sbs.pearl;
+    const brandWash  =`color-mix(in srgb,${brand} 12%,#ffffff)`;
+    const brandBorder=`color-mix(in srgb,${brand} 30%,#e2e8f0)`;
+    const navActiveBg=sb.dark?`color-mix(in srgb,${brand} 12%,#f0f4f8)`:`color-mix(in srgb,${brand} 14%,transparent)`;
+    const h=new Date().getHours();
+    const greeting=h<12?'Bom dia ☀️':h<18?'Boa tarde 🌤':'Boa noite 🌙';
+
+    const step=st.screen;
+    const isHome=step==='home';
+    const isFlow=['inc-cats','inc-symptoms','inc-form','req-cats','req-items','req-form'].includes(step);
+    const isDone=step==='done';
+    const stepNum={'inc-cats':1,'inc-symptoms':2,'inc-form':3,'req-cats':1,'req-items':2,'req-form':3}[step]||0;
+
+    // Breadcrumb
+    const BC={'inc-cats':'Reportar Problema','inc-symptoms':`Reportar Problema  ›  ${st.selCat?.name||''}`,'inc-form':`Reportar Problema  ›  ${st.selCat?.name||''}  ›  ${st.selSymptom||''}`,'req-cats':'Solicitar Serviço','req-items':`Solicitar Serviço  ›  ${st.selCat?.name||''}`,'req-form':`Solicitar Serviço  ›  ${st.selCat?.name||''}  ›  ${st.selItem||''}`};
+    const topTitles={'home':'Como posso te ajudar, Anderson?','inc-cats':'Reportar Problema','inc-symptoms':'Reportar Problema','inc-form':'Reportar Problema','req-cats':'Solicitar Serviço','req-items':'Solicitar Serviço','req-form':'Solicitar Serviço','done':'Chamado registrado'};
+
+    // Incident data
+    const incCats=this.INC.map(c=>({...c,count:c.symptoms.length,onSelect:()=>this.setState({screen:'inc-symptoms',flowType:'incident',selCat:c,selSymptom:null})}));
+    const symptoms=(st.selCat?.symptoms||[]).map(s=>({label:s,onSelect:()=>this.setState({screen:'inc-form',selSymptom:s})}));
+    const reqCats=this.REQ.map(c=>({...c,count:c.items.length,onSelect:()=>this.setState({screen:'req-items',flowType:'request',selCat:c,selItem:null})}));
+    const reqItems=(st.selCat?.items||[]).map(i=>({label:i,onSelect:()=>this.setState({screen:'req-form',selItem:i})}));
+
+    // Priority
+    const pKey=`${st.impact}-${st.urgency}`;
+    const incidentPriority=this.PRIO[pKey]||'P3 — Moderada';
+    const prioColor=incidentPriority.startsWith('P1')?'#dc2626':incidentPriority.startsWith('P2')?'#ea580c':incidentPriority.startsWith('P3')?'#d97706':'#2563eb';
+    const prioBg  =incidentPriority.startsWith('P1')?'#fee2e2':incidentPriority.startsWith('P2')?'#ffedd5':incidentPriority.startsWith('P3')?'#fef9c3':'#dbeafe';
+
+    // Search index
+    const idx=[
+      ...this.INC.flatMap(c=>c.symptoms.map(s=>({emoji:'⚠️',label:s,sub:`Incidente  ›  ${c.name}`,tag:'Incidente',tagBg:'#fee2e2',tagFg:'#b91c1c',onSelect:()=>this.setState({screen:'inc-form',flowType:'incident',selCat:c,selSymptom:s,searchQ:'',searchOpen:false})}))),
+      ...this.REQ.flatMap(c=>c.items.map(i=>({emoji:'✅',label:i,sub:`Requisição  ›  ${c.name}`,tag:'Requisição',tagBg:brandWash,tagFg:brand,onSelect:()=>this.setState({screen:'req-form',flowType:'request',selCat:c,selItem:i,searchQ:'',searchOpen:false})}))),
+    ];
+    const q=(st.searchQ||'').toLowerCase().trim();
+    const searchResults=q.length>=2?idx.filter(r=>`${r.label} ${r.sub}`.toLowerCase().includes(q)).slice(0,8):[];
+
+    // Logo slot
+    const logoSlot=st.logoDataUrl
+      ?React.createElement('div',{style:{width:'100%',height:'56px',borderRadius:'8px',overflow:'hidden',position:'relative',cursor:'pointer'},title:'Clique para trocar o logo',onClick:()=>document.getElementById('logo-input-hidden').click()},
+          React.createElement('img',{src:st.logoDataUrl,alt:'Logo',style:{width:'100%',height:'100%',objectFit:'contain'}}),
+          React.createElement('button',{onClick:this.clearLogo.bind(this),title:'Remover logo',style:{position:'absolute',top:'4px',right:'4px',width:'18px',height:'18px',borderRadius:'50%',background:'rgba(0,0,0,.45)',border:'none',color:'#fff',fontSize:'10px',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer'}},'×'),
+          React.createElement('input',{id:'logo-input-hidden',type:'file',accept:'image/*',style:{display:'none'},onChange:this.handleLogoChange.bind(this)}))
+      :React.createElement('label',{style:{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',width:'100%',height:'56px',borderRadius:'8px',border:`1.5px dashed ${sb.muted}`,cursor:'pointer',gap:'4px'},title:'Clique para enviar logo'},
+          React.createElement('span',{style:{fontSize:'18px'}},'🖼'),
+          React.createElement('span',{style:{font:"500 11px 'Hanken Grotesk'",color:sb.muted}},'Clique para enviar logo'),
+          React.createElement('input',{type:'file',accept:'image/*',style:{display:'none'},onChange:this.handleLogoChange.bind(this)}));
+
+    return {
+      brand,brandWash,brandBorder,
+      sbBg:sb.bg,sbBorder:sb.border,sbItemBg:sb.itemBg,sbMuted:sb.muted,sbText:sb.text,sbItemText:sb.itemText,
+      navActiveBg,sbNavHover:sb.hoverBg,
+      companyName:company,portalTitle:title,greeting,logoSlot,
+      topBarTitle:topTitles[step]||'Como posso te ajudar?',
+      isHome,isFlow,isDone,
+      isHomeGrid:isHome&&layout==='grid',
+      isHomeList:isHome&&layout==='list',
+      isStepIncCats:step==='inc-cats',isStepIncSymptoms:step==='inc-symptoms',isStepIncForm:step==='inc-form',
+      isStepReqCats:step==='req-cats',isStepReqItems:step==='req-items',isStepReqForm:step==='req-form',
+      flowBreadcrumb:BC[step]||'',
+      dot1:stepNum>=1?brand:'#e2e8f0',dot2:stepNum>=2?brand:'#e2e8f0',dot3:stepNum>=3?brand:'#e2e8f0',
+      incCats,symptoms,reqCats,reqItems,
+      selCatName:st.selCat?.name||'',selSymptom:st.selSymptom||'',selItem:st.selItem||'',
+      incidentPriority,prioColor,prioBg,
+      desc:st.desc,impact:st.impact,urgency:st.urgency,
+      onDescChange:e=>this.setState({desc:e.target.value}),
+      onImpactChange:e=>this.setState({impact:e.target.value}),
+      onUrgencyChange:e=>this.setState({urgency:e.target.value}),
+      goBack:this.goBack.bind(this),submit:this.submit.bind(this),goHome:this.goHome.bind(this),
+      openIncident:()=>this.setState({screen:'inc-cats',flowType:'incident'}),
+      openRequest:()=>this.setState({screen:'req-cats',flowType:'request'}),
+      searchQ:st.searchQ,showResults:st.searchOpen&&searchResults.length>0,searchResults,
+      onSearchChange:e=>this.setState({searchQ:e.target.value,searchOpen:true}),
+      onSearchFocus:()=>this.setState({searchOpen:true}),
+      onSearchBlur:()=>setTimeout(()=>this.setState({searchOpen:false}),200),
+      ticketNum:st.ticketNum||'',
+      tickets:[{id:'INC-08722',title:'Sistema ERP Lento',dot:'#d97706'},{id:'REQ-09101',title:'Novo Monitor 24"',dot:'#7c3aed'},{id:'INC-08550',title:'Falha na VPN',dot:'#059669'}],
+      cats:[{emoji:'🧑‍💼',name:'Recursos Humanos',desc:'Férias, benefícios e folha de pagamento',iconBg:'#eff6ff'},{emoji:'🛒',name:'Compras',desc:'Material, notebooks, softwares e periféricos',iconBg:'#fef9c3'},{emoji:'📚',name:'Base de Conhecimento',desc:'Tutoriais, FAQs e autoatendimento',iconBg:'#f5f3ff'}],
+    };
+  }
+}
+</script>
+</body>
+</html>

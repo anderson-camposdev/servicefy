@@ -35,6 +35,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     root.style.setProperty('--brand-secondary', secondary)
     root.style.setProperty('--brand-accent', secondary)
     root.style.setProperty('--brand-bg', bg)
+    root.style.setProperty('--color-bg-primary', bg)
 
     // Injeta o slug do tenant no documentElement para acionar as regras CSS
     root.setAttribute('data-tenant', tenantSlug)

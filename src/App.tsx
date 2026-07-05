@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react'
-import { Plus, Settings, Clock, ShieldAlert, ClipboardList, AlertOctagon, RefreshCw, Home, Code2, BarChart3 } from 'lucide-react'
+import { Plus, Settings, ShieldAlert, ClipboardList, AlertOctagon, RefreshCw, Home, Code2, BarChart3, Zap, CircleCheckBig } from 'lucide-react'
 import { useToast } from './context'
 import type { AppView, User, Company, Role } from './types'
 import {
@@ -9,13 +9,14 @@ import {
 import { useIncidents } from './hooks/useIncidents'
 import { useAppData, useProblems, useChanges } from './hooks/useDbData'
 import { usePersistentState } from './hooks/usePersistentState'
-import type { ProblemRow, ChangeRow, CompanyRow, ProfileRow, IncidentRow, IncidentHistoryRow, PortalTicketDetail, TicketPriority, IncidentCategory, ChangeType, ChangeRisk } from './lib/database.types'
-import { incidentsService, cioService, problemsService, changesService } from './lib/services'
+import type { ProblemRow, CompanyRow, ProfileRow, TicketPriority, IncidentCategory } from './lib/database.types'
+import { incidentsService, cioService, problemsService } from './lib/services'
 import { translateState } from './lib/statusLabels'
 import { useTenant } from './tenant'
 import { setTenantOverride } from './tenant/resolveTenant'
 import { useAuth } from './auth'
-import { UserPortalLayout, AdminPortalSettings, AnalystCockpit, TicketManagementDashboard, WorkspaceLayout, ServiceCatalog, TicketChat, SettingsGovernance, FlowfyBI } from './pages'
+import { UserPortalLayout, AdminPortalSettings, AnalystCockpit, TicketManagementDashboard, WorkspaceLayout, SettingsGovernance, WorkflowBuilder, ChangeManagementDashboard, ApprovalInbox } from './pages'
+import BiApp from './features/bi/BiApp'
 
 const ACTIVE_VIEW_STORAGE_KEY = 'flowfy_active_view'
 
@@ -24,10 +25,12 @@ const PERSISTED_APP_VIEWS: readonly AppView[] = [
   'dashboard_requests',
   'dashboard_problems',
   'dashboard_changes',
+  'approval_inbox',
   'user_portal',
   'api_docs',
   'settings_governance',
   'flowfy_bi',
+  'workflow_builder',
 ]
 
 const isPersistedAppView = (value: unknown): value is AppView =>
@@ -160,22 +163,6 @@ const methodBadge: Record<string, string> = {
   PATCH:  'bg-amber-50 text-amber-700 border-amber-200',
   PUT:    'bg-blue-50 text-blue-700 border-blue-200',
   DELETE: 'bg-red-50 text-red-700 border-red-200',
-}
-
-const relativeTime = (iso: string) => {
-  const diff = Date.now() - new Date(iso).getTime()
-  const mins = Math.floor(diff / 60000)
-  if (mins < 60) return `${mins}min atrás`
-  const hrs = Math.floor(mins / 60)
-  if (hrs < 24) return `${hrs}h atrás`
-  return `${Math.floor(hrs / 24)}d atrás`
-}
-
-const formatPortalValue = (value: unknown) => {
-  if (Array.isArray(value)) return value.join(', ') || 'Nenhuma opção selecionada'
-  if (typeof value === 'boolean') return value ? 'Sim' : 'Não'
-  if (value === null || value === undefined || value === '') return 'Não informado'
-  return String(value)
 }
 
 // ─── Shared Components ────────────────────────────────────────
@@ -552,672 +539,6 @@ function ProblemDashboard({ companyId }: { companyId: string }) {
   )
 }
 
-function ChangeDashboard({ companyId }: { companyId: string }) {
-  const { toast } = useToast()
-  const { profile } = useAuth()
-  const [detail, setDetail] = useState<ChangeRow | null>(null)
-  const { changes: base, kpis: stats, loading, error, refetch } = useChanges(companyId)
-  const [showNew, setShowNew] = useState(false)
-  const [saving, setSaving] = useState(false)
-  const [form, setForm] = useState({ short: '', description: '', type: 'Normal', risk: 'Medium' })
-
-  const submitNew = async () => {
-    if (!form.short.trim()) { toast.error('Informe a descrição curta da mudança.'); return }
-    setSaving(true)
-    try {
-      await changesService.create({
-        companyId,
-        shortDescription: form.short.trim(),
-        description: form.description.trim() || undefined,
-        type: form.type as ChangeType,
-        risk: form.risk as ChangeRisk,
-        requestedByName: profile?.name ?? 'Sistema',
-        requestedById: profile?.id,
-      })
-      toast.success('Mudança registrada com sucesso.')
-      setShowNew(false)
-      setForm({ short: '', description: '', type: 'Normal', risk: 'Medium' })
-      refetch()
-    } catch (e) {
-      toast.error(`Falha ao registrar mudança: ${e instanceof Error ? e.message : 'erro'}`)
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  if (error) return <div className="text-red-500 text-sm p-4">{error}</div>
-
-  return (
-    <div>
-      <div className="flex items-start justify-between gap-4">
-        <PageHeader title="Change Enablement" subtitle="Controle de Mudanças com aprovação CAB — ITIL v4" />
-        <button onClick={() => setShowNew(true)} className="mt-1 flex items-center gap-1.5 px-3.5 py-2 bg-violet-600 hover:bg-violet-700 text-white text-sm font-bold rounded-xl shadow-sm transition-all shrink-0">
-          <Plus className="w-4 h-4" /> Nova Mudança
-        </button>
-      </div>
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
-        <StatCard label="Total" value={loading ? '…' : stats.total} accent="bg-slate-100 text-slate-500" icon={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" /></svg>} />
-        <StatCard label="Aguardando CAB" value={loading ? '…' : stats.awaitingCAB} accent="bg-amber-50 text-amber-500" icon={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" /></svg>} />
-        <StatCard label="Emergenciais" value={loading ? '…' : stats.emergency} accent="bg-red-50 text-red-500" icon={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>} />
-        <StatCard label="Alto Risco" value={loading ? '…' : stats.highRisk} accent="bg-orange-50 text-orange-500" icon={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>} />
-        <StatCard label="Agendadas" value={loading ? '…' : stats.scheduled} accent="bg-sky-50 text-sky-500" icon={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>} />
-      </div>
-
-      <TableCard header={<span className="text-xs font-bold text-slate-500 uppercase tracking-widest">Registro de Mudanças</span>}>
-        <table className="w-full text-left text-sm min-w-[820px]">
-          <TableHead cols={['Número', 'Descrição', 'Tipo', 'Risco', 'Estado', 'Solicitante', 'CAB', 'Janela']} />
-          <tbody className="divide-y divide-slate-50">
-            {base.length === 0 && !loading && <tr><td colSpan={8} className="py-12 text-center text-slate-400">Nenhuma mudança encontrada.</td></tr>}
-            {loading && base.length === 0 && <tr><td colSpan={8} className="py-12 text-center"><span className="text-slate-400 animate-pulse text-sm">Carregando…</span></td></tr>}
-            {base.map(chg => {
-              const riskBadge: Record<string, string> = {
-                Low: 'text-emerald-700 bg-emerald-50 border-emerald-200',
-                Medium: 'text-amber-700 bg-amber-50 border-amber-200',
-                High: 'text-orange-700 bg-orange-50 border-orange-200',
-                Critical: 'text-red-700 bg-red-50 border-red-200',
-              }
-              const typeColor: Record<string, string> = {
-                Standard: 'text-slate-500', Normal: 'text-sky-600 font-semibold', Emergency: 'text-red-600 font-bold'
-              }
-              const approvals = (typeof chg.cab_approvals === 'string' ? JSON.parse(chg.cab_approvals) : chg.cab_approvals) as Record<string, boolean> || {}
-              const approvers = (typeof chg.cab_approvers === 'string' ? JSON.parse(chg.cab_approvers) : chg.cab_approvers) as string[] || []
-
-              return (
-                <tr key={chg.id} onClick={() => setDetail(chg)} className="hover:bg-slate-50 cursor-pointer transition-colors">
-                  <td className="px-5 py-3.5 font-mono text-violet-600 text-xs font-bold">{chg.number}</td>
-                  <td className="px-5 py-3.5 text-slate-700 font-medium max-w-[200px] truncate">{chg.short_description}</td>
-                  <td className={`px-5 py-3.5 text-xs ${typeColor[chg.type]}`}>{chg.type}</td>
-                  <td className="px-5 py-3.5"><span className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase border ${riskBadge[chg.risk]}`}>{chg.risk}</span></td>
-                  <td className="px-5 py-3.5"><StateBadge state={chg.state} /></td>
-                  <td className="px-5 py-3.5 text-slate-600 text-xs">{chg.requested_by_name}</td>
-                  <td className="px-5 py-3.5 text-xs text-slate-500">{Object.keys(approvals).length}/{approvers.length} aprovações</td>
-                  <td className="px-5 py-3.5 text-slate-400 text-xs">{chg.change_window_start ? new Date(chg.change_window_start).toLocaleDateString('pt-BR') : '—'}</td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
-      </TableCard>
-
-      {detail && (
-        <Modal title={detail.number} subtitle="Detalhes da Mudança" onClose={() => setDetail(null)}>
-          {(() => {
-            const approvals = (typeof detail.cab_approvals === 'string' ? JSON.parse(detail.cab_approvals) : detail.cab_approvals) as Record<string, boolean> || {}
-            const approvers = (typeof detail.cab_approvers === 'string' ? JSON.parse(detail.cab_approvers) : detail.cab_approvers) as string[] || []
-
-            return (
-              <div className="space-y-4">
-                <div className="flex flex-wrap gap-2">
-                  <span className={`px-2.5 py-1 rounded-md text-xs font-bold ${detail.type === 'Emergency' ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-slate-100 text-slate-600 border border-slate-200'}`}>{detail.type}</span>
-                  <StateBadge state={detail.state} />
-                </div>
-                <InfoBlock label="Descrição Curta" value={detail.short_description} />
-                {detail.description && <InfoBlock label="Justificativa" value={detail.justification ?? detail.description} mono />}
-                {detail.implementation_plan && <InfoBlock label="Plano de Implementação" value={detail.implementation_plan} mono />}
-                {detail.test_plan && <InfoBlock label="Plano de Testes" value={detail.test_plan} mono />}
-                {detail.backout_plan && <InfoBlock label="Plano de Rollback (Backout)" value={detail.backout_plan} mono />}
-                <div className="grid grid-cols-2 gap-4 pt-3 border-t border-slate-100">
-                  <InfoBlock label="Solicitado por" value={detail.requested_by_name} />
-                  <InfoBlock label="Janela de Mudança" value={detail.change_window_start ? `${new Date(detail.change_window_start).toLocaleString('pt-BR')} → ${new Date(detail.change_window_end ?? '').toLocaleString('pt-BR')}` : 'Não agendada'} />
-                  <InfoBlock label="Aprovações CAB" value={`${Object.keys(approvals).length} de ${approvers.length}`} />
-                </div>
-              </div>
-            )
-          })()}
-        </Modal>
-      )}
-
-      {showNew && (
-        <Modal title="Nova Mudança" subtitle="Change Enablement — ITIL v4" onClose={() => setShowNew(false)}>
-          <div className="space-y-4">
-            <FieldText label="Descrição Curta *" value={form.short} onChange={v => setForm(f => ({ ...f, short: v }))} placeholder="Resumo da mudança planejada…" />
-            <FieldArea label="Justificativa / Descrição" value={form.description} onChange={v => setForm(f => ({ ...f, description: v }))} placeholder="Motivo, escopo e impacto esperado…" />
-            <div className="grid grid-cols-2 gap-4">
-              <FieldSelect label="Tipo" value={form.type} onChange={v => setForm(f => ({ ...f, type: v }))} options={['Standard', 'Normal', 'Emergency']} />
-              <FieldSelect label="Risco" value={form.risk} onChange={v => setForm(f => ({ ...f, risk: v }))} options={['Low', 'Medium', 'High', 'Critical']} />
-            </div>
-            <div className="flex justify-end gap-2 pt-2">
-              <button onClick={() => setShowNew(false)} className="px-4 py-2 rounded-xl text-sm font-semibold text-slate-600 border border-slate-200 hover:bg-slate-50">Cancelar</button>
-              <button onClick={submitNew} disabled={saving} className="px-5 py-2 rounded-xl text-sm font-bold text-white bg-violet-600 hover:bg-violet-700 disabled:opacity-50">{saving ? 'Salvando…' : 'Registrar Mudança'}</button>
-            </div>
-          </div>
-        </Modal>
-      )}
-    </div>
-  )
-}
-
-// ─── USER PORTAL ──────────────────────────────────────────────
-
-function UserPortal({ currentUser, company }: { currentUser: User; company: Company }) {
-  const { toast } = useToast()
-  const [activeTab, setActiveTab] = useState<'catalog' | 'my_tickets'>('catalog')
-  const [chatIncident, setChatIncident] = useState<IncidentRow | null>(null)
-  const [ticketDetail, setTicketDetail] = useState<PortalTicketDetail | null>(null)
-  const [detailLoading, setDetailLoading] = useState(false)
-
-  const [detailTab, setDetailTab] = useState<'overview' | 'chat' | 'timeline'>('overview')
-  const [historyRows, setHistoryRows] = useState<IncidentHistoryRow[]>([])
-  const [showReopenModal, setShowReopenModal] = useState(false)
-  const [reopenJustification, setReopenJustification] = useState('')
-  const [submittingReopen, setSubmittingReopen] = useState(false)
-
-  // Relógio vivo para o cronômetro de SLA / tempo decorrido
-  const [now, setNow] = useState(() => Date.now())
-  useEffect(() => {
-    const t = setInterval(() => setNow(Date.now()), 1000)
-    return () => clearInterval(t)
-  }, [])
-
-  useEffect(() => {
-    if (chatIncident) {
-      setDetailTab('overview')
-    }
-  }, [chatIncident?.id])
-
-  const { incidents: dbIncidents, loading, upsertIncident } = useIncidents(company.id, currentUser.id)
-
-  useEffect(() => {
-    if (!chatIncident) {
-      setTicketDetail(null)
-      return
-    }
-
-    let cancelled = false
-    setDetailLoading(true)
-    incidentsService.getPortalDetail(chatIncident.id, company.id)
-      .then(detail => { if (!cancelled) setTicketDetail(detail) })
-      .catch(error => { if (!cancelled) console.error('Falha ao carregar os detalhes do chamado.', error) })
-      .finally(() => { if (!cancelled) setDetailLoading(false) })
-
-    return () => {
-      cancelled = true
-    }
-  }, [chatIncident?.id, company.id])
-
-  // Linha do tempo: histórico PÚBLICO do chamado (abertura → status atual).
-  useEffect(() => {
-    if (!chatIncident) { setHistoryRows([]); return }
-    let cancelled = false
-    incidentsService.listPublicHistory(chatIncident.id, company.id)
-      .then(rows => { if (!cancelled) setHistoryRows(rows) })
-      .catch(() => { if (!cancelled) setHistoryRows([]) })
-    return () => { cancelled = true }
-  }, [chatIncident?.id, company.id])
-
-  useEffect(() => {
-    if (!chatIncident) return
-    const updated = dbIncidents.find(incident => incident.id === chatIncident.id)
-    if (updated) {
-      setChatIncident(updated)
-      setTicketDetail(previous => previous ? { ...previous, ...updated } : previous)
-    }
-  }, [dbIncidents, chatIncident?.id])
-
-  const myRequests = useMemo(() => {
-    return dbIncidents.filter(ticket => ticket.ticket_type === 'request')
-  }, [dbIncidents])
-
-  const myIncidents = useMemo(() => {
-    return dbIncidents.filter(ticket => ticket.ticket_type === 'incident')
-  }, [dbIncidents])
-
-  const { primaryColor, accentColor, backgroundColor } = company.branding
-  const brandName = company.branding.brandName || company.name
-
-  return (
-    <div className="min-h-screen" style={{ background: backgroundColor, backgroundSize: 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat', backgroundAttachment: 'fixed', fontFamily: 'system-ui, sans-serif' }}>
-      {/* Branded Header */}
-      <header className="px-6 py-4 flex items-center justify-between shadow-sm" style={{ backgroundColor: primaryColor }}>
-        <div className="flex items-center gap-3">
-          {company.branding.logoUrl ? (
-            <img src={company.branding.logoUrl} alt={brandName} className="w-9 h-9 rounded-xl shadow-sm bg-white/90 object-contain" />
-          ) : (
-            <div className="w-9 h-9 rounded-xl shadow-sm bg-white/20 flex items-center justify-center text-white font-black text-lg">
-              {brandName.charAt(0)}
-            </div>
-          )}
-          <div>
-            <div className="text-white font-bold text-base leading-tight">{brandName}</div>
-            <div className="text-white/60 text-[10px] uppercase tracking-widest font-semibold">Portal de Atendimento</div>
-          </div>
-        </div>
-        <div className="flex items-center gap-3">
-          <div className="text-right hidden sm:block">
-            <div className="text-white font-semibold text-sm">{currentUser.name}</div>
-            <div className="text-white/60 text-[10px]">{currentUser.department}</div>
-          </div>
-          <img
-            src={currentUser.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(currentUser.name)}&background=fff&color=${primaryColor.replace('#', '')}&bold=true`}
-            className="w-9 h-9 rounded-full border-2 border-white/30 object-cover"
-            alt={currentUser.name}
-          />
-        </div>
-      </header>
-
-      {/* Welcome Banner */}
-      <div className="px-6 py-10 md:py-14 text-center" style={{ background: `linear-gradient(135deg, ${primaryColor}18, ${accentColor}10, ${backgroundColor})` }}>
-        <p className="text-base md:text-lg font-semibold mb-2" style={{ color: primaryColor }}>
-          Olá, {currentUser.name.split(' ')[0]}! 👋
-        </p>
-        <h1
-          className="text-3xl md:text-4xl font-extrabold mb-3 tracking-tight drop-shadow-sm"
-          style={{
-            color: company.branding.titleColor || primaryColor,
-            fontFamily: company.branding.titleFont || undefined,
-            fontSize: company.branding.titleSize || undefined
-          }}
-        >
-          {company.branding.welcomeTitle}
-        </h1>
-        <p
-          className="text-slate-500 text-base md:text-lg font-medium"
-          style={{
-            color: company.branding.subtitleColor || undefined,
-            fontFamily: company.branding.subtitleFont || undefined,
-            fontSize: company.branding.subtitleSize || undefined
-          }}
-        >
-          {company.branding.welcomeSubtitle}
-        </p>
-      </div>
-
-      {/* Content */}
-      <div className="max-w-5xl mx-auto px-6 pb-12 space-y-6">
-        {/* Tabs */}
-        <div className="flex gap-2 border-b border-slate-200 pb-0">
-          {[['catalog', '🛒 Catálogo de Serviços'], ['my_tickets', `📋 Meus Chamados (${myRequests.length + myIncidents.length})`]].map(([tab, label]) => (
-            <button key={tab} onClick={() => setActiveTab(tab as 'catalog' | 'my_tickets')}
-              className={`px-5 py-2.5 text-sm font-semibold rounded-t-xl border-b-2 transition-all cursor-pointer -mb-px ${activeTab === tab ? 'border-b-2 text-white' : 'border-transparent text-slate-500 hover:text-slate-700 bg-transparent'}`}
-              style={activeTab === tab ? { borderBottomColor: primaryColor, backgroundColor: primaryColor } : {}}>
-              {label}
-            </button>
-          ))}
-        </div>
-
-        {/* Catalog (vitrine de serviços → abre requisição como incident) */}
-        {activeTab === 'catalog' && (
-          <ServiceCatalog
-            companyId={company.id}
-            currentUserId={currentUser.id}
-            currentUserName={currentUser.name}
-            primaryColor={primaryColor}
-            catalogHeadline={company.branding.catalogHeadline}
-            catalogHeadlineColor={company.branding.catalogHeadlineColor}
-            catalogHeadlineSize={company.branding.catalogHeadlineSize}
-            greetingPrefix={company.branding.greetingPrefix}
-            greetingColor={company.branding.greetingColor}
-            onCreated={upsertIncident}
-            onNavigateToTickets={() => setActiveTab('my_tickets')}
-          />
-        )}
-
-        {/* My Tickets */}
-        {activeTab === 'my_tickets' && (
-          <div className="space-y-6">
-            {loading ? (
-              <div className="text-center py-12 text-slate-400 animate-pulse">Carregando chamados...</div>
-            ) : myRequests.length === 0 && myIncidents.length === 0 ? (
-              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm text-center py-16 text-slate-400 space-y-2">
-                <div className="text-4xl">📭</div>
-                <p className="text-sm">Nenhum chamado encontrado para o seu usuário.</p>
-              </div>
-            ) : (
-              <>
-                {myRequests.length > 0 && (
-                  <div>
-                    <h2 className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-3">Minhas Requisições</h2>
-                    <div className="space-y-2">
-                      {myRequests.map(req => (
-                        <div
-                          key={req.id}
-                          onClick={() => setChatIncident(req)}
-                          className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 flex items-center gap-4 hover:border-sky-300 hover:shadow-md transition-all cursor-pointer"
-                        >
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span className="font-mono text-xs font-bold text-sky-600">{req.number}</span>
-                              <StateBadge state={req.state} />
-                            </div>
-                            <div className="text-sm font-semibold text-slate-700 mt-0.5 truncate">{req.short_description}</div>
-                          </div>
-                          <div className="flex items-center gap-2 shrink-0">
-                            <span className="text-xs text-slate-400">{relativeTime(req.created_at)}</span>
-                            <span className="text-[10px] font-bold text-sky-600 bg-sky-50 border border-sky-100 px-2 py-1 rounded-lg">Abrir</span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                {myIncidents.length > 0 && (
-                  <div>
-                    <h2 className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-3">Meus Incidentes</h2>
-                    <div className="space-y-2">
-                      {myIncidents.map(inc => (
-                        <div
-                          key={inc.id}
-                          onClick={() => setChatIncident(inc)}
-                          className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 flex items-center gap-4 hover:border-indigo-300 hover:shadow-md transition-all cursor-pointer"
-                        >
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span className="font-mono text-xs font-bold text-red-500">{inc.number}</span>
-                              <span className={`px-2 py-0.5 rounded-md text-[10px] uppercase tracking-wide ${priorityBadge[inc.priority]}`}>{inc.priority}</span>
-                              <StateBadge state={inc.state} />
-                            </div>
-                            <div className="text-sm font-semibold text-slate-700 mt-0.5 truncate">{inc.short_description}</div>
-                          </div>
-                          <div className="flex items-center gap-2 shrink-0">
-                            <span className="text-xs text-slate-400">{relativeTime(inc.created_at)}</span>
-                            <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 border border-indigo-100 px-2 py-1 rounded-lg">💬 Abrir</span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-        )}
-      </div>
-
-      {chatIncident && (() => {
-        const status = ticketDetail?.state ?? chatIncident.state ?? 'New'
-        const isResolved = status === 'Resolved' || status === 'Closed'
-        const openedAt = chatIncident.created_at ? new Date(chatIncident.created_at).getTime() : null
-        const frozenAt = isResolved
-          ? (ticketDetail?.resolved_at ? new Date(ticketDetail.resolved_at).getTime()
-             : ticketDetail?.closed_at ? new Date(ticketDetail.closed_at).getTime()
-             : now)
-          : now
-        const elapsedMs = openedAt !== null ? frozenAt - openedAt : null
-        const deadlineAt = ticketDetail?.sla_deadline ? new Date(ticketDetail.sla_deadline).getTime() : null
-        const remainingMs = deadlineAt !== null ? deadlineAt - frozenAt : null
-        const slaBreached = !isResolved && (Boolean(ticketDetail?.sla_breached) || (remainingMs !== null && remainingMs < 0))
-
-        const fmtDuration = (ms: number) => {
-          const abs = Math.abs(ms)
-          const s = Math.floor(abs / 1000)
-          const d = Math.floor(s / 86400)
-          const h = Math.floor((s % 86400) / 3600)
-          const m = Math.floor((s % 3600) / 60)
-          const sec = s % 60
-          if (d > 0) return `${d}d ${h}h`
-          if (h > 0) return `${h}h ${m}m`
-          if (m > 0) return `${m}m ${sec}s`
-          return `${sec}s`
-        }
-
-        return (
-          <>
-            <Modal wide title={chatIncident.number} subtitle="Detalhes do Chamado" onClose={() => { setChatIncident(null); setTicketDetail(null) }}>
-              <div className="space-y-6">
-                {/* Header com Status e SLA */}
-                <div className="flex flex-wrap items-center justify-between gap-4 p-4 rounded-2xl bg-white border border-slate-200/85 shadow-xs">
-                  <div className="space-y-1">
-                    <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Status do Chamado</div>
-                    <div className="flex items-center gap-2">
-                      <StateBadge state={ticketDetail?.state ?? chatIncident.state} />
-                      <span className="text-slate-400">·</span>
-                      <span className="text-xs text-slate-500 font-medium">Aberto em {new Date(chatIncident.created_at).toLocaleString('pt-BR')}</span>
-                    </div>
-                  </div>
-
-                  {/* Cronômetro do SLA */}
-                  {elapsedMs !== null && (
-                    <div className="text-right">
-                      <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400">SLA de Solução</div>
-                      <div className={`mt-1 inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold border transition-all ${
-                        isResolved
-                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                          : slaBreached
-                            ? 'bg-rose-50 text-rose-700 border-rose-200 animate-pulse'
-                            : 'bg-slate-50 text-slate-600 border-slate-200'
-                      }`}>
-                        <Clock className="w-3.5 h-3.5" />
-                        {isResolved
-                          ? `Encerrado em ${elapsedMs !== null ? fmtDuration(elapsedMs) : ''}`
-                          : remainingMs !== null
-                            ? (slaBreached ? `Estourado há ${fmtDuration(remainingMs)}` : `${fmtDuration(remainingMs)} restante`)
-                            : `${fmtDuration(elapsedMs ?? 0)} decorridos`}
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Ações de Aceite / Reabertura se resolvido */}
-                {status === 'Resolved' && (
-                  <div className="p-4 rounded-2xl bg-amber-50/50 border border-amber-200 flex flex-wrap items-center justify-between gap-4">
-                    <div className="space-y-1">
-                      <div className="text-sm font-bold text-slate-800">O analista marcou este chamado como Resolvido</div>
-                      <p className="text-xs text-slate-600">Por favor, confirme se a solução atende às suas necessidades ou reabra o chamado se o problema persistir.</p>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <button
-                        onClick={async () => {
-                          if (confirm('Deseja aceitar a solução apresentada e fechar este chamado?')) {
-                            try {
-                              await incidentsService.acceptResolution(chatIncident.id, company.id, currentUser.name)
-                              toast.success('Chamado fechado com sucesso!')
-                              if (ticketDetail) {
-                                setTicketDetail({ ...ticketDetail, state: 'Closed', closed_at: new Date().toISOString() })
-                              }
-                              setChatIncident(prev => prev ? { ...prev, state: 'Closed' } : null)
-                            } catch (err: any) {
-                              toast.error(`Erro ao aceitar solução: ${err.message}`)
-                            }
-                          }
-                        }}
-                        className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-xs transition-all cursor-pointer"
-                      >
-                        Aceitar Solução
-                      </button>
-                      <button
-                        onClick={() => setShowReopenModal(true)}
-                        className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl shadow-xs transition-all cursor-pointer"
-                      >
-                        Reabrir Chamado
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {/* Abas Internas */}
-                <div className="flex gap-2 border-b border-slate-200">
-                  <button
-                    onClick={() => setDetailTab('overview')}
-                    className={`px-4 py-2 text-xs font-bold border-b-2 transition-all cursor-pointer -mb-px ${
-                      detailTab === 'overview'
-                        ? 'border-indigo-600 text-indigo-600'
-                        : 'border-transparent text-slate-500 hover:text-slate-700'
-                    }`}
-                  >
-                    📋 Visão Geral / Solicitação
-                  </button>
-                  <button
-                    onClick={() => setDetailTab('chat')}
-                    className={`px-4 py-2 text-xs font-bold border-b-2 transition-all cursor-pointer -mb-px ${
-                      detailTab === 'chat'
-                        ? 'border-indigo-600 text-indigo-600'
-                        : 'border-transparent text-slate-500 hover:text-slate-700'
-                    }`}
-                  >
-                    💬 Acompanhamento / Chat
-                  </button>
-                  <button
-                    onClick={() => setDetailTab('timeline')}
-                    className={`px-4 py-2 text-xs font-bold border-b-2 transition-all cursor-pointer -mb-px ${
-                      detailTab === 'timeline'
-                        ? 'border-indigo-600 text-indigo-600'
-                        : 'border-transparent text-slate-500 hover:text-slate-700'
-                    }`}
-                  >
-                    🕓 Histórico do Chamado
-                  </button>
-                </div>
-
-                {/* Aba 1: Visão Geral */}
-                {detailTab === 'overview' && (
-                  <div className="space-y-4">
-                    <div className="rounded-2xl border border-slate-200 bg-white p-5 space-y-4">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <InfoBlock label="Assunto" value={ticketDetail?.short_description ?? chatIncident.short_description} />
-                        <InfoBlock label="Tipo" value={(ticketDetail?.ticket_type ?? chatIncident.ticket_type) === 'request' ? 'Requisição' : 'Incidente'} />
-                      </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-3 border-t border-slate-100">
-                        <InfoBlock label="Categoria" value={ticketDetail?.catalog_category_name ?? 'Não identificada'} />
-                        <InfoBlock label="Serviço / Item" value={ticketDetail?.catalog_selection_name ?? chatIncident.short_description} />
-                      </div>
-                    </div>
-
-                    {detailLoading && (
-                      <div className="animate-pulse rounded-xl bg-slate-50 py-8 text-center text-sm text-slate-400">
-                        Carregando detalhes completos...
-                      </div>
-                    )}
-
-                    {!detailLoading && ticketDetail?.description && (
-                      <div className="rounded-2xl border border-slate-200 bg-white p-5">
-                        <InfoBlock label="Descrição informada" value={ticketDetail.description} mono />
-                      </div>
-                    )}
-
-                    {!detailLoading && ticketDetail?.form_data && Object.keys(ticketDetail.form_data as Record<string, unknown>).length > 0 && (
-                      <section className="space-y-2">
-                        <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400 px-1">Respostas do Formulário</div>
-                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                          {Object.entries(ticketDetail.form_data as Record<string, unknown>).map(([label, value]) => (
-                            <div key={label} className="rounded-xl border border-slate-200 bg-white p-3 shadow-xs">
-                              <InfoBlock label={label} value={formatPortalValue(value)} />
-                            </div>
-                          ))}
-                        </div>
-                      </section>
-                    )}
-                  </div>
-                )}
-
-                {/* Aba 2: Chat */}
-                {detailTab === 'chat' && (
-                  <div className="space-y-4">
-                    <TicketChat
-                      incidentId={chatIncident.id}
-                      companyId={company.id}
-                      senderId={currentUser.id}
-                      senderName={currentUser.name}
-                      actorType="user"
-                      hideInternal={true}
-                      locked={status === 'Closed'}
-                    />
-                  </div>
-                )}
-
-                {/* Aba 3: Histórico do Chamado (linha do tempo pública) */}
-                {detailTab === 'timeline' && (
-                  <div className="space-y-4">
-                    {historyRows.length === 0 ? (
-                      <div className="text-center py-12 text-slate-400 text-sm">Nenhum registro de histórico ainda.</div>
-                    ) : (
-                      <div className="relative border-l-2 border-slate-200 ml-3 pl-6 space-y-5 py-2">
-                        {historyRows.map(h => {
-                          const isOpen = ['Criação', 'Abertura', 'created'].includes(h.field_name)
-                          const isStart = h.field_name === 'Início de Atendimento'
-                          const isComment = h.field_name === 'comment'
-                          const isState = h.field_name === 'state'
-                          let title = 'Atualização do chamado'
-                          let body = ''
-                          if (isOpen) { title = 'Chamado aberto'; body = h.comment ?? 'Solicitação registrada no portal.' }
-                          else if (isStart) { title = 'Atendimento iniciado'; body = h.comment ?? 'Um analista assumiu o chamado.' }
-                          else if (isComment) { title = 'Mensagem do analista'; body = h.comment ?? '' }
-                          else if (isState) { title = 'Status atualizado'; body = `${h.old_value ? translateState(h.old_value) + ' → ' : ''}${translateState(h.new_value)}` }
-                          else { title = h.field_name; body = `${h.old_value ?? ''}${h.old_value ? ' → ' : ''}${h.new_value ?? ''}` }
-                          const dot = isOpen ? 'bg-emerald-500' : isStart ? 'bg-sky-500' : isState ? 'bg-indigo-500' : isComment ? 'bg-violet-500' : 'bg-slate-400'
-                          return (
-                            <div key={h.id} className="relative">
-                              <span className={`absolute -left-[31px] top-1 w-3.5 h-3.5 rounded-full border-2 border-white shadow ${dot}`} />
-                              <div className="flex items-center justify-between gap-2 flex-wrap">
-                                <span className="text-sm font-bold text-slate-700">{title}</span>
-                                <span className="text-[10px] text-slate-400 font-mono">{new Date(h.created_at).toLocaleString('pt-BR')}</span>
-                              </div>
-                              {body && <p className="text-xs text-slate-500 mt-0.5 whitespace-pre-wrap leading-relaxed">{body}</p>}
-                              {h.changed_by_name && <p className="text-[10px] text-slate-400 mt-1">por {h.changed_by_name}</p>}
-                            </div>
-                          )
-                        })}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            </Modal>
-
-            {/* Modal de Justificativa de Reabertura */}
-            {showReopenModal && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/50 backdrop-blur-xs">
-                <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden">
-                  <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
-                    <h3 className="font-extrabold text-slate-800 text-sm">Justificativa de Reabertura</h3>
-                    <button onClick={() => { setShowReopenModal(false); setReopenJustification('') }} className="p-1.5 rounded-lg hover:bg-slate-200 text-slate-400 hover:text-slate-600 transition-all cursor-pointer">
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
-                    </button>
-                  </div>
-                  <div className="p-6 space-y-4">
-                    <p className="text-xs text-slate-500">Por favor, descreva brevemente o motivo pelo qual você está reabrindo este chamado.</p>
-                    <textarea
-                      value={reopenJustification}
-                      onChange={e => setReopenJustification(e.target.value)}
-                      placeholder="Ex: O problema voltou a ocorrer..."
-                      rows={4}
-                      className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500"
-                    />
-                  </div>
-                  <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex justify-end gap-3">
-                    <button
-                      onClick={() => { setShowReopenModal(false); setReopenJustification('') }}
-                      disabled={submittingReopen}
-                      className="px-4 py-2 border border-slate-200 hover:bg-slate-100 text-slate-600 text-xs font-bold rounded-xl transition-all cursor-pointer"
-                    >
-                      Cancelar
-                    </button>
-                    <button
-                      onClick={async () => {
-                        if (!reopenJustification.trim()) {
-                          toast.error('A justificativa é obrigatória para reabrir o chamado.')
-                          return
-                        }
-                        setSubmittingReopen(true)
-                        try {
-                          await incidentsService.userReopen(chatIncident.id, company.id, reopenJustification, currentUser.id, currentUser.name)
-                          toast.success('Chamado reaberto com sucesso!')
-                          setShowReopenModal(false)
-                          setReopenJustification('')
-                          if (ticketDetail) {
-                            setTicketDetail({ ...ticketDetail, state: 'In Progress', resolved_at: null })
-                          }
-                          setChatIncident(prev => prev ? { ...prev, state: 'In Progress' } : null)
-                        } catch (err: any) {
-                          toast.error(`Erro ao reabrir chamado: ${err.message}`)
-                        } finally {
-                          setSubmittingReopen(false)
-                        }
-                      }}
-                      disabled={submittingReopen || !reopenJustification.trim()}
-                      className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-bold rounded-xl shadow-md transition-all cursor-pointer"
-                    >
-                      {submittingReopen ? 'Reabrindo...' : 'Reabrir Chamado'}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-          </>
-        )
-      })()}
-    </div>
-  )
-}
 
 // ─── API DOCS ─────────────────────────────────────────────────
 
@@ -1694,18 +1015,17 @@ export default function App() {
 
   const unreadNotifs = useMemo(() => mockNotifications.filter(n => !n.read).length, [])
 
-  // Atalho TEMPORÁRIO de preview: /?preview=portal | admin renderiza os
-  // novos layouts (mocks) sem exigir login. Remover quando os componentes
-  // forem para a fiação com dados reais.
-  const previewMode = useMemo(
-    () => (typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('preview') : null),
-    [],
-  )
-  if (previewMode === 'portal') return <UserPortalLayout />
-  if (previewMode === 'admin') return <AdminPortalSettings />
-  if (previewMode === 'cockpit') return <AnalystCockpit />
-  if (previewMode === 'tickets') return <TicketManagementDashboard />
-  if (previewMode === 'workspace') return <div className="h-screen"><WorkspaceLayout /></div>
+  // Atalho de preview: /?preview=portal | admin — SOMENTE em desenvolvimento.
+  // Em produção (import.meta.env.DEV === false) este bloco é eliminado pelo
+  // tree-shaking do Vite, impedindo acesso sem autenticação a componentes admin.
+  if (import.meta.env.DEV) {
+    const previewMode = new URLSearchParams(window.location.search).get('preview')
+    if (previewMode === 'portal')    return <UserPortalLayout companyId={currentCompany?.id} />
+    if (previewMode === 'admin')     return <AdminPortalSettings />
+    if (previewMode === 'cockpit')   return <AnalystCockpit />
+    if (previewMode === 'tickets')   return <TicketManagementDashboard />
+    if (previewMode === 'workspace') return <div className="h-screen"><WorkspaceLayout /></div>
+  }
 
   if (dbLoading || authStatus === 'loading') {
     return (
@@ -1724,7 +1044,10 @@ export default function App() {
         <div className="bg-red-50 border border-red-200 rounded-2xl p-6 text-center max-w-md shadow-sm">
           <div className="text-2xl mb-2">⚠️</div>
           <div className="font-semibold text-slate-800">Erro ao carregar dados do banco</div>
-          <div className="text-red-400 mt-1 text-xs font-mono">{dbError}</div>
+          {import.meta.env.DEV
+            ? <div className="text-red-400 mt-1 text-xs font-mono">{dbError}</div>
+            : <div className="text-slate-500 mt-1 text-xs">Ocorreu um erro interno. Tente recarregar a página ou contate o suporte.</div>
+          }
         </div>
       </div>
     )
@@ -1756,9 +1079,9 @@ export default function App() {
     return (
       <div>
         <div className="fixed top-4 right-4 z-50 flex gap-2">
-          {currentUser.role !== 'end_user' && (
+          {import.meta.env.DEV && currentUser.role !== 'end_user' && (
             <>
-              {/* Role Sim Selector for testing */}
+              {/* Role Sim Selector — apenas em desenvolvimento (import.meta.env.DEV) */}
               <div className="flex items-center gap-1 border border-slate-200 bg-white rounded-xl px-2 py-1 shadow-sm shrink-0">
                 <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Simular Papel:</span>
                 <select
@@ -1793,7 +1116,7 @@ export default function App() {
           )}
           <button onClick={handleLogout} className="px-3 py-1.5 rounded-xl bg-white border border-slate-200 text-slate-500 text-xs hover:bg-slate-50 hover:border-slate-300 transition-all cursor-pointer shadow-sm">Sair</button>
         </div>
-        <UserPortal currentUser={currentUser} company={currentCompany} />
+        <UserPortalLayout companyId={currentCompany.id} />
       </div>
     )
   }
@@ -1803,12 +1126,14 @@ export default function App() {
     { view: 'dashboard_requests', label: 'Requisições', icon: <ClipboardList className="w-5 h-5" /> },
     { view: 'dashboard_problems', label: 'Problemas', icon: <AlertOctagon className="w-5 h-5" /> },
     { view: 'dashboard_changes', label: 'Mudanças', icon: <RefreshCw className="w-5 h-5" /> },
+    { view: 'approval_inbox', label: 'Minhas Aprovações', icon: <CircleCheckBig className="w-5 h-5" /> },
     { view: 'user_portal', label: 'Portal do Usuário', icon: <Home className="w-5 h-5" /> },
     { view: 'api_docs', label: 'API de Integração', icon: <Code2 className="w-5 h-5" /> },
   ]
 
   // O Flowfy BI fica disponível para todos os perfis gerenciais/técnicos que alcançam esta tela
   navItems.push({ view: 'flowfy_bi', label: 'Flowfy BI Analytics', icon: <BarChart3 className="w-5 h-5" /> })
+  navItems.push({ view: 'workflow_builder', label: 'Motor de Automação', icon: <Zap className="w-5 h-5" /> })
 
   // Apenas papéis administrativos e CIO têm acesso ao menu Configurações
   const isConfigEligible = ['sysadmin', 'company_admin', 'cio', 'it_manager', 'area_manager', 'client_manager'].includes(activeRole)
@@ -1851,9 +1176,11 @@ export default function App() {
     }
 
     if (activeView === 'dashboard_problems') return <ProblemDashboard companyId={currentCompany.id} />
-    if (activeView === 'dashboard_changes') return <ChangeDashboard companyId={currentCompany.id} />
+    if (activeView === 'dashboard_changes') return <ChangeManagementDashboard companyId={currentCompany.id} />
+    if (activeView === 'approval_inbox') return <ApprovalInbox />
     if (activeView === 'api_docs') return <ApiDocs />
-    if (activeView === 'flowfy_bi') return <FlowfyBI />
+    if (activeView === 'flowfy_bi') return <BiApp companyId={currentCompany.id} themeName={(currentCompany as any).primary_color} />
+    if (activeView === 'workflow_builder') return <WorkflowBuilder companyId={currentCompany.id} />
 
     return <WorkspaceLayout companyId={currentCompany.id} isProvider={isProvider} companies={companies} />
   }
@@ -1907,34 +1234,36 @@ export default function App() {
           )}
         </div>
 
-        {/* Role Simulator Dropdown */}
-        <div className="flex items-center gap-1.5 border border-outline-variant bg-surface rounded-xl px-2 py-1 shadow-sm shrink-0">
-          <span className="text-[10px] text-on-surface-variant font-bold uppercase tracking-wider hidden md:inline">Simular Papel:</span>
-          <select
-            value={activeRole}
-            onChange={e => {
-              const r = e.target.value as Role
-              setSimulatedRole(r)
-              if (r === 'end_user') {
-                setActiveView('user_portal')
-              } else if (r === 'sysadmin' || r === 'company_admin' || r === 'cio' || r === 'it_manager' || r === 'area_manager' || r === 'client_manager') {
-                setActiveView('settings_governance')
-              } else {
-                setActiveView('dashboard_incidents')
-              }
-            }}
-            className="text-xs font-semibold text-on-surface bg-surface border-none outline-none cursor-pointer focus:ring-0"
-          >
-            <option value="sysadmin">SysAdmin (Admin Global)</option>
-            <option value="company_admin">CompanyAdmin (Admin Tenant)</option>
-            <option value="technician">Technician (Analista)</option>
-            <option value="area_manager">AreaManager (Gerente Torre)</option>
-            <option value="it_manager">ITManager (Gerente Geral TI)</option>
-            <option value="client_manager">ClientManager (Gestor Cliente)</option>
-            <option value="cio">CIO (Executivo TI)</option>
-            <option value="end_user">EndUser (Usuário Final)</option>
-          </select>
-        </div>
+        {/* Role Simulator Dropdown — apenas em desenvolvimento */}
+        {import.meta.env.DEV && (
+          <div className="flex items-center gap-1.5 border border-outline-variant bg-surface rounded-xl px-2 py-1 shadow-sm shrink-0">
+            <span className="text-[10px] text-on-surface-variant font-bold uppercase tracking-wider hidden md:inline">Simular Papel:</span>
+            <select
+              value={activeRole}
+              onChange={e => {
+                const r = e.target.value as Role
+                setSimulatedRole(r)
+                if (r === 'end_user') {
+                  setActiveView('user_portal')
+                } else if (r === 'sysadmin' || r === 'company_admin' || r === 'cio' || r === 'it_manager' || r === 'area_manager' || r === 'client_manager') {
+                  setActiveView('settings_governance')
+                } else {
+                  setActiveView('dashboard_incidents')
+                }
+              }}
+              className="text-xs font-semibold text-on-surface bg-surface border-none outline-none cursor-pointer focus:ring-0"
+            >
+              <option value="sysadmin">SysAdmin (Admin Global)</option>
+              <option value="company_admin">CompanyAdmin (Admin Tenant)</option>
+              <option value="technician">Technician (Analista)</option>
+              <option value="area_manager">AreaManager (Gerente Torre)</option>
+              <option value="it_manager">ITManager (Gerente Geral TI)</option>
+              <option value="client_manager">ClientManager (Gestor Cliente)</option>
+              <option value="cio">CIO (Executivo TI)</option>
+              <option value="end_user">EndUser (Usuário Final)</option>
+            </select>
+          </div>
+        )}
 
         {/* Spacer */}
         <div className="flex-1" />

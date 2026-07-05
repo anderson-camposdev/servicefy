@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #EBEDF0; -webkit-font-smoothing: antialiased; }
+  @page { size: letter; margin: 0.5in; }
+  @media print {
+    html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    body { background: #fff; }
+    .page-canvas { background: #fff !important; padding: 0 !important; }
+    .doc { box-shadow: none !important; border: none !important; }
+    section { break-inside: avoid; }
+  }
+</style>
+</helmet>
+
+<div class="page-canvas" style="padding:40px 20px;font-family:'Hanken Grotesk',sans-serif;color:#1e293b">
+<div class="doc" style="max-width:860px;margin:0 auto;background:#FFFFFF;border:1px solid #e2e8f0;border-radius:12px;box-shadow:0 1px 3px rgba(15,23,42,.04),0 16px 48px rgba(15,23,42,.07);overflow:hidden">
+
+  <!-- ===== COVER ===== -->
+  <div style="padding:54px 56px 40px;background:linear-gradient(180deg,#FBFCFD 0%,#FFFFFF 100%);border-bottom:1px solid #eef2f6">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:26px">
+      <div style="width:28px;height:28px;border-radius:8px;background:#10b981;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:16px">F</div>
+      <span style="font:700 16px 'Hanken Grotesk';letter-spacing:-.01em;color:#0f172a">Flowfy</span>
+      <span style="font:500 11px 'JetBrains Mono';color:#94a3b8;margin-left:2px;letter-spacing:.04em">ITSM · white-label</span>
+    </div>
+    <div style="font:600 12px 'JetBrains Mono';color:#10b981;letter-spacing:.12em;text-transform:uppercase;margin-bottom:14px">Auditoria visual do código</div>
+    <h1 style="margin:0 0 18px;font:800 38px/1.1 'Hanken Grotesk';letter-spacing:-.025em;color:#0f172a;text-wrap:balance">Fontes, tamanhos e cor — o que o código realmente está renderizando</h1>
+    <p style="margin:0;max-width:620px;font:400 16px/1.6 'Hanken Grotesk';color:#475569;text-wrap:pretty">Boa notícia: a fundação existe e é madura (escala tipográfica completa, motor white-label, paleta de status). O problema do "sem graça" não é falta de sistema — é que <strong style="color:#1e293b;font-weight:600">peças do sistema não estão conectadas</strong>. Abaixo, o que encontrei nos arquivos e como ligar os fios.</p>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:26px">
+      <span style="display:inline-flex;align-items:center;padding:5px 11px;border-radius:999px;background:#ecfdf5;color:#047857;font:600 12px 'Hanken Grotesk'">React 19 · Tailwind v4</span>
+      <span style="display:inline-flex;align-items:center;padding:5px 11px;border-radius:999px;background:#f1f5f9;color:#475569;font:600 12px 'Hanken Grotesk'">Hanken Grotesk + JetBrains Mono</span>
+      <span style="display:inline-flex;align-items:center;padding:5px 11px;border-radius:999px;background:#f1f5f9;color:#475569;font:600 12px 'Hanken Grotesk'">Supabase multi-tenant</span>
+    </div>
+  </div>
+
+  <div style="padding:46px 56px 56px">
+
+    <!-- ===== RESUMO ===== -->
+    <section style="margin-bottom:52px">
+      <div style="display:flex;align-items:center;gap:14px;margin-bottom:20px">
+        <span style="font:700 13px 'JetBrains Mono';color:#10b981;letter-spacing:.06em">00</span>
+        <span style="font:700 13px 'JetBrains Mono';color:#94a3b8;letter-spacing:.1em;text-transform:uppercase">Resumo dos achados</span>
+        <div style="height:1px;flex:1;background:#eef2f6"></div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <!-- F1 -->
+        <div style="display:flex;gap:14px;padding:16px 18px;border:1px solid #e2e8f0;border-left:3px solid #ef4444;border-radius:0 10px 10px 0;background:#fff">
+          <span style="flex:none;align-self:flex-start;font:700 10px 'JetBrains Mono';letter-spacing:.04em;text-transform:uppercase;color:#b91c1c;background:#fee2e2;padding:3px 8px;border-radius:5px">Crítico</span>
+          <div>
+            <div style="font:700 15px 'Hanken Grotesk';color:#0f172a;margin-bottom:3px">A fonte de marca não está aplicada</div>
+            <div style="font:400 13.5px/1.55 'Hanken Grotesk';color:#64748b">Hanken Grotesk é importada, mas <code style="font:500 12px 'JetBrains Mono';color:#be123c;background:#fff1f2;padding:1px 5px;border-radius:4px">font-sans</code> e a base não apontam pra ela — e o <code style="font:500 12px 'JetBrains Mono';color:#be123c;background:#fff1f2;padding:1px 5px;border-radius:4px">:root</code> ainda pede <code style="font:500 12px 'JetBrains Mono';color:#be123c;background:#fff1f2;padding:1px 5px;border-radius:4px">"Inter"</code>, que nem é carregada. O app renderiza em fonte de sistema.</div>
+          </div>
+        </div>
+        <!-- F2 -->
+        <div style="display:flex;gap:14px;padding:16px 18px;border:1px solid #e2e8f0;border-left:3px solid #ef4444;border-radius:0 10px 10px 0;background:#fff">
+          <span style="flex:none;align-self:flex-start;font:700 10px 'JetBrains Mono';letter-spacing:.04em;text-transform:uppercase;color:#b91c1c;background:#fee2e2;padding:3px 8px;border-radius:5px">Crítico</span>
+          <div>
+            <div style="font:700 15px 'Hanken Grotesk';color:#0f172a;margin-bottom:3px">A cor primária do white-label não propaga</div>
+            <div style="font:400 13.5px/1.55 'Hanken Grotesk';color:#64748b"><code style="font:500 12px 'JetBrains Mono';color:#be123c;background:#fff1f2;padding:1px 5px;border-radius:4px">bg-primary</code> lê <code style="font:500 12px 'JetBrains Mono';color:#be123c;background:#fff1f2;padding:1px 5px;border-radius:4px">--color-brand-primary</code> (azul fixo), mas o motor grava <code style="font:500 12px 'JetBrains Mono';color:#be123c;background:#fff1f2;padding:1px 5px;border-radius:4px">--brand-primary</code>. São dois namespaces de token que não se falam.</div>
+          </div>
+        </div>
+        <!-- F3 -->
+        <div style="display:flex;gap:14px;padding:16px 18px;border:1px solid #e2e8f0;border-left:3px solid #f59e0b;border-radius:0 10px 10px 0;background:#fff">
+          <span style="flex:none;align-self:flex-start;font:700 10px 'JetBrains Mono';letter-spacing:.04em;text-transform:uppercase;color:#b45309;background:#fef3c7;padding:3px 8px;border-radius:5px">Importante</span>
+          <div>
+            <div style="font:700 15px 'Hanken Grotesk';color:#0f172a;margin-bottom:3px">A escala tipográfica existe, mas é ignorada</div>
+            <div style="font:400 13.5px/1.55 'Hanken Grotesk';color:#64748b">Você definiu uma escala completa em <code style="font:500 12px 'JetBrains Mono';color:#be123c;background:#fff1f2;padding:1px 5px;border-radius:4px">@theme</code>, mas os componentes usam tamanhos avulsos como <code style="font:500 12px 'JetBrains Mono';color:#be123c;background:#fff1f2;padding:1px 5px;border-radius:4px">text-[9px]</code>, <code style="font:500 12px 'JetBrains Mono';color:#be123c;background:#fff1f2;padding:1px 5px;border-radius:4px">[10px]</code>, <code style="font:500 12px 'JetBrains Mono';color:#be123c;background:#fff1f2;padding:1px 5px;border-radius:4px">[11px]</code> — pequenos demais e sem ritmo.</div>
+          </div>
+        </div>
+        <!-- F4 -->
+        <div style="display:flex;gap:14px;padding:16px 18px;border:1px solid #e2e8f0;border-left:3px solid #f59e0b;border-radius:0 10px 10px 0;background:#fff">
+          <span style="flex:none;align-self:flex-start;font:700 10px 'JetBrains Mono';letter-spacing:.04em;text-transform:uppercase;color:#b45309;background:#fef3c7;padding:3px 8px;border-radius:5px">Importante</span>
+          <div>
+            <div style="font:700 15px 'Hanken Grotesk';color:#0f172a;margin-bottom:3px">Cor semântica espalhada e o status usando a marca</div>
+            <div style="font:400 13.5px/1.55 'Hanken Grotesk';color:#64748b">Prioridade/SLA são <code style="font:500 12px 'JetBrains Mono';color:#be123c;background:#fff1f2;padding:1px 5px;border-radius:4px">rose/amber/sky</code> hardcoded por componente, sem token. O badge de status usa <code style="font:500 12px 'JetBrains Mono';color:#be123c;background:#fff1f2;padding:1px 5px;border-radius:4px">bg-primary-container</code> — ou seja, muda com a cor do cliente.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== 01 TIPOGRAFIA ===== -->
+    <section style="margin-bottom:52px">
+      <div style="display:flex;align-items:center;gap:14px;margin-bottom:20px">
+        <span style="font:700 13px 'JetBrains Mono';color:#10b981;letter-spacing:.06em">01</span>
+        <span style="font:700 13px 'JetBrains Mono';color:#94a3b8;letter-spacing:.1em;text-transform:uppercase">Tipografia</span>
+        <div style="height:1px;flex:1;background:#eef2f6"></div>
+      </div>
+      <h2 style="margin:0 0 16px;font:700 25px/1.2 'Hanken Grotesk';letter-spacing:-.02em;color:#0f172a">A escolha está certa — falta ligar na tomada</h2>
+      <p style="margin:0 0 22px;font:400 15.5px/1.65 'Hanken Grotesk';color:#334155;text-wrap:pretty"><strong style="font-weight:600;color:#0f172a">Hanken Grotesk</strong> (texto) + <strong style="font-weight:600;color:#0f172a">JetBrains Mono</strong> (IDs, timers de SLA) é uma ótima dupla para ITSM: neutra, legível em densidade, com mono para números. Este documento inteiro está nessas fontes. O problema é puramente de fiação:</p>
+
+      <!-- bug box -->
+      <div style="border:1px solid #fecaca;border-radius:10px;overflow:hidden;margin-bottom:26px">
+        <div style="padding:10px 16px;background:#fef2f2;border-bottom:1px solid #fecaca;font:600 11px 'JetBrains Mono';color:#b91c1c;letter-spacing:.04em">src/index.css · :root</div>
+        <div style="padding:16px 18px;background:#fff">
+          <div style="font:500 13px/1.7 'JetBrains Mono';color:#475569">--font-family-display-val: <span style="color:#be123c;text-decoration:line-through">"Inter"</span>;  <span style="color:#94a3b8">/* não é importada → cai no sistema */</span></div>
+          <div style="font:400 13px/1.6 'Hanken Grotesk';color:#64748b;margin-top:10px">Só os tenants <em>alpha</em>/<em>beta</em> trocam para Hanken Grotesk. Além disso, o utilitário <code style="font:500 12px 'JetBrains Mono';color:#be123c;background:#fff1f2;padding:1px 5px;border-radius:4px">font-sans</code> usado nas telas aponta para o stack padrão do Tailwind, não para a sua fonte. Resultado: a maior parte do app aparece em <span style="font-family:system-ui">fonte do sistema</span>, não em <span style="font-weight:600">Hanken Grotesk</span>.</div>
+        </div>
+      </div>
+
+      <!-- specimen -->
+      <div style="border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;margin-bottom:24px">
+        <div style="padding:10px 18px;background:#f8fafc;border-bottom:1px solid #e2e8f0;font:500 11px 'JetBrains Mono';color:#64748b;letter-spacing:.06em">ESPÉCIME · HANKEN GROTESK (a sua fonte, aplicada de verdade)</div>
+        <div style="padding:24px 22px">
+          <div style="font:800 46px/1.02 'Hanken Grotesk';letter-spacing:-.03em;color:#0f172a;margin-bottom:8px">Fila de incidentes</div>
+          <div style="font:400 19px/1.45 'Hanken Grotesk';color:#334155;margin-bottom:20px">Quando o tipo tem hierarquia clara, a tela densa começa a respirar.</div>
+          <div style="display:flex;gap:26px;flex-wrap:wrap;align-items:flex-end">
+            <div><div style="font:400 11px 'JetBrains Mono';color:#94a3b8;margin-bottom:4px">400</div><div style="font:400 18px 'Hanken Grotesk';color:#1e293b">Chamado</div></div>
+            <div><div style="font:400 11px 'JetBrains Mono';color:#94a3b8;margin-bottom:4px">500</div><div style="font:500 18px 'Hanken Grotesk';color:#1e293b">Chamado</div></div>
+            <div><div style="font:400 11px 'JetBrains Mono';color:#94a3b8;margin-bottom:4px">600</div><div style="font:600 18px 'Hanken Grotesk';color:#1e293b">Chamado</div></div>
+            <div><div style="font:400 11px 'JetBrains Mono';color:#94a3b8;margin-bottom:4px">700</div><div style="font:700 18px 'Hanken Grotesk';color:#1e293b">Chamado</div></div>
+            <div style="border-left:1px solid #e2e8f0;padding-left:26px"><div style="font:400 11px 'JetBrains Mono';color:#94a3b8;margin-bottom:4px">MONO · TABULAR</div><div style="font:500 18px 'JetBrains Mono';color:#1e293b;font-variant-numeric:tabular-nums">INC-08722 · 00:42</div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- scale: defined vs used -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
+        <div style="border:1px solid #d1fae5;border-radius:10px;overflow:hidden">
+          <div style="padding:9px 14px;background:#ecfdf5;font:600 11px 'JetBrains Mono';color:#047857;letter-spacing:.04em">✓ ESCALA DEFINIDA (@theme)</div>
+          <div style="padding:14px">
+            <div style="font:600 11px/2 'JetBrains Mono';color:#475569">display-lg · 48/700<br>headline-lg · 32/600<br>headline-md · 24/600<br>title-lg · 20/500<br>body-lg · 16/400<br>body-md · 14/400<br>label-md · 12/500<br>label-sm · 10/500</div>
+          </div>
+        </div>
+        <div style="border:1px solid #fde68a;border-radius:10px;overflow:hidden">
+          <div style="padding:9px 14px;background:#fffbeb;font:600 11px 'JetBrains Mono';color:#b45309;letter-spacing:.04em">✗ O QUE OS COMPONENTES USAM</div>
+          <div style="padding:14px">
+            <div style="font:600 11px/2 'JetBrains Mono';color:#475569">text-lg · text-sm · text-xs<br>text-[11px] · text-[10px]<br>text-[9px] &nbsp;← ilegível em UI<br><span style="color:#94a3b8">tamanhos avulsos, sem ritmo;</span><br><span style="color:#94a3b8">a escala nomeada quase não</span><br><span style="color:#94a3b8">é usada (font-body-md etc).</span></div>
+          </div>
+        </div>
+      </div>
+      <p style="margin:8px 0 0;font:400 13.5px/1.6 'Hanken Grotesk';color:#64748b;text-wrap:pretty"><strong style="color:#475569;font-weight:600">Recomendação:</strong> conecte <code style="font:500 12px 'JetBrains Mono';color:#475569;background:#f1f5f9;padding:1px 5px;border-radius:4px">--font-sans</code> e a fonte-base a Hanken Grotesk, remova "Inter", e adote a escala nomeada nos componentes. Em tabela/UI densa, piso de <strong style="color:#1e293b;font-weight:600">12px</strong> (nada de 9–10px).</p>
+    </section>
+
+    <!-- ===== 02 COR / TOKENS ===== -->
+    <section style="margin-bottom:52px">
+      <div style="display:flex;align-items:center;gap:14px;margin-bottom:20px">
+        <span style="font:700 13px 'JetBrains Mono';color:#10b981;letter-spacing:.06em">02</span>
+        <span style="font:700 13px 'JetBrains Mono';color:#94a3b8;letter-spacing:.1em;text-transform:uppercase">Cor &amp; tokens</span>
+        <div style="height:1px;flex:1;background:#eef2f6"></div>
+      </div>
+      <h2 style="margin:0 0 16px;font:700 25px/1.2 'Hanken Grotesk';letter-spacing:-.02em;color:#0f172a">O motor white-label existe — mas o fio do "primary" está cortado</h2>
+      <p style="margin:0 0 22px;font:400 15.5px/1.65 'Hanken Grotesk';color:#334155;text-wrap:pretty">O <code style="font:500 13px 'JetBrains Mono';color:#475569;background:#f1f5f9;padding:1px 5px;border-radius:4px">ThemeProvider</code> injeta a cor do cliente em tempo real — mas grava num token que o Tailwind não lê para o <code style="font:500 13px 'JetBrains Mono';color:#475569;background:#f1f5f9;padding:1px 5px;border-radius:4px">bg-primary</code>. Veja o caminho:</p>
+
+      <!-- token flow diagram -->
+      <div style="border:1px solid #e2e8f0;border-radius:12px;padding:22px;background:#f8fafc;margin-bottom:14px">
+        <div style="display:flex;align-items:stretch;gap:12px;flex-wrap:wrap">
+          <div style="flex:1;min-width:150px;background:#fff;border:1px solid #e2e8f0;border-radius:9px;padding:14px">
+            <div style="font:600 10px 'JetBrains Mono';color:#94a3b8;letter-spacing:.04em;margin-bottom:6px">MOTOR (runtime)</div>
+            <div style="font:600 13px 'Hanken Grotesk';color:#0f172a;margin-bottom:4px">ThemeProvider</div>
+            <div style="font:500 12px/1.5 'JetBrains Mono';color:#047857">grava<br>--brand-primary</div>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-width:90px">
+            <div style="font:700 13px 'JetBrains Mono';color:#dc2626">✗ não liga</div>
+            <div style="font:400 10px 'Hanken Grotesk';color:#94a3b8;text-align:center;margin-top:4px">namespaces<br>diferentes</div>
+          </div>
+          <div style="flex:1;min-width:150px;background:#fff;border:1px solid #e2e8f0;border-radius:9px;padding:14px">
+            <div style="font:600 10px 'JetBrains Mono';color:#94a3b8;letter-spacing:.04em;margin-bottom:6px">TAILWIND @theme</div>
+            <div style="font:600 13px 'Hanken Grotesk';color:#0f172a;margin-bottom:4px">--color-primary</div>
+            <div style="font:500 12px/1.5 'JetBrains Mono';color:#be123c">lê<br>--color-brand-primary</div>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-width:60px">
+            <div style="font:700 16px 'JetBrains Mono';color:#cbd5e1">→</div>
+          </div>
+          <div style="flex:none;width:130px;background:#fff;border:1px solid #e2e8f0;border-radius:9px;padding:14px;display:flex;flex-direction:column;justify-content:center">
+            <div style="font:600 10px 'JetBrains Mono';color:#94a3b8;letter-spacing:.04em;margin-bottom:8px">RESULTADO</div>
+            <div style="display:flex;align-items:center;gap:8px"><span style="width:26px;height:26px;border-radius:6px;background:#2563eb"></span><span style="font:500 11px 'JetBrains Mono';color:#475569">#2563eb<br>fixo</span></div>
+          </div>
+        </div>
+        <div style="margin-top:14px;padding-top:14px;border-top:1px dashed #cbd5e1;font:400 13px/1.55 'Hanken Grotesk';color:#64748b">Efeito visível: a marca padrão do Flowfy é <span style="display:inline-flex;align-items:center;gap:5px;vertical-align:-2px"><span style="width:12px;height:12px;border-radius:3px;background:#10b981"></span><strong style="color:#047857;font-weight:600">emerald #10b981</strong></span>, mas os botões primários saem <span style="display:inline-flex;align-items:center;gap:5px;vertical-align:-2px"><span style="width:12px;height:12px;border-radius:3px;background:#2563eb"></span><strong style="color:#1d4ed8;font-weight:600">azuis #2563eb</strong></span>. Trocar a cor do cliente no banco não muda o <code style="font:500 12px 'JetBrains Mono';color:#475569;background:#f1f5f9;padding:1px 4px;border-radius:4px">primary</code>.</div>
+      </div>
+      <p style="margin:0 0 8px;font:400 13.5px/1.6 'Hanken Grotesk';color:#64748b;text-wrap:pretty"><strong style="color:#475569;font-weight:600">Correção:</strong> unifique num só namespace. Faça o <code style="font:500 12px 'JetBrains Mono';color:#475569;background:#f1f5f9;padding:1px 5px;border-radius:4px">@theme</code> ler exatamente o token que o motor grava (ex.: <code style="font:500 12px 'JetBrains Mono';color:#475569;background:#f1f5f9;padding:1px 5px;border-radius:4px">--color-primary: var(--brand-primary)</code>), e o mesmo para <code style="font:500 12px 'JetBrains Mono';color:#475569;background:#f1f5f9;padding:1px 5px;border-radius:4px">background</code>.</p>
+    </section>
+
+    <!-- ===== 03 SEMÂNTICA ===== -->
+    <section style="margin-bottom:52px">
+      <div style="display:flex;align-items:center;gap:14px;margin-bottom:20px">
+        <span style="font:700 13px 'JetBrains Mono';color:#10b981;letter-spacing:.06em">03</span>
+        <span style="font:700 13px 'JetBrains Mono';color:#94a3b8;letter-spacing:.1em;text-transform:uppercase">Paleta semântica</span>
+        <div style="height:1px;flex:1;background:#eef2f6"></div>
+      </div>
+      <h2 style="margin:0 0 16px;font:700 25px/1.2 'Hanken Grotesk';letter-spacing:-.02em;color:#0f172a">Centralize o significado em tokens fixos</h2>
+      <p style="margin:0 0 20px;font:400 15.5px/1.65 'Hanken Grotesk';color:#334155;text-wrap:pretty">Hoje as cores de prioridade vivem dentro do <code style="font:500 13px 'JetBrains Mono';color:#475569;background:#f1f5f9;padding:1px 5px;border-radius:4px">AnalystCockpit.tsx</code> (<code style="font:500 12px 'JetBrains Mono';color:#475569;background:#f1f5f9;padding:1px 5px;border-radius:4px">PRIORITY_STYLES</code>), e o SLA usa outra convenção (<code style="font:500 12px 'JetBrains Mono';color:#475569;background:#f1f5f9;padding:1px 5px;border-radius:4px">-50/-200/-700</code>). Promova isso a um arquivo único de tokens. <strong style="font-weight:600;color:#0f172a">Estas cores são fixas — nunca entram no white-label.</strong> Sua matriz P1–P5 (ServiceNow) já é ótima; falta padronizar a cor.</p>
+
+      <div style="font:700 11px 'JetBrains Mono';color:#94a3b8;letter-spacing:.06em;margin:4px 0 10px">PRIORIDADE · P1 → P5</div>
+      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:18px">
+        <div><div style="height:42px;border-radius:7px;background:#dc2626;border:1px solid rgba(15,23,42,.06)"></div><div style="font:600 12px 'Hanken Grotesk';color:#1e293b;margin-top:6px">P1 Crítica</div><div style="font:500 10px 'JetBrains Mono';color:#94a3b8">#DC2626</div></div>
+        <div><div style="height:42px;border-radius:7px;background:#ea580c;border:1px solid rgba(15,23,42,.06)"></div><div style="font:600 12px 'Hanken Grotesk';color:#1e293b;margin-top:6px">P2 Alta</div><div style="font:500 10px 'JetBrains Mono';color:#94a3b8">#EA580C</div></div>
+        <div><div style="height:42px;border-radius:7px;background:#eab308;border:1px solid rgba(15,23,42,.06)"></div><div style="font:600 12px 'Hanken Grotesk';color:#1e293b;margin-top:6px">P3 Moderada</div><div style="font:500 10px 'JetBrains Mono';color:#94a3b8">#EAB308</div></div>
+        <div><div style="height:42px;border-radius:7px;background:#2563eb;border:1px solid rgba(15,23,42,.06)"></div><div style="font:600 12px 'Hanken Grotesk';color:#1e293b;margin-top:6px">P4 Baixa</div><div style="font:500 10px 'JetBrains Mono';color:#94a3b8">#2563EB</div></div>
+        <div><div style="height:42px;border-radius:7px;background:#16a34a;border:1px solid rgba(15,23,42,.06)"></div><div style="font:600 12px 'Hanken Grotesk';color:#1e293b;margin-top:6px">P5 Planejada</div><div style="font:500 10px 'JetBrains Mono';color:#94a3b8">#16A34A</div></div>
+      </div>
+
+      <div style="font:700 11px 'JetBrains Mono';color:#94a3b8;letter-spacing:.06em;margin:4px 0 10px">STATUS · use cor semântica, NÃO a marca</div>
+      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:18px">
+        <div><div style="height:42px;border-radius:7px;background:#2563eb;border:1px solid rgba(15,23,42,.06)"></div><div style="font:600 12px 'Hanken Grotesk';color:#1e293b;margin-top:6px">Novo</div></div>
+        <div><div style="height:42px;border-radius:7px;background:#d97706;border:1px solid rgba(15,23,42,.06)"></div><div style="font:600 12px 'Hanken Grotesk';color:#1e293b;margin-top:6px">Em Atend.</div></div>
+        <div><div style="height:42px;border-radius:7px;background:#7c3aed;border:1px solid rgba(15,23,42,.06)"></div><div style="font:600 12px 'Hanken Grotesk';color:#1e293b;margin-top:6px">Pendente</div></div>
+        <div><div style="height:42px;border-radius:7px;background:#059669;border:1px solid rgba(15,23,42,.06)"></div><div style="font:600 12px 'Hanken Grotesk';color:#1e293b;margin-top:6px">Resolvido</div></div>
+        <div><div style="height:42px;border-radius:7px;background:#64748b;border:1px solid rgba(15,23,42,.06)"></div><div style="font:600 12px 'Hanken Grotesk';color:#1e293b;margin-top:6px">Fechado</div></div>
+      </div>
+
+      <div style="font:700 11px 'JetBrains Mono';color:#94a3b8;letter-spacing:.06em;margin:4px 0 10px">SAÚDE DO SLA</div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
+        <div><div style="height:42px;border-radius:7px;background:#059669;border:1px solid rgba(15,23,42,.06)"></div><div style="font:600 12px 'Hanken Grotesk';color:#1e293b;margin-top:6px">No prazo</div></div>
+        <div><div style="height:42px;border-radius:7px;background:#d97706;border:1px solid rgba(15,23,42,.06)"></div><div style="font:600 12px 'Hanken Grotesk';color:#1e293b;margin-top:6px">Em risco</div></div>
+        <div><div style="height:42px;border-radius:7px;background:#e11d48;border:1px solid rgba(15,23,42,.06)"></div><div style="font:600 12px 'Hanken Grotesk';color:#1e293b;margin-top:6px">Estourado</div></div>
+      </div>
+    </section>
+
+    <!-- ===== 04 ANTES/DEPOIS ===== -->
+    <section style="margin-bottom:52px">
+      <div style="display:flex;align-items:center;gap:14px;margin-bottom:20px">
+        <span style="font:700 13px 'JetBrains Mono';color:#10b981;letter-spacing:.06em">04</span>
+        <span style="font:700 13px 'JetBrains Mono';color:#94a3b8;letter-spacing:.1em;text-transform:uppercase">Na prática</span>
+        <div style="height:1px;flex:1;background:#eef2f6"></div>
+      </div>
+      <h2 style="margin:0 0 16px;font:700 25px/1.2 'Hanken Grotesk';letter-spacing:-.02em;color:#0f172a">A fila de chamados, antes e depois</h2>
+      <p style="margin:0 0 22px;font:400 15.5px/1.65 'Hanken Grotesk';color:#334155;text-wrap:pretty">Os dados são os mesmos do seu <code style="font:500 13px 'JetBrains Mono';color:#475569;background:#f1f5f9;padding:1px 5px;border-radius:4px">TicketManagementDashboard</code>. A diferença é só fonte ligada + tokens semânticos.</p>
+
+      <div style="font:600 11px 'JetBrains Mono';color:#b91c1c;letter-spacing:.04em;margin-bottom:8px">ANTES · fonte de sistema, sem hierarquia de cor</div>
+      <div style="border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;margin-bottom:24px;background:#fff">
+        <div style="display:flex;align-items:center;gap:16px;padding:13px 18px;border-bottom:1px solid #eef2f6;font-family:system-ui,Arial,sans-serif;color:#475569">
+          <span style="font-size:13px;width:92px">INC-08550</span>
+          <span style="font-size:13px;flex:1">Falha no link principal</span>
+          <span style="font-size:13px;width:70px">Crítica</span>
+          <span style="font-size:13px;width:96px">Em Atendimento</span>
+          <span style="font-size:13px;width:64px">Violado</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:16px;padding:13px 18px;font-family:system-ui,Arial,sans-serif;color:#475569">
+          <span style="font-size:13px;width:92px">REQ-09101</span>
+          <span style="font-size:13px;flex:1">Solicitação de Acesso - VPN</span>
+          <span style="font-size:13px;width:70px">Baixa</span>
+          <span style="font-size:13px;width:96px">Em Atendimento</span>
+          <span style="font-size:13px;width:64px">12h 00m</span>
+        </div>
+      </div>
+
+      <div style="font:600 11px 'JetBrains Mono';color:#15803d;letter-spacing:.04em;margin-bottom:8px">DEPOIS · Hanken Grotesk + tokens semânticos</div>
+      <div style="border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;background:#fff">
+        <div style="display:flex;align-items:center;gap:10px;padding:10px 18px;background:#f8fafc;border-bottom:1px solid #e2e8f0;font:600 10px 'JetBrains Mono';color:#64748b;letter-spacing:.06em;text-transform:uppercase">
+          <span style="width:96px">Chamado</span>
+          <span style="flex:1">Assunto</span>
+          <span style="width:104px">Prioridade</span>
+          <span style="width:104px">Status</span>
+          <span style="width:78px;text-align:right">SLA</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;padding:13px 18px;border-bottom:1px solid #eef2f6">
+          <span style="width:96px;font:500 13px 'JetBrains Mono';color:#0284c7;font-variant-numeric:tabular-nums">INC-08550</span>
+          <span style="flex:1;font:600 13.5px 'Hanken Grotesk';color:#0f172a">Falha no link principal</span>
+          <span style="width:104px"><span style="display:inline-flex;align-items:center;gap:6px;padding:3px 9px;border-radius:999px;background:#fee2e2;color:#991b1b;font:700 11.5px 'Hanken Grotesk'"><span style="width:7px;height:7px;border-radius:50%;background:#dc2626"></span>P1 Crítica</span></span>
+          <span style="width:104px"><span style="display:inline-flex;align-items:center;padding:3px 9px;border-radius:999px;background:#fef3c7;color:#b45309;font:700 11.5px 'Hanken Grotesk'">Em Atend.</span></span>
+          <span style="width:78px;text-align:right;font:700 13px 'JetBrains Mono';color:#dc2626;font-variant-numeric:tabular-nums">Violado</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;padding:13px 18px">
+          <span style="width:96px;font:500 13px 'JetBrains Mono';color:#0284c7;font-variant-numeric:tabular-nums">REQ-09101</span>
+          <span style="flex:1;font:600 13.5px 'Hanken Grotesk';color:#0f172a">Solicitação de Acesso — VPN</span>
+          <span style="width:104px"><span style="display:inline-flex;align-items:center;gap:6px;padding:3px 9px;border-radius:999px;background:#dbeafe;color:#1d4ed8;font:700 11.5px 'Hanken Grotesk'"><span style="width:7px;height:7px;border-radius:50%;background:#2563eb"></span>P4 Baixa</span></span>
+          <span style="width:104px"><span style="display:inline-flex;align-items:center;padding:3px 9px;border-radius:999px;background:#fef3c7;color:#b45309;font:700 11.5px 'Hanken Grotesk'">Em Atend.</span></span>
+          <span style="width:78px;text-align:right;font:700 13px 'JetBrains Mono';color:#059669;font-variant-numeric:tabular-nums">12h 00m</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== 05 PLANO ===== -->
+    <section>
+      <div style="display:flex;align-items:center;gap:14px;margin-bottom:20px">
+        <span style="font:700 13px 'JetBrains Mono';color:#10b981;letter-spacing:.06em">05</span>
+        <span style="font:700 13px 'JetBrains Mono';color:#94a3b8;letter-spacing:.1em;text-transform:uppercase">Plano de execução</span>
+        <div style="height:1px;flex:1;background:#eef2f6"></div>
+      </div>
+      <h2 style="margin:0 0 20px;font:700 25px/1.2 'Hanken Grotesk';letter-spacing:-.02em;color:#0f172a">Ordem sugerida</h2>
+      <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:28px">
+        <div style="display:flex;gap:12px;align-items:flex-start;padding:14px 16px;border:1px solid #e2e8f0;border-radius:9px;background:#fbfdfc">
+          <span style="width:22px;height:22px;flex:none;border-radius:50%;background:#ecfdf5;color:#047857;font:700 12px 'JetBrains Mono';display:flex;align-items:center;justify-content:center">1</span>
+          <div><div style="font:600 14px 'Hanken Grotesk';color:#0f172a">Ligar a fonte de marca <span style="font:600 10px 'JetBrains Mono';color:#b91c1c;background:#fee2e2;padding:1px 6px;border-radius:4px;margin-left:4px">CRÍTICO</span></div><div style="font:400 13px/1.5 'Hanken Grotesk';color:#64748b">Em <code style="font:500 12px 'JetBrains Mono';color:#475569;background:#f1f5f9;padding:1px 4px;border-radius:4px">index.css</code>: <code style="font:500 12px 'JetBrains Mono';color:#475569;background:#f1f5f9;padding:1px 4px;border-radius:4px">--font-sans</code> e base = Hanken Grotesk; remover "Inter".</div></div>
+        </div>
+        <div style="display:flex;gap:12px;align-items:flex-start;padding:14px 16px;border:1px solid #e2e8f0;border-radius:9px;background:#fbfdfc">
+          <span style="width:22px;height:22px;flex:none;border-radius:50%;background:#ecfdf5;color:#047857;font:700 12px 'JetBrains Mono';display:flex;align-items:center;justify-content:center">2</span>
+          <div><div style="font:600 14px 'Hanken Grotesk';color:#0f172a">Unificar os tokens de marca <span style="font:600 10px 'JetBrains Mono';color:#b91c1c;background:#fee2e2;padding:1px 6px;border-radius:4px;margin-left:4px">CRÍTICO</span></div><div style="font:400 13px/1.5 'Hanken Grotesk';color:#64748b">Um só namespace. <code style="font:500 12px 'JetBrains Mono';color:#475569;background:#f1f5f9;padding:1px 4px;border-radius:4px">@theme</code> lê o token que o motor grava (primary + background).</div></div>
+        </div>
+        <div style="display:flex;gap:12px;align-items:flex-start;padding:14px 16px;border:1px solid #e2e8f0;border-radius:9px;background:#fbfdfc">
+          <span style="width:22px;height:22px;flex:none;border-radius:50%;background:#ecfdf5;color:#047857;font:700 12px 'JetBrains Mono';display:flex;align-items:center;justify-content:center">3</span>
+          <div><div style="font:600 14px 'Hanken Grotesk';color:#0f172a">Criar tokens semânticos</div><div style="font:400 13px/1.5 'Hanken Grotesk';color:#64748b">Arquivo único para prioridade/status/SLA. Tirar <code style="font:500 12px 'JetBrains Mono';color:#475569;background:#f1f5f9;padding:1px 4px;border-radius:4px">PRIORITY_STYLES</code> de dentro da página; status deixa de usar cor de marca.</div></div>
+        </div>
+        <div style="display:flex;gap:12px;align-items:flex-start;padding:14px 16px;border:1px solid #e2e8f0;border-radius:9px;background:#fbfdfc">
+          <span style="width:22px;height:22px;flex:none;border-radius:50%;background:#ecfdf5;color:#047857;font:700 12px 'JetBrains Mono';display:flex;align-items:center;justify-content:center">4</span>
+          <div><div style="font:600 14px 'Hanken Grotesk';color:#0f172a">Adotar a escala &amp; validar contraste (AA)</div><div style="font:400 13px/1.5 'Hanken Grotesk';color:#64748b">Trocar <code style="font:500 12px 'JetBrains Mono';color:#475569;background:#f1f5f9;padding:1px 4px;border-radius:4px">text-[9/10/11px]</code> pela escala nomeada; garantir contraste dos badges.</div></div>
+        </div>
+      </div>
+
+      <div style="padding:22px 24px;border-radius:11px;background:#0f172a;color:#fff">
+        <div style="font:600 12px 'JetBrains Mono';color:#6ee7b7;letter-spacing:.06em;margin-bottom:8px">QUER QUE EU SIGA?</div>
+        <p style="margin:0 0 4px;font:600 15.5px/1.5 'Hanken Grotesk';color:#f8fafc">Posso desenhar a fila de chamados e o cockpit já com este sistema aplicado.</p>
+        <p style="margin:0;font:400 13.5px/1.6 'Hanken Grotesk';color:#94a3b8">Te entrego como protótipo navegável aqui — e o conjunto de tokens (CSS) pronto pra você colar no <code style="font:500 12px 'JetBrains Mono';color:#cbd5e1;background:rgba(255,255,255,.08);padding:1px 5px;border-radius:4px">index.css</code> via Claude Code. É só dizer por onde começar.</p>
+      </div>
+    </section>
+
+  </div>
+</div>
+</div>
+</x-dc>
+</body>
+</html>

@@ -47,26 +47,29 @@ export interface AuthConfig {
 // ─── Company / Tenant ────────────────────────────────────────
 
 export interface CompanyBranding {
+  themeName?: string; // ex: 'Ocean', 'Midnight'
+  fontScale?: string; // ex: 'compact', 'standard', 'large', 'display'
   logoUrl?: string;
-  primaryColor: string;   // ex: '#0F4C81'
-  secondaryColor?: string;
   brandName?: string;     // nome de exibição customizado da marca
-  accentColor: string;    // ex: '#00A3E0'
-  backgroundColor: string;
-  welcomeTitle: string;
-  welcomeSubtitle: string;
+  welcomeTitle?: string;
+  welcomeSubtitle?: string;
+  catalogHeadline?: string;
+  greetingPrefix?: string;
+  faviconUrl?: string;
+  // Cores/tipografia vindas das colunas de branding da company (migrations 016/042/043/044)
+  primaryColor?: string | null;
+  secondaryColor?: string | null;
+  accentColor?: string | null;
+  backgroundColor?: string | null;
   titleColor?: string;
   titleFont?: string;
   titleSize?: string;
   subtitleColor?: string;
   subtitleFont?: string;
   subtitleSize?: string;
-  catalogHeadline?: string;
   catalogHeadlineColor?: string;
   catalogHeadlineSize?: string;
-  greetingPrefix?: string;
   greetingColor?: string;
-  faviconUrl?: string;
 }
 
 export interface Company {
@@ -74,6 +77,8 @@ export interface Company {
   name: string;
   slug?: string;
   domain: string;         // ex: 'acmecorp.com'
+  /** Nome do tema white-label (coluna primary_color da company) — presente em objetos vindos direto do banco */
+  primary_color?: string | null;
   branding: CompanyBranding;
   authConfig: AuthConfig;
   createdAt: string;
@@ -348,11 +353,13 @@ export type AppView =
   | 'dashboard_requests'
   | 'dashboard_problems'
   | 'dashboard_changes'
+  | 'approval_inbox'
   | 'user_portal'
   | 'api_docs'
   | 'admin_dashboard'
   | 'settings_governance'
-  | 'flowfy_bi';
+  | 'flowfy_bi'
+  | 'workflow_builder';
 
 // ─── Catálogo Hierárquico de Incidentes (3 Níveis + SLA) ─────
 

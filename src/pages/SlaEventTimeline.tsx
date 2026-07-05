@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import {
-  Timer, CheckCircle2, Clock, Pause, Play, AlertTriangle, History
+  Timer, CheckCircle2, Clock, Pause, Play, AlertTriangle, History, RotateCcw
 } from 'lucide-react'
 import { slaEventsService } from '../lib/services'
 import type { SlaEventRow } from '../lib/database.types'
@@ -94,6 +94,14 @@ export default function SlaEventTimeline({ incidentId }: { incidentId: string })
           description: `O limite de tempo para ${metadata.kind === 'response' ? 'resposta inicial' : 'solução final'} foi ultrapassado!`,
           bgColor: 'bg-rose-500/10 border-rose-500/25',
           textColor: 'text-rose-700 dark:text-rose-300'
+        }
+      case 'reopened':
+        return {
+          icon: <RotateCcw className="w-3.5 h-3.5 text-orange-500" />,
+          title: 'Chamado Reaberto',
+          description: `Reaberto de "${metadata.from_state ?? '—'}" para "${metadata.to_state ?? '—'}". Tempo fechado (${metadata.elapsed_minutes ?? 0} min úteis) somado ao prazo. Novo prazo de solução: ${metadata.resolution_deadline ? fmt(metadata.resolution_deadline) : '—'}.`,
+          bgColor: 'bg-orange-500/10 border-orange-500/25',
+          textColor: 'text-orange-700 dark:text-orange-300'
         }
       default:
         return {

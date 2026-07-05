@@ -12,12 +12,13 @@ import type {
   CatalogServiceRow, SystemSymptomRow, CatalogServiceSymptomRow,
   RequestCategoryRow, RequestItemRow, RequestFormField, FormTemplateRow,
   TicketPriority, IncidentState, IncidentCategory,
-  ChangeType, ChangeRisk, ChangeState,
+  ChangeType, ChangeRisk,
   IncidentCatalogItemRow, IncidentCatalogSubitemRow, IncidentCatalogSymptomRow,
   RequestCatalogItemRow, RequestCatalogSubitemRow, ApprovalTokenRow,
   ActiveSessionRow, ChatbotWhitelistRow, ChatbotMessageRow, ChatbotConfigRow,
-  AssignmentGroupRow, PendingReasonRow,
+  AssignmentGroupRow, PendingReasonRow, DepartmentRow, RequestSubcategoryRow, TicketTaskRow, RequestApprovalRow, CsatSurveyRow, ResponseMacroRow,
   SlaCalendarRow, SlaCalendarShiftRow, SlaCalendarHolidayRow, SLAPolicyRow, SlaEventRow,
+  WorkflowRuleRow, WorkflowExecutionLogRow, WorkflowActionQueueRow,
 } from './database.types'
 
 const url  = import.meta.env.VITE_SUPABASE_URL  as string
@@ -25,6 +26,12 @@ const key  = import.meta.env.VITE_SUPABASE_ANON_KEY as string
 
 // Dynamic schema clients cache to avoid recreating them constantly
 const schemaClientsCache: Record<string, any> = {}
+
+// TODO(security): Migrar para verificação via is_provider_tenant no perfil do usuário.
+// Hoje a lógica MSP depende deste UUID hardcoded, o que cria um ponto de falha
+// único: qualquer brecha na RLS com este ID bypassa o filtro de company_id.
+// Quando o backend implementar verificação server-side, remover este UUID.
+export const MSP_COMPANY_ID = '44444444-4444-4444-4444-444444444444'
 
 // Registro dinâmico companyId → schemaName do PostgreSQL.
 // Alimentado em runtime por setCompanySchemas() (ver useAppData).
@@ -36,8 +43,16 @@ export const setCompanySchemas = (mapping: Record<string, string>) => {
   companySchemaMap = { ...companySchemaMap, ...mapping }
 }
 
+// Schemas reservados do Supabase que nunca devem ser usados como schema de tenant.
+const RESERVED_SCHEMAS = new Set(['auth', 'storage', 'extensions', 'graphql', 'graphql_public', 'realtime', 'supabase_functions', 'vault'])
+const SCHEMA_NAME_RE = /^[a-z][a-z0-9_]{0,62}$/
+
 export function getSupabaseForSchema(schemaName?: string | null) {
   if (!schemaName || schemaName === 'public') {
+    return supabase
+  }
+  if (!SCHEMA_NAME_RE.test(schemaName) || RESERVED_SCHEMAS.has(schemaName)) {
+    console.error(`[security] Schema inválido ou reservado ignorado: "${schemaName}"`)
     return supabase
   }
   if (!schemaClientsCache[schemaName]) {
@@ -143,11 +158,7 @@ export const profilesService = {
 
   async update(id: string, payload: Partial<ProfileRow>): Promise<ProfileRow> {
     const { data, error } = await supabase
-      .from('profiles')
-      .update(payload)
-      .eq('id', id)
-      .select()
-      .single()
+      .rpc('update_profile_secure', { p_profile_id: id, p_patch: payload })
     return throwIfError(data, error)
   },
 }
@@ -171,7 +182,7 @@ export type IncidentFilters = {
 export const incidentsService = {
   /** Fetch a filtered, paginated list of incidents */
   async list(filters: IncidentFilters): Promise<IncidentRow[]> {
-    const isMSP = filters.companyId === '44444444-4444-4444-4444-444444444444'
+    const isMSP = filters.companyId === MSP_COMPANY_ID
     let client = getClientForCompany(filters.companyId)
     let q = client.from('incidents').select('*')
 
@@ -263,7 +274,7 @@ export const incidentsService = {
 
   /** KPI aggregates for the dashboard */
   async getKPIs(companyId: string, filterCompanyId?: string, ticketType?: 'incident' | 'request') {
-    const isMSP = companyId === '44444444-4444-4444-4444-444444444444'
+    const isMSP = companyId === MSP_COMPANY_ID
     let q = getClientForCompany(companyId)
       .from('incidents')
       .select('state, priority, sla_breached, assigned_to_id, company_id, ticket_type')
@@ -575,23 +586,18 @@ export const incidentsService = {
 
   /** Solicitante aceita a solução → fecha o chamado (Closed). */
   async acceptResolution(id: string, companyId: string, actorName: string): Promise<void> {
-    const client = getClientForCompany(companyId)
-    const { error } = await client
-      .from('incidents')
-      .update({ state: 'Closed', closed_at: new Date().toISOString() })
-      .eq('id', id)
-    if (error) throw error
-    await client.from('incident_history').insert({
-      incident_id: id, changed_by_name: actorName, field_name: 'state',
-      new_value: 'Closed', comment: 'Solução aceita pelo solicitante.', is_public: true,
+    void companyId
+    void actorName
+    const { error } = await supabase.rpc('accept_incident_resolution', {
+      p_incident_id: id,
     })
+    if (error) throw error
   },
 
   /**
    * Reabertura pelo solicitante: grava a justificativa no chat (ticket_messages,
    * actor 'user') — o trigger reopen_incident_on_user_message volta o estado para
-   * In Progress e zera resolved_at — e também registra a justificativa no
-   * incident_history (documento de auditoria).
+   * In Progress, zera resolved_at e registra a transição no histórico.
    */
   async userReopen(id: string, companyId: string, justification: string, senderId: string | null, senderName: string): Promise<void> {
     const reason = justification.trim()
@@ -599,12 +605,6 @@ export const incidentsService = {
     await messagesService.send({
       incidentId: id, companyId, body: `🔄 Reabertura solicitada: ${reason}`,
       isInternal: false, senderId, senderName, actorType: 'user',
-    })
-    // 2) Justificativa explícita na auditoria
-    const client = getClientForCompany(companyId)
-    await client.from('incident_history').insert({
-      incident_id: id, changed_by_name: senderName, field_name: 'reopen',
-      new_value: 'In Progress', comment: `Reaberto pelo solicitante: ${reason}`, is_public: true,
     })
   },
 
@@ -616,7 +616,7 @@ export const incidentsService = {
     callerId?: string,
   ) {
     const schema = companySchemaMap[companyId] || 'public'
-    const isMSP = companyId === '44444444-4444-4444-4444-444444444444'
+    const isMSP = companyId === MSP_COMPANY_ID
     const channelName = callerId ? `incidents:caller:${callerId}` : isMSP ? 'incidents:msp' : `incidents:${companyId}`
     const callerFilter = callerId ? `caller_id=eq.${callerId}` : null
     const insertConfig: any = callerFilter
@@ -1090,6 +1090,7 @@ export const changesService = {
     requestedByName: string
     requestedById?: string
     cabApprovers?: string[]
+    cabApprovals?: any
   }): Promise<ChangeRow> {
     const { data, error } = await getClientForCompany(payload.companyId)
       .from('changes')
@@ -1108,19 +1109,129 @@ export const changesService = {
         requested_by_name:   payload.requestedByName,
         requested_by_id:     payload.requestedById ?? null,
         cab_approvers:       payload.cabApprovers ?? [],
-        cab_approvals:       {},
+        cab_approvals:       payload.cabApprovals ?? {},
       })
       .select()
       .single()
     return throwIfError(data, error)
   },
 
-  async updateState(id: string, companyId: string, state: ChangeState, actorName: string): Promise<ChangeRow> {
+  async submitForCAB(id: string): Promise<ChangeRow> {
+    const { data, error } = await supabase.rpc('submit_change_for_cab', {
+      p_change_id: id,
+    })
+    return throwIfError(data, error)
+  },
+
+  async update(id: string, companyId: string, payload: Partial<ChangeRow>): Promise<ChangeRow> {
     const client = getClientForCompany(companyId)
-    const { data, error } = await client.from('changes').update({ state }).eq('id', id).select().single()
+    const { data, error } = await client
+      .from('changes')
+      .update(payload)
+      .eq('id', id)
+      .select()
+      .single()
+    return throwIfError(data, error)
+  },
+
+  async submitApproval(id: string, approve: boolean): Promise<ChangeRow> {
+    const { data, error } = await supabase.rpc('cast_change_cab_vote', {
+      p_change_id: id,
+      p_approve: approve,
+    })
+    return throwIfError(data, error)
+  },
+
+  async scheduleStandard(id: string): Promise<ChangeRow> {
+    const { data, error } = await supabase.rpc('schedule_standard_change', {
+      p_change_id: id,
+    })
+    return throwIfError(data, error)
+  },
+
+  async listIncidentIds(id: string): Promise<string[]> {
+    const { data, error } = await supabase
+      .from('change_incidents')
+      .select('incident_id')
+      .eq('change_id', id)
     if (error) throw error
-    await client.from('change_history').insert({ change_id: id, changed_by_name: actorName, field_name: 'state', new_value: state, is_public: true })
-    return data!
+    return (data ?? []).map((row: { incident_id: string }) => row.incident_id)
+  },
+
+  async setIncidentLinks(id: string, incidentIds: string[]): Promise<void> {
+    const { error } = await supabase.rpc('set_change_incident_links', {
+      p_change_id: id,
+      p_incident_ids: incidentIds,
+    })
+    if (error) throw error
+  },
+}
+
+// ─── REQUEST APPROVALS (modelo unificado incidents/request_items) ──
+
+export const requestApprovalsService = {
+  async listMine(profileId: string, status: RequestApprovalRow['status'] | 'all' = 'pending'): Promise<RequestApprovalRow[]> {
+    let query = supabase
+      .from('request_approvals')
+      .select(`
+        *,
+        incident:incidents!request_approvals_incident_id_fkey(
+          id, number, short_description, caller_name, created_at, approval_status
+        )
+      `)
+      .eq('approver_id', profileId)
+      .order('created_at', { ascending: false })
+    if (status !== 'all') query = query.eq('status', status)
+    const { data, error } = await query
+    return throwIfError(data, error)
+  },
+
+  async decide(id: string, approve: boolean, note?: string): Promise<RequestApprovalRow> {
+    const { data, error } = await supabase.rpc('decide_request_approval', {
+      p_approval_id: id,
+      p_approve: approve,
+      p_note: note?.trim() || null,
+    })
+    return throwIfError(data, error)
+  },
+}
+
+export const csatService = {
+  async getForIncident(incidentId: string): Promise<CsatSurveyRow | null> {
+    const { data, error } = await supabase
+      .from('csat_surveys')
+      .select('*')
+      .eq('incident_id', incidentId)
+      .maybeSingle()
+    if (error) throw error
+    return data
+  },
+
+  async submit(id: string, rating: number, comment?: string): Promise<CsatSurveyRow> {
+    const { data, error } = await supabase.rpc('submit_csat', {
+      p_survey_id: id,
+      p_rating: rating,
+      p_comment: comment?.trim() || null,
+    })
+    return throwIfError(data, error)
+  },
+}
+
+export const responseMacrosService = {
+  async list(companyId: string): Promise<ResponseMacroRow[]> {
+    const { data, error } = await supabase
+      .from('response_macros')
+      .select('*')
+      .eq('company_id', companyId)
+      .eq('active', true)
+      .order('usage_count', { ascending: false })
+      .order('name')
+    return throwIfError(data, error)
+  },
+
+  async recordUse(id: string): Promise<void> {
+    const { error } = await supabase.rpc('record_response_macro_use', { p_macro_id: id })
+    if (error) throw error
   },
 }
 
@@ -1803,6 +1914,8 @@ export const serviceCatalogService = {
     companyId: string; serviceId: string; symptomId: string
     slaHours: number; assignmentGroupId?: string | null; active: boolean
     formFields?: RequestFormField[]; formTemplateId?: string | null; uiConfig?: CatalogServiceSymptomRow['ui_config']
+    // Overrides de governança de SLA (migration 033; aplicados por trigger na abertura — migration 038)
+    slaCalendarId?: string | null; fixedPriority?: number | null
   }): Promise<CatalogServiceSymptomRow> {
     const { data, error } = await supabase
       .from('catalog_service_symptoms')
@@ -1816,6 +1929,8 @@ export const serviceCatalogService = {
         form_fields: payload.formFields ?? [],
         ui_config: payload.uiConfig ?? {},
         active: payload.active,
+        sla_calendar_id: payload.slaCalendarId ?? null,
+        fixed_priority: payload.fixedPriority ?? null,
       }, { onConflict: 'service_id,symptom_id' })
       .select('*, symptom:system_symptoms(id,name,icon,sort_order), group:assignment_groups(id,name)')
       .single()
@@ -2061,6 +2176,84 @@ export const slaEventsService = {
 }
 
 // ============================================================
+// MOTOR DE AUTOMAÇÃO (Workflow Builder) — regras + log de execução
+// ============================================================
+export const workflowService = {
+  async list(companyId: string): Promise<WorkflowRuleRow[]> {
+    const { data, error } = await supabase
+      .from('workflow_rules')
+      .select('*')
+      .eq('company_id', companyId)
+      .order('priority_order')
+    return throwIfError(data, error)
+  },
+  async getById(id: string, companyId: string): Promise<WorkflowRuleRow> {
+    const { data, error } = await supabase
+      .from('workflow_rules')
+      .select('*')
+      .eq('id', id)
+      .eq('company_id', companyId)
+      .single()
+    return throwIfError(data, error)
+  },
+  async create(payload: Partial<WorkflowRuleRow>): Promise<WorkflowRuleRow> {
+    const { data, error } = await supabase.from('workflow_rules').insert(payload).select().single()
+    return throwIfError(data, error)
+  },
+  async update(id: string, companyId: string, payload: Partial<WorkflowRuleRow>): Promise<WorkflowRuleRow> {
+    const { data, error } = await supabase
+      .from('workflow_rules')
+      .update({ ...payload, updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .eq('company_id', companyId)
+      .select()
+      .single()
+    return throwIfError(data, error)
+  },
+  async remove(id: string, companyId: string): Promise<void> {
+    const { error } = await supabase.from('workflow_rules').delete().eq('id', id).eq('company_id', companyId)
+    if (error) throw error
+  },
+  /** Liga/desliga uma regra sem precisar reenviar o payload inteiro. */
+  async setActive(id: string, companyId: string, active: boolean): Promise<WorkflowRuleRow> {
+    return workflowService.update(id, companyId, { active })
+  },
+  /** Histórico real de execuções — substitui o MOCK_LOGS da UI. */
+  async listExecutionLog(companyId: string, ruleId?: string, limit = 50): Promise<WorkflowExecutionLogRow[]> {
+    let q = supabase
+      .from('workflow_execution_log')
+      .select('*')
+      .eq('company_id', companyId)
+      .order('created_at', { ascending: false })
+      .limit(limit)
+    if (ruleId) q = q.eq('rule_id', ruleId)
+    const { data, error } = await q
+    return throwIfError(data, error)
+  },
+  /** Assina inserts em tempo real para a aba "Histórico" atualizar ao vivo. */
+  subscribeToExecutionLog(companyId: string, onInsert: (row: WorkflowExecutionLogRow) => void) {
+    return supabase
+      .channel(`workflow_execution_log:${companyId}`)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'workflow_execution_log', filter: `company_id=eq.${companyId}` },
+        (payload: any) => onInsert(payload.new as WorkflowExecutionLogRow),
+      )
+      .subscribe()
+  },
+  /** Fila de ações assíncronas pendentes/processadas — visão de diagnóstico opcional. */
+  async listActionQueue(companyId: string, limit = 50): Promise<WorkflowActionQueueRow[]> {
+    const { data, error } = await supabase
+      .from('workflow_action_queue')
+      .select('*')
+      .eq('company_id', companyId)
+      .order('created_at', { ascending: false })
+      .limit(limit)
+    return throwIfError(data, error)
+  },
+}
+
+// ============================================================
 // SERVIÇOS DO FLOWFY BI & ANALYTICS
 // ============================================================
 export const biService = {
@@ -2078,7 +2271,7 @@ export const biService = {
 
     // Provedor MSP enxerga todos os clientes (cross-company via RLS);
     // tenant comum só os próprios chamados.
-    const isMSP = companyId === '44444444-4444-4444-4444-444444444444'
+    const isMSP = companyId === MSP_COMPANY_ID
     const client = getClientForCompany(companyId)
 
     // Consulta otimizada trazendo apenas as colunas úteis (+ company_id real).

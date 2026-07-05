@@ -1,12 +1,13 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { AlertTriangle, ShoppingCart, ChevronLeft, Search, Check, Ticket, ArrowLeft, ShieldCheck } from 'lucide-react'
+import * as Icons from 'lucide-react'
 import { serviceCatalogService, departmentsService } from '../lib/services'
 import { buildLabeledFormData, isEmptyFormValue, parseFormFields } from '../lib/catalogFormFields'
 import { parseCatalogUiConfig } from '../lib/catalogUiConfig'
 import { IMPACT_OPTIONS, URGENCY_OPTIONS } from '../lib/priority'
 import CatalogIcon from './CatalogIcon'
 import DynamicFormFields from './DynamicFormFields'
-import ServiceCard from './ServiceCard'
+import ServiceCard from '../components/ServiceCard'
 import type {
   CatalogCategoryRow, CatalogServiceRow, CatalogServiceSymptomRow,
   RequestCategoryRow, RequestSubcategoryRow, RequestItemRow, RequestFormField, IncidentRow, DepartmentRow
@@ -14,8 +15,10 @@ import type {
 import type { FormAnswers, FormFieldValue } from '../lib/catalogFormFields'
 import { useTenant } from '../tenant/TenantContext'
 
+import type { ThemeTokens } from '../lib/theme-engine'
+
 export type CatalogUiConfig = {
-  layout_style?: 'modern_3d' | 'striped_3d' | 'default'
+  layout_style?: 'modern_3d' | 'striped_3d' | 'image_fullcard' | 'pill_label' | 'default'
   background?: { type: 'image' | 'color' | 'pattern'; value: string }
   cards?: {
     id: string
@@ -25,22 +28,33 @@ export type CatalogUiConfig = {
     action: 'incident' | 'request'
     style?: 'pill_label' | 'default'
   }[]
+  /** Ajustes globais dos cards (ícone/fonte/cores) — gravados pelo CatalogManager em companies.catalog_ui_config */
+  card_settings?: {
+    icon_size?: string
+    font_size?: string
+    icon_bg_color?: string
+    label_bg_color?: string
+    label_color?: string
+  }
 }
 
 interface ServiceCatalogProps {
   companyId: string
   currentUserId: string
   currentUserName: string
-  primaryColor: string
+  theme: ThemeTokens
   catalogHeadline?: string
-  catalogHeadlineColor?: string
-  catalogHeadlineSize?: string
   greetingPrefix?: string
-  greetingColor?: string
   onCreated?: (incident: IncidentRow) => void
   /** Navega para a aba "Meus Chamados" (botão da tela de confirmação). */
   onNavigateToTickets?: () => void
+  /** Oculta o bloco de saudação/headline/busca (usado quando o portal já tem seu próprio hero). */
+  hideGreeting?: boolean
 }
+
+// Card virtual "Outros" no nível de subcategoria: agrupa itens legados que
+// ainda não foram vinculados a uma subcategoria (pré-migration 047).
+const OTHERS_SUBCAT_ID = '__others__'
 
 const getMsg = (e: unknown): string => {
   if (e && typeof e === 'object') {
@@ -71,9 +85,19 @@ const slaFromInc = (inc: IncidentRow, fallback = 'Padrão') => {
   return fallback
 }
 
-export default function ServiceCatalog({ companyId, currentUserId, currentUserName, primaryColor, catalogHeadline, catalogHeadlineColor, catalogHeadlineSize, greetingPrefix, greetingColor, onCreated, onNavigateToTickets }: ServiceCatalogProps) {
+export default function ServiceCatalog({ companyId, currentUserId, currentUserName, theme, catalogHeadline, greetingPrefix, onCreated, onNavigateToTickets, hideGreeting }: ServiceCatalogProps) {
   const { tenant } = useTenant()
   const uiConfig = (tenant?.catalog_ui_config || {}) as CatalogUiConfig
+
+  // Map layout_style to a valid ThemeStyle for the ServiceCard component
+  const resolveDefaultTheme = (): import('../components/ServiceCard').ThemeStyle => {
+    const s = uiConfig.layout_style
+    if (s === 'modern_3d') return 'modern_3d'
+    if (s === 'image_fullcard') return 'image_fullcard'
+    return 'minimalist'
+  }
+  const catalogTheme = resolveDefaultTheme()
+
 
   const [mode, setMode] = useState<Mode>(null)
   const [error, setError] = useState<string | null>(null)
@@ -111,7 +135,7 @@ export default function ServiceCatalog({ companyId, currentUserId, currentUserNa
   const [query, setQuery] = useState('')
   const [showResults, setShowResults] = useState(false)
 
-  useEffect(() => {
+  const loadCatalog = useCallback(() => {
     let c = false
     setLoading(true); setError(null)
     Promise.all([
@@ -129,14 +153,43 @@ export default function ServiceCatalog({ companyId, currentUserId, currentUserNa
     return () => { c = true }
   }, [companyId])
 
+  useEffect(() => {
+    if (!companyId) return
+    loadCatalog()
+  }, [companyId])
+
+  useEffect(() => {
+    if (departments.length === 1 && !department) {
+      setDepartment(departments[0])
+    }
+  }, [departments, department])
+
   // Derivações da jornada (filtragem em memória — instantâneo)
-  const incCategoriesForDept = useMemo(() => department ? categories.filter(c => c.department_id === department.id) : [], [categories, department])
+  const incCategoriesForDept = useMemo(() => {
+    if (departments.length === 0) return categories
+    return department ? categories.filter(c => c.department_id === department.id) : []
+  }, [categories, department, departments])
   const servicesForCat = useMemo(() => category ? services.filter(s => s.category_id === category.id) : [], [services, category])
   const symptomsForSvc = useMemo(() => service ? serviceSymptoms.filter(ss => ss.service_id === service.id) : [], [serviceSymptoms, service])
   
-  const reqCategoriesForDept = useMemo(() => department ? reqCategories.filter(c => c.department_id === department.id) : [], [reqCategories, department])
+  const reqCategoriesForDept = useMemo(() => {
+    if (departments.length === 0) return reqCategories
+    return department ? reqCategories.filter(c => c.department_id === department.id) : []
+  }, [reqCategories, department, departments])
   const subcategoriesForReqCat = useMemo(() => reqCategory ? reqSubcategories.filter(s => s.category_id === reqCategory.id) : [], [reqSubcategories, reqCategory])
-  const itemsForReqSubcat = useMemo(() => reqSubcategory ? reqItems.filter(it => it.request_subcategory_id === reqSubcategory.id) : [], [reqItems, reqSubcategory])
+  // Itens legados/órfãos: pertencem à categoria mas não têm subcategoria (pré-migration 047)
+  const legacyItemsForReqCat = useMemo(
+    () => reqCategory ? reqItems.filter(it => !it.request_subcategory_id && it.request_category_id === reqCategory.id) : [],
+    [reqItems, reqCategory],
+  )
+  const itemsForReqSubcat = useMemo(() => {
+    if (!reqCategory) return []
+    if (reqSubcategory && reqSubcategory.id !== OTHERS_SUBCAT_ID) {
+      return reqItems.filter(it => it.request_subcategory_id === reqSubcategory.id)
+    }
+    // Card "Outros" selecionado OU categoria sem subcategorias: itens direto da categoria
+    return legacyItemsForReqCat
+  }, [reqItems, reqSubcategory, reqCategory, legacyItemsForReqCat])
 
   // Índices de busca
   const incIndex = useMemo(() => {
@@ -154,9 +207,12 @@ export default function ServiceCatalog({ companyId, currentUserId, currentUserNa
     const catById = new Map(reqCategories.map(c => [c.id, c]))
     return reqItems.map(it => {
       const subcat = it.request_subcategory_id ? subcatById.get(it.request_subcategory_id) : undefined
-      const cat = subcat ? catById.get(subcat.category_id) : undefined
-      return { it, subcat, cat, label: it.name, sub: `${cat?.name ?? ''} > ${subcat?.name ?? ''}` }
-    }).filter(r => r.subcat && r.cat)
+      // Fallback legado: item sem subcategoria resolve a categoria direto pela FK antiga
+      const cat = subcat
+        ? catById.get(subcat.category_id)
+        : (it.request_category_id ? catById.get(it.request_category_id) : undefined)
+      return { it, subcat, cat, label: it.name, sub: subcat ? `${cat?.name ?? ''} > ${subcat.name}` : (cat?.name ?? '') }
+    }).filter(r => r.cat)
   }, [reqItems, reqSubcategories, reqCategories])
 
   const q = query.trim().toLowerCase()
@@ -254,34 +310,34 @@ export default function ServiceCatalog({ companyId, currentUserId, currentUserNa
       <div className="flex justify-center py-6">
         <div className="relative w-full max-w-lg bg-white rounded-2xl border border-slate-200 shadow-xl overflow-hidden">
           {/* Barra de acento no topo */}
-          <div className="h-1.5 w-full" style={{ backgroundColor: primaryColor }} />
+          <div className={`h-1.5 w-full ${theme.primaryBg}`} />
 
           <div className="px-8 py-10 text-center">
             {/* Selo de sucesso */}
-            <div className="mx-auto mb-6 flex items-center justify-center w-20 h-20 rounded-full" style={{ backgroundColor: `${primaryColor}1f` }}>
-              <div className="flex items-center justify-center w-14 h-14 rounded-full shadow-lg" style={{ backgroundColor: primaryColor }}>
+            <div className={`mx-auto mb-6 flex items-center justify-center w-20 h-20 rounded-full ${theme.primaryBg} bg-opacity-10`}>
+              <div className={`flex items-center justify-center w-14 h-14 rounded-full shadow-lg ${theme.primaryBg}`}>
                 <Check className="w-7 h-7 text-white" strokeWidth={3} />
               </div>
             </div>
 
             <h2 className="text-2xl font-bold text-slate-800 mb-2">Solicitação Enviada com Sucesso!</h2>
             <p className="text-sm text-slate-500 max-w-sm mx-auto mb-8">
-              Seu chamado <b style={{ color: primaryColor }}>#{done.number}</b> foi registrado e nossa equipe técnica já está analisando.
+              Seu chamado <b className={theme.textAccent}>#{done.number}</b> foi registrado e nossa equipe técnica já está analisando.
             </p>
 
             {/* Resumo do chamado */}
             <div className="grid grid-cols-3 gap-3 mb-8">
               <InfoPill label="Serviço" value={done.service} />
               <InfoPill label="Prioridade" value={done.priority} dotColor={priorityDot(done.priority)} />
-              <InfoPill label="SLA Estimado" value={done.sla} accentColor={primaryColor} />
+              {/* InfoPill originalmente aceitava HEX no accentColor. Mudaremos a div lá dentro no CSS ou passaremos tailwind puro. Se quebrar algo lá, ajustaremos. Passando string vazia no accentColor e forçaremos via theme. */}
+              <InfoPill label="SLA Estimado" value={done.sla} accentColor={theme.primaryBg} />
             </div>
 
             {/* Ações */}
             <div className="flex flex-col sm:flex-row gap-3">
               <button
                 onClick={() => { setDone(null); onNavigateToTickets?.() }}
-                className="flex-1 inline-flex items-center justify-center gap-2 py-3 px-5 rounded-xl text-sm font-bold text-white shadow-md hover:opacity-90 active:scale-[0.99] transition-all"
-                style={{ backgroundColor: primaryColor }}
+                className={`flex-1 inline-flex items-center justify-center gap-2 py-3 px-5 rounded-xl text-sm font-bold ${theme.primaryText} ${theme.primaryBg} shadow-md hover:opacity-90 active:scale-[0.99] transition-all`}
               >
                 <Ticket className="w-4 h-4" /> Ir para Meus Chamados
               </button>
@@ -308,8 +364,12 @@ export default function ServiceCatalog({ companyId, currentUserId, currentUserNa
     <div className="space-y-6">
       {/* BUSCA PREDITIVA */}
       <div className="text-center max-w-2xl mx-auto">
-        <p className="text-sm font-semibold mb-1.5" style={{ color: greetingColor || primaryColor }}>{greetingPrefix || 'Olá'}, {currentUserName.split(' ')[0]}! 👋</p>
-        <h1 className="text-3xl md:text-4xl font-extrabold mb-5 tracking-tight" style={{ color: catalogHeadlineColor || undefined, fontSize: catalogHeadlineSize || undefined }}>{catalogHeadline || 'Como podemos te ajudar hoje?'}</h1>
+        {!hideGreeting && (
+          <>
+            <p className={`text-sm font-semibold mb-1.5 ${theme.textMuted}`}>{greetingPrefix || 'Olá'}, {currentUserName.split(' ')[0]}! 👋</p>
+            <h1 className={`text-3xl md:text-4xl font-extrabold mb-5 tracking-tight ${theme.headerText}`}>{catalogHeadline || 'Como podemos te ajudar hoje?'}</h1>
+          </>
+        )}
         <div className="relative">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
           <input
@@ -362,90 +422,145 @@ export default function ServiceCatalog({ companyId, currentUserId, currentUserNa
 
       {!loading && (
         // ─── PASSO 1: escolher o departamento ───
-        !department ? (
+        !department && departments.length > 1 ? (
           <div className="space-y-4">
             <h2 className="text-xl font-bold text-slate-800 text-center mb-6">Qual área você precisa acessar?</h2>
             <Grid>
               {departments.map(d => (
-                <ServiceCard key={d.id} iconName={d.icon} title={d.name} description={d.description} onClick={() => setDepartment(d)} fallbackAccentColor={primaryColor} defaultTheme={uiConfig.layout_style === 'modern_3d' ? 'modern_3d' : 'minimalist'} uiConfig={d.ui_config} />
+                <ServiceCard key={d.id} iconName={d.icon} title={d.name} description={d.description} onClick={() => setDepartment(d)} uiConfig={d.ui_config} />
               ))}
               {departments.length === 0 && <Empty>Nenhum departamento configurado.</Empty>}
             </Grid>
           </div>
         ) : !mode ? (
           <div className="space-y-4">
-            <BackBtn onClick={() => setDepartment(null)} />
-            <h2 className="text-xl font-bold text-slate-800 text-center mb-6">Departamento: {department.name}</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              {uiConfig?.cards && uiConfig.cards.length > 0 ? (
-              uiConfig.cards.map((card, idx) => {
-                if (card.style === 'pill_label') {
-                  return (
-                    <button
-                      key={idx}
-                      onClick={() => setMode(card.action)}
-                      className="group relative flex flex-col items-center justify-center bg-white rounded-3xl border-2 border-slate-100 shadow-sm hover:shadow-2xl hover:-translate-y-1 hover:border-slate-300 transition-all overflow-hidden h-[300px]"
-                    >
-                      {/* Efeito de listras padrão no fundo do card se for modern_3d */}
-                      {uiConfig.layout_style === 'modern_3d' && (
-                        <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 10px, #000 10px, #000 20px)' }} />
-                      )}
-                      
-                      <div className="relative z-10 w-48 h-48 mb-6 flex items-center justify-center transition-transform group-hover:scale-110 duration-500">
-                        {card.image_url ? (
-                          <img src={card.image_url} alt={card.title} className="w-full h-full object-contain drop-shadow-2xl" />
-                        ) : (
-                          card.action === 'incident' ? <AlertTriangle className="w-20 h-20 text-rose-500 drop-shadow-lg" /> : <ShoppingCart className="w-20 h-20 text-indigo-500 drop-shadow-lg" />
-                        )}
-                      </div>
-                      
-                      <div className="absolute bottom-6 z-20 px-6 py-2.5 bg-slate-800 rounded-full text-white font-bold text-sm shadow-xl flex items-center gap-2 group-hover:bg-slate-900 transition-colors">
-                        {card.title}
-                      </div>
-                    </button>
-                  )
+            {departments.length > 1 && <BackBtn onClick={() => setDepartment(null)} />}
+            <h2 className="text-xl font-bold text-slate-800 text-center mb-6">{departments.length > 0 && department ? `Departamento: ${department.name}` : 'Catálogo de Serviços'}</h2>
+            <div className="max-w-2xl mx-auto w-full">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {(() => {
+                const style = uiConfig?.layout_style || 'modern_3d'
+                
+                // Fallback for older array-based config or new object-based config
+                const cardsArray = Array.isArray(uiConfig?.cards) ? uiConfig.cards : null
+                const getCardConf = (action: 'incident' | 'request') => {
+                  if (cardsArray) return cardsArray.find((c: any) => c.action === action) || {}
+                  return (uiConfig?.cards as any)?.[action] || {}
+                }
+                
+                const incConf = getCardConf('incident')
+                const reqConf = getCardConf('request')
+                
+                const incidentCard = {
+                  action: 'incident',
+                  title: incConf.title || 'Reportar um Problema?',
+                  description: incConf.description || 'Algo está com erro, lento ou fora do ar. Vamos diagnosticar em 3 passos.',
+                  image_url: incConf.image_url || '',
+                  icon: <AlertTriangle className="w-8 h-8" />,
+                  bigIcon: (
+                    <img
+                      src="https://img.icons8.com/fluency/96/error--v1.png"
+                      alt="Reportar Problema"
+                      className="w-16 h-16 object-contain drop-shadow-xl"
+                      onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
+                    />
+                  ),
                 }
 
-                // Default dynamic style
-                return (
-                  <button key={idx} onClick={() => setMode(card.action)} className="group text-left bg-white rounded-2xl border border-slate-200 shadow-sm p-8 hover:shadow-lg hover:-translate-y-0.5 transition-all" style={{ borderColor: primaryColor }}>
-                    <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-5 group-hover:scale-105 transition-transform" style={{ backgroundColor: `${primaryColor}1a`, color: primaryColor }}>
-                       {card.image_url ? <img src={card.image_url} alt="" className="w-10 h-10 object-contain" /> : (card.action === 'incident' ? <AlertTriangle className="w-8 h-8" /> : <ShoppingCart className="w-8 h-8" />)}
-                    </div>
-                    <h2 className="text-xl font-bold text-slate-900">{card.title}</h2>
-                    {card.description && <p className="text-sm text-slate-500 mt-2">{card.description}</p>}
-                    <span className="mt-5 inline-flex items-center text-sm font-semibold" style={{ color: primaryColor }}>{card.action === 'incident' ? 'Abrir Incidente →' : 'Abrir Requisição →'}</span>
-                  </button>
-                )
-              })
-            ) : (
-              // Fallback original para tenants sem config
-              <>
-                <button onClick={() => setMode('incident')} className="group text-left bg-white rounded-2xl border border-slate-200 shadow-sm p-8 hover:shadow-lg hover:border-rose-200 hover:-translate-y-0.5 transition-all">
-                  <div className="w-16 h-16 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mb-5 group-hover:scale-105 transition-transform"><AlertTriangle className="w-8 h-8" /></div>
-                  <h2 className="text-xl font-bold text-slate-900">Reportar um Problema?</h2>
-                  <p className="text-sm text-slate-500 mt-2">Algo está com erro, lento ou fora do ar. Vamos diagnosticar em 3 passos.</p>
-                  <span className="mt-5 inline-flex items-center text-sm font-semibold text-rose-600">Abrir Incidente →</span>
-                </button>
-                <button onClick={() => setMode('request')} className="group text-left bg-white rounded-2xl border border-slate-200 shadow-sm p-8 hover:shadow-lg hover:border-indigo-200 hover:-translate-y-0.5 transition-all">
-                  <div className="w-16 h-16 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center mb-5 group-hover:scale-105 transition-transform"><ShoppingCart className="w-8 h-8" /></div>
-                  <h2 className="text-xl font-bold text-slate-900">Solicitar Algo / Serviço?</h2>
-                  <p className="text-sm text-slate-500 mt-2">Pedir equipamentos, acessos ou serviços do catálogo da empresa.</p>
-                  <span className="mt-5 inline-flex items-center text-sm font-semibold text-indigo-600">Abrir Requisição →</span>
-                </button>
-              </>
-            )}
-          </div>
-        ) : mode === 'incident' ? (
+                const requestCard = {
+                  action: 'request',
+                  title: reqConf.title || 'Solicitar Algo / Serviço?',
+                  description: reqConf.description || 'Pedir equipamentos, acessos ou serviços do catálogo da empresa.',
+                  image_url: reqConf.image_url || '',
+                  icon: <ShoppingCart className="w-8 h-8" />,
+                  bigIcon: (
+                    <img
+                      src="https://img.icons8.com/fluency/96/purchase-order.png"
+                      alt="Solicitar Serviço"
+                      className="w-16 h-16 object-contain drop-shadow-xl"
+                      onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
+                    />
+                  ),
+                }
+                
+                const cards = [incidentCard, requestCard]
+
+                const renderCardImage = (card: any, sizeMode: 'big' | 'normal') => {
+                  const isBig = sizeMode === 'big'
+                  if (!card.image_url) {
+                    return isBig ? card.bigIcon : (card.action === 'incident' ? <AlertTriangle className="w-14 h-14" /> : <ShoppingCart className="w-14 h-14" />)
+                  }
+                  if (card.image_url.startsWith('lucide:')) {
+                    const iconName = card.image_url.replace('lucide:', '')
+                    const Cmp = (Icons as any)[iconName] || Icons.Box
+                    return <Cmp className={isBig ? "w-32 h-32 text-indigo-500 drop-shadow-lg" : "w-14 h-14 text-indigo-500 drop-shadow-md"} />
+                  }
+                  return <img src={card.image_url} alt={card.title} className={isBig ? "w-full h-full object-contain drop-shadow-2xl" : "w-16 h-16 object-contain"} />
+                }
+
+                return cards.map((card, idx) => {
+                  if (style === 'pill_label') {
+                    return (
+                      <button
+                        key={idx}
+                        onClick={() => setMode(card.action as 'incident' | 'request')}
+                        className="group relative flex flex-col items-center justify-center bg-white rounded-2xl border border-slate-200/60 shadow-xl hover:shadow-2xl hover:-translate-y-1 transition-all duration-200 overflow-hidden h-[160px]"
+                      >
+                        <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 10px, #000 10px, #000 20px)' }} />
+                        <div className="relative z-10 w-16 h-16 mb-2 flex items-center justify-center transition-transform group-hover:scale-110 duration-500">
+                          {renderCardImage(card, 'big')}
+                        </div>
+                        <div className="absolute bottom-6 z-20 px-6 py-2.5 bg-slate-800 rounded-full text-white font-bold text-sm shadow-xl flex items-center gap-2 group-hover:bg-slate-900 transition-colors">
+                          {card.title}
+                        </div>
+                      </button>
+                    )
+                  }
+
+                  if (style === 'modern_3d') {
+                    return (
+                      <button
+                        key={idx}
+                        onClick={() => setMode(card.action as 'incident' | 'request')}
+                        className="group relative flex flex-col items-center justify-center bg-white rounded-2xl border border-slate-200/60 shadow-xl hover:shadow-2xl hover:-translate-y-1 transition-all duration-200 overflow-hidden h-[160px]"
+                      >
+                        <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 10px, #000 10px, #000 20px)' }} />
+                        <div className="relative z-10 w-16 h-16 mb-2 flex items-center justify-center transition-transform group-hover:scale-110 duration-500">
+                          {renderCardImage(card, 'big')}
+                        </div>
+                        <div className="absolute bottom-6 z-20 px-6 py-2.5 bg-slate-800 rounded-full text-white font-bold text-sm shadow-xl flex items-center gap-2 group-hover:bg-slate-900 transition-colors">
+                          {card.title}
+                        </div>
+                      </button>
+                    )
+                  }
+
+                  // Default / Classic / Minimal
+                  return (
+                    <button key={idx} onClick={() => setMode(card.action as 'incident' | 'request')} className="group text-left bg-white rounded-2xl border border-slate-200/60 shadow-xl p-5 hover:shadow-2xl hover:-translate-y-1 transition-all duration-200">
+                      <div className={`w-12 h-12 rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform ${theme.primaryBg} ${theme.primaryText} bg-opacity-10`}>
+                        {renderCardImage(card, 'normal')}
+                      </div>
+                      <h2 className="text-base font-bold text-slate-900">{card.title}</h2>
+                      <p className="text-sm text-slate-500 mt-1">{card.description}</p>
+                      <span className={`mt-4 inline-flex items-center text-sm font-semibold ${theme.textAccent}`}>{card.action === 'incident' ? 'Abrir Incidente →' : 'Abrir Requisição →'}</span>
+                    </button>
+                  )
+                })
+              })()}
+            </div>
+            </div>
+        </div>
+      ) : mode === 'incident' ? (
           // ─── INCIDENTE ───
           <div className="space-y-2">
             <BackBtn onClick={() => (category ? (service ? (symptom ? setSymptom(null) : setService(null)) : setCategory(null)) : setMode(null))} />
             {!category ? (
-              <Grid>{incCategoriesForDept.map(c => <ServiceCard key={c.id} iconName={c.icon} title={c.name} description={c.description} onClick={() => setCategory(c)} fallbackAccentColor={primaryColor} defaultTheme={uiConfig.layout_style === 'modern_3d' ? 'modern_3d' : 'minimalist'} uiConfig={c.ui_config} />)}{incCategoriesForDept.length === 0 && <Empty>Nenhuma categoria de incidente.</Empty>}</Grid>
+              <Grid>{incCategoriesForDept.map(c => <ServiceCard key={c.id} iconName={c.icon} title={c.name} description={c.description} onClick={() => setCategory(c)} uiConfig={{ ...(c.ui_config as any), card_settings: uiConfig.card_settings }} />)}{incCategoriesForDept.length === 0 && <Empty>Nenhuma categoria de incidente.</Empty>}</Grid>
             ) : !service ? (
-              <Grid>{servicesForCat.map(s => <ServiceCard key={s.id} iconName={s.icon} title={s.name} description={s.description} onClick={() => setService(s)} fallbackAccentColor={primaryColor} defaultTheme={uiConfig.layout_style === 'modern_3d' ? 'modern_3d' : 'minimalist'} uiConfig={s.ui_config} />)}{servicesForCat.length === 0 && <Empty>Nenhum serviço nesta categoria.</Empty>}</Grid>
+              <Grid>{servicesForCat.map(s => <ServiceCard key={s.id} iconName={s.icon} title={s.name} description={s.description} onClick={() => setService(s)} uiConfig={{ ...(s.ui_config as any), card_settings: uiConfig.card_settings }} />)}{servicesForCat.length === 0 && <Empty>Nenhum serviço nesta categoria.</Empty>}</Grid>
             ) : !symptom ? (
-              <Grid>{symptomsForSvc.map(ss => <ServiceCard key={ss.id} iconName={ss.symptom?.icon} title={ss.symptom?.name ?? ''} description={`SLA ${ss.sla_hours}h${ss.group?.name ? ` · ${ss.group.name}` : ''}`} uiConfig={ss.ui_config} onClick={() => { setSymptom(ss); setIncidentAnswers({}); setIncidentFieldErrors({}); setError(null) }} fallbackAccentColor={primaryColor} defaultTheme={uiConfig.layout_style === 'modern_3d' ? 'modern_3d' : 'minimalist'} />)}{symptomsForSvc.length === 0 && <Empty>Nenhum sintoma configurado.</Empty>}</Grid>
+              <Grid>{symptomsForSvc.map(ss => <ServiceCard key={ss.id} iconName={ss.symptom?.icon} title={ss.symptom?.name ?? ''} description={`SLA ${ss.sla_hours}h${ss.group?.name ? ` · ${ss.group.name}` : ''}`} uiConfig={{ ...(ss.ui_config as any), card_settings: uiConfig.card_settings }} onClick={() => { setSymptom(ss); setIncidentAnswers({}); setIncidentFieldErrors({}); setError(null) }} />)}{symptomsForSvc.length === 0 && <Empty>Nenhum sintoma configurado.</Empty>}</Grid>
             ) : (
               <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-4">
                 <h2 className="text-lg font-bold text-slate-800">{service.name} — {symptom.symptom?.name}</h2>
@@ -470,20 +585,35 @@ export default function ServiceCatalog({ companyId, currentUserId, currentUserNa
                   <SelectField label="Impacto no seu trabalho? (Urgência)" value={urgency} onChange={setUrgency} options={URGENCY_OPTIONS} />
                 </div>
                 <TextareaField label="Detalhes" value={incDescription} onChange={setIncDescription} placeholder="Descreva o que está acontecendo (opcional)…" />
-                <SubmitBtn onClick={submitIncident} loading={submitting} color={primaryColor} label="Abrir Incidente" />
+                <SubmitBtn onClick={submitIncident} loading={submitting} color={theme.primaryBg} label="Abrir Incidente" />
               </div>
             )}
           </div>
         ) : (
           // ─── REQUISIÇÃO ───
           <div className="space-y-2">
-            <BackBtn onClick={() => (reqCategory ? (reqSubcategory ? (reqItem ? setReqItem(null) : setReqSubcategory(null)) : setReqCategory(null)) : setMode(null))} />
+            <BackBtn onClick={() => (reqItem ? setReqItem(null) : reqSubcategory ? setReqSubcategory(null) : reqCategory ? setReqCategory(null) : setMode(null))} />
             {!reqCategory ? (
-              <Grid>{reqCategoriesForDept.map(c => <ServiceCard key={c.id} iconName={c.icon} title={c.name} description={c.description} onClick={() => setReqCategory(c)} fallbackAccentColor={primaryColor} defaultTheme={uiConfig.layout_style === 'modern_3d' ? 'modern_3d' : 'minimalist'} uiConfig={c.ui_config} />)}{reqCategoriesForDept.length === 0 && <Empty>Nenhuma categoria de requisição.</Empty>}</Grid>
-            ) : !reqSubcategory ? (
-              <Grid>{subcategoriesForReqCat.map(s => <ServiceCard key={s.id} iconName={s.icon} title={s.name} description={s.description} onClick={() => setReqSubcategory(s)} fallbackAccentColor={primaryColor} defaultTheme={uiConfig.layout_style === 'modern_3d' ? 'modern_3d' : 'minimalist'} uiConfig={s.ui_config} />)}{subcategoriesForReqCat.length === 0 && <Empty>Nenhuma subcategoria configurada.</Empty>}</Grid>
+              <Grid>{reqCategoriesForDept.map(c => <ServiceCard key={c.id} iconName={c.icon} title={c.name} description={c.description} onClick={() => setReqCategory(c)} fallbackAccentColor={theme.primaryBg} defaultTheme={catalogTheme} uiConfig={{ ...(c.ui_config as any), card_settings: uiConfig.card_settings }} />)}{reqCategoriesForDept.length === 0 && <Empty>Nenhuma categoria de requisição.</Empty>}</Grid>
+            ) : (!reqItem && !reqSubcategory && subcategoriesForReqCat.length > 0) ? (
+              <Grid>
+                {subcategoriesForReqCat.map(s => <ServiceCard key={s.id} iconName={s.icon} title={s.name} description={s.description} onClick={() => setReqSubcategory(s)} fallbackAccentColor={theme.primaryBg} defaultTheme={catalogTheme} uiConfig={{ ...(s.ui_config as any), card_settings: uiConfig.card_settings }} />)}
+                {/* Itens legados sem subcategoria ficam acessíveis no card "Outros" */}
+                {legacyItemsForReqCat.length > 0 && (
+                  <ServiceCard
+                    key={OTHERS_SUBCAT_ID}
+                    iconName="📂"
+                    title="Outros"
+                    description="Demais solicitações desta categoria"
+                    onClick={() => setReqSubcategory({ id: OTHERS_SUBCAT_ID, company_id: companyId, category_id: reqCategory.id, name: 'Outros', description: null, icon: '📂', active: true, sort_order: 999, created_at: '', updated_at: '' })}
+                    fallbackAccentColor={theme.primaryBg}
+                    defaultTheme={catalogTheme}
+                    uiConfig={{ card_settings: uiConfig.card_settings } as any}
+                  />
+                )}
+              </Grid>
             ) : !reqItem ? (
-              <Grid>{itemsForReqSubcat.map(it => <ServiceCard key={it.id} iconName={it.icon} title={it.name} description={it.description} uiConfig={it.ui_config} onClick={() => { setReqItem(it); setAnswers({}); setFieldErrors({}); setError(null) }} fallbackAccentColor={primaryColor} defaultTheme={uiConfig.layout_style === 'modern_3d' ? 'modern_3d' : 'minimalist'} />)}{itemsForReqSubcat.length === 0 && <Empty>Nenhum item nesta subcategoria.</Empty>}</Grid>
+              <Grid>{itemsForReqSubcat.map(it => <ServiceCard key={it.id} iconName={it.icon} title={it.name} description={it.description} uiConfig={{ ...(it.ui_config as any), card_settings: uiConfig.card_settings }} onClick={() => { setReqItem(it); setAnswers({}); setFieldErrors({}); setError(null) }} fallbackAccentColor={theme.primaryBg} defaultTheme={catalogTheme} />)}{itemsForReqSubcat.length === 0 && <Empty>Nenhum item disponível nesta categoria.</Empty>}</Grid>
             ) : (
               <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-4">
                 <div className="flex items-center gap-4">
@@ -510,7 +640,7 @@ export default function ServiceCatalog({ companyId, currentUserId, currentUserNa
                     })
                   }}
                 />
-                <SubmitBtn onClick={submitRequest} loading={submitting} color={primaryColor} label="Enviar Requisição" />
+                <SubmitBtn onClick={submitRequest} loading={submitting} color={theme.primaryBg} label="Enviar Requisição" />
               </div>
             )}
           </div>
@@ -537,7 +667,7 @@ function InfoPill({ label, value, dotColor, accentColor }: { label: string; valu
   return (
     <div className="rounded-xl bg-slate-50 border border-slate-200/70 px-3 py-3">
       <div className="text-[9px] font-bold uppercase tracking-widest text-slate-400 mb-1.5 text-center">{label}</div>
-      <div className="flex items-center justify-center gap-1.5 text-sm font-bold" style={{ color: accentColor ?? '#1e293b' }}>
+      <div className={`flex items-center justify-center gap-1.5 text-sm font-bold ${accentColor || 'text-slate-800'}`}>
         {dotColor && <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: dotColor }} />}
         <span className="truncate">{value}</span>
       </div>
@@ -570,5 +700,5 @@ function TextareaField({ label, value, onChange, placeholder }: { label: string;
   )
 }
 function SubmitBtn({ onClick, loading, color, label }: { onClick: () => void; loading: boolean; color: string; label: string }) {
-  return <button onClick={onClick} disabled={loading} className="w-full py-2.5 rounded-xl text-sm font-bold text-white hover:opacity-90 shadow-md disabled:opacity-50 transition-all" style={{ backgroundColor: color }}>{loading ? 'Enviando…' : label}</button>
+  return <button onClick={onClick} disabled={loading} className={`w-full py-2.5 rounded-xl text-sm font-bold text-white hover:opacity-90 shadow-md disabled:opacity-50 transition-all ${color}`}>{loading ? 'Enviando…' : label}</button>
 }

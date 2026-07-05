@@ -9,6 +9,8 @@
 // ============================================================
 
 import type { CompanyRow } from '../lib/database.types'
+import { THEME_HEX_COLORS } from '../lib/theme-engine'
+import type { ThemeName } from '../lib/theme-engine'
 
 export interface TenantBranding {
   /** Nome de exibição da marca. */
@@ -26,6 +28,12 @@ export interface TenantBranding {
   subtitleColor: string | null
   subtitleFont: string | null
   subtitleSize: string | null
+  /** ThemeName do motor de temas (mesmo valor que primaryColor para novos registros). */
+  themeName: string
+  /** URL da imagem de fundo do portal do usuário (não afeta a tela de login). */
+  backgroundUrl: string | null
+  /** Escala da fonte dos títulos: 'compact' | 'standard' | 'large' | 'display'. */
+  fontScale: string
 }
 
 /** Branding padrão do produto (Flowfy) — usado fora de um tenant resolvido. */
@@ -44,6 +52,9 @@ export const DEFAULT_BRANDING: TenantBranding = {
   subtitleColor: null,
   subtitleFont: null,
   subtitleSize: null,
+  themeName: 'Midnight',
+  backgroundUrl: null,
+  fontScale: 'standard',
 }
 
 /** Monta o branding a partir da linha de `companies`, com fallbacks seguros. */
@@ -63,6 +74,9 @@ export function brandingFromCompany(row: CompanyRow): TenantBranding {
     subtitleColor: row.subtitle_color ?? null,
     subtitleFont: row.subtitle_font ?? null,
     subtitleSize: row.subtitle_size ?? null,
+    themeName: row.primary_color || DEFAULT_BRANDING.themeName,
+    backgroundUrl: row.background_url ?? null,
+    fontScale: row.title_size || DEFAULT_BRANDING.fontScale,
   }
 }
 
@@ -86,9 +100,13 @@ export function applyBranding(branding: TenantBranding): void {
   if (typeof document === 'undefined') return
 
   const root = document.documentElement
-  root.style.setProperty('--brand-primary', branding.primaryColor)
+
+  const hexPrimary = THEME_HEX_COLORS[branding.primaryColor as ThemeName] || branding.primaryColor
+
+  root.style.setProperty('--brand-primary', hexPrimary)
   root.style.setProperty('--brand-accent', branding.accentColor)
   root.style.setProperty('--brand-bg', branding.backgroundColor)
+  root.style.setProperty('--color-bg-primary', branding.backgroundColor)
   
   if (branding.titleColor) {
     root.style.setProperty('--brand-title-color', branding.titleColor)

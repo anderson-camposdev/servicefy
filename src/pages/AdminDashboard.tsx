@@ -7,6 +7,7 @@ import type { ProfileRow, AssignmentGroupRow, CompanyRow } from '../lib/database
 import { setTenantOverride } from '../tenant/resolveTenant'
 import CatalogManager from './CatalogManager'
 import SlaSettings from './SlaSettings'
+import DepartmentManager from './DepartmentManager'
 
 interface AssignmentGroupsAdminProps {
   currentCompany: Company
@@ -604,6 +605,10 @@ export default function AdminDashboard({ refetchAppData, currentCompany, activeT
 
       {activeTab === 'groups' && (
         <AssignmentGroupsAdmin currentCompany={currentCompany} rawProfiles={rawProfiles} />
+      )}
+
+      {activeTab === 'departments' && (
+        <DepartmentManager companyId={currentCompany.id} cardClass="bg-white border border-slate-200 rounded-2xl shadow-sm" primaryColor={currentCompany.primary_color || '#4f46e5'} />
       )}
 
       {(['catalog_incidents', 'catalog_requests', 'form_templates'] as string[]).includes(activeTab) && (

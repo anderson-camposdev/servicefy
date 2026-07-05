@@ -22,3 +22,17 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Design sync
+.ds-sync/
+ds-bundle/
+dist-lib/
+.design-sync/.cache/
+.design-sync/learnings/
+.design-sync/node_modules
+
+# Local and generated development artifacts
+.claude/settings.local.json
+.claude/skills/*/shots/
+playwright-report/
+test-results/

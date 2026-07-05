@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{background:#f1f5f9;font-family:'Hanken Grotesk',sans-serif;-webkit-font-smoothing:antialiased}
+  ::-webkit-scrollbar{width:10px;height:10px}
+  ::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:6px;border:2px solid transparent;background-clip:content-box}
+  @keyframes slaPulse{0%,100%{opacity:1}50%{opacity:.55}}
+</style>
+</helmet>
+
+<div style="--brand:{{ brand }};--brand-wash:{{ brandWash }};--brand-line:{{ brandLine }};height:100vh;display:flex;flex-direction:column;background:#f1f5f9;color:#0f172a;overflow:hidden;font-family:'Hanken Grotesk',sans-serif">
+
+  <!-- ===== TOP BRAND BAR ===== -->
+  <div style="height:52px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:0 18px;background:#0f172a;color:#fff">
+    <div style="display:flex;align-items:center;gap:11px">
+      <div style="width:28px;height:28px;border-radius:8px;background:var(--brand);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px;color:#fff">F</div>
+      <span style="font:700 16px 'Hanken Grotesk';letter-spacing:-.01em">Flowfy</span>
+      <span style="font:500 11px 'JetBrains Mono';color:#64748b;letter-spacing:.04em;margin-left:2px">ITSM</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:16px">
+      <div style="display:flex;align-items:center;gap:9px">
+        <span style="font:600 10px 'JetBrains Mono';color:#94a3b8;letter-spacing:.06em;text-transform:uppercase">Marca do cliente</span>
+        <div style="display:flex;gap:6px">
+          <sc-for list="{{ brandSwatches }}" as="sw" hint-placeholder-count="3">
+            <button onClick="{{ sw.onClick }}" title="{{ sw.name }}" style="width:20px;height:20px;border-radius:6px;background:{{ sw.v }};border:2px solid {{ sw.ring }};cursor:pointer;padding:0"></button>
+          </sc-for>
+        </div>
+      </div>
+      <div style="width:1px;height:22px;background:#1e293b"></div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="font:600 12.5px 'Hanken Grotesk';color:#e2e8f0">Ana Martins</span>
+        <div style="width:28px;height:28px;border-radius:50%;background:var(--brand);display:flex;align-items:center;justify-content:center;font:700 11px 'Hanken Grotesk';color:#fff">AM</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== INTERNAL TAB BAR ===== -->
+  <div style="flex:none;display:flex;align-items:stretch;gap:4px;padding:8px 10px 0;background:#e2e8f0;border-bottom:1px solid #cbd5e1">
+    <button onClick="{{ gotoQueue }}" style="display:flex;align-items:center;gap:8px;padding:9px 16px;border:none;border-radius:9px 9px 0 0;cursor:pointer;font:700 13px 'Hanken Grotesk';background:{{ rootTabBg }};color:{{ rootTabColor }};border-top:2px solid {{ rootTabBorder }}">
+      <span style="width:14px;height:14px;border-radius:3px;background:currentColor;opacity:.85;display:inline-block"></span>
+      Gestão de Tickets
+    </button>
+    <sc-if value="{{ hasOpenTicket }}" hint-placeholder-val="{{ false }}">
+      <button onClick="{{ focusTicketTab }}" style="display:flex;align-items:center;gap:9px;padding:9px 14px;border:none;border-radius:9px 9px 0 0;cursor:pointer;font:600 13px 'JetBrains Mono';background:{{ ticketTabBg }};color:{{ ticketTabColor }};border-top:2px solid {{ ticketTabBorder }}">
+        {{ openTicketId }}
+        <span onClick="{{ closeTicketTab }}" style="display:inline-flex;width:18px;height:18px;align-items:center;justify-content:center;border-radius:5px;font-family:'Hanken Grotesk';font-size:14px;color:#94a3b8">×</span>
+      </button>
+    </sc-if>
+  </div>
+
+  <!-- ===== QUEUE SCREEN ===== -->
+  <sc-if value="{{ isQueue }}" hint-placeholder-val="{{ true }}">
+  <div style="flex:1;min-height:0;display:flex;flex-direction:column;background:#f8fafc;overflow:hidden">
+
+    <!-- filter bar -->
+    <div style="flex:none;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 22px;background:#fff;border-bottom:1px solid #e2e8f0">
+      <div style="display:flex;align-items:center;gap:8px;overflow-x:auto">
+        <span style="display:flex;align-items:center;gap:5px;font:700 12px 'Hanken Grotesk';color:#94a3b8;text-transform:uppercase;letter-spacing:.04em;margin-right:4px;flex:none">Clientes</span>
+        <sc-for list="{{ clientChips }}" as="c" hint-placeholder-count="4">
+          <button onClick="{{ c.onClick }}" style="flex:none;padding:6px 14px;border-radius:999px;cursor:pointer;font:600 13px 'Hanken Grotesk';white-space:nowrap;background:{{ c.bg }};color:{{ c.fg }};border:1px solid {{ c.border }}">{{ c.name }}</button>
+        </sc-for>
+      </div>
+      <div style="display:flex;align-items:center;gap:14px;padding-left:16px;border-left:1px solid #e2e8f0;flex:none">
+        <div style="display:flex;align-items:center;gap:7px;padding:7px 12px;background:#f1f5f9;border-radius:9px;width:230px">
+          <span style="width:14px;height:14px;border-radius:50%;border:2px solid #94a3b8;border-right-color:transparent;transform:rotate(45deg)"></span>
+          <span style="font:400 13px 'Hanken Grotesk';color:#94a3b8">Buscar ID ou assunto…</span>
+        </div>
+        <button style="display:flex;align-items:center;gap:6px;padding:7px 14px;border:none;border-radius:9px;cursor:pointer;font:700 13px 'Hanken Grotesk';color:#fff;background:var(--brand)">
+          <span style="font-size:15px;line-height:1">+</span> Novo Incidente
+        </button>
+        <div style="display:flex;background:#f1f5f9;padding:3px;border-radius:9px;border:1px solid #e2e8f0">
+          <button onClick="{{ setTable }}" title="Lista" style="display:flex;align-items:center;justify-content:center;width:32px;height:28px;border:none;border-radius:6px;cursor:pointer;background:{{ tableBtnBg }}">
+            <span style="display:flex;flex-direction:column;gap:2px;width:14px"><span style="height:2px;background:{{ tableBtnInk }};border-radius:2px"></span><span style="height:2px;background:{{ tableBtnInk }};border-radius:2px"></span><span style="height:2px;background:{{ tableBtnInk }};border-radius:2px"></span></span>
+          </button>
+          <button onClick="{{ setKanban }}" title="Kanban" style="display:flex;align-items:center;justify-content:center;width:32px;height:28px;border:none;border-radius:6px;cursor:pointer;background:{{ kanbanBtnBg }}">
+            <span style="display:grid;grid-template-columns:1fr 1fr;gap:2px;width:14px;height:14px"><span style="background:{{ kanbanBtnInk }};border-radius:1px"></span><span style="background:{{ kanbanBtnInk }};border-radius:1px"></span><span style="background:{{ kanbanBtnInk }};border-radius:1px"></span><span style="background:{{ kanbanBtnInk }};border-radius:1px"></span></span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- metric cards -->
+    <div style="flex:none;display:flex;gap:14px;padding:16px 22px;overflow-x:auto">
+      <sc-for list="{{ metricCards }}" as="m" hint-placeholder-count="4">
+        <button onClick="{{ m.onClick }}" style="flex:none;display:flex;align-items:center;gap:14px;min-width:200px;padding:13px 16px;border-radius:13px;cursor:pointer;text-align:left;background:{{ m.bg }};border:1px solid {{ m.border }};box-shadow:0 1px 2px rgba(15,23,42,.04)">
+          <span style="width:38px;height:38px;border-radius:10px;flex:none;background:{{ m.iconBg }};display:flex;align-items:center;justify-content:center"><span style="width:12px;height:12px;border-radius:4px;background:{{ m.accent }}"></span></span>
+          <span style="display:flex;flex-direction:column">
+            <span style="font:800 24px/1 'Hanken Grotesk';color:{{ m.numColor }}">{{ m.count }}</span>
+            <span style="font:700 11px 'Hanken Grotesk';text-transform:uppercase;letter-spacing:.04em;margin-top:5px;color:{{ m.labelColor }}">{{ m.title }}</span>
+          </span>
+        </button>
+      </sc-for>
+    </div>
+
+    <!-- TABLE -->
+    <sc-if value="{{ isTable }}" hint-placeholder-val="{{ true }}">
+    <div style="flex:1;min-height:0;padding:0 22px 22px;overflow:auto">
+      <div style="background:#fff;border:1px solid #e2e8f0;border-radius:13px;overflow:hidden">
+        <div style="display:flex;align-items:center;gap:12px;padding:11px 18px;background:#f8fafc;border-bottom:1px solid #e2e8f0;font:700 10px 'JetBrains Mono';color:#94a3b8;letter-spacing:.06em;text-transform:uppercase">
+          <span style="width:118px;flex:none">Ticket</span>
+          <span style="flex:1;min-width:0">Assunto</span>
+          <span style="width:120px;flex:none">Empresa</span>
+          <span style="width:120px;flex:none">Solicitante</span>
+          <span style="width:118px;flex:none">Status</span>
+          <span style="width:122px;flex:none">Prioridade</span>
+          <span style="width:96px;flex:none;text-align:right">SLA</span>
+        </div>
+        <sc-for list="{{ tableRows }}" as="r" hint-placeholder-count="6">
+          <div onClick="{{ r.onOpen }}" style="display:flex;align-items:center;gap:12px;padding:13px 18px;border-bottom:1px solid #f1f5f9;cursor:pointer;background:{{ r.rowBg }}">
+            <span style="width:118px;flex:none;display:flex;flex-direction:column;gap:3px">
+              <span style="font:600 13px 'JetBrains Mono';color:var(--brand);font-variant-numeric:tabular-nums">{{ r.id }}</span>
+              <span style="font:700 9px 'Hanken Grotesk';text-transform:uppercase;letter-spacing:.05em;padding:1px 6px;border-radius:4px;width:fit-content;background:{{ r.typeBg }};color:{{ r.typeFg }}">{{ r.typeLabel }}</span>
+            </span>
+            <span style="flex:1;min-width:0;font:600 13.5px 'Hanken Grotesk';color:#0f172a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.title }}</span>
+            <span style="width:120px;flex:none;font:500 12.5px 'Hanken Grotesk';color:#475569">{{ r.client }}</span>
+            <span style="width:120px;flex:none;font:400 12.5px 'Hanken Grotesk';color:#64748b">{{ r.requester }}</span>
+            <span style="width:118px;flex:none"><span style="display:inline-flex;align-items:center;padding:3px 10px;border-radius:999px;font:700 11.5px 'Hanken Grotesk';background:{{ r.stBg }};color:{{ r.stFg }}">{{ r.stLabel }}</span></span>
+            <span style="width:122px;flex:none"><span style="display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:999px;font:700 11.5px 'Hanken Grotesk';background:{{ r.prioBg }};color:{{ r.prioFg }}"><span style="width:7px;height:7px;border-radius:50%;background:{{ r.prioDot }}"></span>{{ r.prioLabel }}</span></span>
+            <span style="width:96px;flex:none;text-align:right;font:700 12.5px 'JetBrains Mono';font-variant-numeric:tabular-nums;color:{{ r.slaColor }}">{{ r.slaText }}</span>
+          </div>
+        </sc-for>
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:11px 18px;background:#f8fafc;font:500 12px 'Hanken Grotesk';color:#64748b">
+          <span>{{ rowCount }} chamado(s)</span>
+          <span style="font:400 12px 'Hanken Grotesk';color:#94a3b8">Clique numa linha para abrir o cockpit →</span>
+        </div>
+      </div>
+    </div>
+    </sc-if>
+
+    <!-- KANBAN -->
+    <sc-if value="{{ isKanban }}" hint-placeholder-val="{{ false }}">
+    <div style="flex:1;min-height:0;padding:0 22px 22px;overflow:auto">
+      <div style="display:flex;gap:16px;height:100%;min-width:max-content">
+        <sc-for list="{{ kanbanCols }}" as="col" hint-placeholder-count="4">
+          <div style="width:300px;flex:none;display:flex;flex-direction:column;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:14px;max-height:100%">
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:13px 15px;border-top:3px solid {{ col.accent }};border-radius:11px 11px 0 0;background:#fff">
+              <span style="font:700 12px 'Hanken Grotesk';text-transform:uppercase;letter-spacing:.04em;color:#334155">{{ col.title }}</span>
+              <span style="font:700 11px 'JetBrains Mono';color:#64748b;background:#f1f5f9;padding:2px 8px;border-radius:999px">{{ col.count }}</span>
+            </div>
+            <div style="flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:11px">
+              <sc-for list="{{ col.rows }}" as="k" hint-placeholder-count="2">
+                <div onClick="{{ k.onOpen }}" style="background:#fff;border:1px solid #e2e8f0;border-radius:11px;padding:13px;cursor:pointer;box-shadow:0 1px 2px rgba(15,23,42,.04)">
+                  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:9px">
+                    <span style="font:600 12px 'JetBrains Mono';color:var(--brand)">{{ k.id }}</span>
+                    <span style="font:700 9px 'Hanken Grotesk';text-transform:uppercase;letter-spacing:.05em;padding:1px 6px;border-radius:4px;background:{{ k.typeBg }};color:{{ k.typeFg }}">{{ k.typeLabel }}</span>
+                  </div>
+                  <div style="font:600 13.5px/1.35 'Hanken Grotesk';color:#0f172a;margin-bottom:11px">{{ k.title }}</div>
+                  <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+                    <span style="display:inline-flex;align-items:center;gap:6px;padding:3px 9px;border-radius:999px;font:700 11px 'Hanken Grotesk';background:{{ k.prioBg }};color:{{ k.prioFg }}"><span style="width:6px;height:6px;border-radius:50%;background:{{ k.prioDot }}"></span>{{ k.prioLabel }}</span>
+                    <span style="font:700 11.5px 'JetBrains Mono';font-variant-numeric:tabular-nums;color:{{ k.slaColor }}">{{ k.slaText }}</span>
+                  </div>
+                  <div style="margin-top:10px;padding-top:10px;border-top:1px solid #f1f5f9;display:flex;align-items:center;gap:7px">
+                    <span style="width:20px;height:20px;border-radius:50%;background:#f1f5f9;display:flex;align-items:center;justify-content:center;font:700 9px 'Hanken Grotesk';color:#64748b">{{ k.clientInitials }}</span>
+                    <span style="font:500 11.5px 'Hanken Grotesk';color:#64748b">{{ k.client }}</span>
+                  </div>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+    </sc-if>
+
+  </div>
+  </sc-if>
+
+  <!-- ===== COCKPIT SCREEN ===== -->
+  <sc-if value="{{ isCockpit }}" hint-placeholder-val="{{ false }}">
+  <div style="flex:1;min-height:0;display:flex;flex-direction:column;background:#f8fafc;overflow:hidden">
+
+    <!-- sticky header -->
+    <div style="flex:none;background:#fff;border-bottom:1px solid #e2e8f0">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;padding:14px 24px 0;flex-wrap:wrap">
+        <div style="min-width:0">
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+            <span style="font:800 19px 'Hanken Grotesk';color:#0f172a">{{ ck.id }}</span>
+            <span style="display:inline-flex;align-items:center;padding:3px 11px;border-radius:999px;font:700 11.5px 'Hanken Grotesk';background:{{ ck.stBg }};color:{{ ck.stFg }}">{{ ck.stLabel }}</span>
+            <span style="display:inline-flex;align-items:center;gap:6px;padding:3px 11px;border-radius:999px;font:700 11.5px 'JetBrains Mono';border:1px solid {{ ck.slaChipBorder }};background:{{ ck.slaChipBg }};color:{{ ck.slaColor }}">⏱ {{ ck.slaChipText }}</span>
+          </div>
+          <div style="font:400 13px 'Hanken Grotesk';color:#64748b;margin-top:5px">{{ ck.title }}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:9px;padding-bottom:4px;flex-wrap:wrap">
+          <button style="display:flex;align-items:center;gap:6px;padding:8px 13px;border:1px solid #e2e8f0;border-radius:9px;background:#fff;cursor:pointer;font:600 13px 'Hanken Grotesk';color:#334155">Base de Conhecimento</button>
+          <button style="display:flex;align-items:center;gap:6px;padding:8px 13px;border:1px solid #e2e8f0;border-radius:9px;background:#fff;cursor:pointer;font:600 13px 'Hanken Grotesk';color:#b45309">⏸ Pendente</button>
+          <button style="display:flex;align-items:center;gap:6px;padding:8px 15px;border:none;border-radius:9px;background:var(--brand);cursor:pointer;font:700 13px 'Hanken Grotesk';color:#fff">▸ Atualizar Chamado</button>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:2px;padding:8px 20px 0;margin-top:8px;border-top:1px solid #f1f5f9">
+        <sc-for list="{{ ckTabs }}" as="t" hint-placeholder-count="4">
+          <button onClick="{{ t.onClick }}" style="padding:9px 15px;border:none;background:none;cursor:pointer;font:600 13px 'Hanken Grotesk';border-bottom:2px solid {{ t.border }};color:{{ t.color }}">{{ t.label }}</button>
+        </sc-for>
+      </div>
+    </div>
+
+    <!-- body -->
+    <div style="flex:1;min-height:0;overflow-y:auto;padding:22px 24px">
+      <div style="max-width:1100px;margin:0 auto">
+
+        <!-- SLA timer cards -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:18px">
+          <div style="border:1px solid {{ ck.respBorder }};background:{{ ck.respBg }};border-radius:13px;padding:16px">
+            <div style="font:700 10px 'JetBrains Mono';text-transform:uppercase;letter-spacing:.06em;color:#64748b">SLA de Resposta</div>
+            <div style="font:800 20px 'Hanken Grotesk';margin-top:6px;color:{{ ck.respColor }}">{{ ck.respText }}</div>
+            <div style="font:400 11px 'Hanken Grotesk';color:#94a3b8;margin-top:3px">Prazo: {{ ck.respDeadline }}</div>
+          </div>
+          <div style="border:1px solid {{ ck.resoBorder }};background:{{ ck.resoBg }};border-radius:13px;padding:16px">
+            <div style="font:700 10px 'JetBrains Mono';text-transform:uppercase;letter-spacing:.06em;color:#64748b">SLA de Resolução</div>
+            <div style="font:800 20px 'Hanken Grotesk';margin-top:6px;color:{{ ck.resoColor }}">{{ ck.resoText }}</div>
+            <div style="font:400 11px 'Hanken Grotesk';color:#94a3b8;margin-top:3px">Prazo: {{ ck.resoDeadline }}</div>
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 320px;gap:18px;align-items:start">
+          <!-- left -->
+          <div style="display:flex;flex-direction:column;gap:18px">
+            <div style="background:#fff;border:1px solid #e2e8f0;border-radius:13px;padding:18px">
+              <div style="font:700 11px 'JetBrains Mono';text-transform:uppercase;letter-spacing:.06em;color:#94a3b8;margin-bottom:10px">Descrição</div>
+              <div style="font:400 14px/1.6 'Hanken Grotesk';color:#334155">{{ ck.description }}</div>
+            </div>
+            <div style="background:#fff;border:1px solid #e2e8f0;border-radius:13px;padding:18px">
+              <div style="font:700 11px 'JetBrains Mono';text-transform:uppercase;letter-spacing:.06em;color:#94a3b8;margin-bottom:16px">Linha do tempo</div>
+              <div style="display:flex;flex-direction:column;gap:0">
+                <sc-for list="{{ ck.activity }}" as="a" hint-placeholder-count="3">
+                  <div style="display:flex;gap:12px">
+                    <div style="display:flex;flex-direction:column;align-items:center;flex:none">
+                      <span style="width:10px;height:10px;border-radius:50%;background:{{ a.dot }};border:2px solid #fff;box-shadow:0 0 0 1px {{ a.dot }}"></span>
+                      <span style="width:2px;flex:1;background:#e2e8f0;min-height:18px"></span>
+                    </div>
+                    <div style="padding-bottom:16px">
+                      <div style="display:flex;align-items:baseline;gap:8px"><span style="font:700 12.5px 'Hanken Grotesk';color:#0f172a">{{ a.actor }}</span><span style="font:500 11px 'JetBrains Mono';color:#94a3b8">{{ a.time }}</span></div>
+                      <div style="font:400 13px/1.5 'Hanken Grotesk';color:#475569;margin-top:2px">{{ a.text }}</div>
+                    </div>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+          </div>
+          <!-- right -->
+          <div style="background:#fff;border:1px solid #e2e8f0;border-radius:13px;padding:18px;display:flex;flex-direction:column;gap:14px">
+            <div style="font:700 11px 'JetBrains Mono';text-transform:uppercase;letter-spacing:.06em;color:#94a3b8">Propriedades</div>
+            <div style="display:flex;flex-direction:column;gap:13px">
+              <div><div style="font:700 10px 'Hanken Grotesk';text-transform:uppercase;letter-spacing:.05em;color:#94a3b8;margin-bottom:3px">Prioridade</div><span style="display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:999px;font:700 11.5px 'Hanken Grotesk';background:{{ ck.prioBg }};color:{{ ck.prioFg }}"><span style="width:7px;height:7px;border-radius:50%;background:{{ ck.prioDot }}"></span>{{ ck.prioLabel }}</span></div>
+              <div><div style="font:700 10px 'Hanken Grotesk';text-transform:uppercase;letter-spacing:.05em;color:#94a3b8;margin-bottom:3px">Solicitante</div><div style="font:600 13.5px 'Hanken Grotesk';color:#0f172a">{{ ck.requester }}</div></div>
+              <div><div style="font:700 10px 'Hanken Grotesk';text-transform:uppercase;letter-spacing:.05em;color:#94a3b8;margin-bottom:3px">Empresa</div><div style="font:600 13.5px 'Hanken Grotesk';color:#0f172a">{{ ck.client }}</div></div>
+              <div><div style="font:700 10px 'Hanken Grotesk';text-transform:uppercase;letter-spacing:.05em;color:#94a3b8;margin-bottom:3px">Grupo Solucionador</div><div style="font:600 13.5px 'Hanken Grotesk';color:#0f172a">{{ ck.group }}</div></div>
+              <div><div style="font:700 10px 'Hanken Grotesk';text-transform:uppercase;letter-spacing:.05em;color:#94a3b8;margin-bottom:3px">Responsável</div><div style="font:600 13.5px 'Hanken Grotesk';color:{{ ck.assigneeColor }}">{{ ck.assignee }}</div></div>
+              <div><div style="font:700 10px 'Hanken Grotesk';text-transform:uppercase;letter-spacing:.05em;color:#94a3b8;margin-bottom:3px">Impacto × Urgência</div><div style="font:600 13.5px 'Hanken Grotesk';color:#0f172a">{{ ck.impactUrgency }}</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  </sc-if>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1280,&quot;height&quot;:820}}">
+class Component extends DCLogic {
+  state = { screen: 'queue', view: 'table', metric: null, openId: null, client: 'all', ckTab: 'detalhes', brand: '#10b981' };
+
+  PRIO = {
+    1: { label: 'P1 Crítica',  bg: '#fee2e2', fg: '#991b1b', dot: '#dc2626' },
+    2: { label: 'P2 Alta',     bg: '#ffedd5', fg: '#c2410c', dot: '#ea580c' },
+    3: { label: 'P3 Moderada', bg: '#fef9c3', fg: '#713f12', dot: '#eab308' },
+    4: { label: 'P4 Baixa',    bg: '#dbeafe', fg: '#1d4ed8', dot: '#2563eb' },
+    5: { label: 'P5 Planej.',  bg: '#dcfce7', fg: '#166534', dot: '#16a34a' },
+  };
+  ST = {
+    'New':         { label: 'Novo',          bg: '#dbeafe', fg: '#1d4ed8', col: 'open',     dot: '#2563eb' },
+    'In Progress': { label: 'Em Atendimento',bg: '#fef3c7', fg: '#b45309', col: 'progress', dot: '#d97706' },
+    'On Hold':     { label: 'Pendente',      bg: '#ede9fe', fg: '#6d28d9', col: 'waiting',  dot: '#7c3aed' },
+    'Resolved':    { label: 'Resolvido',     bg: '#d1fae5', fg: '#047857', col: 'resolved', dot: '#059669' },
+  };
+  SLA = { ok: '#059669', risk: '#d97706', breach: '#e11d48', done: '#059669' };
+
+  TICKETS = [
+    { id:'INC-08550', type:'incident', client:'Allied IT',  requester:'Roberto Teixeira', title:'Falha no link principal',                 state:'In Progress', level:1, sla:'breach', slaText:'Violado', group:'Infraestrutura',  mine:true,  impact:'Toda a empresa', urgency:'Estou totalmente travado',
+      description:'Link de internet principal da matriz fora do ar desde 09:05. Operação parada em todas as filiais. Contingência de link secundário não assumiu automaticamente.',
+      activity:[ {actor:'Roberto Teixeira', time:'09:15', text:'Chamado aberto via portal.', dot:'#2563eb'}, {actor:'Sistema', time:'09:16', text:'Prioridade calculada: P1 — Crítica (Impacto × Urgência).', dot:'#e11d48'}, {actor:'Ana Martins', time:'09:22', text:'Atendimento iniciado. Acionando operadora.', dot:'#d97706'} ] },
+    { id:'INC-08722', type:'incident', client:'Grupo Wish', requester:'Karen Ribeiro',    title:'Sistema ERP com lentidão extrema',        state:'New',         level:2, sla:'risk',   slaText:'1h 15m', group:'Sistemas',       mine:false, impact:'Meu departamento', urgency:'Uma tarefa importante está parada',
+      description:'ERP apresentando lentidão severa nas telas de faturamento desde a atualização de ontem à noite. Equipe fiscal não consegue emitir notas.',
+      activity:[ {actor:'Karen Ribeiro', time:'10:54', text:'Chamado aberto via portal.', dot:'#2563eb'}, {actor:'Sistema', time:'10:54', text:'Aguardando triagem da equipe de Sistemas.', dot:'#94a3b8'} ] },
+    { id:'REQ-09101', type:'request',  client:'Sephora',    requester:'Lucas Pietro',     title:'Solicitação de Acesso — VPN',             state:'In Progress', level:4, sla:'ok',     slaText:'12h 00m', group:'Acessos e Contas', mine:false, impact:'Apenas eu', urgency:'Consigo trabalhar, mas incomoda',
+      description:'Novo colaborador do time comercial precisa de acesso à VPN corporativa para trabalho remoto. Aprovação do gestor já anexada.',
+      activity:[ {actor:'Lucas Pietro', time:'11:30', text:'Requisição aberta pelo catálogo.', dot:'#2563eb'}, {actor:'Marina Couto', time:'11:48', text:'Em atendimento — validando aprovação.', dot:'#d97706'} ] },
+    { id:'INC-08740', type:'incident', client:'Grupo Wish', requester:'Marcos Lima',      title:'Impressora fiscal sem resposta',          state:'On Hold',     level:3, sla:'risk',   slaText:'2h 40m', group:'Suporte',        mine:false, impact:'Meu departamento', urgency:'Uma tarefa importante está parada',
+      description:'Impressora fiscal do PDV 3 não responde. Aguardando retorno do fornecedor sobre a peça de reposição.',
+      activity:[ {actor:'Marcos Lima', time:'08:40', text:'Chamado aberto.', dot:'#2563eb'}, {actor:'Suporte', time:'09:10', text:'Pendente de fornecedor — SLA pausado.', dot:'#7c3aed'} ] },
+    { id:'INC-08766', type:'incident', client:'Sephora',    requester:'Bruno Alves',      title:'Dois-fatores não envia SMS',              state:'In Progress', level:1, sla:'risk',   slaText:'00:22', group:'Segurança',      mine:true,  impact:'Toda a empresa', urgency:'Estou totalmente travado',
+      description:'Usuários não recebem o código 2FA por SMS no login. Vários relatos simultâneos. Gateway de SMS sob investigação.',
+      activity:[ {actor:'Bruno Alves', time:'13:02', text:'Chamado aberto.', dot:'#2563eb'}, {actor:'Ana Martins', time:'13:08', text:'Investigando gateway de SMS.', dot:'#d97706'} ] },
+    { id:'REQ-09120', type:'request',  client:'Allied IT',  requester:'Paula Souza',      title:'Provisionar notebook — novo colaborador', state:'New',         level:5, sla:'ok',     slaText:'3d 00h', group:'Field Service',  mine:false, impact:'Apenas eu', urgency:'Consigo trabalhar, mas incomoda',
+      description:'Solicitação de notebook configurado para colaborador que inicia na próxima semana. Imagem padrão + acessos do time de Marketing.',
+      activity:[ {actor:'Paula Souza', time:'08:00', text:'Requisição aberta pelo catálogo.', dot:'#2563eb'} ] },
+    { id:'INC-08200', type:'incident', client:'Sephora',    requester:'Diana Prince',     title:'Acesso bloqueado no ERP',                 state:'Resolved',    level:2, sla:'done',   slaText:'Resolvido', group:'Sistemas',     mine:true,  impact:'Meu departamento', urgency:'Estou totalmente travado',
+      description:'Conta bloqueada após tentativas de login. Desbloqueio realizado e senha redefinida.',
+      activity:[ {actor:'Diana Prince', time:'08:00', text:'Chamado aberto.', dot:'#2563eb'}, {actor:'Ana Martins', time:'08:25', text:'Conta desbloqueada e senha redefinida.', dot:'#059669'} ] },
+    { id:'REQ-09077', type:'request',  client:'Grupo Wish', requester:'Helena Dias',      title:'Aumento de cota de e-mail',               state:'Resolved',    level:4, sla:'done',   slaText:'Resolvido', group:'Mensageria',   mine:false, impact:'Apenas eu', urgency:'Consigo trabalhar, mas incomoda',
+      description:'Caixa de e-mail atingiu o limite. Cota aumentada de 5GB para 25GB conforme política.',
+      activity:[ {actor:'Helena Dias', time:'Ontem', text:'Requisição aberta.', dot:'#2563eb'}, {actor:'Mensageria', time:'Ontem', text:'Cota ajustada para 25GB.', dot:'#059669'} ] },
+  ];
+
+  initials(name){ return (name||'').split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase(); }
+
+  display(t){
+    const p = this.PRIO[t.level], s = this.ST[t.state];
+    const sc = this.SLA[t.sla];
+    return {
+      ...t,
+      onOpen: () => this.setState({ screen:'cockpit', openId:t.id }),
+      typeLabel: t.type==='request' ? 'Requisição' : 'Incidente',
+      typeBg: t.type==='request' ? '#eef2ff' : '#fff1f2',
+      typeFg: t.type==='request' ? '#4338ca' : '#be123c',
+      prioLabel:p.label, prioBg:p.bg, prioFg:p.fg, prioDot:p.dot,
+      stLabel:s.label, stBg:s.bg, stFg:s.fg,
+      slaColor:sc, clientInitials:this.initials(t.client),
+      rowBg:'#fff',
+    };
+  }
+
+  filtered(){
+    const m = this.state.metric;
+    const byClient = this.state.client==='all' ? this.TICKETS : this.TICKETS.filter(t=>t.client===this.state.client);
+    if(!m) return byClient;
+    const f = {
+      total:()=>true,
+      critical:t=>t.level===1,
+      progress:t=>t.state==='In Progress',
+      breach:t=>t.sla==='breach',
+      mine:t=>t.mine,
+      unassigned:t=>t.group==='—' || t.state==='New',
+    }[m] || (()=>true);
+    return byClient.filter(f);
+  }
+
+  metricDefs(){
+    const T=this.TICKETS;
+    return [
+      { key:'total',    title:'Total na Fila', accent:'#64748b', count:T.length },
+      { key:'critical', title:'Críticos P1',   accent:'#e11d48', count:T.filter(t=>t.level===1).length },
+      { key:'progress', title:'Em Atendimento',accent:'#d97706', count:T.filter(t=>t.state==='In Progress').length },
+      { key:'breach',   title:'SLA Violado',   accent:'#e11d48', count:T.filter(t=>t.sla==='breach').length },
+      { key:'mine',     title:'Minha Fila',    accent:'#0d9488', count:T.filter(t=>t.mine).length },
+    ];
+  }
+
+  renderVals(){
+    const st = this.state;
+    const brandWash = `color-mix(in srgb, ${st.brand} 12%, #ffffff)`;
+    const brandLine = st.brand;
+    const isQueue = st.screen==='queue';
+
+    // brand swatches
+    const swatches = [['#10b981','Esmeralda'],['#2563eb','Azul'],['#7c3aed','Roxo']].map(([v,name])=>({
+      v, name, ring: st.brand===v ? '#ffffff' : 'transparent', onClick:()=>this.setState({brand:v})
+    }));
+
+    // client chips
+    const clients = ['all','Allied IT','Grupo Wish','Sephora'];
+    const clientChips = clients.map(c=>{
+      const active = st.client===c;
+      return { name: c==='all'?'Todos os Clientes':c, onClick:()=>this.setState({client:c}),
+        bg: active?'#0f172a':'#fff', fg: active?'#fff':'#475569', border: active?'#0f172a':'#e2e8f0' };
+    });
+
+    // metrics
+    const metricCards = this.metricDefs().map(m=>{
+      const active = st.metric===m.key;
+      return { ...m, onClick:()=>this.setState({metric: active?null:m.key}),
+        bg: active? brandWash : '#fff',
+        border: active? st.brand : '#e2e8f0',
+        iconBg: active? '#ffffff' : '#f8fafc',
+        numColor:'#0f172a', labelColor:'#64748b' };
+    });
+
+    const rows = this.filtered().map(t=>this.display(t));
+
+    // kanban
+    const COLS = [['open','Abertos','#94a3b8'],['progress','Em Atendimento','#d97706'],['waiting','Aguardando','#7c3aed'],['resolved','Resolvidos','#059669']];
+    const kanbanCols = COLS.map(([id,title,accent])=>{
+      const cr = rows.filter(r=>this.ST[r.state].col===id);
+      return { id, title, accent, count:cr.length, rows:cr };
+    });
+
+    // cockpit ticket
+    const t = this.TICKETS.find(x=>x.id===st.openId) || this.TICKETS[0];
+    const d = this.display(t);
+    const respDone = t.state!=='New';
+    const ck = {
+      ...d,
+      slaChipText: t.sla==='breach' ? 'SLA estourado' : t.sla==='done' ? 'Encerrado' : `SLA: ${t.slaText} restante`,
+      slaChipBg: t.sla==='breach' ? '#fff1f2' : t.sla==='done' ? '#ecfdf5' : '#f8fafc',
+      slaChipBorder: t.sla==='breach' ? '#fecdd3' : t.sla==='done' ? '#a7f3d0' : '#e2e8f0',
+      respText: respDone ? 'Cumprido' : 'Aguardando 1º atendimento',
+      respColor: respDone ? '#047857' : '#b45309',
+      respBg: respDone ? '#ecfdf5' : '#fffbeb', respBorder: respDone ? '#a7f3d0' : '#fde68a',
+      respDeadline: '15 min após abertura',
+      resoText: t.sla==='breach' ? 'Estourado' : t.sla==='done' ? 'Cumprido' : `${t.slaText} restante`,
+      resoColor: this.SLA[t.sla],
+      resoBg: t.sla==='breach' ? '#fff1f2' : t.sla==='done' ? '#ecfdf5' : t.sla==='risk' ? '#fffbeb' : '#f8fafc',
+      resoBorder: t.sla==='breach' ? '#fecdd3' : t.sla==='done' ? '#a7f3d0' : t.sla==='risk' ? '#fde68a' : '#e2e8f0',
+      resoDeadline: 'Conforme matriz de SLA',
+      assignee: t.mine ? 'Ana Martins (você)' : (t.state==='New' ? 'Não atribuído' : 'Equipe ' + t.group),
+      assigneeColor: t.state==='New' ? '#94a3b8' : '#0f172a',
+      impactUrgency: `${t.impact} × ${t.urgency}`,
+    };
+
+    const mkTab = (id,label)=>({ id,label, onClick:()=>this.setState({ckTab:id}),
+      color: st.ckTab===id ? st.brand : '#64748b',
+      border: st.ckTab===id ? st.brand : 'transparent' });
+
+    return {
+      brand: st.brand, brandWash, brandLine,
+      brandSwatches: swatches,
+      isQueue, isCockpit: st.screen==='cockpit',
+      isTable: st.view==='table', isKanban: st.view==='kanban',
+      gotoQueue: ()=>this.setState({screen:'queue'}),
+      focusTicketTab: ()=>this.setState({screen:'cockpit'}),
+      closeTicketTab: (e)=>{ if(e&&e.stopPropagation)e.stopPropagation(); this.setState({screen:'queue', openId:null}); },
+      hasOpenTicket: !!st.openId,
+      openTicketId: st.openId || '',
+      rootTabBg: isQueue ? '#f8fafc' : 'transparent',
+      rootTabColor: isQueue ? st.brand : '#64748b',
+      rootTabBorder: isQueue ? st.brand : 'transparent',
+      ticketTabBg: !isQueue ? '#f8fafc' : 'transparent',
+      ticketTabColor: !isQueue ? st.brand : '#64748b',
+      ticketTabBorder: !isQueue ? st.brand : 'transparent',
+      setTable: ()=>this.setState({view:'table'}),
+      setKanban: ()=>this.setState({view:'kanban'}),
+      tableBtnBg: st.view==='table' ? '#fff' : 'transparent',
+      tableBtnInk: st.view==='table' ? st.brand : '#94a3b8',
+      kanbanBtnBg: st.view==='kanban' ? '#fff' : 'transparent',
+      kanbanBtnInk: st.view==='kanban' ? st.brand : '#94a3b8',
+      clientChips, metricCards,
+      tableRows: rows, rowCount: rows.length,
+      kanbanCols,
+      ck,
+      ckTabs: [ mkTab('detalhes','Detalhes'), mkTab('historico','Histórico'), mkTab('sub','Sub Chamados'), mkTab('rel','Relacionamentos') ],
+    };
+  }
+}
+</script>
+</body>
+</html>

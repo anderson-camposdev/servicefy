@@ -2,13 +2,13 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   User, Building2, AlertTriangle, Send,
   BookOpen, CheckCircle, History, FileText, ListTree, Link2, Lock, Pause, Timer, Edit3,
-  ShieldAlert,
+  ShieldAlert, PlayCircle, ArrowRightLeft,
 } from 'lucide-react'
-import { incidentsService, messagesService, assignmentGroupsService, pendingReasonsService } from '../lib/services'
+import { incidentsService, messagesService, assignmentGroupsService, pendingReasonsService, responseMacrosService } from '../lib/services'
 import { translateState, STATE_LABELS_PT } from '../lib/statusLabels'
 import { useAuth } from '../auth'
 import { useToast } from '../context'
-import type { IncidentRow, IncidentHistoryRow, IncidentState, TicketMessageRow, AssignmentGroupRow, ProfileRow, PendingReasonRow } from '../lib/database.types'
+import type { IncidentRow, IncidentHistoryRow, IncidentState, TicketMessageRow, AssignmentGroupRow, ProfileRow, PendingReasonRow, ResponseMacroRow } from '../lib/database.types'
 import type { WorkspaceTicket } from './workspace.types'
 import SlaEventTimeline from './SlaEventTimeline'
 import TicketTasksPanel from '../components/TicketTasksPanel'
@@ -84,11 +84,11 @@ const fmtDuration = (ms: number) => {
 
 // Matriz visual de prioridades ITIL (P1..P5) — usada nos badges e no command bar NOC.
 const PRIORITY_STYLES: Record<number, { badge: string; dot: string; label: string }> = {
-  1: { badge: 'bg-rose-500/10 border-rose-500/30 text-rose-500 font-extrabold shadow-sm', dot: 'bg-rose-500 animate-ping', label: 'P1 · Crítica' },
-  2: { badge: 'bg-orange-500/10 border-orange-500/30 text-orange-500 font-bold shadow-sm', dot: 'bg-orange-500', label: 'P2 · Alta' },
-  3: { badge: 'bg-amber-500/10 border-amber-500/30 text-amber-500 font-bold shadow-sm', dot: 'bg-amber-500', label: 'P3 · Moderada' },
-  4: { badge: 'bg-sky-500/10 border-sky-500/30 text-sky-500 font-semibold', dot: 'bg-sky-500', label: 'P4 · Baixa' },
-  5: { badge: 'bg-slate-500/10 border-slate-500/20 text-slate-500 font-semibold', dot: 'bg-slate-400', label: 'P5 · Planejada' },
+  1: { badge: 'bg-p1-bg border-p1/30 text-p1-fg font-extrabold shadow-sm', dot: 'bg-p1 animate-ping', label: 'P1 · Crítica' },
+  2: { badge: 'bg-p2-bg border-p2/30 text-p2-fg font-bold shadow-sm',      dot: 'bg-p2',             label: 'P2 · Alta' },
+  3: { badge: 'bg-p3-bg border-p3/30 text-p3-fg font-bold shadow-sm',      dot: 'bg-p3',             label: 'P3 · Moderada' },
+  4: { badge: 'bg-p4-bg border-p4/30 text-p4-fg font-semibold',            dot: 'bg-p4',             label: 'P4 · Baixa' },
+  5: { badge: 'bg-p5-bg border-p5/20 text-p5-fg font-semibold',            dot: 'bg-p5',             label: 'P5 · Planejada' },
 }
 
 const CONTEXT_TABS: { id: ContextTab; label: string; icon: React.ReactNode }[] = [
@@ -258,7 +258,6 @@ const AnalystCockpit = ({ ticket = FALLBACK_TICKET }: { ticket?: WorkspaceTicket
 
   // Ações de estado
   const [stateOverride, setStateOverride] = useState<string | null>(null)
-  const [assigning, setAssigning] = useState(false)
   const [closeCode, setCloseCode] = useState('')
   const [closeNotes, setCloseNotes] = useState('')
   const [timeSpent, setTimeSpent] = useState('')
@@ -268,6 +267,7 @@ const AnalystCockpit = ({ ticket = FALLBACK_TICKET }: { ticket?: WorkspaceTicket
   const [activeGroups, setActiveGroups] = useState<AssignmentGroupRow[]>([])
   const [groupMembers, setGroupMembers] = useState<ProfileRow[]>([])
   const [loadingGroups, setLoadingGroups] = useState(false)
+  const [responseMacros, setResponseMacros] = useState<ResponseMacroRow[]>([])
 
   // Form states for 'Condução do Chamado'
   const [formComment, setFormComment] = useState('')
@@ -278,9 +278,32 @@ const AnalystCockpit = ({ ticket = FALLBACK_TICKET }: { ticket?: WorkspaceTicket
   const [formImpact, setFormImpact] = useState('Low')
   const [formUrgency, setFormUrgency] = useState('Low')
   const [formPendingReasonId, setFormPendingReasonId] = useState('')
+
+  useEffect(() => {
+    if (!ticket.companyId) return
+    let cancelled = false
+    responseMacrosService.list(ticket.companyId)
+      .then(rows => { if (!cancelled) setResponseMacros(rows) })
+      .catch(console.error)
+    return () => { cancelled = true }
+  }, [ticket.companyId])
+
+  const applyResponseMacro = useCallback((macroId: string) => {
+    const macro = responseMacros.find(item => item.id === macroId)
+    if (!macro) return
+    const body = macro.body
+      .replaceAll('{{usuario.nome}}', detail?.caller_name ?? ticket.requester ?? 'Cliente')
+      .replaceAll('{{chamado.numero}}', detail?.number ?? ticket.id)
+      .replaceAll('{{chamado.titulo}}', detail?.short_description ?? ticket.title)
+    setFormComment(body)
+    if (macro.visibility === 'internal') setIsInternal(true)
+    if (macro.visibility === 'public') setIsInternal(false)
+    void responseMacrosService.recordUse(macro.id).catch(console.error)
+  }, [responseMacros, detail, ticket])
   const [pendingReasons, setPendingReasons] = useState<PendingReasonRow[]>([])
   const [savingConducao, setSavingConducao] = useState(false)
-  const [isEditing, setIsEditing] = useState(false)
+  // 'idle' → seletor de ação; 'start' → primeiro atendimento; 'update' → atualização; 'transfer' → transferência; 'resolve' → resolução; 'reopen' → reabertura
+  const [conducaoMode, setConducaoMode] = useState<'idle' | 'start' | 'update' | 'transfer' | 'resolve' | 'reopen'>('idle')
 
   // Status atual acessível dentro de callbacks do Realtime (sempre fresco).
   const statusRef = useRef<string>('')
@@ -313,7 +336,7 @@ const AnalystCockpit = ({ ticket = FALLBACK_TICKET }: { ticket?: WorkspaceTicket
       setFormImpact(detail.impact || 'Low')
       setFormUrgency(detail.urgency || 'Low')
       setFormPendingReasonId(detail.pending_reason_id || '')
-      setIsEditing(false)
+      setConducaoMode('idle')
     }
   }, [detail])
 
@@ -425,54 +448,162 @@ const AnalystCockpit = ({ ticket = FALLBACK_TICKET }: { ticket?: WorkspaceTicket
     return () => { channel.unsubscribe() }
   }, [ticket.incidentId, ticket.companyId])
 
-  const handleStartService = useCallback(async () => {
-    if (!ticket.incidentId || !ticket.companyId || !profile) return
-    setAssigning(true); setActionMsg(null)
-    try {
-      const updated = await incidentsService.startService(ticket.incidentId, ticket.companyId)
-      setDetail(current => current ? { ...current, ...updated } : current)
-      setStateOverride('In Progress')
-      setFormState('In Progress')
-      setFormAssigneeId(updated.assigned_to_id || profile.id)
-      setFormGroupId(updated.assignment_group_id || updated.assigned_group_id || '')
-      const msg = 'Atendimento iniciado e SLA de resposta registrado.'
-      setActionMsg(msg)
-      toast.success(msg)
-      refreshIncident()
-      refreshMessages()
-    } catch (e) {
-      const errMsg = dbErrMsg(e, 'Falha ao iniciar atendimento.')
-      setActionMsg(errMsg)
-      toast.error(`Erro ao iniciar atendimento: ${errMsg}`)
-    } finally {
-      setAssigning(false)
-    }
-  }, [ticket.incidentId, ticket.companyId, profile, toast, refreshIncident, refreshMessages])
-
   const openEditForm = useCallback(() => {
     if (detail) {
-      setFormState(detail.state || '')
+      // Garante que o estado não fique em Resolved/Closed no modo update
+      const safeState = ['Resolved', 'Closed'].includes(detail.state || '') ? 'In Progress' : (detail.state || '')
+      setFormState(safeState)
       setFormGroupId(detail.assignment_group_id || detail.assigned_group_id || '')
       setFormAssigneeId(detail.assigned_to_id || '')
       setFormImpact(detail.impact || 'Low')
       setFormUrgency(detail.urgency || 'Low')
       setFormPendingReasonId(detail.pending_reason_id || '')
       setFormComment('')
-      setCloseCode(detail.close_code || '')
-      setCloseNotes(detail.close_notes || '')
     }
     setError(null)
     setActionMsg(null)
-    setIsEditing(true)
+    setConducaoMode('update')
     setActiveContext('detalhes')
   }, [detail])
 
+  const openResolveForm = useCallback(() => {
+    if (detail) {
+      setCloseCode(detail.close_code || '')
+      setCloseNotes(detail.close_notes || '')
+      setTimeSpent('')
+      setFormComment('')
+      setIsInternal(false)
+    }
+    setError(null)
+    setActionMsg(null)
+    setConducaoMode('resolve')
+    setActiveContext('detalhes')
+  }, [detail])
+
+  const openStartForm = useCallback(() => {
+    setFormComment('')
+    setIsInternal(false)
+    setError(null)
+    setActionMsg(null)
+    setConducaoMode('start')
+    setActiveContext('detalhes')
+  }, [])
+
+  const handleStartAtendimento = useCallback(async () => {
+    if (!ticket.incidentId || !ticket.companyId || !profile) return
+    setSavingConducao(true)
+    setError(null)
+    try {
+      const updated = await incidentsService.startService(ticket.incidentId, ticket.companyId)
+      if (formComment.trim()) {
+        await incidentsService.conduct(ticket.incidentId, ticket.companyId, {
+          changes: {},
+          comment: formComment.trim(),
+          isInternal: false,
+          senderId: profile.id,
+          senderName: profile.name ?? 'Analista',
+        })
+      }
+      setDetail(current => current ? { ...current, ...updated } : current)
+      setStateOverride('In Progress')
+      setFormState('In Progress')
+      toast.success('Atendimento iniciado! SLA de resposta registrado.')
+      setConducaoMode('idle')
+      refreshIncident()
+      refreshMessages()
+    } catch (e) {
+      const errMsg = dbErrMsg(e, 'Falha ao iniciar atendimento.')
+      setError(errMsg)
+      toast.error(errMsg)
+    } finally {
+      setSavingConducao(false)
+    }
+  }, [ticket.incidentId, ticket.companyId, profile, formComment, toast, refreshIncident, refreshMessages])
+
+  const openTransferForm = useCallback(() => {
+    if (detail) {
+      setFormGroupId(detail.assignment_group_id || detail.assigned_group_id || '')
+      setFormAssigneeId(detail.assigned_to_id || '')
+      setFormComment('')
+    }
+    setError(null)
+    setActionMsg(null)
+    setConducaoMode('transfer')
+    setActiveContext('detalhes')
+  }, [detail])
+
+  const handleTransfer = useCallback(async () => {
+    const cid = detail?.company_id || ticket.companyId
+    if (!ticket.incidentId || !cid) return
+    if (!formGroupId) { setError('Selecione o Grupo Solucionador para transferir.'); return }
+    setSavingConducao(true)
+    setError(null)
+    try {
+      const updated = await incidentsService.conduct(ticket.incidentId, cid, {
+        changes: {
+          assignment_group_id: formGroupId || null,
+          assigned_to_id: formAssigneeId || null,
+        },
+        comment: formComment.trim() || undefined,
+        isInternal: true,
+        senderId: profile?.id ?? null,
+        senderName: profile?.name ?? 'Analista',
+      })
+      setDetail(prev => prev ? { ...prev, ...updated } : null)
+      toast.success('Chamado transferido com sucesso!')
+      setConducaoMode('idle')
+      refreshIncident()
+      refreshMessages()
+    } catch (e) {
+      const errMsg = dbErrMsg(e, 'Falha ao transferir chamado.')
+      setError(errMsg)
+      toast.error(errMsg)
+    } finally {
+      setSavingConducao(false)
+    }
+  }, [ticket.incidentId, ticket.companyId, detail?.company_id, formGroupId, formAssigneeId, formComment, profile, toast, refreshIncident, refreshMessages])
+
+  const openReopenForm = useCallback(() => {
+    setFormComment('')
+    setError(null)
+    setActionMsg(null)
+    setConducaoMode('reopen')
+    setActiveContext('detalhes')
+  }, [])
+
+  const handleReopen = useCallback(async () => {
+    const cid = detail?.company_id || ticket.companyId
+    if (!ticket.incidentId || !cid) return
+    setSavingConducao(true)
+    setError(null)
+    try {
+      const updated = await incidentsService.conduct(ticket.incidentId, cid, {
+        changes: { state: 'In Progress', close_code: null, close_notes: null, resolved_at: null },
+        comment: formComment.trim() || 'Chamado reaberto.',
+        isInternal: false,
+        senderId: profile?.id ?? null,
+        senderName: profile?.name ?? 'Analista',
+      })
+      setDetail(prev => prev ? { ...prev, ...updated } : null)
+      setStateOverride('In Progress')
+      toast.success('Chamado reaberto com sucesso!')
+      setConducaoMode('idle')
+      refreshIncident()
+      refreshMessages()
+    } catch (e) {
+      const errMsg = dbErrMsg(e, 'Falha ao reabrir chamado.')
+      setError(errMsg)
+      toast.error(errMsg)
+    } finally {
+      setSavingConducao(false)
+    }
+  }, [ticket.incidentId, ticket.companyId, detail?.company_id, formComment, profile, toast, refreshIncident, refreshMessages])
 
   // Atalho "Pendente": abre o formulário de condução já com o estado
   // preenchido (Pendente exige Motivo + justificativa obrigatórios).
   const openPendingForm = useCallback(() => {
     setFormState('On Hold')
-    setIsEditing(true)
+    setConducaoMode('update')
     setActiveContext('detalhes')
   }, [])
 
@@ -573,7 +704,7 @@ const AnalystCockpit = ({ ticket = FALLBACK_TICKET }: { ticket?: WorkspaceTicket
       const successMsg = 'Atualização gravada com sucesso!'
       setActionMsg(successMsg)
       toast.success(successMsg)
-      setIsEditing(false) // Close editing mode automatically
+      setConducaoMode('idle')
       refreshIncident()
       refreshMessages()
     } catch (e) {
@@ -586,7 +717,7 @@ const AnalystCockpit = ({ ticket = FALLBACK_TICKET }: { ticket?: WorkspaceTicket
   }, [ticket.incidentId, ticket.companyId, detail?.company_id, formState, formGroupId, formAssigneeId, formImpact, formUrgency, formPendingReasonId, pendingReasons, formComment, isInternal, activeGroups, groupMembers, closeCode, closeNotes, timeSpent, detail, profile, toast, refreshIncident, refreshMessages, isAdmin])
 
   const handleCancelEdit = useCallback(() => {
-    setIsEditing(false)
+    setConducaoMode('idle')
     setError(null)
     setActionMsg(null)
     if (detail) {
@@ -596,10 +727,56 @@ const AnalystCockpit = ({ ticket = FALLBACK_TICKET }: { ticket?: WorkspaceTicket
       setFormImpact(detail.impact || 'Low')
       setFormUrgency(detail.urgency || 'Low')
       setFormComment('')
-      setCloseCode(detail.close_code || '')
-      setCloseNotes(detail.close_notes || '')
+      setCloseCode('')
+      setCloseNotes('')
+      setTimeSpent('')
     }
   }, [detail])
+
+  // Resolução focada: só grava close_code + close_notes + estado=Resolved
+  const handleResolve = useCallback(async () => {
+    const cid = detail?.company_id || ticket.companyId
+    if (!ticket.incidentId || !cid) return
+
+    if (!closeCode) {
+      const msg = 'Selecione o Código de Encerramento.'
+      setError(msg); toast.error(msg); return
+    }
+    if (!closeNotes.trim()) {
+      const msg = 'Preencha as Notas de Resolução descrevendo a solução aplicada.'
+      setError(msg); toast.error(msg); return
+    }
+
+    setSavingConducao(true)
+    setError(null)
+    try {
+      const notes = timeSpent ? `${closeNotes.trim()}\n\n[Tempo gasto: ${timeSpent}]` : closeNotes.trim()
+      const updated = await incidentsService.conduct(ticket.incidentId, cid, {
+        changes: {
+          state: 'Resolved',
+          close_code: closeCode,
+          close_notes: notes,
+          resolved_at: new Date().toISOString(),
+        },
+        comment: formComment.trim() || undefined,
+        isInternal: false,
+        senderId: profile?.id ?? null,
+        senderName: profile?.name ?? 'Analista',
+      })
+      setDetail(prev => prev ? { ...prev, ...updated } : null)
+      setStateOverride('Resolved')
+      toast.success('Chamado resolvido com sucesso!')
+      setConducaoMode('idle')
+      refreshIncident()
+      refreshMessages()
+    } catch (e) {
+      const errMsg = dbErrMsg(e, 'Falha ao resolver o chamado.')
+      setError(errMsg)
+      toast.error(errMsg)
+    } finally {
+      setSavingConducao(false)
+    }
+  }, [ticket.incidentId, ticket.companyId, detail?.company_id, closeCode, closeNotes, timeSpent, formComment, profile, toast, refreshIncident, refreshMessages])
 
   // Valores de exibição
   const number = ticket.id
@@ -627,6 +804,8 @@ const AnalystCockpit = ({ ticket = FALLBACK_TICKET }: { ticket?: WorkspaceTicket
   const visibleAuditRows = isTechnicalUser ? auditRows : auditRows.filter(h => h.is_public)
   const canAct = realMode && Boolean(profile)
   const isResolved = status === 'Resolved' || status === 'Closed'
+  // Chamado novo: primeiro atendimento ainda não foi realizado
+  const isNew = status === 'New' && !detail?.responded_at
   // Edição liberada quando NÃO encerrado — OU sempre, se for admin (override).
   const canEdit = canAct && (!isResolved || isAdmin)
 
@@ -652,7 +831,13 @@ const AnalystCockpit = ({ ticket = FALLBACK_TICKET }: { ticket?: WorkspaceTicket
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <h1 className="text-lg font-bold truncate text-text-main">{number}</h1>
-              <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full shrink-0 bg-primary-container text-on-primary-container">{translateState(status)}</span>
+              <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full shrink-0 ${{
+                'New':         'bg-new-bg text-new-fg',
+                'In Progress': 'bg-progress-bg text-progress-fg',
+                'On Hold':     'bg-hold-bg text-hold-fg',
+                'Resolved':    'bg-resolved-bg text-resolved-fg',
+                'Closed':      'bg-closed-bg text-closed-fg',
+              }[status ?? ''] ?? 'bg-surface-container text-on-surface-variant'}`}>{translateState(status)}</span>
               {/* Cronômetro de SLA / tempo decorrido */}
               {elapsedMs !== null && (
                 <span
@@ -682,26 +867,22 @@ const AnalystCockpit = ({ ticket = FALLBACK_TICKET }: { ticket?: WorkspaceTicket
             <button className="flex items-center gap-1.5 px-3 py-2 text-sm font-semibold transition-colors border border-outline-variant text-text-main hover:bg-surface-container rounded-lg">
               <BookOpen className="w-4 h-4" /> <span className="hidden lg:inline">Base de Conhecimento</span>
             </button>
-            {isResolved && !isAdmin ? (
-              <span className="inline-flex items-center gap-1.5 px-3 py-2 border text-sm font-bold bg-surface-container text-on-surface-variant border-outline-variant rounded-lg">
-                <Lock className="w-4 h-4" /> Somente leitura · {translateState(status)}
-              </span>
-            ) : (
+            {isResolved ? (
               <>
-                {isResolved && isAdmin && (
+                {isAdmin && (
                   <span className="inline-flex items-center gap-1 px-2.5 py-2 border text-[11px] font-bold bg-amber-500/10 text-amber-500 border border-amber-500/20 rounded-lg" title="Override administrativo ativo">
                     <Lock className="w-3.5 h-3.5" /> God Mode
                   </span>
                 )}
-                {canEdit && !isEditing && (
+                {canAct && conducaoMode === 'idle' && (
                   <button
-                    onClick={openEditForm}
-                    className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold shadow-sm transition-all hover:opacity-90 active:scale-[0.98] bg-primary text-on-primary rounded-lg"
+                    onClick={openReopenForm}
+                    className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold shadow-sm transition-all hover:opacity-90 active:scale-[0.98] border-2 border-primary text-primary bg-transparent hover:bg-primary/5 rounded-lg"
                   >
-                    <Edit3 className="w-4 h-4" /> Atualizar Chamado
+                    <PlayCircle className="w-4 h-4" /> Reabrir Chamado
                   </button>
                 )}
-                {canEdit && isEditing && (
+                {conducaoMode === 'reopen' && (
                   <button
                     onClick={handleCancelEdit}
                     className="flex items-center gap-1.5 px-3 py-2 border text-sm font-semibold transition-colors border-outline-variant text-text-main hover:bg-surface-container rounded-lg"
@@ -709,20 +890,43 @@ const AnalystCockpit = ({ ticket = FALLBACK_TICKET }: { ticket?: WorkspaceTicket
                     Cancelar
                   </button>
                 )}
-                <button
-                  onClick={handleStartService}
-                  disabled={!canEdit || assigning || Boolean(detail?.responded_at)}
-                  className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold shadow-sm transition-all hover:opacity-90 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed bg-primary text-on-primary rounded-lg"
-                >
-                  <CheckCircle className="w-4 h-4" /> {assigning ? 'Iniciando…' : detail?.responded_at ? 'Atendimento iniciado' : 'Iniciar Atendimento'}
-                </button>
-                <button
-                  onClick={openPendingForm}
-                  disabled={!canEdit || status === 'On Hold'}
-                  className="flex items-center gap-1.5 px-3 py-2 border text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed border-outline-variant text-text-main hover:bg-amber-500/15 hover:text-amber-500 hover:border-amber-500/30 rounded-lg"
-                >
-                  <Pause className="w-4 h-4" /> <span className="hidden lg:inline">Pendente</span>
-                </button>
+              </>
+            ) : (
+              <>
+                {/* Workflow: New → só "Iniciar Atendimento" */}
+                {canEdit && isNew && conducaoMode === 'idle' && (
+                  <button
+                    onClick={openStartForm}
+                    className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold shadow-sm transition-all hover:opacity-90 active:scale-[0.98] bg-primary text-on-primary rounded-lg"
+                  >
+                    <PlayCircle className="w-4 h-4" /> Iniciar Atendimento
+                  </button>
+                )}
+                {canEdit && !isNew && conducaoMode === 'idle' && (
+                  <>
+                    <button
+                      onClick={openEditForm}
+                      className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold shadow-sm transition-all hover:opacity-90 active:scale-[0.98] bg-primary text-on-primary rounded-lg"
+                    >
+                      <Edit3 className="w-4 h-4" /> Atualizar Chamado
+                    </button>
+                    <button
+                      onClick={openPendingForm}
+                      disabled={status === 'On Hold'}
+                      className="flex items-center gap-1.5 px-3 py-2 border text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed border-outline-variant text-text-main hover:bg-amber-500/15 hover:text-amber-500 hover:border-amber-500/30 rounded-lg"
+                    >
+                      <Pause className="w-4 h-4" /> <span className="hidden lg:inline">Pendente</span>
+                    </button>
+                  </>
+                )}
+                {canEdit && conducaoMode !== 'idle' && (
+                  <button
+                    onClick={handleCancelEdit}
+                    className="flex items-center gap-1.5 px-3 py-2 border text-sm font-semibold transition-colors border-outline-variant text-text-main hover:bg-surface-container rounded-lg"
+                  >
+                    Cancelar
+                  </button>
+                )}
               </>
             )}
           </div>
@@ -1040,366 +1244,451 @@ const AnalystCockpit = ({ ticket = FALLBACK_TICKET }: { ticket?: WorkspaceTicket
                   </div>
                 </div>
 
-                {/* CONDUÇÃO DO CHAMADO (EDIT / ACTION VIEW) */}
-                {canEdit && (
-                  isEditing ? (
-                    <div className={`${cardClass} overflow-hidden`}>
-                      <div className={`px-5 py-4 border-b flex items-center justify-between ${
-                        isAlpha 
-                          ? 'border-zinc-800 bg-zinc-900/50' 
-                          : isBeta 
-                            ? 'border-zinc-200 bg-slate-50/80' 
-                            : 'border-outline-variant bg-surface-container/30'
-                      }`}>
-                        <div className="flex items-center gap-2">
-                          <Send className={`w-4 h-4 ${isBeta ? 'text-medical-blue' : 'text-primary'}`} />
-                          <h2 className={`text-sm font-bold ${isAlpha ? 'text-zinc-300 font-mono' : 'text-on-surface'}`}>
-                            Condução do Chamado
-                          </h2>
+                {/* CONDUÇÃO DO CHAMADO — idle: reabrir quando resolvido */}
+                {isResolved && canAct && conducaoMode === 'idle' && (
+                  <div className={`${cardClass} p-5 space-y-3`}>
+                    <div className="flex items-center gap-2 mb-1">
+                      <PlayCircle className="w-4 h-4 text-primary" />
+                      <h2 className="text-sm font-bold text-on-surface">Ações do Chamado</h2>
+                    </div>
+                    <p className="text-[11px] text-on-surface-variant leading-relaxed">
+                      Este chamado está <b>{translateState(status)}</b>. Se a solução não foi suficiente ou o problema voltou, reabra o chamado para retomar o atendimento.
+                    </p>
+                    <button
+                      onClick={openReopenForm}
+                      className="w-full px-4 py-2.5 text-xs font-semibold border-2 transition-all flex items-center justify-center gap-1.5 cursor-pointer rounded-lg border-primary text-primary hover:bg-primary/5 active:scale-[0.98]"
+                    >
+                      <PlayCircle className="w-4 h-4" /> Reabrir Chamado
+                    </button>
+                  </div>
+                )}
+
+                {/* CONDUÇÃO DO CHAMADO — idle: condicional por status */}
+                {canEdit && !isResolved && conducaoMode === 'idle' && isNew && (
+                  <div className={`${cardClass} p-5 space-y-3`}>
+                    <div className="flex items-center gap-2 mb-1">
+                      <PlayCircle className="w-4 h-4 text-primary" />
+                      <h2 className="text-sm font-bold text-on-surface">Primeiro Atendimento</h2>
+                    </div>
+                    <p className="text-[11px] text-on-surface-variant leading-relaxed">
+                      Este chamado está <b>Novo</b> e aguarda o primeiro atendimento. Ao iniciar, o <b>SLA de resposta</b> será registrado e o estado passará para <b>Em Andamento</b>.
+                    </p>
+                    <button
+                      onClick={openStartForm}
+                      className="w-full px-4 py-2.5 text-xs font-bold shadow-sm transition-all flex items-center justify-center gap-1.5 cursor-pointer rounded-lg bg-primary text-on-primary hover:opacity-90 active:scale-[0.98]"
+                    >
+                      <PlayCircle className="w-4 h-4" /> Iniciar Atendimento
+                    </button>
+                  </div>
+                )}
+
+                {canEdit && !isResolved && conducaoMode === 'idle' && !isNew && (
+                  <div className={`${cardClass} p-5 space-y-3`}>
+                    <div className="flex items-center gap-2 mb-1">
+                      <Send className="w-4 h-4 text-primary" />
+                      <h2 className="text-sm font-bold text-on-surface">Ações do Chamado</h2>
+                    </div>
+                    <button
+                      onClick={openEditForm}
+                      className="w-full px-4 py-2.5 text-xs font-semibold shadow-sm transition-all flex items-center justify-center gap-1.5 cursor-pointer rounded-lg bg-primary text-on-primary hover:opacity-90 active:scale-[0.98]"
+                    >
+                      <Edit3 className="w-4 h-4" /> Atualizar Chamado
+                    </button>
+                    <button
+                      onClick={openTransferForm}
+                      className="w-full px-4 py-2.5 text-xs font-semibold border transition-all flex items-center justify-center gap-1.5 cursor-pointer rounded-lg border-outline-variant text-on-surface hover:bg-surface-container active:scale-[0.98]"
+                    >
+                      <ArrowRightLeft className="w-4 h-4" /> Transferir Chamado
+                    </button>
+                    {!isResolved && (
+                      <button
+                        onClick={openResolveForm}
+                        className="w-full px-4 py-2.5 text-xs font-semibold border-2 transition-all flex items-center justify-center gap-1.5 cursor-pointer rounded-lg border-emerald-500 text-emerald-600 hover:bg-emerald-50 active:scale-[0.98]"
+                      >
+                        <CheckCircle className="w-4 h-4" /> Resolver Chamado
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                {/* MODO ATUALIZAÇÃO */}
+                {canEdit && conducaoMode === 'update' && (
+                  <div className={`${cardClass} overflow-hidden`}>
+                    <div className="px-5 py-4 border-b border-outline-variant bg-surface-container/30 flex items-center gap-2">
+                      <Edit3 className="w-4 h-4 text-primary" />
+                      <h2 className="text-sm font-bold text-on-surface">Atualizar Chamado</h2>
+                    </div>
+
+                    <div className="p-5 space-y-5">
+                      {/* Seletor de Visibilidade (Abas) */}
+                      <div>
+                        <label className="block text-[10px] font-bold uppercase tracking-widest mb-1.5 text-on-surface-variant">
+                          Visibilidade da Mensagem
+                        </label>
+                        <div className="flex p-0.5 w-full border bg-surface-container border-outline-variant rounded-lg">
+                          <button type="button" onClick={() => setIsInternal(false)}
+                            className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs font-semibold transition-all cursor-pointer ${!isInternal ? 'bg-primary text-on-primary rounded-md shadow-sm' : 'text-on-surface-variant hover:text-on-surface bg-transparent'}`}>
+                            <User className="w-3.5 h-3.5" /> Cliente
+                          </button>
+                          <button type="button" onClick={() => setIsInternal(true)}
+                            className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs font-semibold transition-all cursor-pointer ${isInternal ? 'bg-amber-500 text-white rounded-md shadow-sm' : 'text-on-surface-variant hover:text-on-surface bg-transparent'}`}>
+                            <Lock className="w-3.5 h-3.5" /> Interno
+                          </button>
                         </div>
                       </div>
 
-                      <div className="p-5 space-y-5">
-                        {/* Seletor de Visibilidade (Abas) */}
+                      {/* Mensagem */}
+                      <div>
+                        <label className="block text-[10px] font-bold uppercase tracking-widest mb-1.5 text-on-surface-variant">
+                          Mensagem / Ação
+                        </label>
+                        {responseMacros.length > 0 && (
+                          <select defaultValue="" onChange={e => { applyResponseMacro(e.target.value); e.currentTarget.value = '' }}
+                            className={`w-full px-2.5 py-2 mb-2 text-xs outline-none cursor-pointer font-medium ${inputClass}`}>
+                            <option value="">⚡ Inserir resposta pronta…</option>
+                            {responseMacros
+                              .filter(macro => macro.visibility === 'both' || (isInternal ? macro.visibility === 'internal' : macro.visibility === 'public'))
+                              .map(macro => <option key={macro.id} value={macro.id}>{macro.name}</option>)}
+                          </select>
+                        )}
+                        <textarea rows={3} value={formComment} onChange={e => setFormComment(e.target.value)}
+                          placeholder={isInternal ? 'Anotações técnicas internas (oculto para o cliente)...' : 'Escreva sua resposta ou orientação para o cliente...'}
+                          className={`w-full p-3 text-xs outline-none resize-none transition-all ${inputClass}`} />
+                      </div>
+
+                      {/* Estado — SEM Resolvido/Fechado (use o botão Resolver para isso) */}
+                      <div className="space-y-4">
                         <div>
-                          <label className={`block text-[10px] font-bold uppercase tracking-widest mb-1.5 ${
-                            isAlpha ? 'text-zinc-500 font-mono' : 'text-on-surface-variant'
-                          }`}>
-                            Visibilidade da Mensagem
+                          <label className="block text-[10px] font-bold uppercase tracking-widest mb-1.5 text-on-surface-variant">
+                            Estado (Status)
                           </label>
-                          <div className={`flex p-0.5 w-full border ${
-                            isAlpha 
-                              ? 'bg-zinc-950 border-zinc-800 rounded-lg' 
-                              : isBeta 
-                                ? 'bg-slate-50 border-zinc-200 rounded-sm' 
-                                : 'bg-surface-container border-outline-variant rounded-lg'
-                          }`}>
-                            <button
-                              type="button"
-                              onClick={() => setIsInternal(false)}
-                              className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs font-semibold transition-all cursor-pointer ${
-                                !isInternal
-                                  ? isAlpha
-                                    ? 'bg-primary text-on-primary rounded-md shadow-sm font-mono'
-                                    : isBeta
-                                      ? 'bg-medical-blue text-white rounded-sm shadow-sm'
-                                      : 'bg-primary text-on-primary rounded-md shadow-sm'
-                                  : 'text-on-surface-variant hover:text-on-surface bg-transparent'
-                              }`}
-                            >
-                              <User className="w-3.5 h-3.5" /> Cliente
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setIsInternal(true)}
-                              className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs font-semibold transition-all cursor-pointer ${
-                                isInternal
-                                  ? isAlpha
-                                    ? 'bg-amber-500 text-white rounded-md shadow-sm font-mono'
-                                    : isBeta
-                                      ? 'bg-amber-500 text-white rounded-sm shadow-sm'
-                                      : 'bg-amber-500 text-white rounded-md shadow-sm'
-                                  : 'text-on-surface-variant hover:text-on-surface bg-transparent'
-                              }`}
-                            >
-                              <Lock className="w-3.5 h-3.5" /> Interno
-                            </button>
-                          </div>
+                          <select value={formState} onChange={e => setFormState(e.target.value)}
+                            className={`w-full px-2.5 py-2 text-xs outline-none cursor-pointer font-medium ${inputClass}`}>
+                            {Object.entries(STATE_LABELS_PT)
+                              .filter(([value]) => !['Pending User', 'Resolved', 'Closed'].includes(value) || (isAdmin && value === 'Closed'))
+                              .filter(([value]) => value !== 'Resolved')
+                              .map(([value, label]) => (
+                                <option key={value} value={value}>{label}</option>
+                              ))}
+                          </select>
+                          <p className="text-[10px] text-on-surface-variant mt-1">Para resolver o chamado, use o botão <b>Resolver Chamado</b>.</p>
                         </div>
 
-                        {/* Campo de Texto */}
-                        <div>
-                          <label className={`block text-[10px] font-bold uppercase tracking-widest mb-1.5 ${
-                            isAlpha ? 'text-zinc-500 font-mono' : 'text-on-surface-variant'
-                          }`}>
-                            Mensagem / Ação
-                          </label>
-                          <textarea
-                            rows={3}
-                            value={formComment}
-                            onChange={e => setFormComment(e.target.value)}
-                            placeholder={
-                              isInternal
-                                ? 'Descreva detalhes técnicos ou anotações internas (oculto para o cliente)...'
-                                : 'Escreva sua resposta ou orientação para o cliente...'
-                            }
-                            className={`w-full p-3 text-xs outline-none resize-none transition-all ${inputClass}`}
-                          />
-                        </div>
-
-                        {/* Campos de Controle Integrados */}
-                        <div className="space-y-4">
-                          {/* Dropdown Estado */}
-                          <div>
-                            <label className={`block text-[10px] font-bold uppercase tracking-widest mb-1.5 ${
-                              isAlpha ? 'text-zinc-500 font-mono' : 'text-on-surface-variant'
-                            }`}>
-                              Estado (Status)
+                        {/* Motivo da Pendência */}
+                        {formState === 'On Hold' && (
+                          <div className="border-t pt-4 space-y-2 border-outline-variant">
+                            <label className="block text-[10px] font-bold text-amber-500 uppercase tracking-wider">
+                              Motivo da Pendência <span className="text-error">*</span>
                             </label>
-                            <select
-                              value={formState}
-                              onChange={e => setFormState(e.target.value)}
-                              className={`w-full px-2.5 py-2 text-xs outline-none cursor-pointer font-medium ${inputClass}`}
-                            >
-                              {Object.entries(STATE_LABELS_PT)
-                                .filter(([value]) => value !== 'Pending User')
-                                .filter(([value]) => value !== 'Closed' || isAdmin)
-                                .map(([value, label]) => (
-                                  <option key={value} value={value}>{label}</option>
-                                ))}
+                            <select value={formPendingReasonId} onChange={e => setFormPendingReasonId(e.target.value)}
+                              className="w-full px-2.5 py-2 text-xs font-medium outline-none cursor-pointer bg-amber-500/10 border border-amber-500/25 text-amber-500 rounded-xl focus:ring-2 focus:ring-amber-500">
+                              <option value="">Selecione o motivo…</option>
+                              {pendingReasons.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
                             </select>
-                          </div>
-
-                          {/* Motivo da Pendência (obrigatório quando Pendente) — logo após o Estado */}
-                          {formState === 'On Hold' && (
-                            <div className={`border-t pt-4 space-y-2 ${isAlpha ? 'border-zinc-800' : 'border-outline-variant'}`}>
-                              <label className="block text-[10px] font-bold text-amber-500 uppercase tracking-wider">
-                                Motivo da Pendência <span className="text-error">*</span>
-                              </label>
-                              <select
-                                value={formPendingReasonId}
-                                onChange={e => setFormPendingReasonId(e.target.value)}
-                                className={`w-full px-2.5 py-2 text-xs font-medium outline-none cursor-pointer ${
-                                  isAlpha
-                                    ? 'bg-amber-500/10 border border-amber-500/25 text-amber-400 rounded-lg focus:ring-1 focus:ring-amber-500'
-                                    : isBeta
-                                      ? 'bg-amber-50 border border-amber-200 text-amber-800 rounded-sm focus:ring-2 focus:ring-amber-500/20'
-                                      : 'bg-amber-500/10 border border-amber-500/25 text-amber-500 rounded-xl focus:ring-2 focus:ring-amber-500'
-                                }`}
-                              >
-                                <option value="">Selecione o motivo…</option>
-                                {pendingReasons.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
-                              </select>
-                              {(() => {
-                                const sel = pendingReasons.find(r => r.id === formPendingReasonId)
-                                return sel ? (
-                                  <p className="text-[10px] text-amber-500 flex items-start gap-1.5 leading-normal">
-                                    <Pause className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-                                    <span>
-                                      {sel.requires_customer_action
-                                        ? 'Aguarda ação do cliente — o relógio de SLA fica pausado enquanto Pendente.'
-                                        : 'Pendência interna/terceiros — o relógio de SLA fica pausado enquanto Pendente.'}
-                                    </span>
-                                  </p>
-                                ) : null
-                              })()}
-                              {pendingReasons.length === 0 && (
-                                <p className="text-[10px] text-error font-medium">Nenhum motivo cadastrado. Configure os Motivos de Pendência na governança de SLA.</p>
-                              )}
-                            </div>
-                          )}
-
-                          {/* Dropdown Grupo Solucionador */}
-                          <div>
-                            <label className={`block text-[10px] font-bold uppercase tracking-widest mb-1.5 ${
-                              isAlpha ? 'text-zinc-500 font-mono' : 'text-on-surface-variant'
-                            }`}>
-                              Grupo Solucionador
-                            </label>
-                            {loadingGroups ? (
-                              <div className={`text-xs py-2 animate-pulse ${isAlpha ? 'text-zinc-500 font-mono' : 'text-on-surface-variant'}`}>
-                                Carregando grupos...
-                              </div>
-                            ) : (
-                              <select
-                                value={formGroupId}
-                                onChange={e => {
-                                  const newGroupId = e.target.value
-                                  setFormGroupId(newGroupId)
-                                  if (newGroupId !== (detail?.assignment_group_id || detail?.assigned_group_id || '')) {
-                                    setFormAssigneeId('')
-                                  }
-                                }}
-                                className={`w-full px-2.5 py-2 text-xs outline-none cursor-pointer font-medium ${inputClass}`}
-                              >
-                                <option value="">Nenhum grupo atribuído</option>
-                                {activeGroups.map(g => (
-                                  <option key={g.id} value={g.id}>{g.name}</option>
-                                ))}
-                              </select>
+                            {(() => {
+                              const sel = pendingReasons.find(r => r.id === formPendingReasonId)
+                              return sel ? (
+                                <p className="text-[10px] text-amber-500 flex items-start gap-1.5 leading-normal">
+                                  <Pause className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                                  <span>{sel.requires_customer_action ? 'Aguarda ação do cliente — SLA pausado.' : 'Pendência interna — SLA pausado.'}</span>
+                                </p>
+                              ) : null
+                            })()}
+                            {pendingReasons.length === 0 && (
+                              <p className="text-[10px] text-error font-medium">Nenhum motivo cadastrado. Configure em Governança de SLA.</p>
                             )}
-                          </div>
-
-                          {/* Dropdown Analista Responsável */}
-                          <div>
-                            <label className={`block text-[10px] font-bold uppercase tracking-widest mb-1.5 ${
-                              isAlpha ? 'text-zinc-500 font-mono' : 'text-on-surface-variant'
-                            }`}>
-                              Analista Responsável
-                            </label>
-                            <select
-                              disabled={!formGroupId && !detail?.assigned_to_id}
-                              value={formAssigneeId}
-                              onChange={e => setFormAssigneeId(e.target.value)}
-                              className={`w-full px-2.5 py-2 text-xs outline-none cursor-pointer font-medium disabled:opacity-50 disabled:cursor-not-allowed ${inputClass}`}
-                            >
-                              {!formGroupId && !detail?.assigned_to_id ? (
-                                <option value="">Selecione um grupo primeiro</option>
-                              ) : (
-                                <>
-                                  <option value="">Não atribuído</option>
-                                  {detail?.assigned_to_id && !groupMembers.some(member => member.id === detail.assigned_to_id) && (
-                                    <option value={detail.assigned_to_id}>{detail.assigned_to_name || 'Analista atual'}</option>
-                                  )}
-                                  {groupMembers.map(m => (
-                                    <option key={m.id} value={m.id}>{m.name}</option>
-                                  ))}
-                                </>
-                              )}
-                            </select>
-                          </div>
-                        </div>
-
-                        {/* Priorização Automática ITIL (perguntas → matriz ServiceNow) */}
-                        <div className={`space-y-4 pt-3 border-t ${
-                          isAlpha ? 'border-zinc-800' : 'border-outline-variant'
-                        }`}>
-                          {/* Dropdown Impacto — pergunta "Quem é afetado?" */}
-                          <div>
-                            <label className={`block text-[10px] font-bold uppercase tracking-widest mb-1.5 ${
-                              isAlpha ? 'text-zinc-500 font-mono' : 'text-on-surface-variant'
-                            }`}>
-                              Impacto — Quem é afetado?
-                            </label>
-                            <select
-                              value={formImpact}
-                              onChange={e => setFormImpact(e.target.value)}
-                              className={`w-full px-2.5 py-2 text-xs outline-none cursor-pointer font-medium ${inputClass}`}
-                            >
-                              {IMPACT_OPTIONS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-                            </select>
-                          </div>
-
-                          {/* Dropdown Urgência — pergunta "Impacto no trabalho?" */}
-                          <div>
-                            <label className={`block text-[10px] font-bold uppercase tracking-widest mb-1.5 ${
-                              isAlpha ? 'text-zinc-500 font-mono' : 'text-on-surface-variant'
-                            }`}>
-                              Urgência — Impacto no trabalho?
-                            </label>
-                            <select
-                              value={formUrgency}
-                              onChange={e => setFormUrgency(e.target.value)}
-                              className={`w-full px-2.5 py-2 text-xs outline-none cursor-pointer font-medium ${inputClass}`}
-                            >
-                              {URGENCY_OPTIONS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-                            </select>
-                          </div>
-
-                          {/* Prioridade Final Calculada */}
-                          <div>
-                            <label className={`block text-[10px] font-bold uppercase tracking-widest mb-1.5 ${
-                              isAlpha ? 'text-zinc-500 font-mono' : 'text-on-surface-variant'
-                            }`}>
-                              Prioridade (Calculada)
-                            </label>
-                            <div className={`py-2.5 flex items-center px-3 text-xs font-bold shadow-inner ${
-                                isAlpha 
-                                  ? 'bg-zinc-950 border border-zinc-800 text-cyan-400 font-mono rounded-lg' 
-                                  : isBeta 
-                                    ? 'bg-slate-50 border border-zinc-200 text-medical-blue rounded-sm' 
-                                    : 'bg-surface-container border border-outline-variant text-primary rounded-xl'
-                            }`}>
-                              {priorityString(formImpact, formUrgency)}
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Campos de Resolução Condicionais */}
-                        {(formState === 'Resolved' || formState === 'Closed') && (
-                          <div className={`border-t pt-4 space-y-4 ${isAlpha ? 'border-zinc-800' : 'border-outline-variant'}`}>
-                            <div className="flex items-center gap-1.5">
-                              <CheckCircle className="w-4 h-4 text-emerald-500" />
-                              <h4 className={`text-[10px] font-bold uppercase tracking-wider ${isAlpha ? 'text-zinc-400 font-mono' : 'text-on-surface'}`}>Dados de Resolução</h4>
-                            </div>
-                            <div className="space-y-3">
-                              <div>
-                                <label className={`block text-[10px] font-bold uppercase tracking-wider mb-1.5 ${isAlpha ? 'text-zinc-500 font-mono' : 'text-on-surface-variant'}`}>Código de Encerramento <span className="text-error">*</span></label>
-                                <select
-                                  value={closeCode}
-                                  onChange={e => setCloseCode(e.target.value)}
-                                  className={`w-full px-2.5 py-2 text-xs outline-none cursor-pointer font-medium ${inputClass}`}
-                                >
-                                  <option value="">Selecione…</option>
-                                  {CLOSE_CODES.map(grp => (
-                                    <optgroup key={grp.group} label={grp.group}>
-                                      {grp.options.map(opt => (
-                                        <option key={opt} value={`${grp.group} / ${opt}`}>{opt}</option>
-                                      ))}
-                                    </optgroup>
-                                  ))}
-                                </select>
-                              </div>
-                              <div>
-                                <label className={`block text-[10px] font-bold uppercase tracking-wider mb-1.5 ${isAlpha ? 'text-zinc-500 font-mono' : 'text-on-surface-variant'}`}>Tempo Gasto</label>
-                                <input
-                                  value={timeSpent}
-                                  onChange={e => setTimeSpent(e.target.value)}
-                                  type="text"
-                                  placeholder="ex: 1h 30m"
-                                  className={`w-full px-2.5 py-2 text-xs outline-none font-medium ${inputClass}`}
-                                />
-                              </div>
-                              <div>
-                                <label className={`block text-[10px] font-bold uppercase tracking-wider mb-1.5 ${isAlpha ? 'text-zinc-500 font-mono' : 'text-on-surface-variant'}`}>Notas de Resolução <span className="text-error">*</span></label>
-                                <textarea
-                                  rows={2}
-                                  value={closeNotes}
-                                  onChange={e => setCloseNotes(e.target.value)}
-                                  className={`w-full p-3 text-xs outline-none resize-none transition-all ${inputClass}`}
-                                  placeholder="Descreva a solução aplicada (visível ao cliente)..."
-                                />
-                              </div>
-                            </div>
                           </div>
                         )}
 
-                        {/* Ação Gravar Condução */}
-                        <div className={`flex gap-2 pt-3 border-t justify-end ${isAlpha ? 'border-zinc-800' : 'border-outline-variant'}`}>
-                          <button
-                            type="button"
-                            onClick={handleCancelEdit}
-                            className={`px-3 py-2 text-xs font-semibold transition-colors cursor-pointer ${buttonSecondaryClass}`}
-                          >
-                            Cancelar
-                          </button>
-                          <button
-                            type="button"
-                            disabled={savingConducao}
-                            onClick={handleGravarConducao}
-                            className={`px-4 py-2 font-bold text-xs shadow transition-all active:scale-[0.98] disabled:opacity-50 flex items-center gap-1.5 cursor-pointer ${buttonPrimaryClass}`}
-                          >
-                            <Send className="w-3.5 h-3.5" />
-                            {savingConducao ? 'Gravando…' : 'Gravar'}
-                          </button>
+                        {/* Grupo / Analista */}
+                        <div>
+                          <label className="block text-[10px] font-bold uppercase tracking-widest mb-1.5 text-on-surface-variant">Grupo Solucionador</label>
+                          {loadingGroups ? (
+                            <div className="text-xs py-2 animate-pulse text-on-surface-variant">Carregando grupos...</div>
+                          ) : (
+                            <select value={formGroupId} onChange={e => { const id = e.target.value; setFormGroupId(id); if (id !== (detail?.assignment_group_id || detail?.assigned_group_id || '')) setFormAssigneeId('') }}
+                              className={`w-full px-2.5 py-2 text-xs outline-none cursor-pointer font-medium ${inputClass}`}>
+                              <option value="">Nenhum grupo atribuído</option>
+                              {activeGroups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+                            </select>
+                          )}
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold uppercase tracking-widest mb-1.5 text-on-surface-variant">Analista Responsável</label>
+                          <select disabled={!formGroupId && !detail?.assigned_to_id} value={formAssigneeId} onChange={e => setFormAssigneeId(e.target.value)}
+                            className={`w-full px-2.5 py-2 text-xs outline-none cursor-pointer font-medium disabled:opacity-50 disabled:cursor-not-allowed ${inputClass}`}>
+                            {!formGroupId && !detail?.assigned_to_id ? (
+                              <option value="">Selecione um grupo primeiro</option>
+                            ) : (
+                              <>
+                                <option value="">Não atribuído</option>
+                                {detail?.assigned_to_id && !groupMembers.some(m => m.id === detail.assigned_to_id) && (
+                                  <option value={detail.assigned_to_id}>{detail.assigned_to_name || 'Analista atual'}</option>
+                                )}
+                                {groupMembers.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                              </>
+                            )}
+                          </select>
                         </div>
                       </div>
-                    </div>
-                  ) : (
-                    <div className={`${cardClass} p-5 flex flex-col items-center justify-center text-center gap-3`}>
-                      <div className={`w-10 h-10 flex items-center justify-center ${
-                        isAlpha 
-                          ? 'rounded-lg bg-zinc-950 text-cyan-400 border border-zinc-800' 
-                          : isBeta 
-                            ? 'rounded-sm bg-blue-50 text-medical-blue' 
-                            : 'rounded-full bg-primary/10 text-primary'
-                      }`}>
-                        <Edit3 className="w-5 h-5" />
+
+                      {/* Impacto / Urgência / Prioridade */}
+                      <div className="space-y-4 pt-3 border-t border-outline-variant">
+                        <div>
+                          <label className="block text-[10px] font-bold uppercase tracking-widest mb-1.5 text-on-surface-variant">Impacto — Quem é afetado?</label>
+                          <select value={formImpact} onChange={e => setFormImpact(e.target.value)} className={`w-full px-2.5 py-2 text-xs outline-none cursor-pointer font-medium ${inputClass}`}>
+                            {IMPACT_OPTIONS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold uppercase tracking-widest mb-1.5 text-on-surface-variant">Urgência — Impacto no trabalho?</label>
+                          <select value={formUrgency} onChange={e => setFormUrgency(e.target.value)} className={`w-full px-2.5 py-2 text-xs outline-none cursor-pointer font-medium ${inputClass}`}>
+                            {URGENCY_OPTIONS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold uppercase tracking-widest mb-1.5 text-on-surface-variant">Prioridade (Calculada)</label>
+                          <div className="py-2.5 flex items-center px-3 text-xs font-bold shadow-inner bg-surface-container border border-outline-variant text-primary rounded-xl">
+                            {priorityString(formImpact, formUrgency)}
+                          </div>
+                        </div>
                       </div>
+
+                      {/* Rodapé */}
+                      <div className="flex gap-2 pt-3 border-t border-outline-variant justify-end">
+                        <button type="button" onClick={handleCancelEdit} className={`px-3 py-2 text-xs font-semibold transition-colors cursor-pointer ${buttonSecondaryClass}`}>
+                          Cancelar
+                        </button>
+                        <button type="button" disabled={savingConducao} onClick={handleGravarConducao}
+                          className={`px-4 py-2 font-bold text-xs shadow transition-all active:scale-[0.98] disabled:opacity-50 flex items-center gap-1.5 cursor-pointer ${buttonPrimaryClass}`}>
+                          <Send className="w-3.5 h-3.5" />
+                          {savingConducao ? 'Salvando…' : 'Salvar Atualização'}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* MODO RESOLUÇÃO */}
+                {canEdit && conducaoMode === 'resolve' && (
+                  <div className={`${cardClass} overflow-hidden`}>
+                    <div className="px-5 py-4 border-b border-emerald-200 bg-emerald-50 flex items-center gap-2">
+                      <CheckCircle className="w-4 h-4 text-emerald-600" />
+                      <h2 className="text-sm font-bold text-emerald-800">Resolver Chamado</h2>
+                      <span className="ml-auto text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-200">Status → Resolvido</span>
+                    </div>
+
+                    <div className="p-5 space-y-4">
+                      <p className="text-[11px] text-on-surface-variant leading-relaxed">
+                        Preencha os dados de encerramento. O chamado será marcado como <b>Resolvido</b> e o SLA será registrado.
+                      </p>
+
+                      {/* Código de Encerramento */}
                       <div>
-                        <h3 className={`font-bold text-xs ${isAlpha ? 'text-zinc-300 font-mono' : 'text-on-surface'}`}>Atualização do Chamado</h3>
-                        <p className={`text-[11px] mt-1 leading-relaxed ${isAlpha ? 'text-zinc-500 font-mono' : 'text-on-surface-variant'}`}>
-                          Responda ao cliente, mude o estado, altere atribuições ou adicione notas internas.
-                        </p>
+                        <label className="block text-[10px] font-bold uppercase tracking-wider mb-1.5 text-on-surface-variant">
+                          Código de Encerramento <span className="text-error">*</span>
+                        </label>
+                        <select value={closeCode} onChange={e => setCloseCode(e.target.value)}
+                          className={`w-full px-2.5 py-2 text-xs outline-none cursor-pointer font-medium ${inputClass}`}>
+                          <option value="">Selecione…</option>
+                          {CLOSE_CODES.map(grp => (
+                            <optgroup key={grp.group} label={grp.group}>
+                              {grp.options.map(opt => <option key={opt} value={`${grp.group} / ${opt}`}>{opt}</option>)}
+                            </optgroup>
+                          ))}
+                        </select>
                       </div>
-                      <button
-                        onClick={openEditForm}
-                        className={`w-full px-4 py-2 text-xs font-semibold shadow transition-all flex items-center justify-center gap-1.5 cursor-pointer ${buttonPrimaryClass}`}
-                      >
-                        <Edit3 className="w-4 h-4" /> Atualizar Chamado
-                      </button>
+
+                      {/* Notas de Resolução */}
+                      <div>
+                        <label className="block text-[10px] font-bold uppercase tracking-wider mb-1.5 text-on-surface-variant">
+                          Notas de Resolução <span className="text-error">*</span>
+                        </label>
+                        <textarea rows={3} value={closeNotes} onChange={e => setCloseNotes(e.target.value)}
+                          placeholder="Descreva a solução aplicada (visível ao cliente)..."
+                          className={`w-full p-3 text-xs outline-none resize-none transition-all ${inputClass}`} />
+                      </div>
+
+                      {/* Tempo Gasto */}
+                      <div>
+                        <label className="block text-[10px] font-bold uppercase tracking-wider mb-1.5 text-on-surface-variant">Tempo Gasto</label>
+                        <input value={timeSpent} onChange={e => setTimeSpent(e.target.value)}
+                          type="text" placeholder="ex: 1h 30m"
+                          className={`w-full px-2.5 py-2 text-xs outline-none font-medium ${inputClass}`} />
+                      </div>
+
+                      {/* Mensagem opcional ao cliente */}
+                      <div>
+                        <label className="block text-[10px] font-bold uppercase tracking-wider mb-1.5 text-on-surface-variant">
+                          Mensagem ao Cliente <span className="text-on-surface-variant font-normal">(opcional)</span>
+                        </label>
+                        <textarea rows={2} value={formComment} onChange={e => setFormComment(e.target.value)}
+                          placeholder="Informe o cliente sobre a resolução..."
+                          className={`w-full p-3 text-xs outline-none resize-none transition-all ${inputClass}`} />
+                      </div>
+
+                      {/* Rodapé */}
+                      <div className="flex gap-2 pt-3 border-t border-emerald-100 justify-end">
+                        <button type="button" onClick={handleCancelEdit} className={`px-3 py-2 text-xs font-semibold transition-colors cursor-pointer ${buttonSecondaryClass}`}>
+                          Cancelar
+                        </button>
+                        <button type="button" disabled={savingConducao} onClick={handleResolve}
+                          className="px-4 py-2 font-bold text-xs shadow-sm transition-all active:scale-[0.98] disabled:opacity-50 flex items-center gap-1.5 cursor-pointer rounded-lg bg-emerald-600 text-white hover:bg-emerald-700">
+                          <CheckCircle className="w-3.5 h-3.5" />
+                          {savingConducao ? 'Resolvendo…' : 'Confirmar Resolução'}
+                        </button>
+                      </div>
                     </div>
-                  )
+                  </div>
+                )}
+
+                {/* MODO PRIMEIRO ATENDIMENTO */}
+                {canEdit && conducaoMode === 'start' && (
+                  <div className={`${cardClass} overflow-hidden`}>
+                    <div className="px-5 py-4 border-b border-primary/20 bg-primary/5 flex items-center gap-2">
+                      <PlayCircle className="w-4 h-4 text-primary" />
+                      <h2 className="text-sm font-bold text-primary">Iniciar Atendimento</h2>
+                      <span className="ml-auto text-[10px] font-bold px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">SLA Resposta → registrado agora</span>
+                    </div>
+
+                    <div className="p-5 space-y-4">
+                      <p className="text-[11px] text-on-surface-variant leading-relaxed">
+                        Ao confirmar, o <b>SLA de resposta</b> será registrado no momento atual e o estado do chamado mudará para <b>Em Andamento</b>.
+                      </p>
+
+                      {/* Primeira mensagem ao cliente (opcional) */}
+                      <div>
+                        <label className="block text-[10px] font-bold uppercase tracking-wider mb-1.5 text-on-surface-variant">
+                          Primeira Resposta ao Cliente <span className="text-on-surface-variant font-normal">(opcional)</span>
+                        </label>
+                        <textarea rows={4} value={formComment} onChange={e => setFormComment(e.target.value)}
+                          placeholder="Escreva aqui a primeira resposta/orientação ao cliente. Ex: Recebemos seu chamado e já estamos investigando..."
+                          className={`w-full p-3 text-xs outline-none resize-none transition-all ${inputClass}`} />
+                        <p className="text-[10px] text-on-surface-variant mt-1">Deixe em branco para apenas registrar o início do atendimento sem enviar mensagem.</p>
+                      </div>
+
+                      {/* Rodapé */}
+                      <div className="flex gap-2 pt-3 border-t border-outline-variant justify-end">
+                        <button type="button" onClick={handleCancelEdit} className={`px-3 py-2 text-xs font-semibold transition-colors cursor-pointer ${buttonSecondaryClass}`}>
+                          Cancelar
+                        </button>
+                        <button type="button" disabled={savingConducao} onClick={handleStartAtendimento}
+                          className="px-4 py-2 font-bold text-xs shadow-sm transition-all active:scale-[0.98] disabled:opacity-50 flex items-center gap-1.5 cursor-pointer rounded-lg bg-primary text-on-primary hover:opacity-90">
+                          <PlayCircle className="w-3.5 h-3.5" />
+                          {savingConducao ? 'Iniciando…' : 'Iniciar Atendimento'}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* MODO TRANSFERÊNCIA */}
+                {canEdit && conducaoMode === 'transfer' && (
+                  <div className={`${cardClass} overflow-hidden`}>
+                    <div className="px-5 py-4 border-b border-outline-variant bg-surface-container/30 flex items-center gap-2">
+                      <ArrowRightLeft className="w-4 h-4 text-on-surface-variant" />
+                      <h2 className="text-sm font-bold text-on-surface">Transferir Chamado</h2>
+                    </div>
+
+                    <div className="p-5 space-y-4">
+                      <p className="text-[11px] text-on-surface-variant leading-relaxed">
+                        Redirecione o chamado para outro grupo ou analista. Uma nota interna será registrada automaticamente.
+                      </p>
+
+                      {/* Grupo Solucionador */}
+                      <div>
+                        <label className="block text-[10px] font-bold uppercase tracking-wider mb-1.5 text-on-surface-variant">
+                          Grupo Solucionador <span className="text-error">*</span>
+                        </label>
+                        {loadingGroups ? (
+                          <div className="text-xs py-2 animate-pulse text-on-surface-variant">Carregando grupos...</div>
+                        ) : (
+                          <select value={formGroupId}
+                            onChange={e => { const id = e.target.value; setFormGroupId(id); if (id !== (detail?.assignment_group_id || detail?.assigned_group_id || '')) setFormAssigneeId('') }}
+                            className={`w-full px-2.5 py-2 text-xs outline-none cursor-pointer font-medium ${inputClass}`}>
+                            <option value="">Selecione o grupo destino…</option>
+                            {activeGroups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+                          </select>
+                        )}
+                      </div>
+
+                      {/* Analista Responsável */}
+                      <div>
+                        <label className="block text-[10px] font-bold uppercase tracking-wider mb-1.5 text-on-surface-variant">
+                          Analista Responsável <span className="text-on-surface-variant font-normal">(opcional)</span>
+                        </label>
+                        <select disabled={!formGroupId} value={formAssigneeId} onChange={e => setFormAssigneeId(e.target.value)}
+                          className={`w-full px-2.5 py-2 text-xs outline-none cursor-pointer font-medium disabled:opacity-50 disabled:cursor-not-allowed ${inputClass}`}>
+                          {!formGroupId ? (
+                            <option value="">Selecione um grupo primeiro</option>
+                          ) : (
+                            <>
+                              <option value="">Não atribuído</option>
+                              {groupMembers.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                            </>
+                          )}
+                        </select>
+                      </div>
+
+                      {/* Motivo da transferência */}
+                      <div>
+                        <label className="block text-[10px] font-bold uppercase tracking-wider mb-1.5 text-on-surface-variant">
+                          Motivo da Transferência <span className="text-on-surface-variant font-normal">(opcional)</span>
+                        </label>
+                        <textarea rows={2} value={formComment} onChange={e => setFormComment(e.target.value)}
+                          placeholder="Informe o motivo da transferência (nota interna — não visível ao cliente)..."
+                          className={`w-full p-3 text-xs outline-none resize-none transition-all ${inputClass}`} />
+                      </div>
+
+                      {/* Rodapé */}
+                      <div className="flex gap-2 pt-3 border-t border-outline-variant justify-end">
+                        <button type="button" onClick={handleCancelEdit} className={`px-3 py-2 text-xs font-semibold transition-colors cursor-pointer ${buttonSecondaryClass}`}>
+                          Cancelar
+                        </button>
+                        <button type="button" disabled={savingConducao} onClick={handleTransfer}
+                          className={`px-4 py-2 font-bold text-xs shadow-sm transition-all active:scale-[0.98] disabled:opacity-50 flex items-center gap-1.5 cursor-pointer ${buttonPrimaryClass}`}>
+                          <ArrowRightLeft className="w-3.5 h-3.5" />
+                          {savingConducao ? 'Transferindo…' : 'Confirmar Transferência'}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* MODO REABERTURA */}
+                {canAct && conducaoMode === 'reopen' && (
+                  <div className={`${cardClass} overflow-hidden`}>
+                    <div className="px-5 py-4 border-b border-primary/20 bg-primary/5 flex items-center gap-2">
+                      <PlayCircle className="w-4 h-4 text-primary" />
+                      <h2 className="text-sm font-bold text-primary">Reabrir Chamado</h2>
+                    </div>
+
+                    <div className="p-5 space-y-4">
+                      <p className="text-[11px] text-on-surface-variant leading-relaxed">
+                        O chamado voltará para <b>Em Andamento</b>. Informe o motivo da reabertura.
+                      </p>
+
+                      <div>
+                        <label className="block text-[10px] font-bold uppercase tracking-wider mb-1.5 text-on-surface-variant">
+                          Motivo da Reabertura <span className="text-on-surface-variant font-normal">(opcional)</span>
+                        </label>
+                        <textarea rows={3} value={formComment} onChange={e => setFormComment(e.target.value)}
+                          placeholder="Ex: O problema voltou a ocorrer após a solução aplicada..."
+                          className={`w-full p-3 text-xs outline-none resize-none transition-all ${inputClass}`} />
+                      </div>
+
+                      <div className="flex gap-2 pt-3 border-t border-outline-variant justify-end">
+                        <button type="button" onClick={handleCancelEdit} className={`px-3 py-2 text-xs font-semibold transition-colors cursor-pointer ${buttonSecondaryClass}`}>
+                          Cancelar
+                        </button>
+                        <button type="button" disabled={savingConducao} onClick={handleReopen}
+                          className="px-4 py-2 font-bold text-xs shadow-sm transition-all active:scale-[0.98] disabled:opacity-50 flex items-center gap-1.5 cursor-pointer rounded-lg border-2 border-primary text-primary hover:bg-primary/5">
+                          <PlayCircle className="w-3.5 h-3.5" />
+                          {savingConducao ? 'Reabrindo…' : 'Confirmar Reabertura'}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
                 )}
               </div>
             </div>

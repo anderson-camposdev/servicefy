@@ -25,6 +25,7 @@ export interface CompanyRow {
   is_provider_tenant: boolean
   active: boolean
   logo_url: string | null
+  background_url: string | null
   primary_color: string
   secondary_color: string | null
   brand_name: string | null
@@ -150,6 +151,16 @@ export interface IncidentRow {
   pending_reason_id?: string | null
   is_response_breached?: boolean
   is_resolution_breached?: boolean
+  // Motor de SLA: acumulador de reabertura (migration 054)
+  accumulated_reopen_time_minutes?: number
+  // Motor de SLA: guarda de idempotência do aviso <30min (migration 059)
+  sla_warning_notified?: boolean
+  // Motor de Automação: tags livres + canal de origem (migration 055)
+  tags?: string[]
+  opened_via?: 'portal' | 'manual' | 'email' | 'api' | null
+  // Aprovação unificada de requisições (migration 072)
+  approval_status?: 'not_required' | 'pending' | 'approved' | 'rejected'
+  approval_decided_at?: string | null
 }
 
 // Motivos de pendência por tenant (migration 035).
@@ -171,6 +182,7 @@ export type SlaEventType =
   | 'paused'
   | 'resumed'
   | 'breached'
+  | 'reopened'
 
 export interface SlaEventRow {
   id: string
@@ -474,8 +486,50 @@ export interface RequestItemRow {
   // Overrides do motor de SLA (migration 033)
   sla_calendar_id?: string | null
   fixed_priority?: number | null
+  // Aprovação por grupo (migration 072)
+  requires_approval?: boolean
+  approval_group_id?: string | null
+  approval_mode?: 'any' | 'all'
   // join opcional
   group?: { id: string; name: string } | null
+}
+
+export interface RequestApprovalRow {
+  id: string
+  company_id: string
+  incident_id: string
+  approver_id: string
+  status: 'pending' | 'approved' | 'rejected' | 'cancelled'
+  decision_note: string | null
+  decided_at: string | null
+  created_at: string
+  incident?: Pick<IncidentRow, 'id' | 'number' | 'short_description' | 'caller_name' | 'created_at' | 'approval_status'> | null
+}
+
+export interface CsatSurveyRow {
+  id: string
+  company_id: string
+  incident_id: string
+  requester_id: string
+  status: 'pending' | 'submitted' | 'expired'
+  rating: number | null
+  comment: string | null
+  sent_at: string
+  submitted_at: string | null
+  created_at: string
+}
+
+export interface ResponseMacroRow {
+  id: string
+  company_id: string
+  name: string
+  body: string
+  visibility: 'public' | 'internal' | 'both'
+  active: boolean
+  usage_count: number
+  created_by: string | null
+  created_at: string
+  updated_at: string
 }
 
 // Política de SLA por tenant (migration 033) — prioridade numérica 1..5.
@@ -505,11 +559,48 @@ export interface WorkflowRuleRow {
   name: string
   description: string | null
   trigger_event: string
+  trigger_source: 'any' | 'portal' | 'email' | 'api'
   conditions: Json
   actions: Json
   active: boolean
   priority_order: number
   created_at: string
+  updated_at: string
+}
+
+/** Motor de Automação: log real de execução (migration 056) — substitui o mock da UI. */
+export interface WorkflowExecutionLogRow {
+  id: string
+  company_id: string
+  rule_id: string | null
+  rule_name: string
+  incident_id: string | null
+  incident_number: string | null
+  trigger_event: string
+  matched: boolean
+  status: 'success' | 'error' | 'skipped' | 'partial'
+  actions_summary: string | null
+  duration_ms: number | null
+  created_at: string
+}
+
+/** Motor de Automação: fila de ações assíncronas (migration 056). */
+export interface WorkflowActionQueueRow {
+  id: string
+  company_id: string
+  rule_id: string | null
+  incident_id: string
+  action: Json
+  status: 'pending' | 'processing' | 'done' | 'failed' | 'cancelled'
+  attempts: number
+  max_attempts: number
+  run_after: string
+  last_error: string | null
+  created_at: string
+  processed_at: string | null
+  claimed_at?: string | null
+  chain_id?: string | null
+  sequence_no?: number
 }
 
 export interface NotificationRow {
@@ -706,6 +797,9 @@ export type Database = {
       assignment_groups:          { Row: AssignmentGroupRow;            Insert: Partial<AssignmentGroupRow>;            Update: Partial<AssignmentGroupRow>;            Relationships: [] }
       user_groups:                { Row: UserGroupRow;                  Insert: UserGroupRow;                           Update: Partial<UserGroupRow>;                  Relationships: [] }
       incidents:                  { Row: IncidentRow;                   Insert: Partial<IncidentRow>;                   Update: Partial<IncidentRow>;                   Relationships: [] }
+      request_approvals:          { Row: RequestApprovalRow;            Insert: Partial<RequestApprovalRow>;            Update: Partial<RequestApprovalRow>;            Relationships: [] }
+      csat_surveys:               { Row: CsatSurveyRow;                 Insert: Partial<CsatSurveyRow>;                 Update: Partial<CsatSurveyRow>;                 Relationships: [] }
+      response_macros:            { Row: ResponseMacroRow;              Insert: Partial<ResponseMacroRow>;              Update: Partial<ResponseMacroRow>;              Relationships: [] }
       incident_history:           { Row: IncidentHistoryRow;            Insert: Partial<IncidentHistoryRow>;            Update: Partial<IncidentHistoryRow>;            Relationships: [] }
       problems:                   { Row: ProblemRow;                    Insert: Partial<ProblemRow>;                    Update: Partial<ProblemRow>;                    Relationships: [] }
       changes:                    { Row: ChangeRow;                     Insert: Partial<ChangeRow>;                     Update: Partial<ChangeRow>;                     Relationships: [] }
@@ -722,6 +816,8 @@ export type Database = {
       pending_reasons:            { Row: PendingReasonRow;              Insert: Partial<PendingReasonRow>;              Update: Partial<PendingReasonRow>;              Relationships: [] }
       sla_events:                 { Row: SlaEventRow;                   Insert: Partial<SlaEventRow>;                   Update: Partial<SlaEventRow>;                   Relationships: [] }
       workflow_rules:             { Row: WorkflowRuleRow;               Insert: Partial<WorkflowRuleRow>;               Update: Partial<WorkflowRuleRow>;               Relationships: [] }
+      workflow_execution_log:     { Row: WorkflowExecutionLogRow;       Insert: Partial<WorkflowExecutionLogRow>;       Update: Partial<WorkflowExecutionLogRow>;       Relationships: [] }
+      workflow_action_queue:      { Row: WorkflowActionQueueRow;        Insert: Partial<WorkflowActionQueueRow>;        Update: Partial<WorkflowActionQueueRow>;        Relationships: [] }
       notifications:              { Row: NotificationRow;               Insert: Partial<NotificationRow>;               Update: Partial<NotificationRow>;               Relationships: [] }
       // ─ Novos: Catálogo Hierárquico de Incidentes
       incident_catalog_items:     { Row: IncidentCatalogItemRow;        Insert: Partial<IncidentCatalogItemRow>;        Update: Partial<IncidentCatalogItemRow>;        Relationships: [] }

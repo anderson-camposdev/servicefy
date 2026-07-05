@@ -1,0 +1,18 @@
+{
+  "projectId": "d0267629-51eb-491d-ab1b-01e4f1ef2f12",
+  "pkg": "servicefy",
+  "globalName": "Servicefy",
+  "shape": "package",
+  "buildCmd": "vite build --config vite.lib.config.ts",
+  "srcDir": "src/components",
+  "componentSrcMap": {
+    "ServiceCard": "src/components/ServiceCard.tsx",
+    "RequestCatalogSelector": "src/components/RequestCatalogSelector.tsx",
+    "IncidentCatalogSelector": "src/components/IncidentCatalogSelector.tsx",
+    "ErrorBoundary": null,
+    "IconPicker": null,
+    "TicketTasksPanel": null
+  },
+  "cssEntry": "dist-lib/styles.css",
+  "readmeHeader": ".design-sync/conventions.md"
+}

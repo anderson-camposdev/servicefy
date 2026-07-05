@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { X, LayoutGrid } from 'lucide-react'
+import { X, LayoutGrid, Shuffle } from 'lucide-react'
 import TicketManagementDashboard from './TicketManagementDashboard'
 import AnalystCockpit from './AnalystCockpit'
+import ChangeManagementDashboard from './ChangeManagementDashboard'
 import type { WorkspaceTicket, CompanyLite } from './workspace.types'
 
 /**
@@ -29,7 +30,10 @@ interface WorkspaceLayoutProps {
 }
 
 const WorkspaceLayout = ({ companyId, isProvider, companies, ticketType }: WorkspaceLayoutProps) => {
-  const [tabs, setTabs] = useState<WorkspaceTab[]>([{ id: ROOT_ID, title: 'Gestão de Tickets' }])
+  const [tabs, setTabs] = useState<WorkspaceTab[]>([
+    { id: ROOT_ID, title: 'Gestão de Tickets' },
+    { id: 'changes', title: 'Gestão de Mudanças' }
+  ])
   const [activeId, setActiveId] = useState<string>(ROOT_ID)
 
   const openTicket = (ticket: WorkspaceTicket) => {
@@ -52,7 +56,7 @@ const WorkspaceLayout = ({ companyId, isProvider, companies, ticketType }: Works
       <div className={`flex items-stretch gap-1 px-2 pt-2 overflow-x-auto hide-scrollbar shrink-0 ${barBg}`}>
         {tabs.map(tab => {
           const active = tab.id === activeId
-          const isRoot = tab.id === ROOT_ID
+          const isRoot = tab.id === ROOT_ID || tab.id === 'changes'
           
           let tabStyle = ''
           if (active) {
@@ -67,8 +71,11 @@ const WorkspaceLayout = ({ companyId, isProvider, companies, ticketType }: Works
               onClick={() => setActiveId(tab.id)}
               className={`group flex items-center gap-2 px-4 py-2 text-sm whitespace-nowrap transition-all ${tabStyle}`}
             >
-              {isRoot && (
+              {tab.id === ROOT_ID && (
                 <LayoutGrid className="w-4 h-4 text-primary" />
+              )}
+              {tab.id === 'changes' && (
+                <Shuffle className="w-4 h-4 text-primary" />
               )}
               {tab.title}
               {!isRoot && (
@@ -96,7 +103,14 @@ const WorkspaceLayout = ({ companyId, isProvider, companies, ticketType }: Works
             ticketType={ticketType}
           />
         </div>
-        {tabs.filter(t => t.id !== ROOT_ID).map(tab => (
+        
+        <div className={activeId === 'changes' ? 'h-full' : 'hidden'}>
+          <ChangeManagementDashboard
+            companyId={companyId}
+          />
+        </div>
+
+        {tabs.filter(t => t.id !== ROOT_ID && t.id !== 'changes').map(tab => (
           <div key={tab.id} className={activeId === tab.id ? 'h-full' : 'hidden'}>
             <AnalystCockpit ticket={tab.ticket} />
           </div>

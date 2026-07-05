@@ -7,7 +7,8 @@ import type { PendingReasonRow, SLAPolicyRow } from '../lib/database.types'
 import SlaCalendarManager from './SlaCalendarManager'
 import { useAppData } from '../hooks/useDbData'
 import AdminDashboard from './AdminDashboard'
-
+import { THEME_LIST, FONT_SCALE_LIST, getTheme } from '../lib/theme-engine'
+import type { ThemeName, FontScale } from '../lib/theme-engine'
 const getMsg = (e: unknown): string => {
   if (e && typeof e === 'object') {
     const o = e as { message?: unknown; details?: unknown }
@@ -41,6 +42,14 @@ const humanize = (mins: number): string => {
   return `${(mins / 1440).toFixed(mins % 1440 ? 1 : 0)}d`
 }
 
+// Lookup maps para preview e portal — strings literais para o Tailwind JIT escanear
+const PREVIEW_TITLE_SIZE: Record<string, string> = {
+  small: 'text-sm',
+  medium: 'text-base',
+  large: 'text-lg',
+  xlarge: 'text-xl'
+}
+
 interface DraftRow {
   response: string
   resolution: string
@@ -56,6 +65,7 @@ type GovTab =
   | 'catalog_incidents'
   | 'catalog_requests'
   | 'form_templates'
+  | 'departments'
 
 export default function SettingsGovernance({ companyId, activeRole }: { companyId: string; activeRole: string }) {
   const { toast } = useToast()
@@ -167,6 +177,7 @@ export default function SettingsGovernance({ companyId, activeRole }: { companyI
     greeting_color: currentCompanyRow?.greeting_color || '',
     catalog_headline_color: currentCompanyRow?.catalog_headline_color || '',
     catalog_headline_size: currentCompanyRow?.catalog_headline_size || '',
+    catalog_ui_config: (currentCompanyRow?.catalog_ui_config || {}) as Record<string, any>,
   })
   const [savingAppearance, setSavingAppearance] = useState(false)
   const [uploadingLogo, setUploadingLogo] = useState(false)
@@ -218,6 +229,7 @@ export default function SettingsGovernance({ companyId, activeRole }: { companyI
         greeting_color: currentCompanyRow.greeting_color || '',
         catalog_headline_color: currentCompanyRow.catalog_headline_color || '',
         catalog_headline_size: currentCompanyRow.catalog_headline_size || '',
+        catalog_ui_config: (currentCompanyRow.catalog_ui_config || {}) as Record<string, any>,
       })
     }
   }, [currentCompanyRow])
@@ -247,6 +259,7 @@ export default function SettingsGovernance({ companyId, activeRole }: { companyI
       greeting_color: appearanceForm.greeting_color || null,
       catalog_headline_color: appearanceForm.catalog_headline_color || null,
       catalog_headline_size: appearanceForm.catalog_headline_size || null,
+      catalog_ui_config: appearanceForm.catalog_ui_config,
     }
     try {
       const { error } = await supabase
@@ -497,8 +510,9 @@ export default function SettingsGovernance({ companyId, activeRole }: { companyI
     { key: 'pending_reasons', label: 'Motivos de Pausa', icon: <PauseCircle className="w-5 h-5" /> },
   ]
 
-  if (isSysAdmin) {
+  if (['sysadmin', 'company_admin', 'it_manager', 'area_manager'].includes(activeRole)) {
     tabs.push(
+      { key: 'departments', label: 'Departamentos', icon: <Building className="w-5 h-5" /> },
       { key: 'users', label: 'Usuários & RBAC', icon: <Users className="w-5 h-5" /> },
       { key: 'groups', label: 'Equipes Solucionadoras', icon: <Network className="w-5 h-5" /> },
       { key: 'catalog_incidents', label: 'Catálogo de Incidentes', icon: <BookOpen className="w-5 h-5" /> },
@@ -578,7 +592,7 @@ export default function SettingsGovernance({ companyId, activeRole }: { companyI
       </div>
 
       {/* Tabs list */}
-      <div className="flex border-b border-outline-variant gap-2 overflow-x-auto hide-scrollbar">
+      <div className="flex border-b border-outline-variant gap-2 flex-wrap">
         {tabs.map(t => (
           <button
             key={t.key}
@@ -606,7 +620,7 @@ export default function SettingsGovernance({ companyId, activeRole }: { companyI
                   <Paintbrush className="w-6 h-6 text-primary" /> Personalização Visual
                 </h3>
                 <p className="text-sm text-on-surface-variant mt-1.5">
-                  Ajuste logo, cores, fontes e textos do portal. O preview ao lado atualiza em tempo real.
+                  Ajuste a identidade da marca e os textos do portal. O preview ao lado reflete exatamente o que os usuários verão.
                 </p>
               </div>
 
@@ -614,6 +628,7 @@ export default function SettingsGovernance({ companyId, activeRole }: { companyI
               <div className="space-y-5">
                 <h4 className="text-xs font-bold text-on-surface-variant uppercase tracking-widest">Identidade da Marca</h4>
 
+                {/* Nome da marca */}
                 <div>
                   <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Nome de Exibição da Marca</label>
                   <input
@@ -664,264 +679,174 @@ export default function SettingsGovernance({ companyId, activeRole }: { companyI
                       className="flex-1 bg-transparent text-xs text-slate-500 border-b border-slate-200 focus:border-indigo-500 outline-none pb-0.5 font-mono"
                     />
                   </div>
+                  
+                  <div className="mt-4">
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Tamanho no Portal</label>
+                    <select
+                      value={appearanceForm.catalog_ui_config?.logo_size || 'large'}
+                      onChange={e => setAppearanceForm({ 
+                        ...appearanceForm, 
+                        catalog_ui_config: { ...appearanceForm.catalog_ui_config, logo_size: e.target.value } 
+                      })}
+                      className="w-full border border-slate-200 rounded-lg px-3 py-2 text-xs bg-white outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+                    >
+                      <option value="small">Pequeno</option>
+                      <option value="medium">Médio</option>
+                      <option value="large">Grande (Recomendado)</option>
+                      <option value="xlarge">Gigante</option>
+                      <option value="original">Proporção Original</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Tema / Cor Primária */}
+                <div className="space-y-2">
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider">Motor de Temas</label>
+                  <p className="text-[10px] text-slate-400 -mt-1">Escolha uma identidade visual (cores) unificada do catálogo corporativo.</p>
+                  <select
+                    value={appearanceForm.primary_color || 'Ocean'}
+                    onChange={e => setAppearanceForm({ ...appearanceForm, primary_color: e.target.value as ThemeName })}
+                    className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm bg-white outline-none focus:ring-2 focus:ring-indigo-500"
+                  >
+                    {THEME_LIST.map(themeStr => (
+                      <option key={themeStr} value={themeStr}>
+                        {themeStr}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
 
-              {/* ── Seção 2: Textos do Portal ── */}
-              <div className="border-t border-outline-variant pt-6 space-y-6">
-                <h4 className="text-xs font-bold text-on-surface-variant uppercase tracking-widest">Textos da Página Inicial</h4>
-
-                {/* Catálogo de Serviços */}
-                <div className="p-4 border border-outline-variant rounded-2xl bg-surface-container/20 space-y-5">
-                  <div className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Catálogo de Serviços</div>
-
-                  {/* Saudação */}
-                  <div className="space-y-2">
-                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider">Prefixo da Saudação</label>
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="text" value={appearanceForm.greeting_prefix}
-                        onChange={e => setAppearanceForm({ ...appearanceForm, greeting_prefix: e.target.value })}
-                        placeholder='Olá'
-                        className="flex-1 border border-slate-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500"
-                      />
-                      <input
-                        type="color" value={appearanceForm.greeting_color || appearanceForm.primary_color || '#2563EB'}
-                        onChange={e => setAppearanceForm({ ...appearanceForm, greeting_color: e.target.value })}
-                        title="Cor da saudação"
-                        className="w-10 h-10 border border-slate-200 p-0.5 rounded-lg cursor-pointer bg-transparent shrink-0"
-                      />
-                    </div>
-                    <p className="text-[10px] text-slate-400">Aparece como: "{appearanceForm.greeting_prefix || 'Olá'}, {'{nome}'}! 👋"</p>
-                  </div>
-
-                  {/* Título do catálogo */}
-                  <div className="space-y-2">
-                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider">Título do Catálogo</label>
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="text" value={appearanceForm.catalog_headline}
-                        onChange={e => setAppearanceForm({ ...appearanceForm, catalog_headline: e.target.value })}
-                        placeholder='Como podemos te ajudar hoje?'
-                        className="flex-1 border border-slate-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500"
-                      />
-                      <input
-                        type="color" value={appearanceForm.catalog_headline_color || '#1e293b'}
-                        onChange={e => setAppearanceForm({ ...appearanceForm, catalog_headline_color: e.target.value })}
-                        title="Cor do título"
-                        className="w-10 h-10 border border-slate-200 p-0.5 rounded-lg cursor-pointer bg-transparent shrink-0"
-                      />
-                    </div>
-                    <div className="flex items-center gap-2 mt-1">
-                      <label className="text-[10px] font-bold text-slate-400 shrink-0">TAMANHO:</label>
-                      <select
-                        value={appearanceForm.catalog_headline_size}
-                        onChange={e => setAppearanceForm({ ...appearanceForm, catalog_headline_size: e.target.value })}
-                        className="text-xs border border-slate-200 rounded-lg px-2 py-1 outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
-                      >
-                        <option value="">Padrão (32–40px)</option>
-                        <option value="1.25rem">Pequeno (20px)</option>
-                        <option value="1.5rem">Médio (24px)</option>
-                        <option value="2rem">Grande (32px)</option>
-                        <option value="2.5rem">Extra (40px)</option>
-                        <option value="3rem">Gigante (48px)</option>
-                        <option value="4rem">Colossal (64px)</option>
-                      </select>
-                    </div>
-                  </div>
+              {/* ── Seção 2: Boas-vindas do Portal ── */}
+              <div className="border-t border-outline-variant pt-6 space-y-5">
+                <div>
+                  <h4 className="text-xs font-bold text-on-surface-variant uppercase tracking-widest">Boas-vindas do Portal</h4>
+                  <p className="text-[11px] text-slate-400 mt-1">Texto exibido na faixa abaixo das abas do portal de atendimento.</p>
                 </div>
 
-                {/* Banner de Boas-vindas (App.tsx) */}
-                <div className="text-[11px] font-bold text-slate-400 uppercase tracking-widest -mb-2">Banner de Boas-vindas</div>
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 p-5 border border-outline-variant rounded-2xl bg-surface-container/30">
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Título Principal</label>
-                      <input
-                        type="text" value={appearanceForm.welcome_title}
-                        onChange={e => setAppearanceForm({ ...appearanceForm, welcome_title: e.target.value })}
-                        className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500"
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Fonte do Título</label>
-                        <select
-                          value={appearanceForm.title_font}
-                          onChange={e => setAppearanceForm({ ...appearanceForm, title_font: e.target.value })}
-                          className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500"
-                        >
-                          <option value="">Padrão (Inter)</option>
-                          <option value="'Montserrat', sans-serif">Montserrat</option>
-                          <option value="'Playfair Display', serif">Playfair Display</option>
-                          <option value="'Roboto Mono', monospace">Roboto Mono</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Tamanho do Título</label>
-                        <select
-                          value={appearanceForm.title_size}
-                          onChange={e => setAppearanceForm({ ...appearanceForm, title_size: e.target.value })}
-                          className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500"
-                        >
-                          <option value="">Padrão</option>
-                          <option value="1.5rem">Médio (24px)</option>
-                          <option value="2rem">Grande (32px)</option>
-                          <option value="2.5rem">Extra (40px)</option>
-                          <option value="3rem">Gigante (48px)</option>
-                          <option value="4rem">Colossal (64px)</option>
-                        </select>
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Cor do Título</label>
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="color" value={appearanceForm.title_color || '#000000'}
-                          onChange={e => setAppearanceForm({ ...appearanceForm, title_color: e.target.value })}
-                          className="w-10 h-10 border-0 p-0 rounded-lg cursor-pointer bg-transparent"
-                        />
-                        <input
-                          type="text" value={appearanceForm.title_color}
-                          onChange={e => setAppearanceForm({ ...appearanceForm, title_color: e.target.value })}
-                          placeholder="Vazio para padrão"
-                          className="flex-1 border border-slate-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
-                        />
-                      </div>
-                    </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Título</label>
+                  <input
+                    type="text" value={appearanceForm.welcome_title}
+                    onChange={e => setAppearanceForm({ ...appearanceForm, welcome_title: e.target.value })}
+                    placeholder="Como podemos ajudar?"
+                    className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Subtítulo</label>
+                  <input
+                    type="text" value={appearanceForm.welcome_subtitle}
+                    onChange={e => setAppearanceForm({ ...appearanceForm, welcome_subtitle: e.target.value })}
+                    placeholder="Encontre respostas rapidamente ou abra um chamado."
+                    className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Escala da Fonte */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Escala da Fonte</label>
+                    <select
+                      value={appearanceForm.title_size || 'standard'}
+                      onChange={e => setAppearanceForm({ ...appearanceForm, title_size: e.target.value as FontScale })}
+                      className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm bg-white outline-none focus:ring-2 focus:ring-indigo-500"
+                    >
+                      {FONT_SCALE_LIST.map(optStr => (
+                        <option key={optStr} value={optStr}>{optStr}</option>
+                      ))}
+                    </select>
                   </div>
 
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Subtítulo</label>
-                      <input
-                        type="text" value={appearanceForm.welcome_subtitle}
-                        onChange={e => setAppearanceForm({ ...appearanceForm, welcome_subtitle: e.target.value })}
-                        className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500"
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Fonte do Subtítulo</label>
-                        <select
-                          value={appearanceForm.subtitle_font}
-                          onChange={e => setAppearanceForm({ ...appearanceForm, subtitle_font: e.target.value })}
-                          className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500"
-                        >
-                          <option value="">Padrão (Inter)</option>
-                          <option value="'Montserrat', sans-serif">Montserrat</option>
-                          <option value="'Playfair Display', serif">Playfair Display</option>
-                          <option value="'Roboto Mono', monospace">Roboto Mono</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Tamanho do Subtítulo</label>
-                        <select
-                          value={appearanceForm.subtitle_size}
-                          onChange={e => setAppearanceForm({ ...appearanceForm, subtitle_size: e.target.value })}
-                          className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500"
-                        >
-                          <option value="">Padrão</option>
-                          <option value="1rem">Pequeno (16px)</option>
-                          <option value="1.125rem">Médio (18px)</option>
-                          <option value="1.25rem">Grande (20px)</option>
-                          <option value="1.5rem">Extra (24px)</option>
-                        </select>
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Cor do Subtítulo</label>
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="color" value={appearanceForm.subtitle_color || '#64748B'}
-                          onChange={e => setAppearanceForm({ ...appearanceForm, subtitle_color: e.target.value })}
-                          className="w-10 h-10 border-0 p-0 rounded-lg cursor-pointer bg-transparent"
-                        />
-                        <input
-                          type="text" value={appearanceForm.subtitle_color}
-                          onChange={e => setAppearanceForm({ ...appearanceForm, subtitle_color: e.target.value })}
-                          placeholder="Vazio para padrão"
-                          className="flex-1 border border-slate-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
-                        />
-                      </div>
-                    </div>
+                  {/* Cor da Marca */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Cor da Marca</label>
+                    <select
+                      value={appearanceForm.title_color || 'text-slate-800'}
+                      onChange={e => setAppearanceForm({ ...appearanceForm, title_color: e.target.value })}
+                      className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm bg-white outline-none focus:ring-2 focus:ring-indigo-500"
+                    >
+                      <option value="text-blue-600">🔵 Azul</option>
+                      <option value="text-emerald-600">🟢 Verde</option>
+                      <option value="text-orange-500">🟠 Laranja</option>
+                      <option value="text-violet-600">🟣 Roxo</option>
+                      <option value="text-slate-800">⚫ Grafite</option>
+                    </select>
                   </div>
                 </div>
               </div>
 
-              {/* ── Seção 3: Cores e Fundo ── */}
-              <div className="border-t border-outline-variant pt-6 space-y-6">
-                <h4 className="text-xs font-bold text-on-surface-variant uppercase tracking-widest">Cores e Fundo</h4>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <label className="block text-sm font-bold text-on-surface-variant uppercase tracking-wider">Cor Primária</label>
-                    <div className="flex items-center gap-2">
-                      <input type="color" value={appearanceForm.primary_color}
-                        onChange={e => setAppearanceForm({ ...appearanceForm, primary_color: e.target.value })}
-                        className="w-11 h-10 border-0 rounded-lg cursor-pointer p-0 bg-transparent"
-                      />
-                      <input type="text" maxLength={7} value={appearanceForm.primary_color}
-                        onChange={e => setAppearanceForm({ ...appearanceForm, primary_color: e.target.value })}
-                        className={`flex-1 ${inputClass} font-mono`} placeholder="#2563EB"
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <label className="block text-sm font-bold text-on-surface-variant uppercase tracking-wider">Cor Secundária (Accent)</label>
-                    <div className="flex items-center gap-2">
-                      <input type="color" value={appearanceForm.accent_color}
-                        onChange={e => setAppearanceForm({ ...appearanceForm, accent_color: e.target.value })}
-                        className="w-11 h-10 border-0 rounded-lg cursor-pointer p-0 bg-transparent"
-                      />
-                      <input type="text" maxLength={7} value={appearanceForm.accent_color}
-                        onChange={e => setAppearanceForm({ ...appearanceForm, accent_color: e.target.value })}
-                        className={`flex-1 ${inputClass} font-mono`} placeholder="#3B82F6"
-                      />
-                    </div>
-                  </div>
+              {/* ── Seção 3: Fundo imersivo do portal e login ── */}
+              <div className="border-t border-outline-variant pt-6 space-y-5">
+                <div>
+                  <h4 className="text-xs font-bold text-on-surface-variant uppercase tracking-widest">Imagem de Fundo do Portal</h4>
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    Afeta o fundo imersivo do Portal do Usuário e da tela de login. Faça upload de uma foto ou cole a URL de uma imagem.
+                    Se vazio, usa um escritório moderno padrão.
+                  </p>
                 </div>
 
-                {/* Fundo: Cor sólida ou imagem */}
+                {/* Upload de imagem */}
                 <div className="space-y-3">
-                  <label className="block text-sm font-bold text-on-surface-variant uppercase tracking-wider">Fundo do Portal</label>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {/* Cor sólida */}
-                    <div className="space-y-2">
-                      <div className="text-xs font-semibold text-slate-500 mb-1">Cor Sólida</div>
-                      <div className="flex items-center gap-2">
-                        <input type="color"
-                          value={appearanceForm.bg_color.startsWith('#') ? appearanceForm.bg_color : '#F1F5F9'}
-                          onChange={e => setAppearanceForm({ ...appearanceForm, bg_color: e.target.value })}
-                          className="w-11 h-10 border-0 rounded-lg cursor-pointer p-0 bg-transparent"
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider">Upload de Imagem de Fundo</label>
+                  <label className={`flex items-center gap-3 px-4 py-3 border-2 border-dashed rounded-xl cursor-pointer transition-colors ${
+                    uploadingBg
+                      ? 'border-primary/40 bg-primary/5 opacity-70'
+                      : 'border-outline-variant hover:border-primary/50 hover:bg-primary/5'
+                  }`}>
+                    <input type="file" accept="image/*" className="hidden" onChange={handleUploadBgImage} disabled={uploadingBg} />
+                    <div className="w-10 h-10 rounded-lg bg-surface-container flex items-center justify-center shrink-0 overflow-hidden">
+                      {appearanceForm.bg_color && (appearanceForm.bg_color.startsWith('http') || appearanceForm.bg_color.includes('url(')) ? (
+                        <img
+                          src={appearanceForm.bg_color.startsWith('http')
+                            ? appearanceForm.bg_color
+                            : (appearanceForm.bg_color.match(/url\(['"]?([^'")\s]+)['"]?\)/) || [])[1] || ''}
+                          alt=""
+                          className="w-full h-full object-cover"
                         />
-                        <input type="text" value={appearanceForm.bg_color}
-                          onChange={e => setAppearanceForm({ ...appearanceForm, bg_color: e.target.value })}
-                          className={`flex-1 ${inputClass} font-mono`} placeholder="#F8FAFC ou url(...)"
-                        />
-                      </div>
+                      ) : (
+                        <span className="text-xl">🖼️</span>
+                      )}
                     </div>
-                    {/* Imagem */}
-                    <div className="space-y-2">
-                      <div className="text-xs font-semibold text-slate-500 mb-1">Imagem de Fundo (upload)</div>
-                      <div className="relative group rounded-xl border-2 border-dashed border-slate-200 hover:border-indigo-400 transition-all overflow-hidden cursor-pointer h-10">
-                        <input type="file" accept="image/*"
-                          onChange={handleUploadBgImage}
-                          disabled={uploadingBg}
-                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10 disabled:cursor-not-allowed"
-                        />
-                        <div className="flex items-center justify-center gap-2 h-full px-3">
-                          {uploadingBg ? (
-                            <span className="flex items-center gap-1.5 text-xs text-indigo-600 font-semibold">
-                              <div className="w-3.5 h-3.5 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" /> Enviando…
-                            </span>
-                          ) : (
-                            <span className="flex items-center gap-1.5 text-xs text-slate-500 group-hover:text-indigo-600 font-semibold">
-                              <Upload className="w-3.5 h-3.5" /> PNG, JPG (cobre 100% da tela)
-                            </span>
-                          )}
-                        </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-semibold text-on-surface">
+                        {uploadingBg ? 'Enviando...' : 'Clique para fazer upload'}
                       </div>
+                      <div className="text-[11px] text-on-surface-variant mt-0.5">JPG, PNG, WebP até 5 MB</div>
                     </div>
+                  </label>
+                </div>
+
+                {/* URL manual */}
+                <div className="space-y-2">
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider">Ou Cole a URL da Imagem</label>
+                  <input
+                    type="url"
+                    value={appearanceForm.bg_color.startsWith('http') ? appearanceForm.bg_color : ''}
+                    onChange={e => setAppearanceForm({ ...appearanceForm, bg_color: e.target.value })}
+                    className={`w-full ${inputClass} font-mono`}
+                    placeholder="https://images.unsplash.com/..."
+                  />
+                  <p className="text-[10px] text-slate-400">
+                    Dica: use <span className="font-mono text-primary">unsplash.com</span> para fotos gratuitas em alta resolução.
+                  </p>
+                </div>
+
+                {/* Cor sólida (fallback) */}
+                <div className="space-y-2">
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider">Ou Cor Sólida de Fallback</label>
+                  <div className="flex items-center gap-2">
+                    <input type="color"
+                      value={appearanceForm.bg_color.startsWith('#') ? appearanceForm.bg_color : '#0f172a'}
+                      onChange={e => setAppearanceForm({ ...appearanceForm, bg_color: e.target.value })}
+                      className="w-11 h-10 border-0 rounded-lg cursor-pointer p-0 bg-transparent"
+                    />
+                    <input type="text"
+                      value={appearanceForm.bg_color.startsWith('#') ? appearanceForm.bg_color : ''}
+                      onChange={e => setAppearanceForm({ ...appearanceForm, bg_color: e.target.value })}
+                      className={`flex-1 ${inputClass} font-mono`} placeholder="#0f172a"
+                    />
                   </div>
                 </div>
               </div>
@@ -940,75 +865,105 @@ export default function SettingsGovernance({ companyId, activeRole }: { companyI
             </div>
 
             {/* PREVIEW AO VIVO */}
-            <div className="hidden xl:block">
+            <div className="w-full max-w-[340px] mx-auto xl:mx-0">
               <div className="sticky top-6 space-y-2">
-                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center">Pré-visualização do Portal</div>
-                <div className="rounded-2xl overflow-hidden shadow-xl border border-slate-200"
-                  style={{ background: appearanceForm.bg_color || '#f8fafc', backgroundSize: 'cover', backgroundPosition: 'center' }}>
+                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center mb-4">Pré-visualização do Portal</div>
+{(() => {
+                  const theme = getTheme(appearanceForm.primary_color || 'Ocean')
+                  const bgVal = appearanceForm.bg_color || ''
+                  const previewBgUrl = bgVal.startsWith('http')
+                    ? bgVal
+                    : bgVal.includes('url(')
+                      ? (bgVal.match(/url\(['"]?([^'")\s]+)['"]?\)/) || [])[1] || ''
+                      : 'https://images.unsplash.com/photo-1497366216548-37526070297c?w=800&q=80'
+                  const brandLabel = appearanceForm.brand_name || currentCompanyRow?.name || 'Flowfy'
+                  
+                  const logoSize = appearanceForm.catalog_ui_config?.logo_size || 'large'
+                  const LOGO_PREVIEW_MAP: Record<string, string> = {
+                    small: 'h-4 max-w-[60px]',
+                    medium: 'h-5 max-w-[80px]',
+                    large: 'h-6 max-w-[120px]',
+                    xlarge: 'h-8 max-w-[160px]',
+                    original: 'h-auto max-h-[40px] max-w-[160px]',
+                  }
+                  const logoPreviewClass = LOGO_PREVIEW_MAP[logoSize] || LOGO_PREVIEW_MAP.large
 
-                  {/* Mini header */}
-                  <div className="px-3 py-2.5 flex items-center gap-2" style={{ backgroundColor: appearanceForm.primary_color }}>
-                    <div className="w-6 h-6 rounded-lg bg-white/20 flex items-center justify-center shrink-0 overflow-hidden">
-                      {appearanceForm.logo_url
-                        ? <img src={appearanceForm.logo_url} alt="" className="w-full h-full object-contain p-0.5" />
-                        : <span className="text-white text-[10px] font-black">{(appearanceForm.brand_name || currentCompanyRow?.name || 'F').charAt(0)}</span>
-                      }
-                    </div>
-                    <div>
-                      <div className="text-white text-[11px] font-bold leading-tight">{appearanceForm.brand_name || currentCompanyRow?.name}</div>
-                      <div className="text-white/60 text-[8px] uppercase tracking-widest">Portal de Atendimento</div>
-                    </div>
-                    <div className="ml-auto flex items-center gap-1.5">
-                      <div className="w-5 h-5 rounded-full bg-white/20 border border-white/30" />
-                    </div>
-                  </div>
+                  return (
+                    <div
+                      className="rounded-2xl overflow-hidden shadow-xl border border-slate-200 relative bg-cover bg-center transition-all"
+                      style={{ backgroundImage: `url(${previewBgUrl})` }}
+                    >
+                      {/* Overlay escuro — igual ao portal */}
+                      <div className={`absolute inset-0 ${theme.headerBg} opacity-50 pointer-events-none mix-blend-multiply`} />
 
-                  {/* Mini welcome banner */}
-                  <div className="px-4 py-5 text-center" style={{ background: `linear-gradient(135deg, ${appearanceForm.primary_color}18, ${appearanceForm.accent_color}10)` }}>
-                    <div className="text-[10px] font-semibold mb-1" style={{ color: appearanceForm.primary_color }}>Olá, Anderson! 👋</div>
-                    <div className="font-extrabold text-slate-800 leading-tight mb-1"
-                      style={{
-                        color: appearanceForm.title_color || appearanceForm.primary_color,
-                        fontFamily: appearanceForm.title_font || undefined,
-                        fontSize: appearanceForm.title_size ? `calc(${appearanceForm.title_size} * 0.45)` : '0.9rem',
-                      }}>
-                      {appearanceForm.welcome_title || 'Como podemos ajudar?'}
-                    </div>
-                    <div className="text-[10px] text-slate-500"
-                      style={{
-                        color: appearanceForm.subtitle_color || undefined,
-                        fontFamily: appearanceForm.subtitle_font || undefined,
-                      }}>
-                      {appearanceForm.welcome_subtitle || 'Selecione uma opção abaixo'}
-                    </div>
-                  </div>
+                      {/* 1. Header — theme engine glassmorphism */}
+                      <div className={`relative z-10 ${theme.headerBg} backdrop-blur-xl border-b ${theme.headerBorder} transition-colors duration-300`}>
+                        <div className="px-3 py-2.5 flex items-center justify-between">
+                          <div className="flex items-center gap-2 flex-1 min-w-0">
+                            {appearanceForm.logo_url ? (
+                              <img src={appearanceForm.logo_url} alt="" className={`${logoPreviewClass} object-contain drop-shadow-md transition-all`} />
+                            ) : (
+                              <div className="flex items-center gap-1.5">
+                                <div
+                                  className={`w-6 h-6 rounded-lg flex items-center justify-center ${theme.primaryText} ${theme.primaryBg} font-black text-[10px] shrink-0`}
+                                >
+                                  {brandLabel.charAt(0)}
+                                </div>
+                                <span className={`${theme.headerText} text-[11px] font-bold leading-tight truncate`}>{brandLabel}</span>
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <div className="w-6 h-6 rounded-full border border-white/20 flex items-center justify-center text-[9px] font-bold overflow-hidden">
+                               <img src="https://ui-avatars.com/api/?name=User&background=ffffff&color=000&bold=true" className="w-full h-full object-cover"/>
+                            </div>
+                          </div>
+                        </div>
 
-                  {/* Mini catalog */}
-                  <div className="px-4 pb-4 pt-1">
-                    <div className="text-center mb-3">
-                      <div className="text-[9px] font-semibold" style={{ color: appearanceForm.greeting_color || appearanceForm.primary_color }}>{appearanceForm.greeting_prefix || 'Olá'}, Anderson! 👋</div>
-                      <div className="font-extrabold mt-0.5" style={{ color: appearanceForm.catalog_headline_color || '#1e293b', fontSize: appearanceForm.catalog_headline_size ? `calc(${appearanceForm.catalog_headline_size} * 0.38)` : '0.7rem' }}>{appearanceForm.catalog_headline || 'Como podemos te ajudar hoje?'}</div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <div className="bg-white rounded-xl border border-slate-200 p-3 shadow-sm">
-                        <div className="w-7 h-7 rounded-lg bg-rose-50 text-rose-500 flex items-center justify-center mb-1.5 text-sm">🔴</div>
-                        <div className="text-[10px] font-bold text-slate-800">Reportar Problema</div>
-                        <div className="text-[9px] text-slate-400 mt-0.5">Abrir Incidente →</div>
+                        {/* Tabs (Sem breadcrumb) */}
+                        <div className={`flex border-t ${theme.headerBorder}`}>
+                          <span className={`px-3 py-1.5 border-b-2 border-current ${theme.textAccent} text-[9px] font-bold bg-white/5`}>🛒 Catálogo</span>
+                          <span className={`px-3 py-1.5 border-b-2 border-transparent ${theme.textMuted} text-[9px]`}>📋 Chamados</span>
+                        </div>
                       </div>
-                      <div className="bg-white rounded-xl border border-slate-200 p-3 shadow-sm">
-                        <div className="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-500 flex items-center justify-center mb-1.5 text-sm">🛒</div>
-                        <div className="text-[10px] font-bold text-slate-800">Solicitar Serviço</div>
-                        <div className="text-[9px] text-slate-400 mt-0.5">Abrir Requisição →</div>
+
+                      {/* 2. Hero Banner */}
+                      <div className="relative z-10 px-3 py-6 text-center">
+                        <div className={`text-[8px] font-medium ${theme.textMuted} mb-1.5`}>Olá, Usuário! 👋</div>
+                        {appearanceForm.welcome_title ? (
+                          <div className={`${PREVIEW_TITLE_SIZE[appearanceForm.title_size || ''] || 'text-sm'} font-extrabold leading-tight drop-shadow-lg ${theme.headerText}`}>
+                            {appearanceForm.welcome_title}
+                          </div>
+                        ) : (
+                          <div className={`text-sm font-extrabold ${theme.headerText} leading-tight`}>Título do Portal</div>
+                        )}
+                        {appearanceForm.welcome_subtitle && (
+                          <div className={`text-[9px] ${theme.textMuted} mt-1.5 leading-snug`}>{appearanceForm.welcome_subtitle}</div>
+                        )}
+                      </div>
+
+                      {/* 3. Painel glassmorphism — igual ao portal */}
+                      <div className="relative z-10 px-2.5 pb-4">
+                        <div className={`${theme.cardBg} backdrop-blur-xl rounded-xl shadow-2xl border ${theme.cardBorder} overflow-hidden p-3 transition-colors`}>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div className="bg-white rounded-lg border border-slate-200/60 shadow-sm p-2.5">
+                              <div className={`w-7 h-7 rounded-lg ${theme.iconBg} flex items-center justify-center mb-2 text-sm`}>
+                                <AlertCircle className="w-4 h-4" />
+                              </div>
+                              <div className="text-[10px] font-bold text-slate-800 leading-tight">Reportar Problema</div>
+                            </div>
+                            <div className="bg-white rounded-lg border border-slate-200/60 shadow-sm p-2.5">
+                              <div className={`w-7 h-7 rounded-lg ${theme.primaryBg} ${theme.primaryText} flex items-center justify-center mb-2 text-sm`}>
+                                <Plus className="w-4 h-4" />
+                              </div>
+                              <div className="text-[10px] font-bold text-slate-800 leading-tight">Solicitar Serviço</div>
+                            </div>
+                          </div>
+                        </div>
                       </div>
                     </div>
-                  </div>
-
-                  <div className="px-4 pb-3 text-center">
-                    <span className="text-[9px] bg-white/80 text-slate-400 px-2 py-0.5 rounded-full font-semibold border border-slate-200/60">
-                      Live Preview Interativo
-                    </span>
-                  </div>
-                </div>
+                  )
+                })()}
               </div>
             </div>
           </div>
@@ -1208,7 +1163,7 @@ export default function SettingsGovernance({ companyId, activeRole }: { companyI
         )}
 
         {/* Abas Administrativas do SysAdmin */}
-        {isSysAdmin && ['users', 'groups', 'catalog_incidents', 'catalog_requests', 'form_templates'].includes(activeTab) && (
+        {(isSysAdmin || activeRole === 'company_admin') && ['departments', 'users', 'groups', 'catalog_incidents', 'catalog_requests', 'form_templates'].includes(activeTab) && (
           <div className={`${cardClass} p-6 bg-surface`}>
             <AdminDashboard
               activeTab={activeTab}
