@@ -110,6 +110,12 @@ async function setupSmokeMocks(page: Page) {
     // GET
     await route.fulfill({ status: 200, contentType: 'application/json', body: '[]' })
   })
+  await page.route(`${SUPABASE_URL}/rest/v1/company_module_entitlements*`, route =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: '[]' }),
+  )
+  await page.route(`${SUPABASE_URL}/rest/v1/channel_connections*`, route =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: '[]' }),
+  )
 }
 
 async function navigateToPortal(page: Page) {
@@ -149,10 +155,11 @@ test.describe('ServiceFY ITSM — Smoke Test E2E', () => {
 
     // 1. Valida carga da página inicial do portal (saudação ao analista)
     const greeting = page.getByText(/Olá.*Analista|Olá.*👋/i).first()
-    await expect(greeting).toBeVisible({ timeout: 15_000 })
+    const currentGreeting = page.getByText(/Como posso te ajudar.*Analista/i).first().or(greeting)
+    await expect(currentGreeting).toBeVisible({ timeout: 15_000 })
 
     // 2. Valida visibilidade dos cards de entrada do catálogo
-    const problemCard = page.getByText(/Reportar um Problema/i).first()
+    const problemCard = page.getByText(/Reportar (um )?Problema/i).first()
     await expect(problemCard).toBeVisible({ timeout: 10_000 })
 
     // Clica no card para entrar na jornada de Incidentes
@@ -164,12 +171,14 @@ test.describe('ServiceFY ITSM — Smoke Test E2E', () => {
     await expect(catCard).toBeVisible({ timeout: 5_000 })
     await catCard.click()
     await page.waitForTimeout(1_000)
+    await expect(page.getByRole('heading', { name: /Qual servi.o foi afetado/i })).toBeVisible()
 
     // 4. Nível 2: Clica no serviço "ERP ServiceFY"
     const svcCard = page.getByText(/ERP ServiceFY/i).first()
     await expect(svcCard).toBeVisible({ timeout: 5_000 })
     await svcCard.click()
     await page.waitForTimeout(1_000)
+    await expect(page.getByRole('heading', { name: /O que est. acontecendo/i })).toBeVisible()
 
     // 5. Nível 3: Clica no sintoma "Erro de Autenticação/Login"
     const symCard = page.getByText(/Erro de Autenticação\/Login/i).first()
@@ -204,4 +213,23 @@ test.describe('ServiceFY ITSM — Smoke Test E2E', () => {
 
     expect(hasConfirmation).toBeTruthy()
   })
+  test('Configurações aparecem somente para administradores', async ({ page }) => {
+    await setupSmokeMocks(page)
+    await page.goto('/')
+    await page.waitForTimeout(3_000)
+
+    await expect(page.getByRole('button', { name: 'Configurações' })).toHaveCount(0)
+
+    const roleSelector = page.locator('select:has(option[value="company_admin"])').first()
+    await expect(roleSelector).toBeVisible()
+    await roleSelector.selectOption('company_admin')
+
+    await expect(page.getByRole('heading', { name: 'Central de Configurações' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Configurações' })).toBeVisible()
+
+    await roleSelector.selectOption('cio')
+    await expect(page.getByRole('button', { name: 'Configurações' })).toHaveCount(0)
+    await expect(page.getByRole('heading', { name: 'Central de Configurações' })).toHaveCount(0)
+  })
+
 })

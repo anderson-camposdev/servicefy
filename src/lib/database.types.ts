@@ -721,6 +721,61 @@ export interface ActiveSessionRow {
 }
 
 // ─── Chatbot ───────────────────────────────────────────
+// ─── Fundação administrativa e Omnichannel ─────────────
+export interface ModuleEntitlementRow {
+  id: string
+  company_id: string
+  module_key: string
+  enabled: boolean
+  source: 'plan' | 'trial' | 'override'
+  starts_at: string | null
+  ends_at: string | null
+  limits: Json
+  updated_by: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface AdminAuditEventRow {
+  id: string
+  company_id: string
+  actor_profile_id: string | null
+  actor_role: string
+  action: string
+  resource_type: string
+  resource_id: string | null
+  before_data: Json | null
+  after_data: Json | null
+  correlation_id: string
+  ip_address: string | null
+  user_agent: string | null
+  created_at: string
+}
+
+export interface ChannelConnectionRow {
+  id: string
+  company_id: string
+  scope: 'tenant' | 'provider'
+  provider: 'microsoft_graph' | 'microsoft_teams' | 'gmail' | 'google_chat' | 'whatsapp_cloud' | 'imap_smtp' | 'portal' | 'api'
+  name: string
+  external_account_id: string | null
+  address: string | null
+  enabled: boolean
+  status: 'disconnected' | 'connecting' | 'healthy' | 'degraded' | 'expired' | 'error'
+  vault_secret_id: string | null
+  config: Json
+  capabilities: Json
+  subscription_expires_at: string | null
+  last_health_check_at: string | null
+  last_error_code: string | null
+  last_error_message: string | null
+  rotation_required: boolean
+  created_by: string | null
+  created_at: string
+  updated_at: string
+}
+
+
 export interface ChatbotWhitelistRow {
   id: string
   company_id: string
@@ -776,6 +831,10 @@ export interface ChatbotConfigRow {
   teams_app_id: string | null
   teams_app_secret: string | null
   teams_tenant_id: string | null
+  whatsapp_vault_secret_id: string | null
+  whatsapp_webhook_vault_secret_id: string | null
+  teams_vault_secret_id: string | null
+  rotation_required: boolean
   bot_name: string
   welcome_message: string | null
   unauthorized_message: string
@@ -829,6 +888,9 @@ export type Database = {
       approval_tokens:            { Row: ApprovalTokenRow;              Insert: Partial<ApprovalTokenRow>;              Update: Partial<ApprovalTokenRow>;              Relationships: [] }
       // ─ Novos: Licenças e Sessões
       active_sessions:            { Row: ActiveSessionRow;              Insert: Partial<ActiveSessionRow>;              Update: Partial<ActiveSessionRow>;              Relationships: [] }
+      company_module_entitlements: { Row: ModuleEntitlementRow;            Insert: Partial<ModuleEntitlementRow>;            Update: Partial<ModuleEntitlementRow>;            Relationships: [] }
+      admin_audit_events:          { Row: AdminAuditEventRow;             Insert: Partial<AdminAuditEventRow>;             Update: Partial<AdminAuditEventRow>;             Relationships: [] }
+      channel_connections:         { Row: ChannelConnectionRow;           Insert: Partial<ChannelConnectionRow>;           Update: Partial<ChannelConnectionRow>;           Relationships: [] }
       // ─ Novos: Chatbot
       chatbot_whitelist:          { Row: ChatbotWhitelistRow;           Insert: Partial<ChatbotWhitelistRow>;           Update: Partial<ChatbotWhitelistRow>;           Relationships: [] }
       chatbot_messages:           { Row: ChatbotMessageRow;             Insert: Partial<ChatbotMessageRow>;             Update: Partial<ChatbotMessageRow>;             Relationships: [] }
@@ -836,7 +898,26 @@ export type Database = {
       chatbot_config:             { Row: ChatbotConfigRow;              Insert: Partial<ChatbotConfigRow>;              Update: Partial<ChatbotConfigRow>;              Relationships: [] }
     }
     Views: Record<string, never>
-    Functions: Record<string, never>
+    Functions: {
+      save_channel_connection: {
+        Args: {
+          p_company_id: string
+          p_connection_id: string | null
+          p_scope: 'tenant' | 'provider'
+          p_provider: ChannelConnectionRow['provider']
+          p_name: string
+          p_address: string | null
+          p_enabled: boolean
+          p_config?: Json
+          p_secret?: string | null
+        }
+        Returns: Json
+      }
+      revoke_channel_connection: {
+        Args: { p_company_id: string; p_connection_id: string }
+        Returns: undefined
+      }
+    }
     Enums: {
       ticket_priority:   TicketPriority
       user_role:         UserRole

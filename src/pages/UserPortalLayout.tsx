@@ -17,7 +17,7 @@ import DynamicFormFields from './DynamicFormFields'
 import CatalogIcon from './CatalogIcon'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
-type Screen = 'home' | 'dept-cats' | 'inc-cats' | 'inc-symptoms' | 'inc-form' | 'req-cats' | 'req-subcats' | 'req-items' | 'req-form' | 'done' | 'tickets' | 'history' | 'ticket-detail'
+type Screen = 'home' | 'dept-cats' | 'inc-cats' | 'inc-services' | 'inc-symptoms' | 'inc-form' | 'req-cats' | 'req-subcats' | 'req-items' | 'req-form' | 'done' | 'tickets' | 'history' | 'ticket-detail'
 
 // Card virtual "Outros" no nível de subcategoria: agrupa itens legados sem subcategoria.
 const OTHERS_SUBCAT_ID = '__others__'
@@ -415,6 +415,7 @@ const UserPortalLayout = ({ companyId }: { companyId?: string } = {}) => {
 
   // Seleções dinâmicas do banco de dados
   const [dbSelIncCat, setDbSelIncCat] = useState<CatalogCategoryRow | null>(null)
+  const [dbSelIncService, setDbSelIncService] = useState<CatalogServiceRow | null>(null)
   const [dbSelSymptom, setDbSelSymptom] = useState<CatalogServiceSymptomRow | null>(null)
   const [dbSelReqCat, setDbSelReqCat] = useState<RequestCategoryRow | null>(null)
   const [dbSelReqSubcat, setDbSelReqSubcat] = useState<RequestSubcategoryRow | null>(null)
@@ -601,16 +602,21 @@ const UserPortalLayout = ({ companyId }: { companyId?: string } = {}) => {
       setScreen('home')
       setSelDeptId(null)
       setSelIncCat(null); setSelReqCat(null)
-      setDbSelIncCat(null); setDbSelReqCat(null)
+      setDbSelIncCat(null); setDbSelIncService(null); setDbSelSymptom(null); setDbSelReqCat(null)
     } else if (screen === 'inc-cats' || screen === 'req-cats') {
       setScreen(selDeptId ? 'dept-cats' : 'home')
       setSelIncCat(null); setSelReqCat(null)
-      setDbSelIncCat(null); setDbSelReqCat(null); setDbSelReqSubcat(null)
+      setDbSelIncCat(null); setDbSelIncService(null); setDbSelSymptom(null); setDbSelReqCat(null); setDbSelReqSubcat(null)
     } else if (screen === 'ticket-detail') {
       setScreen(selectedTicket && CLOSED_STATES.has(selectedTicket.state) ? 'history' : 'tickets')
-    } else if (screen === 'inc-symptoms') {
+    } else if (screen === 'inc-services') {
       setScreen('inc-cats')
+      setDbSelIncService(null)
+      setDbSelSymptom(null)
+    } else if (screen === 'inc-symptoms') {
+      setScreen(dbSelIncCat ? 'inc-services' : 'inc-cats')
       setSelSymptom(null)
+      setDbSelIncService(null)
       setDbSelSymptom(null)
     } else if (screen === 'inc-form') {
       setScreen('inc-symptoms')
@@ -738,14 +744,14 @@ const UserPortalLayout = ({ companyId }: { companyId?: string } = {}) => {
     setScreen('home')
     setSelDeptId(null)
     setSelIncCat(null); setSelSymptom(null); setSelReqCat(null); setSelItem(null)
-    setDbSelIncCat(null); setDbSelSymptom(null); setDbSelReqCat(null); setDbSelReqSubcat(null); setDbSelItem(null)
+    setDbSelIncCat(null); setDbSelIncService(null); setDbSelSymptom(null); setDbSelReqCat(null); setDbSelReqSubcat(null); setDbSelItem(null)
     setImpact('Media'); setUrgency('Media'); setDesc(''); setTicketNum(null)
     setFormAnswers({}); setFormErrors({}); setSubmitError(null)
   }
 
   const goTickets = () => {
     setSelIncCat(null); setSelSymptom(null); setSelReqCat(null); setSelItem(null)
-    setDbSelIncCat(null); setDbSelSymptom(null); setDbSelReqCat(null); setDbSelReqSubcat(null); setDbSelItem(null)
+    setDbSelIncCat(null); setDbSelIncService(null); setDbSelSymptom(null); setDbSelReqCat(null); setDbSelReqSubcat(null); setDbSelItem(null)
     setImpact('Media'); setUrgency('Media'); setDesc(''); setTicketNum(null)
     setFormAnswers({}); setFormErrors({}); setSubmitError(null)
     setScreen('tickets')
@@ -756,13 +762,18 @@ const UserPortalLayout = ({ companyId }: { companyId?: string } = {}) => {
     setScreen('ticket-detail')
   }
 
+  const selectedIncidentService = dbSelIncService
+    ?? services.find(service => service.id === dbSelSymptom?.service_id)
+    ?? null
+
   const isHome        = screen === 'home'
-  const isFlow        = ['dept-cats','inc-cats','inc-symptoms','inc-form','req-cats','req-subcats','req-items','req-form'].includes(screen)
+  const isFlow        = ['dept-cats','inc-cats','inc-services','inc-symptoms','inc-form','req-cats','req-subcats','req-items','req-form'].includes(screen)
   const isDone        = screen === 'done'
   const isTickets     = screen === 'tickets'
   const isHistory     = screen === 'history'
   const isTicketDetail = screen === 'ticket-detail'
-  const stepNum = ({ 'dept-cats':0,'inc-cats':1,'inc-symptoms':2,'inc-form':3,'req-cats':1,'req-subcats':2,'req-items':2,'req-form':3 } as Record<string,number>)[screen] || 0
+  const stepNum = ({ 'dept-cats':0,'inc-cats':1,'inc-services':2,'inc-symptoms':3,'inc-form':4,'req-cats':1,'req-subcats':2,'req-items':2,'req-form':3 } as Record<string,number>)[screen] || 0
+  const flowStepCount = screen.startsWith('inc-') ? 4 : 3
 
   // Quando a origem é um card de departamento (RH, Financeiro…), o breadcrumb usa
   // o nome do departamento em vez do rótulo genérico "Reportar Problema"/"Solicitar Serviço".
@@ -780,10 +791,20 @@ const UserPortalLayout = ({ companyId }: { companyId?: string } = {}) => {
     'req-form':     `${reqPrefix}  ›  ${dbSelReqCat?.name || selReqCat?.name || ''}  ›  ${dbSelItem?.name || selItem || ''}`,
   }
 
+  if (dbSelIncCat) {
+    const separator = '  \u203A  '
+    const categoryPath = `${incPrefix}${separator}${dbSelIncCat.name}`
+    const servicePath = selectedIncidentService ? `${categoryPath}${separator}${selectedIncidentService.name}` : categoryPath
+    BREADCRUMB['inc-services'] = categoryPath
+    BREADCRUMB['inc-symptoms'] = servicePath
+    BREADCRUMB['inc-form'] = `${servicePath}${separator}${dbSelSymptom?.symptom?.name || ''}`
+  }
+
   const TOP_TITLES: Record<Screen, string> = {
     'home':          `Como posso te ajudar, ${profile?.name?.split(' ')[0] || 'você'}?`,
     'dept-cats':     selDept?.name || 'Departamento',
     'inc-cats':      incPrefix,
+    'inc-services':  incPrefix,
     'inc-symptoms':  incPrefix,
     'inc-form':      incPrefix,
     'req-cats':      reqPrefix,
@@ -946,6 +967,7 @@ const UserPortalLayout = ({ companyId }: { companyId?: string } = {}) => {
                     <button key={i} onMouseDown={() => {
                       if (r.type === 'incident') {
                         setDbSelIncCat(r.dbCat);
+                        setDbSelIncService(services.find(service => service.id === r.dbSymptom?.service_id) || null);
                         setDbSelSymptom(r.dbSymptom || null);
                         setScreen('inc-form');
                       } else {
@@ -1206,12 +1228,13 @@ const UserPortalLayout = ({ companyId }: { companyId?: string } = {}) => {
                 </button>
                 <span style={{ font:'500 13px sans-serif', color:'#94a3b8' }}>{BREADCRUMB[screen]||''}</span>
               </div>
-              <div style={{ display:'flex', alignItems:'center', gap:6 }}>
-                <div style={{ width:8, height:8, borderRadius:'50%', background:stepNum>=1?brand:'#e2e8f0' }} />
-                <div style={{ width:20, height:1, background:'#e2e8f0' }} />
-                <div style={{ width:8, height:8, borderRadius:'50%', background:stepNum>=2?brand:'#e2e8f0' }} />
-                <div style={{ width:20, height:1, background:'#e2e8f0' }} />
-                <div style={{ width:8, height:8, borderRadius:'50%', background:stepNum>=3?brand:'#e2e8f0' }} />
+              <div style={{ display:'flex', alignItems:'center', gap:6 }} aria-label={`Etapa ${stepNum} de ${flowStepCount}`}>
+                {Array.from({ length: flowStepCount }, (_, index) => (
+                  <div key={index} style={{ display:'contents' }}>
+                    {index > 0 && <div style={{ width:20, height:1, background:'#e2e8f0' }} />}
+                    <div style={{ width:8, height:8, borderRadius:'50%', background:stepNum >= index + 1 ? brand : '#e2e8f0' }} />
+                  </div>
+                ))}
               </div>
             </div>
 
@@ -1259,12 +1282,9 @@ const UserPortalLayout = ({ companyId }: { companyId?: string } = {}) => {
                     <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
                       {visibleIncCategories.length > 0 ? (
                         visibleIncCategories.map(c => {
-                          const catSymptoms = serviceSymptoms.filter(ss => {
-                            const svc = services.find(s => s.id === ss.service_id)
-                            return svc && svc.category_id === c.id
-                          })
+                          const catServices = services.filter(service => service.category_id === c.id)
                           return (
-                            <button key={c.id} onClick={() => { setDbSelIncCat(c); setScreen('inc-symptoms') }}
+                            <button key={c.id} onClick={() => { setDbSelIncCat(c); setDbSelIncService(null); setDbSelSymptom(null); setScreen('inc-services') }}
                               style={{
                                 display:'flex',
                                 alignItems:'center',
@@ -1281,7 +1301,7 @@ const UserPortalLayout = ({ companyId }: { companyId?: string } = {}) => {
                               <CatalogIcon icon={c.icon} name={c.name} size={catalogIconSize} bg={customIconBg} />
                               <div style={{ minWidth:0 }}>
                                 <div style={{ font:`700 ${catalogFontSize} sans-serif`, color: customPillColor || '#0f172a' }}>{c.name}</div>
-                                <div style={{ font:'400 12px sans-serif', color: customPillColor ? hexToRgba(customPillColor, 0.7) : '#94a3b8', marginTop:2 }}>{catSymptoms.length} sintomas</div>
+                                <div style={{ font:'400 12px sans-serif', color: customPillColor ? hexToRgba(customPillColor, 0.7) : '#94a3b8', marginTop:2 }}>{catServices.length} servi&ccedil;o{catServices.length === 1 ? '' : 's'}</div>
                               </div>
                             </button>
                           )
@@ -1308,32 +1328,63 @@ const UserPortalLayout = ({ companyId }: { companyId?: string } = {}) => {
                 </div>
               )}
 
+
+              {/* INC: Servicos */}
+              {screen === 'inc-services' && dbSelIncCat && (
+                <div>
+                  <h2 style={{ font:'700 20px sans-serif', color:'#0f172a', marginBottom:6 }}>Qual servi&ccedil;o foi afetado?</h2>
+                  <p style={{ font:'400 14px sans-serif', color:'#94a3b8', marginBottom:20 }}>Selecione o servi&ccedil;o para visualizar os sintomas dispon&iacute;veis.</p>
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+                    {(() => {
+                      const catServices = services.filter(service => service.category_id === dbSelIncCat.id)
+                      if (catServices.length === 0) {
+                        return <div style={{ gridColumn:'1 / -1', padding:20, color:'#94a3b8', font:'400 14px sans-serif', textAlign:'center' }}>Nenhum servi&ccedil;o cadastrado nesta categoria.</div>
+                      }
+                      return catServices.map(service => {
+                        const symptomCount = serviceSymptoms.filter(item => item.service_id === service.id).length
+                        return (
+                          <button key={service.id} onClick={() => { setDbSelIncService(service); setDbSelSymptom(null); setScreen('inc-symptoms') }}
+                            style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:12, padding:'16px 18px', background:'#fff', border:'1.5px solid #e2e8f0', borderRadius:13, textAlign:'left', width:'100%', cursor:'pointer', transition:'transform .15s,box-shadow .15s' }}>
+                            <div style={{ display:'flex', alignItems:'center', gap:12, minWidth:0 }}>
+                              <CatalogIcon icon={service.icon} name={service.name} size={36} />
+                              <div style={{ minWidth:0 }}>
+                                <div style={{ font:'700 14.5px sans-serif', color:'#0f172a' }}>{service.name}</div>
+                                <div style={{ font:'400 12px sans-serif', color:'#94a3b8', marginTop:2 }}>{symptomCount} sintoma{symptomCount === 1 ? '' : 's'}</div>
+                              </div>
+                            </div>
+                            <span style={{ fontSize:15, color:'#94a3b8', flexShrink:0 }}>&rarr;</span>
+                          </button>
+                        )
+                      })
+                    })()}
+                  </div>
+                </div>
+              )}
+
               {/* INC: Sintomas */}
-              {screen === 'inc-symptoms' && (dbSelIncCat || selIncCat) && (
+              {screen === 'inc-symptoms' && (dbSelIncService || selIncCat) && (
                 <div>
                   <h2 style={{ font:'700 20px sans-serif', color:'#0f172a', marginBottom:6 }}>O que está acontecendo?</h2>
                   <p style={{ font:'400 14px sans-serif', color:'#94a3b8', marginBottom:20 }}>Selecione o sintoma que melhor descreve o problema.</p>
                   <div style={{ display:'flex', flexDirection:'column', gap:9 }}>
-                    {dbSelIncCat ? (
+                    {dbSelIncService ? (
                       (() => {
-                        const catSymptoms = serviceSymptoms.filter(ss => {
-                          const svc = services.find(s => s.id === ss.service_id)
-                          return svc && svc.category_id === dbSelIncCat.id
-                        })
+                        const catSymptoms = serviceSymptoms.filter(ss => ss.service_id === dbSelIncService.id)
                         
                         if (catSymptoms.length === 0) {
-                          return <div style={{ padding:20, color:'#94a3b8', font:'400 14px sans-serif', textAlign:'center' }}>Nenhum sintoma cadastrado nesta categoria.</div>
+                          return <div style={{ padding:20, color:'#94a3b8', font:'400 14px sans-serif', textAlign:'center' }}>Nenhum sintoma cadastrado neste servi&ccedil;o.</div>
                         }
                         
                         return catSymptoms.map(ss => {
                           const svc = services.find(s => s.id === ss.service_id)
                           const label = ss.symptom?.name ? `${svc?.name || ''} — ${ss.symptom.name}` : (svc?.name || '')
+                          const symptomLabel = ss.symptom?.name || label
                           return (
                             <button key={ss.id} onClick={() => { setDbSelSymptom(ss); setScreen('inc-form') }}
                               style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:12, padding:'15px 18px', background:'#fff', border:'1.5px solid #e2e8f0', borderRadius:13, textAlign:'left', width:'100%', cursor:'pointer', transition:'transform .15s,box-shadow .15s' }}>
                               <div style={{ display:'flex', alignItems:'center', gap:11 }}>
-                                <CatalogIcon icon={ss.symptom?.icon} name={label} size={28} />
-                                <span style={{ font:'600 14.5px sans-serif', color:'#0f172a', marginLeft:8 }}>{label}</span>
+                                <CatalogIcon icon={ss.symptom?.icon} name={symptomLabel} size={28} />
+                                <span style={{ font:'600 14.5px sans-serif', color:'#0f172a', marginLeft:8 }}>{symptomLabel}</span>
                               </div>
                               <span style={{ fontSize:15, color:'#94a3b8', flexShrink:0 }}>→</span>
                             </button>

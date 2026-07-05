@@ -16,6 +16,8 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 
+const OMNICHANNEL_INTERNAL_KEY = Deno.env.get('OMNICHANNEL_INTERNAL_KEY') ?? ''
+const OMNICHANNEL_URL = Deno.env.get('OMNICHANNEL_URL') ?? (SUPABASE_URL + '/functions/v1/omnichannel-gateway')
 const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
   auth: { persistSession: false },
 })
@@ -66,6 +68,22 @@ function cleanReply(body: string): string {
 Deno.serve(async (req) => {
   try {
     const payload = await req.json()
+    // Conexões configuradas delegam ao gateway comum; sem ID, preserva o loop legado.
+    const connectionId = req.headers.get('x-servicefy-connection-id')
+      ?? String(payload.connection_id ?? payload.connectionId ?? '')
+    if (connectionId && OMNICHANNEL_INTERNAL_KEY) {
+      return await fetch(OMNICHANNEL_URL, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-servicefy-internal-key': OMNICHANNEL_INTERNAL_KEY,
+          'x-servicefy-provider': String(payload.provider ?? 'imap_smtp'),
+          'x-servicefy-connection-id': connectionId,
+        },
+        body: JSON.stringify(payload),
+      })
+    }
+
     const { subject, from, text } = parseInbound(payload)
 
     // 1) Extrair o nº do chamado do assunto (fallback no corpo)

@@ -341,7 +341,7 @@ const TicketManagementDashboard = ({ onOpenTicket, companyId, isProvider, compan
   const canOpenNew = realMode && Boolean(profile) && Boolean(newTicketCompanyId)
 
   return (
-    <div className="flex flex-col h-full bg-slate-50 overflow-hidden font-sans text-slate-900">
+    <div className="flex flex-col h-full min-h-0 bg-slate-50 overflow-hidden font-sans text-slate-900">
 
       {canOpenNew && profile && (
         <NewTicketModal
@@ -459,11 +459,11 @@ const TicketManagementDashboard = ({ onOpenTicket, companyId, isProvider, compan
       </div>
 
       {/* 3. ÁREA PRINCIPAL: Tabela ou Kanban */}
-      <div className="flex-1 min-h-0 overflow-auto px-6 pb-6">
+      <div className="flex-1 min-h-0 overflow-hidden px-6 pb-6">
 
         {viewMode === 'table' ? (
           <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden flex flex-col h-full">
-            <div className="overflow-x-auto flex-1">
+            <div className="flex-1 min-h-0 overflow-auto overscroll-contain">
               <table className="w-full text-left text-sm whitespace-nowrap">
                 <thead className="bg-slate-50 sticky top-0 z-10 shadow-sm border-b border-slate-200">
                   <tr className="text-slate-500 font-bold uppercase text-[10px] tracking-wider">
@@ -524,7 +524,7 @@ const TicketManagementDashboard = ({ onOpenTicket, companyId, isProvider, compan
                 </tbody>
               </table>
             </div>
-            <div className="bg-slate-50 border-t border-slate-200 p-3 px-4 text-xs text-slate-500 flex justify-between items-center">
+            <div className="shrink-0 bg-slate-50 border-t border-slate-200 p-3 px-4 text-xs text-slate-500 flex justify-between items-center">
               <span>{realMode ? `${finalFilteredRows.length} chamado(s)` : `Mostrando 1 a ${finalFilteredRows.length} de ${finalFilteredRows.length} chamados`}</span>
               <div className="flex gap-1">
                 <button className="px-3 py-1 border border-slate-200 rounded hover:bg-white">Anterior</button>
@@ -535,16 +535,27 @@ const TicketManagementDashboard = ({ onOpenTicket, companyId, isProvider, compan
 
         ) : (
 
-          <div className="flex gap-6 h-full min-w-max">
+          <div
+            data-testid="ticket-kanban-grid"
+            className="grid h-full min-h-0 gap-4 overflow-x-hidden overflow-y-auto overscroll-contain pr-1"
+            style={{
+              gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 260px), 1fr))',
+              gridAutoRows: 'minmax(280px, 1fr)',
+            }}
+          >
             {KANBAN_COLUMNS.map(col => {
               const colRows = finalFilteredRows.filter(t => t.column === col.id)
               return (
-                <div key={col.id} className="w-[340px] flex flex-col max-h-full bg-slate-100/50 rounded-2xl border border-slate-200">
+                <div
+                  key={col.id}
+                  data-testid="ticket-kanban-column"
+                  className="min-h-[280px] min-w-0 overflow-hidden flex flex-col bg-slate-100/50 rounded-2xl border border-slate-200"
+                >
                   <div className={`p-4 border-t-4 rounded-t-2xl flex justify-between items-center bg-slate-100 ${col.color}`}>
                     <h3 className="font-bold text-slate-800 uppercase tracking-wide text-sm">{col.title}</h3>
                     <span className="bg-white px-2.5 py-0.5 rounded-full text-xs font-bold text-slate-500 shadow-sm">{colRows.length}</span>
                   </div>
-                  <div className="flex-1 overflow-y-auto p-3 space-y-3">
+                  <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3 space-y-3">
                     {colRows.map(ticket => (
                       <div key={ticket.id} onClick={() => openTicket(ticket)} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:border-indigo-300 hover:shadow-md transition-all cursor-pointer group">
                         <div className="flex justify-between items-center mb-3 gap-2">

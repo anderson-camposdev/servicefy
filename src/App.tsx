@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react'
-import { Plus, Settings, ShieldAlert, ClipboardList, AlertOctagon, RefreshCw, Home, Code2, BarChart3, Zap, CircleCheckBig } from 'lucide-react'
+import { Plus, Settings, ShieldAlert, ClipboardList, AlertOctagon, RefreshCw, Home, BarChart3, CircleCheckBig } from 'lucide-react'
 import { useToast } from './context'
 import type { AppView, User, Company, Role } from './types'
 import {
@@ -15,7 +15,7 @@ import { translateState } from './lib/statusLabels'
 import { useTenant } from './tenant'
 import { setTenantOverride } from './tenant/resolveTenant'
 import { useAuth } from './auth'
-import { UserPortalLayout, AdminPortalSettings, AnalystCockpit, TicketManagementDashboard, WorkspaceLayout, SettingsGovernance, WorkflowBuilder, ChangeManagementDashboard, ApprovalInbox } from './pages'
+import { UserPortalLayout, AdminPortalSettings, AnalystCockpit, TicketManagementDashboard, WorkspaceLayout, SettingsCenter, WorkflowBuilder, ChangeManagementDashboard, ApprovalInbox } from './pages'
 import BiApp from './features/bi/BiApp'
 
 const ACTIVE_VIEW_STORAGE_KEY = 'flowfy_active_view'
@@ -1091,7 +1091,7 @@ export default function App() {
                     setSimulatedRole(r)
                     if (r === 'end_user') {
                       setActiveView('user_portal')
-                    } else if (r === 'sysadmin' || r === 'company_admin' || r === 'cio' || r === 'it_manager' || r === 'area_manager' || r === 'client_manager') {
+                    } else if (r === 'sysadmin' || r === 'company_admin') {
                       setActiveView('settings_governance')
                     } else {
                       setActiveView('dashboard_incidents')
@@ -1128,15 +1128,13 @@ export default function App() {
     { view: 'dashboard_changes', label: 'Mudanças', icon: <RefreshCw className="w-5 h-5" /> },
     { view: 'approval_inbox', label: 'Minhas Aprovações', icon: <CircleCheckBig className="w-5 h-5" /> },
     { view: 'user_portal', label: 'Portal do Usuário', icon: <Home className="w-5 h-5" /> },
-    { view: 'api_docs', label: 'API de Integração', icon: <Code2 className="w-5 h-5" /> },
   ]
 
   // O ServiceFY BI fica disponível para todos os perfis gerenciais/técnicos que alcançam esta tela
   navItems.push({ view: 'flowfy_bi', label: 'ServiceFY BI Analytics', icon: <BarChart3 className="w-5 h-5" /> })
-  navItems.push({ view: 'workflow_builder', label: 'Motor de Automação', icon: <Zap className="w-5 h-5" /> })
 
-  // Apenas papéis administrativos e CIO têm acesso ao menu Configurações
-  const isConfigEligible = ['sysadmin', 'company_admin', 'cio', 'it_manager', 'area_manager', 'client_manager'].includes(activeRole)
+  // Configurações, integrações e automações são exclusivas dos administradores.
+  const isConfigEligible = activeRole === 'sysadmin' || activeRole === 'company_admin'
   if (isConfigEligible) {
     navItems.push({
       view: 'settings_governance',
@@ -1150,7 +1148,7 @@ export default function App() {
 
   const renderActiveDashboard = () => {
     if (activeView === 'settings_governance') {
-      return <SettingsGovernance companyId={currentCompany.id} activeRole={activeRole} />
+      return <SettingsCenter companyId={currentCompany.id} activeRole={activeRole} onNavigate={view => setActiveView(view)} />
     }
     
     // Customize layout if viewing the default dashboard view based on active role
@@ -1178,17 +1176,17 @@ export default function App() {
     if (activeView === 'dashboard_problems') return <ProblemDashboard companyId={currentCompany.id} />
     if (activeView === 'dashboard_changes') return <ChangeManagementDashboard companyId={currentCompany.id} />
     if (activeView === 'approval_inbox') return <ApprovalInbox />
-    if (activeView === 'api_docs') return <ApiDocs />
+    if (activeView === 'api_docs') return isConfigEligible ? <ApiDocs /> : <WorkspaceLayout companyId={currentCompany.id} isProvider={isProvider} companies={companies} />
     if (activeView === 'flowfy_bi') return <BiApp companyId={currentCompany.id} themeName={(currentCompany as any).primary_color} />
-    if (activeView === 'workflow_builder') return <WorkflowBuilder companyId={currentCompany.id} />
+    if (activeView === 'workflow_builder') return isConfigEligible ? <WorkflowBuilder companyId={currentCompany.id} /> : <WorkspaceLayout companyId={currentCompany.id} isProvider={isProvider} companies={companies} />
 
     return <WorkspaceLayout companyId={currentCompany.id} isProvider={isProvider} companies={companies} />
   }
 
   return (
-    <div className="min-h-screen text-on-surface flex flex-col" style={{ background: currentCompany.branding.backgroundColor || 'var(--color-bg-primary)', backgroundSize: 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat', backgroundAttachment: 'fixed' }}>
+    <div className="h-screen max-h-screen overflow-hidden text-on-surface flex flex-col" style={{ background: currentCompany.branding.backgroundColor || 'var(--color-bg-primary)', backgroundSize: 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat', backgroundAttachment: 'fixed' }}>
       {/* Top Header */}
-      <header className="sticky top-0 z-40 bg-surface border-b border-outline-variant shadow-sm px-4 lg:px-6 py-3 flex items-center gap-3">
+      <header className="sticky top-0 z-40 shrink-0 bg-surface border-b border-outline-variant shadow-sm px-4 lg:px-6 py-3 flex items-center gap-3">
         {/* Logo */}
         <div className="flex items-center gap-2.5 shrink-0">
           <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-emerald-500 to-teal-400 flex items-center justify-center shadow-md shadow-emerald-500/25">
@@ -1245,7 +1243,7 @@ export default function App() {
                 setSimulatedRole(r)
                 if (r === 'end_user') {
                   setActiveView('user_portal')
-                } else if (r === 'sysadmin' || r === 'company_admin' || r === 'cio' || r === 'it_manager' || r === 'area_manager' || r === 'client_manager') {
+                } else if (r === 'sysadmin' || r === 'company_admin') {
                   setActiveView('settings_governance')
                 } else {
                   setActiveView('dashboard_incidents')
@@ -1304,11 +1302,10 @@ export default function App() {
       </header>
 
       {/* Layout */}
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 min-h-0 overflow-hidden">
         {/* Sidebar */}
         <aside className="w-56 bg-surface border-r border-outline-variant shrink-0 hidden lg:flex flex-col py-4">
           <div className="px-3 space-y-0.5">
-            <div className="text-[9px] text-on-surface-variant font-bold uppercase tracking-widest px-3 py-2">Módulos ITIL v4</div>
             {navItems.slice(0, 4).map(item => (
               <button key={item.view} onClick={() => handleViewChange(item.view)}
                 className={`w-full text-left flex items-center gap-2.5 px-3 py-2.5 rounded-r-none rounded-l-xl text-sm font-semibold transition-all cursor-pointer border-r-2 ${activeView === item.view ? 'bg-surface-container-high text-primary border-primary' : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container border-transparent'}`}>
@@ -1328,18 +1325,40 @@ export default function App() {
             ))}
           </div>
           {/* Active Company Card */}
-          <div className="mt-auto px-3 pb-2">
-            <div className="bg-surface-container border border-outline-variant rounded-2xl p-3 text-center">
-              <div className="text-[9px] text-on-surface-variant uppercase tracking-widest font-bold mb-2">Tenant Ativo</div>
-              <img src={currentCompany.branding.logoUrl} alt={currentCompany.name} className="w-9 h-9 rounded-xl mx-auto mb-1.5 shadow-sm animate-pulse" />
-              <div className="text-[11px] text-on-surface font-bold">{currentCompany.name}</div>
-              <div className="text-[9px] text-on-surface-variant mt-0.5">{currentCompany.domain}</div>
+          <div className="mt-auto px-3 pb-3">
+            <div className="bg-surface-container/80 border border-outline-variant rounded-xl p-2.5 shadow-sm">
+              <div className="flex items-center justify-between mb-2">
+                <div className="text-[9px] text-on-surface-variant uppercase tracking-[0.16em] font-bold">Tenant</div>
+                <span className="inline-flex items-center gap-1 text-[9px] font-semibold text-emerald-600">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                  Ativo
+                </span>
+              </div>
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-14 h-12 shrink-0 rounded-lg border border-outline-variant bg-white overflow-hidden flex items-center justify-center">
+                  {currentCompany.branding.logoUrl ? (
+                    <img
+                      src={currentCompany.branding.logoUrl}
+                      alt={currentCompany.name}
+                      className="w-full h-full object-contain"
+                    />
+                  ) : (
+                    <span className="text-sm font-black text-primary">
+                      {currentCompany.name.slice(0, 2).toUpperCase()}
+                    </span>
+                  )}
+                </div>
+                <div className="min-w-0 text-left">
+                  <div className="text-xs text-on-surface font-bold truncate">{currentCompany.name}</div>
+                  <div className="text-[10px] text-on-surface-variant mt-0.5 truncate">{currentCompany.domain}</div>
+                </div>
+              </div>
             </div>
           </div>
         </aside>
 
         {/* Main Content */}
-        <main className="flex-1 min-h-0 overflow-y-auto bg-background" onClick={() => setIsUserMenuOpen(false)}>
+        <main className={`flex-1 min-h-0 bg-background ${showWorkspace ? 'overflow-hidden' : 'overflow-y-auto'}`} onClick={() => setIsUserMenuOpen(false)}>
           {showWorkspace ? (
             renderActiveDashboard()
           ) : (
@@ -1351,7 +1370,7 @@ export default function App() {
       </div>
 
       {/* Footer */}
-      <footer className="bg-surface border-t border-outline-variant py-3 px-6 flex items-center justify-between">
+      <footer className="shrink-0 bg-surface border-t border-outline-variant py-3 px-6 flex items-center justify-between">
         <span className="text-[10px] text-on-surface-variant">© {new Date().getFullYear()} ServiceFY ITSM · ITIL v4 · Multi-Tenant</span>
         <span className="flex items-center gap-1.5 text-[10px] text-on-surface-variant">
           <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />

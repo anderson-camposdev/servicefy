@@ -55,7 +55,7 @@ interface DraftRow {
   resolution: string
 }
 
-type GovTab =
+export type GovTab =
   | 'appearance'
   | 'policies'
   | 'pending_reasons'
@@ -67,7 +67,14 @@ type GovTab =
   | 'form_templates'
   | 'departments'
 
-export default function SettingsGovernance({ companyId, activeRole }: { companyId: string; activeRole: string }) {
+interface SettingsGovernanceProps {
+  companyId: string
+  activeRole: string
+  startInDetails?: boolean
+  initialTab?: GovTab
+}
+
+export default function SettingsGovernance({ companyId, activeRole, startInDetails = false, initialTab = 'appearance' }: SettingsGovernanceProps) {
   const { toast } = useToast()
   const { companies } = useAppData()
   
@@ -121,8 +128,8 @@ export default function SettingsGovernance({ companyId, activeRole }: { companyI
   }, [currentCompanyRow, managedCompanyId])
 
   // View & Tab State
-  const [viewMode, setViewMode] = useState<'list' | 'details'>(activeRole === 'sysadmin' ? 'list' : 'details')
-  const [activeTab, setActiveTab] = useState<GovTab>('appearance')
+  const [viewMode, setViewMode] = useState<'list' | 'details'>(activeRole === 'sysadmin' && !startInDetails ? 'list' : 'details')
+  const [activeTab, setActiveTab] = useState<GovTab>(initialTab)
 
   // Policies States
   const [policies, setPolicies] = useState<SLAPolicyRow[]>([])
@@ -153,8 +160,8 @@ export default function SettingsGovernance({ companyId, activeRole }: { companyI
   const buttonSecondaryClass = 'border border-outline-variant text-text-main hover:bg-surface-container rounded-lg transition-all font-semibold'
   const fontClass = 'font-sans'
 
-  // Access Control check (CIOs, managers and administrators are authorized)
-  const isAuthorized = ['sysadmin', 'company_admin', 'cio', 'it_manager', 'area_manager', 'client_manager'].includes(activeRole)
+  // Configurações administrativas são exclusivas de sysadmin e company_admin.
+  const isAuthorized = activeRole === 'sysadmin' || activeRole === 'company_admin'
   const isSysAdmin = activeRole === 'sysadmin'
 
   // -- Appearance Form State --
@@ -496,7 +503,7 @@ export default function SettingsGovernance({ companyId, activeRole }: { companyI
             Acesso Restrito
           </h3>
           <p className={`text-sm mt-2 max-w-sm ${isAlpha ? 'text-zinc-500 font-mono' : 'text-on-surface-variant'}`}>
-            Você não tem permissão para acessar esta área de Configurações. Este painel é restrito a administradores do tenant, CIOs e gestores.
+            Esta área é exclusiva para o Administrador do Tenant e o Administrador Global do MSP.
           </p>
         </div>
       </div>
@@ -510,7 +517,7 @@ export default function SettingsGovernance({ companyId, activeRole }: { companyI
     { key: 'pending_reasons', label: 'Motivos de Pausa', icon: <PauseCircle className="w-5 h-5" /> },
   ]
 
-  if (['sysadmin', 'company_admin', 'it_manager', 'area_manager'].includes(activeRole)) {
+  if (isAuthorized) {
     tabs.push(
       { key: 'departments', label: 'Departamentos', icon: <Building className="w-5 h-5" /> },
       { key: 'users', label: 'Usuários & RBAC', icon: <Users className="w-5 h-5" /> },

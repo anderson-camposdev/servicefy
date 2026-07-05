@@ -373,6 +373,7 @@ test('Portal: saudação e catálogo de serviços estão presentes', async ({ pa
 
 test('Analista: chamado aparece na fila de incidentes', async ({ page }) => {
   await setupLifecycleMocks(page)
+  await page.setViewportSize({ width: 1366, height: 768 })
   await page.goto('/')
   await page.waitForTimeout(3_000)
 
@@ -387,4 +388,53 @@ test('Analista: chamado aparece na fila de incidentes', async ({ page }) => {
     bodyText.includes('chamado') || bodyText.includes('Incidente')
 
   expect(hasQueue).toBeTruthy()
+
+  const ticketTable = page.locator('table').first()
+  await expect(ticketTable).toBeVisible()
+  const ticketScroller = ticketTable.locator('xpath=..')
+  const tableOverflowY = await ticketScroller.evaluate(element => getComputedStyle(element).overflowY)
+  expect(tableOverflowY).toMatch(/auto|scroll/)
+
+  const layoutMetrics = await page.evaluate(() => {
+    const appShell = document.querySelector('#root > div')
+    const main = document.querySelector('main')
+    return {
+      viewportHeight: window.innerHeight,
+      documentHeight: document.documentElement.scrollHeight,
+      shellHeight: appShell?.getBoundingClientRect().height ?? 0,
+      mainOverflowY: main ? getComputedStyle(main).overflowY : '',
+    }
+  })
+  expect(layoutMetrics.shellHeight).toBeLessThanOrEqual(layoutMetrics.viewportHeight + 1)
+  expect(layoutMetrics.documentHeight).toBeLessThanOrEqual(layoutMetrics.viewportHeight + 2)
+  expect(layoutMetrics.mainOverflowY).toBe('hidden')
+
+  await page.setViewportSize({ width: 1024, height: 768 })
+  await page.locator('button[title$="Kanban"]').click()
+
+  const kanbanGrid = page.getByTestId('ticket-kanban-grid')
+  await expect(kanbanGrid).toBeVisible()
+
+  const kanbanMetrics = await kanbanGrid.evaluate(element => {
+    const gridBounds = element.getBoundingClientRect()
+    const columns = Array.from(
+      element.querySelectorAll<HTMLElement>('[data-testid="ticket-kanban-column"]'),
+    )
+
+    return {
+      clientWidth: element.clientWidth,
+      scrollWidth: element.scrollWidth,
+      overflowX: getComputedStyle(element).overflowX,
+      columnsInsideGrid: columns.every(column => {
+        const bounds = column.getBoundingClientRect()
+        return bounds.left >= gridBounds.left - 1 && bounds.right <= gridBounds.right + 1
+      }),
+      columnCount: columns.length,
+    }
+  })
+
+  expect(kanbanMetrics.columnCount).toBe(4)
+  expect(kanbanMetrics.overflowX).toBe('hidden')
+  expect(kanbanMetrics.scrollWidth).toBeLessThanOrEqual(kanbanMetrics.clientWidth + 1)
+  expect(kanbanMetrics.columnsInsideGrid).toBeTruthy()
 })

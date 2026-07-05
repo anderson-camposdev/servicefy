@@ -51,7 +51,7 @@ const WorkspaceLayout = ({ companyId, isProvider, companies, ticketType }: Works
   const barBg = 'bg-surface-container/60 border-b border-outline-variant'
 
   return (
-    <div className="flex flex-col h-full bg-background text-on-background">
+    <div className="flex flex-col h-full min-h-0 overflow-hidden bg-background text-on-background">
       {/* Barra de Abas Internas */}
       <div className={`flex items-stretch gap-1 px-2 pt-2 overflow-x-auto hide-scrollbar shrink-0 ${barBg}`}>
         {tabs.map(tab => {
@@ -93,8 +93,8 @@ const WorkspaceLayout = ({ companyId, isProvider, companies, ticketType }: Works
       </div>
 
       {/* Conteúdo das Abas (todas montadas; só a ativa fica visível) */}
-      <div className="flex-1 min-h-0 bg-background">
-        <div className={activeId === ROOT_ID ? 'h-full' : 'hidden'}>
+      <div className="flex-1 min-h-0 overflow-hidden bg-background">
+        <div className={activeId === ROOT_ID ? 'h-full min-h-0 overflow-hidden' : 'hidden'}>
           <TicketManagementDashboard
             onOpenTicket={openTicket}
             companyId={companyId}

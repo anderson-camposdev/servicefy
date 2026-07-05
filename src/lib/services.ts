@@ -1748,21 +1748,30 @@ export const chatbotService = {
 
   // Buscar/criar configuração do chatbot para empresa
   async getConfig(companyId: string): Promise<ChatbotConfigRow | null> {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('chatbot_config')
-      .select('*')
+      .select('id,company_id,whatsapp_enabled,whatsapp_phone_number_id,teams_enabled,teams_app_id,teams_tenant_id,bot_name,welcome_message,unauthorized_message,business_hours_start,business_hours_end,business_days,outside_hours_message,whatsapp_vault_secret_id,whatsapp_webhook_vault_secret_id,teams_vault_secret_id,rotation_required,created_at,updated_at')
       .eq('company_id', companyId)
       .single()
-    return data ?? null
+    if (error) return null
+    return { ...data, whatsapp_token: null, whatsapp_webhook_secret: null, teams_app_secret: null }
   },
 
   async upsertConfig(companyId: string, payload: Partial<ChatbotConfigRow>): Promise<ChatbotConfigRow> {
+    const {
+      whatsapp_token, whatsapp_webhook_secret, teams_app_secret,
+      ...safePayload
+    } = payload
+    if (whatsapp_token !== undefined || whatsapp_webhook_secret !== undefined || teams_app_secret !== undefined) {
+      throw new Error('Credenciais devem ser gravadas somente pelo fluxo seguro de rotação.')
+    }
     const { data, error } = await supabase
       .from('chatbot_config')
-      .upsert({ ...payload, company_id: companyId, updated_at: new Date().toISOString() })
-      .select()
+      .upsert({ ...safePayload, company_id: companyId, updated_at: new Date().toISOString() })
+      .select('id,company_id,whatsapp_enabled,whatsapp_phone_number_id,teams_enabled,teams_app_id,teams_tenant_id,bot_name,welcome_message,unauthorized_message,business_hours_start,business_hours_end,business_days,outside_hours_message,whatsapp_vault_secret_id,whatsapp_webhook_vault_secret_id,teams_vault_secret_id,rotation_required,created_at,updated_at')
       .single()
-    return throwIfError(data, error)
+    const safe = throwIfError(data, error)
+    return { ...safe, whatsapp_token: null, whatsapp_webhook_secret: null, teams_app_secret: null }
   },
 
   // Normalizar número para E.164 (Brasil)

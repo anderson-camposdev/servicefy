@@ -9,7 +9,7 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "test:e2e": "playwright test",
-    "test:security": "node --test tests/security/rbac-cab-contract.test.mjs tests/security/request-approval-contract.test.mjs tests/security/workflow-reliability-contract.test.mjs tests/security/csat-macros-contract.test.mjs tests/security/servicefy-rebrand-contract.test.mjs",
+    "test:security": "node --test tests/security/rbac-cab-contract.test.mjs tests/security/request-approval-contract.test.mjs tests/security/workflow-reliability-contract.test.mjs tests/security/csat-macros-contract.test.mjs tests/security/servicefy-rebrand-contract.test.mjs tests/security/platform-foundation-contract.test.mjs",
     "audit:migrations": "node scripts/audit-migration-baseline.mjs",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:headed": "playwright test --headed",

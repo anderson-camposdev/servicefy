@@ -50,7 +50,7 @@ test('voto do CAB é atômico, autenticado e não aceita identidade do browser',
   assert.match(migration, /Aprovador já registrou seu voto/)
   assert.match(services, /rpc\('cast_change_cab_vote'/)
   const submitApproval = services.match(
-    /async submitApproval\([\s\S]*?return throwIfError\(data, error\)\n  },/,
+    /async submitApproval\([\s\S]*?return throwIfError\(data, error\)\r?\n  },/,
   )?.[0] ?? ''
   assert.ok(submitApproval)
   assert.doesNotMatch(submitApproval, /userId|userName|companyId/)
