@@ -11,6 +11,7 @@ import SettingsGovernance, { type GovTab } from './SettingsGovernance'
 import ChannelConnectionsSettings from './ChannelConnectionsSettings'
 import ChannelRoutingSettings from './ChannelRoutingSettings'
 import KnowledgeAdmin from './KnowledgeAdmin'
+import VirtualAgentAdmin from './VirtualAgentAdmin'
 
 interface Props {
   companyId: string
@@ -60,7 +61,7 @@ const SECTIONS: SettingsSection[] = [
   section('routing', 'channels', 'Rotas e filas', 'Identificação, destinatários e fallback.', ['Roteamento', 'Fila ambígua MSP', 'Idempotência'], { entitlementKey: 'omnichannel' }),
   section('templates', 'channels', 'Templates e notificações', 'Mensagens por evento, canal e idioma.', ['Variáveis', 'Políticas de envio', 'Entrega'], { entitlementKey: 'omnichannel' }),
   section('knowledge', 'knowledge_ai', 'Base de conhecimento', 'Artigos, revisão e publicação.', ['Publicação', 'Feedback', 'Uso pelo agente'], { entitlementKey: 'knowledge' }),
-  section('virtual_agent', 'knowledge_ai', 'Agente virtual', 'Ações, confiança e handoff.', ['Ações controladas', 'Confirmação', 'Transferência'], { status: 'locked', entitlementKey: 'virtual_agent' }),
+  section('virtual_agent', 'knowledge_ai', 'Agente virtual', 'Ações, confiança e handoff.', ['Ações controladas', 'Confirmação', 'Transferência'], { entitlementKey: 'virtual_agent' }),
   section('ci', 'cmdb', 'Itens de configuração', 'Classes, ativos e ciclo de vida.', ['Manual', 'CSV/API', 'Relacionamentos'], { entitlementKey: 'cmdb' }),
   section('discovery', 'cmdb', 'Descoberta e reconciliação', 'Intune, Entra, AD e Google.', ['Precedência', 'Deduplicação', 'Agente local'], { status: 'locked', entitlementKey: 'cmdb_discovery' }),
   section('branding', 'portal_brand', 'Identidade e portal', 'Marca, temas e pré-visualização.', ['White-label', 'Temas', 'Preview'], { legacyTab: 'appearance' }),
@@ -163,6 +164,14 @@ export default function SettingsCenter({ companyId, activeRole, onNavigate }: Pr
 
   if (selected?.key === 'routing') return (
     <ChannelRoutingSettings
+      companyId={targetCompanyId}
+      activeRole={activeRole}
+      onBack={() => setSelected(null)}
+    />
+  )
+
+  if (selected?.key === 'virtual_agent') return (
+    <VirtualAgentAdmin
       companyId={targetCompanyId}
       activeRole={activeRole}
       onBack={() => setSelected(null)}

@@ -308,6 +308,50 @@ export interface KnowledgeArticleCaseRow {
   created_at: string
 }
 
+// ─── Agente Virtual transacional (migrations 079 + 085) ────────
+export type VirtualAgentConfirmationStatus = 'not_required' | 'pending' | 'confirmed' | 'rejected'
+export type VirtualAgentResultStatus = 'success' | 'failed' | 'transferred' | 'blocked' | 'pending'
+
+export interface VirtualAgentActionRow {
+  id: string
+  company_id: string
+  service_domain_id: string | null
+  action_key: string
+  name: string
+  enabled: boolean
+  requires_confirmation: boolean
+  min_confidence: number
+  /** { keywords: string[] } — casamento simples por palavra-chave (NLU por regras). */
+  config: { keywords?: string[]; [key: string]: unknown }
+}
+
+export interface VirtualAgentExecutionRow {
+  id: string
+  company_id: string
+  conversation_id: string | null
+  case_id: string | null
+  action_id: string | null
+  identity_id: string | null
+  intent: string | null
+  confidence: number | null
+  confirmation_status: VirtualAgentConfirmationStatus
+  result_status: VirtualAgentResultStatus
+  source_article_ids: string[]
+  safe_input: Record<string, unknown>
+  safe_output: Record<string, unknown>
+  error_message: string | null
+  created_at: string
+}
+
+/** Retorno das RPCs virtual_agent_process_message / virtual_agent_confirm_action. */
+export interface VirtualAgentReply {
+  conversationId?: string
+  reply: string
+  executionId?: string | null
+  requiresConfirmation?: boolean
+  confirmed?: boolean
+}
+
 /** Linha achatada retornada pela RPC kb_search_articles. */
 export interface KnowledgeSearchResult {
   id: string

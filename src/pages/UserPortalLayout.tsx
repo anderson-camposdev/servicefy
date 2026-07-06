@@ -16,6 +16,7 @@ import type { FormAnswers, FormFieldValue } from '../lib/catalogFormFields'
 import DynamicFormFields from './DynamicFormFields'
 import CatalogIcon from './CatalogIcon'
 import KnowledgePortal from './KnowledgePortal'
+import VirtualAgentWidget from '../components/VirtualAgentWidget'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type Screen = 'home' | 'dept-cats' | 'inc-cats' | 'inc-services' | 'inc-symptoms' | 'inc-form' | 'req-cats' | 'req-subcats' | 'req-items' | 'req-form' | 'done' | 'tickets' | 'history' | 'ticket-detail' | 'knowledge'
@@ -836,6 +837,7 @@ const UserPortalLayout = ({ companyId }: { companyId?: string } = {}) => {
   ]
 
   return (
+    <>
     <div style={{ width:'100%', height:'100vh', display:'flex', overflow:'hidden', fontFamily:'system-ui,sans-serif' }}>
 
       {/* ═══ SIDEBAR ═══ */}
@@ -1737,6 +1739,8 @@ const UserPortalLayout = ({ companyId }: { companyId?: string } = {}) => {
       </div>
 
     </div>
+    <VirtualAgentWidget companyId={catalogCompanyId} />
+    </>
   )
 }
 
