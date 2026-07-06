@@ -18,9 +18,20 @@ const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 
 const OMNICHANNEL_INTERNAL_KEY = Deno.env.get('OMNICHANNEL_INTERNAL_KEY') ?? ''
 const OMNICHANNEL_URL = Deno.env.get('OMNICHANNEL_URL') ?? (SUPABASE_URL + '/functions/v1/omnichannel-gateway')
+const INBOUND_EMAIL_WEBHOOK_KEY = Deno.env.get('INBOUND_EMAIL_WEBHOOK_KEY') ?? ''
+const EMAIL_PROVIDERS = new Set(['microsoft_graph', 'gmail', 'imap_smtp'])
 const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
   auth: { persistSession: false },
 })
+
+function timingSafeEqual(left: string, right: string): boolean {
+  const a = new TextEncoder().encode(left)
+  const b = new TextEncoder().encode(right)
+  if (a.length !== b.length || a.length === 0) return false
+  let difference = 0
+  for (let index = 0; index < a.length; index += 1) difference |= a[index] ^ b[index]
+  return difference === 0
+}
 
 // Aceita formatos comuns de provedores de inbound email.
 function parseInbound(payload: Record<string, unknown>) {
@@ -66,18 +77,34 @@ function cleanReply(body: string): string {
 }
 
 Deno.serve(async (req) => {
+  if (req.method !== 'POST') {
+    return new Response(JSON.stringify({ error: 'method_not_allowed' }), { status: 405 })
+  }
+  const suppliedKey = req.headers.get('x-servicefy-webhook-key') ?? ''
+  if (!INBOUND_EMAIL_WEBHOOK_KEY || !timingSafeEqual(suppliedKey, INBOUND_EMAIL_WEBHOOK_KEY)) {
+    return new Response(JSON.stringify({ error: 'unauthorized' }), { status: 401 })
+  }
+
   try {
     const payload = await req.json()
+    const provider = String(req.headers.get('x-servicefy-provider') ?? payload.provider ?? 'imap_smtp')
+    if (!EMAIL_PROVIDERS.has(provider)) {
+      return new Response(JSON.stringify({ error: 'invalid_email_provider' }), { status: 400 })
+    }
+
     // Conexões configuradas delegam ao gateway comum; sem ID, preserva o loop legado.
     const connectionId = req.headers.get('x-servicefy-connection-id')
       ?? String(payload.connection_id ?? payload.connectionId ?? '')
-    if (connectionId && OMNICHANNEL_INTERNAL_KEY) {
+    if (connectionId) {
+      if (!OMNICHANNEL_INTERNAL_KEY) {
+        return new Response(JSON.stringify({ error: 'gateway_not_configured' }), { status: 503 })
+      }
       return await fetch(OMNICHANNEL_URL, {
         method: 'POST',
         headers: {
           'content-type': 'application/json',
           'x-servicefy-internal-key': OMNICHANNEL_INTERNAL_KEY,
-          'x-servicefy-provider': String(payload.provider ?? 'imap_smtp'),
+          'x-servicefy-provider': provider,
           'x-servicefy-connection-id': connectionId,
         },
         body: JSON.stringify(payload),

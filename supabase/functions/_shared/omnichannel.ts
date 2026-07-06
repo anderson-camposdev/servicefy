@@ -104,7 +104,9 @@ export const normalizeEmail = (
   const messageId = mail.internetMessageId ?? mail.message_id ?? mail['message-id'] ?? mail.id
   if (!messageId) return []
   const from = mail.from?.emailAddress ?? mail.from ?? {}
-  const senderEmail = from.address ?? from.email ?? String(mail.sender ?? '')
+  const senderEmail = typeof from === 'string'
+    ? (from.match(/[\w.+-]+@[\w-]+\.[\w.-]+/)?.[0] ?? from)
+    : from.address ?? from.email ?? String(mail.sender ?? '')
   const references = Array.isArray(mail.references) ? mail.references : String(mail.references ?? '').split(/\s+/).filter(Boolean)
   return [{
     provider, connectionId,

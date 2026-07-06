@@ -48,7 +48,7 @@ test('Gateway omnichannel possui deduplicação, outbox e roteamento MSP', () =>
   assert.match(channelSql, /scope public\.channel_scope/)
   assert.match(channelSql, /match_type.*default/)
   assert.match(gateway, /messageError\?\.code === '23505'/)
-  assert.match(gateway, /chooseCompany/)
+  assert.match(gateway, /chooseRoute/)
   assert.match(gateway, /x-servicefy-internal-key/)
 })
 
