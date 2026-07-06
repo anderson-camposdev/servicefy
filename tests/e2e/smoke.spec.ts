@@ -232,4 +232,40 @@ test.describe('ServiceFY ITSM — Smoke Test E2E', () => {
     await expect(page.getByRole('heading', { name: 'Central de Configurações' })).toHaveCount(0)
   })
 
+  test('Workspace se adapta ao monitor sem overflow horizontal', async ({ page }) => {
+    await setupSmokeMocks(page)
+    await page.goto('/')
+    await page.waitForTimeout(3_000)
+
+    const dashboard = page.getByTestId('ticket-dashboard')
+    const ticketScroll = page.getByTestId('ticket-table-scroll')
+    await expect(dashboard).toBeVisible()
+
+    for (const viewport of [
+      { width: 1920, height: 1080 },
+      { width: 1440, height: 900 },
+      { width: 1280, height: 720 },
+    ]) {
+      await page.setViewportSize(viewport)
+      await page.waitForTimeout(150)
+
+      const dimensions = await page.evaluate(() => {
+        const dashboardElement = document.querySelector('[data-testid="ticket-dashboard"]')
+        const tableElement = document.querySelector('[data-testid="ticket-table-scroll"]')
+        const dashboardRect = dashboardElement?.getBoundingClientRect()
+        return {
+          viewportWidth: window.innerWidth,
+          documentWidth: document.documentElement.scrollWidth,
+          dashboardRight: dashboardRect?.right ?? 0,
+          tableClientWidth: tableElement?.clientWidth ?? 0,
+          tableScrollWidth: tableElement?.scrollWidth ?? 0,
+        }
+      })
+
+      expect(dimensions.documentWidth).toBeLessThanOrEqual(dimensions.viewportWidth + 1)
+      expect(dimensions.dashboardRight).toBeLessThanOrEqual(dimensions.viewportWidth + 1)
+      expect(dimensions.tableScrollWidth).toBeLessThanOrEqual(dimensions.tableClientWidth + 1)
+      await expect(ticketScroll).toBeVisible()
+    }
+  })
 })

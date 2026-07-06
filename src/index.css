@@ -188,3 +188,11 @@
 /* Oculta scrollbar mantendo o scroll */
 .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 .hide-scrollbar::-webkit-scrollbar { display: none; }
+html, body, #root {
+  width: 100%;
+  max-width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+body { min-width: 320px; }

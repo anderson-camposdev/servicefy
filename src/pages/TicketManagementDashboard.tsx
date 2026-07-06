@@ -341,7 +341,7 @@ const TicketManagementDashboard = ({ onOpenTicket, companyId, isProvider, compan
   const canOpenNew = realMode && Boolean(profile) && Boolean(newTicketCompanyId)
 
   return (
-    <div className="flex flex-col h-full min-h-0 bg-slate-50 overflow-hidden font-sans text-slate-900">
+    <div data-testid="ticket-dashboard" className="flex flex-col h-full min-h-0 min-w-0 w-full max-w-full bg-slate-50 overflow-hidden font-sans text-slate-900">
 
       {canOpenNew && profile && (
         <NewTicketModal
@@ -354,9 +354,9 @@ const TicketManagementDashboard = ({ onOpenTicket, companyId, isProvider, compan
       )}
 
       {/* 1. BARRA SUPERIOR: Filtros e Controle de Visão */}
-      <div className="bg-white border-b border-slate-200 px-6 py-3 flex items-center justify-between shrink-0 gap-4">
+      <div className="bg-white border-b border-slate-200 px-3 sm:px-4 xl:px-6 py-3 flex items-center justify-between shrink-0 gap-2 xl:gap-4 min-w-0">
         {showClientChips ? (
-          <div className="flex items-center gap-2 overflow-x-auto pb-1 hide-scrollbar">
+          <div className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto pb-1 hide-scrollbar">
             <span className="text-sm font-bold text-slate-400 uppercase tracking-wider mr-2 flex items-center gap-1 shrink-0">
               <Building2 className="w-4 h-4" /> Clientes
             </span>
@@ -378,15 +378,15 @@ const TicketManagementDashboard = ({ onOpenTicket, companyId, isProvider, compan
           <div className="text-sm font-bold text-slate-700">Fila de Atendimento</div>
         )}
 
-        <div className="flex items-center gap-4 pl-4 border-l border-slate-200 shrink-0">
-          <div className="relative">
+        <div className="flex min-w-0 items-center gap-2 xl:gap-4 pl-2 xl:pl-4 border-l border-slate-200 shrink-0">
+          <div className="relative min-w-0">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <input
               type="text"
               value={realMode ? undefined : localSearch}
               onChange={(e) => handleSearchChange(e.target.value)}
               placeholder="Buscar ID ou assunto..."
-              className="pl-9 pr-4 py-1.5 bg-slate-100 border-transparent rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:bg-white outline-none transition-all w-64"
+              className="pl-9 pr-4 py-1.5 bg-slate-100 border-transparent rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:bg-white outline-none transition-all w-36 sm:w-44 xl:w-56 2xl:w-64"
             />
           </div>
 
@@ -395,7 +395,7 @@ const TicketManagementDashboard = ({ onOpenTicket, companyId, isProvider, compan
               onClick={() => setShowNewTicket(true)}
               className="flex items-center gap-1.5 px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-lg shadow-sm transition-all shrink-0"
             >
-              <Plus className="w-4 h-4" /> {newTicketLabel}
+              <Plus className="w-4 h-4" /><span className="hidden 2xl:inline">{newTicketLabel}</span><span className="2xl:hidden">Novo</span>
             </button>
           )}
 
@@ -420,8 +420,8 @@ const TicketManagementDashboard = ({ onOpenTicket, companyId, isProvider, compan
       </div>
 
       {/* 2. ÁREA SELF-SERVICE: Contadores */}
-      <div className="px-6 py-4 flex items-center gap-4 shrink-0 overflow-x-auto hide-scrollbar">
-        <div className="flex items-center gap-4 flex-1">
+      <div className="px-3 sm:px-4 xl:px-6 py-3 xl:py-4 grid grid-cols-[minmax(0,1fr)_auto] items-stretch gap-2 xl:gap-3 shrink-0 min-w-0">
+        <div className="grid min-w-0 gap-2 xl:gap-3" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 180px), 1fr))' }}>
           {selectedMetricKeys.map(key => {
             const metric = AVAILABLE_METRICS.find(m => m.key === key)
             if (!metric) return null
@@ -433,16 +433,16 @@ const TicketManagementDashboard = ({ onOpenTicket, companyId, isProvider, compan
               <button
                 key={key}
                 onClick={() => setActiveFilterCard(isActive ? null : key)}
-                className={`flex items-center gap-4 p-3 rounded-xl border text-left min-w-[220px] transition-all duration-200 select-none active:scale-98 ${
+                className={`flex min-w-0 w-full items-center gap-2 xl:gap-3 p-2.5 xl:p-3 rounded-xl border text-left transition-all duration-200 select-none active:scale-98 ${
                   isActive ? metric.activeColor : `${metric.color} border-slate-200 shadow-xs hover:shadow-md`
                 }`}
               >
                 <div className={`p-2 rounded-lg rounded-tr-none transition-colors ${isActive ? 'bg-white/20' : 'bg-white/60 shadow-2xs'}`}>
                   <Icon className="w-5 h-5" />
                 </div>
-                <div>
-                  <p className="text-2xl font-black leading-none">{count}</p>
-                  <p className="text-xs font-semibold uppercase tracking-wider mt-1.5 opacity-90">{metric.title}</p>
+                <div className="min-w-0">
+                  <p className="text-xl xl:text-2xl font-black leading-none">{count}</p>
+                  <p className="truncate text-[10px] xl:text-xs font-semibold uppercase tracking-wide xl:tracking-wider mt-1.5 opacity-90">{metric.title}</p>
                 </div>
               </button>
             )
@@ -450,33 +450,33 @@ const TicketManagementDashboard = ({ onOpenTicket, companyId, isProvider, compan
         </div>
         <button
           onClick={() => setIsCustomizing(true)}
-          className="flex items-center gap-2 px-4 py-3 bg-white hover:bg-slate-50 border border-slate-200 hover:border-slate-300 rounded-xl text-xs font-bold text-slate-700 transition-all shadow-2xs hover:shadow-xs shrink-0 group"
+          className="flex items-center justify-center gap-2 px-3 2xl:px-4 py-3 bg-white hover:bg-slate-50 border border-slate-200 hover:border-slate-300 rounded-xl text-xs font-bold text-slate-700 transition-all shadow-2xs hover:shadow-xs shrink-0 group"
           title="Personalizar cards do topo"
         >
           <Settings className="w-4 h-4 text-slate-500 group-hover:rotate-90 transition-transform duration-300" />
-          <span>⚙️ Customizar Visão</span>
+          <span className="hidden 2xl:inline">Customizar Visão</span>
         </button>
       </div>
 
       {/* 3. ÁREA PRINCIPAL: Tabela ou Kanban */}
-      <div className="flex-1 min-h-0 overflow-hidden px-6 pb-6">
+      <div className="flex-1 min-h-0 min-w-0 overflow-hidden px-3 sm:px-4 xl:px-6 pb-3 xl:pb-6">
 
         {viewMode === 'table' ? (
           <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden flex flex-col h-full">
-            <div className="flex-1 min-h-0 overflow-auto overscroll-contain">
-              <table className="w-full text-left text-sm whitespace-nowrap">
+            <div data-testid="ticket-table-scroll" className="flex-1 min-h-0 min-w-0 overflow-x-hidden overflow-y-auto overscroll-contain">
+              <table className="w-full table-fixed text-left text-sm">
                 <thead className="bg-slate-50 sticky top-0 z-10 shadow-sm border-b border-slate-200">
                   <tr className="text-slate-500 font-bold uppercase text-[10px] tracking-wider">
                     <th className="p-3 w-10 text-center"><input type="checkbox" className="rounded border-slate-300" /></th>
-                    <th className="p-3">Ticket ID</th>
-                    <th className="p-3">Abertura</th>
-                    <th className="p-3">Empresa</th>
-                    <th className="p-3">Solicitante</th>
-                    <th className="p-3 max-w-[300px]">Assunto</th>
-                    <th className="p-3">Status</th>
-                    <th className="p-3">Prioridade</th>
-                    <th className="p-3">SLA</th>
-                    <th className="p-3">Grupo Técnico</th>
+                    <th className="p-3 w-[170px] 2xl:w-[185px]">Ticket ID</th>
+                    <th className="hidden 2xl:table-cell p-3 w-[160px]">Abertura</th>
+                    <th className="p-3 w-[145px]">Empresa</th>
+                    <th className="hidden 2xl:table-cell p-3 w-[145px]">Solicitante</th>
+                    <th className="p-3">Assunto</th>
+                    <th className="hidden xl:table-cell p-3 w-[135px]">Status</th>
+                    <th className="p-3 w-[125px]">Prioridade</th>
+                    <th className="p-3 w-[85px]">SLA</th>
+                    <th className="hidden 2xl:table-cell p-3 w-[145px]">Grupo Técnico</th>
                     <th className="p-3 w-10"></th>
                   </tr>
                 </thead>
@@ -493,21 +493,21 @@ const TicketManagementDashboard = ({ onOpenTicket, companyId, isProvider, compan
                   {finalFilteredRows.map((ticket) => (
                     <tr key={ticket.id} onClick={() => openTicket(ticket)} className="hover:bg-indigo-50/50 transition-colors cursor-pointer group">
                       <td className="p-3 text-center" onClick={(e) => e.stopPropagation()}><input type="checkbox" className="rounded border-slate-300" /></td>
-                      <td className="p-3 font-extrabold text-indigo-600 whitespace-nowrap">
-                        <span className="flex items-center gap-2">{ticket.id} <TypeBadge type={ticket.ticketType} /></span>
+                      <td className="p-3 font-extrabold text-indigo-600 whitespace-nowrap overflow-hidden">
+                        <span className="flex min-w-0 items-center gap-2 truncate">{ticket.id} <TypeBadge type={ticket.ticketType} /></span>
                       </td>
-                      <td className="p-3 text-slate-500 text-xs">{ticket.date}</td>
-                      <td className="p-3 font-medium"><span className="flex items-center gap-1"><Building2 className="w-3 h-3 text-slate-400"/> {ticket.client}</span></td>
-                      <td className="p-3 text-slate-600">{ticket.requester}</td>
-                      <td className="p-3 font-semibold text-slate-900 truncate max-w-[300px]" title={ticket.title}>{ticket.title}</td>
-                      <td className="p-3 text-slate-600">{translateState(ticket.status)}</td>
+                      <td className="hidden 2xl:table-cell p-3 text-slate-500 text-xs truncate">{ticket.date}</td>
+                      <td className="p-3 font-medium overflow-hidden"><span className="flex min-w-0 items-center gap-1 truncate"><Building2 className="w-3 h-3 text-slate-400"/> {ticket.client}</span></td>
+                      <td className="hidden 2xl:table-cell p-3 text-slate-600 truncate">{ticket.requester}</td>
+                      <td className="p-3 font-semibold text-slate-900 truncate" title={ticket.title}>{ticket.title}</td>
+                      <td className="hidden xl:table-cell p-3 text-slate-600 truncate">{translateState(ticket.status)}</td>
                       <td className="p-3">
                         <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-md ${priorityClass(ticket.priority)}`}>
                           {ticket.priority}
                         </span>
                       </td>
-                      <td className="p-3 font-bold text-slate-600"><span className="flex items-center gap-1"><Clock className="w-3 h-3"/> {ticket.sla}</span></td>
-                      <td className="p-3">
+                      <td className="p-3 font-bold text-slate-600 overflow-hidden"><span className="flex items-center gap-1"><Clock className="w-3 h-3"/> {ticket.sla}</span></td>
+                      <td className="hidden 2xl:table-cell p-3 overflow-hidden">
                         {ticket.techGroup !== '—' ? (
                           <span className="inline-flex items-center px-2 py-0.5 bg-indigo-50 border border-indigo-100 text-indigo-700 text-xs font-bold rounded-md shadow-xs">
                             {ticket.techGroup}

@@ -1184,9 +1184,9 @@ export default function App() {
   }
 
   return (
-    <div className="h-screen max-h-screen overflow-hidden text-on-surface flex flex-col" style={{ background: currentCompany.branding.backgroundColor || 'var(--color-bg-primary)', backgroundSize: 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat', backgroundAttachment: 'fixed' }}>
+    <div className="h-screen max-h-screen w-full max-w-full overflow-hidden text-on-surface flex flex-col" style={{ background: currentCompany.branding.backgroundColor || 'var(--color-bg-primary)', backgroundSize: 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat', backgroundAttachment: 'fixed' }}>
       {/* Top Header */}
-      <header className="sticky top-0 z-40 shrink-0 bg-surface border-b border-outline-variant shadow-sm px-4 lg:px-6 py-3 flex items-center gap-3">
+      <header className="sticky top-0 z-40 shrink-0 bg-surface border-b border-outline-variant shadow-sm px-3 sm:px-4 lg:px-6 py-3 flex items-center gap-2 lg:gap-3 min-w-0">
         {/* Logo */}
         <div className="flex items-center gap-2.5 shrink-0">
           <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-emerald-500 to-teal-400 flex items-center justify-center shadow-md shadow-emerald-500/25">
@@ -1199,7 +1199,7 @@ export default function App() {
         <div className="w-px h-6 bg-outline-variant mx-1 hidden sm:block" />
 
         {/* Tenant Indicator (+ selo de Provedor MSP) */}
-        <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl border border-outline-variant bg-surface text-xs font-semibold text-on-surface shadow-sm shrink-0">
+        <div className="flex min-w-0 max-w-[13rem] xl:max-w-[18rem] items-center gap-2 px-2.5 py-1.5 rounded-xl border border-outline-variant bg-surface text-xs font-semibold text-on-surface shadow-sm shrink">
           {currentCompany.branding.logoUrl && (
             <img src={currentCompany.branding.logoUrl} alt={currentCompany.name} className="w-5 h-5 rounded-md" />
           )}
@@ -1212,7 +1212,7 @@ export default function App() {
                 window.location.href = `/?tenant=${slug}`;
               }
             }}
-            className="hidden sm:block bg-transparent text-xs font-bold text-slate-800 border-none outline-none cursor-pointer hover:text-indigo-600 focus:ring-0 p-0 m-0 w-auto appearance-none pr-4 relative"
+            className="hidden sm:block min-w-0 max-w-[9rem] xl:max-w-[13rem] bg-transparent text-xs font-bold text-slate-800 border-none outline-none cursor-pointer hover:text-indigo-600 focus:ring-0 p-0 m-0 appearance-none pr-4 relative"
             style={{ 
               width: `${Math.max(currentCompany.name.length + 3, 10)}ch`,
               backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`,
@@ -1226,7 +1226,7 @@ export default function App() {
             ))}
           </select>
           {isProvider && (
-            <span className="ml-1 px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-400 border border-sky-500/20 text-[9px] uppercase tracking-wider font-bold">
+            <span className="hidden xl:inline-flex ml-1 px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-400 border border-sky-500/20 text-[9px] uppercase tracking-wider font-bold">
               Provedor MSP
             </span>
           )}
@@ -1234,7 +1234,7 @@ export default function App() {
 
         {/* Role Simulator Dropdown — apenas em desenvolvimento */}
         {import.meta.env.DEV && (
-          <div className="flex items-center gap-1.5 border border-outline-variant bg-surface rounded-xl px-2 py-1 shadow-sm shrink-0">
+          <div className="hidden md:flex min-w-0 max-w-[18rem] items-center gap-1.5 border border-outline-variant bg-surface rounded-xl px-2 py-1 shadow-sm shrink">
             <span className="text-[10px] text-on-surface-variant font-bold uppercase tracking-wider hidden md:inline">Simular Papel:</span>
             <select
               value={activeRole}
@@ -1249,7 +1249,7 @@ export default function App() {
                   setActiveView('dashboard_incidents')
                 }
               }}
-              className="text-xs font-semibold text-on-surface bg-surface border-none outline-none cursor-pointer focus:ring-0"
+              className="min-w-0 max-w-[13rem] text-xs font-semibold text-on-surface bg-surface border-none outline-none cursor-pointer focus:ring-0"
             >
               <option value="sysadmin">SysAdmin (Admin Global)</option>
               <option value="company_admin">CompanyAdmin (Admin Tenant)</option>
@@ -1302,7 +1302,7 @@ export default function App() {
       </header>
 
       {/* Layout */}
-      <div className="flex flex-1 min-h-0 overflow-hidden">
+      <div className="flex flex-1 min-h-0 min-w-0 overflow-hidden">
         {/* Sidebar */}
         <aside className="w-56 bg-surface border-r border-outline-variant shrink-0 hidden lg:flex flex-col py-4">
           <div className="px-3 space-y-0.5">
@@ -1358,7 +1358,7 @@ export default function App() {
         </aside>
 
         {/* Main Content */}
-        <main className={`flex-1 min-h-0 bg-background ${showWorkspace ? 'overflow-hidden' : 'overflow-y-auto'}`} onClick={() => setIsUserMenuOpen(false)}>
+        <main className={`flex-1 min-h-0 min-w-0 w-0 bg-background ${showWorkspace ? 'overflow-hidden' : 'overflow-y-auto'}`} onClick={() => setIsUserMenuOpen(false)}>
           {showWorkspace ? (
             renderActiveDashboard()
           ) : (
