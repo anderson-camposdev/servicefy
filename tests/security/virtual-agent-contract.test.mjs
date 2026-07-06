@@ -4,6 +4,7 @@ import { test } from 'node:test'
 
 const read = path => readFileSync(new URL('../../' + path, import.meta.url), 'utf8')
 const sql = read('supabase/migrations/20260707000000_085_virtual_agent_transactional.sql')
+const dedupe = read('supabase/migrations/20260707010000_086_virtual_agent_dedupe.sql')
 const service = read('src/lib/virtual-agent-service.ts')
 const center = read('src/pages/SettingsCenter.tsx')
 const admin = read('src/pages/VirtualAgentAdmin.tsx')
@@ -91,4 +92,16 @@ test('Serviço tipado sem any e UI conectada à seção virtual_agent', () => {
   assert.doesNotMatch(admin, /:\s*any\b/)
   assert.match(widget, /virtualAgentService\.processMessage/)
   assert.doesNotMatch(widget, /:\s*any\b/)
+})
+
+test('Migration 086 corrige a duplicação do seed (domain NULL não conflitava)', () => {
+  // Índice único parcial cobre a lacuna da UNIQUE(company_id, service_domain_id, action_key)
+  assert.match(dedupe, /CREATE UNIQUE INDEX IF NOT EXISTS uq_va_actions_company_key_nodomain\s+ON public\.virtual_agent_actions\(company_id, action_key\)\s+WHERE service_domain_id IS NULL/)
+  // Seed passa a usar o índice parcial como alvo do ON CONFLICT
+  assert.match(dedupe, /ON CONFLICT \(company_id, action_key\) WHERE service_domain_id IS NULL DO NOTHING/)
+  // Dedupe preserva execuções (repoint antes do DELETE)
+  assert.match(dedupe, /UPDATE public\.virtual_agent_executions e\s+SET action_id = r\.keeper_id/)
+  assert.match(dedupe, /DELETE FROM public\.virtual_agent_actions a\s+USING ranked r\s+WHERE a\.id = r\.id AND r\.rn > 1/)
+  // Helper continua nunca exposto ao cliente
+  assert.match(dedupe, /REVOKE ALL ON FUNCTION public\.ensure_virtual_agent_connection\(uuid\) FROM public, anon, authenticated/)
 })
