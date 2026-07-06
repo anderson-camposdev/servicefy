@@ -31,6 +31,47 @@ export interface SaveConnectionInput {
   secret?: string | null
 }
 
+export type ChannelMatchType = 'address' | 'alias' | 'domain' | 'phone' | 'external_identity' | 'default'
+
+export interface ChannelRoute {
+  id: string
+  connection_id: string
+  target_company_id: string
+  priority: number
+  match_type: ChannelMatchType
+  match_value: string | null
+  assignment_group_id: string | null
+  enabled: boolean
+  created_at: string
+}
+
+export interface SaveRouteInput {
+  id?: string | null
+  connectionId: string
+  targetCompanyId: string
+  priority: number
+  matchType: ChannelMatchType
+  matchValue: string | null
+  assignmentGroupId: string | null
+  enabled: boolean
+}
+
+export type TriageAction = 'assigned' | 'discarded' | 'reprocessed'
+
+export interface ChannelTriageEvent {
+  id: string
+  company_id: string
+  connection_id: string
+  sender: string | null
+  subject: string | null
+  reason: 'ambiguous_route' | 'route_not_found' | 'invalid_tenant'
+  status: 'pending' | 'assigned' | 'discarded' | 'reprocessed'
+  resolved_company_id: string | null
+  created_at: string
+}
+
+export interface ConnectionOption { id: string; name: string; provider: string }
+
 
 
 export const platformAdminService = {
@@ -98,6 +139,71 @@ export const platformAdminService = {
     const { error } = await supabase.rpc('revoke_channel_connection', {
       p_company_id: companyId,
       p_connection_id: connectionId,
+    })
+    if (error) throw error
+  },
+
+  // ─── Rotas de canal (channel_routes; RLS por target_company_id) ─────────────
+  async listConnectionOptions(companyId: string): Promise<ConnectionOption[]> {
+    const { data, error } = await supabase
+      .from('channel_connections')
+      .select('id,name,provider')
+      .eq('company_id', companyId)
+      .order('name')
+    if (error) throw error
+    return (data ?? []) as ConnectionOption[]
+  },
+
+  async listRoutes(companyId: string): Promise<ChannelRoute[]> {
+    const { data, error } = await supabase
+      .from('channel_routes')
+      .select('id,connection_id,target_company_id,priority,match_type,match_value,assignment_group_id,enabled,created_at')
+      .eq('target_company_id', companyId)
+      .order('priority')
+    if (error) throw error
+    return (data ?? []) as ChannelRoute[]
+  },
+
+  async saveRoute(input: SaveRouteInput): Promise<ChannelRoute> {
+    const payload = {
+      connection_id: input.connectionId,
+      target_company_id: input.targetCompanyId,
+      priority: input.priority,
+      match_type: input.matchType,
+      match_value: input.matchType === 'default' ? null : (input.matchValue ?? null),
+      assignment_group_id: input.assignmentGroupId,
+      enabled: input.enabled,
+    }
+    const query = input.id
+      ? supabase.from('channel_routes').update(payload).eq('id', input.id).select().single()
+      : supabase.from('channel_routes').insert(payload).select().single()
+    const { data, error } = await query
+    if (error) throw error
+    return data as ChannelRoute
+  },
+
+  async deleteRoute(id: string) {
+    const { error } = await supabase.from('channel_routes').delete().eq('id', id)
+    if (error) throw error
+  },
+
+  // ─── Triagem de eventos ambíguos ────────────────────────────────────────────
+  async listTriage(companyId: string): Promise<ChannelTriageEvent[]> {
+    const { data, error } = await supabase
+      .from('channel_triage_events')
+      .select('id,company_id,connection_id,sender,subject,reason,status,resolved_company_id,created_at')
+      .eq('company_id', companyId)
+      .eq('status', 'pending')
+      .order('created_at', { ascending: false })
+    if (error) throw error
+    return (data ?? []) as ChannelTriageEvent[]
+  },
+
+  async resolveTriage(id: string, action: TriageAction, targetCompanyId: string | null) {
+    const { error } = await supabase.rpc('resolve_channel_triage', {
+      p_id: id,
+      p_action: action,
+      p_target_company_id: targetCompanyId,
     })
     if (error) throw error
   },

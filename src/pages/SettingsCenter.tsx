@@ -9,6 +9,7 @@ import type { SettingsCategoryKey, SettingsSection } from '../lib/platform-found
 import { platformAdminService } from '../lib/platform-admin-service'
 import SettingsGovernance, { type GovTab } from './SettingsGovernance'
 import ChannelConnectionsSettings from './ChannelConnectionsSettings'
+import ChannelRoutingSettings from './ChannelRoutingSettings'
 import KnowledgeAdmin from './KnowledgeAdmin'
 
 interface Props {
@@ -154,6 +155,14 @@ export default function SettingsCenter({ companyId, activeRole, onNavigate }: Pr
 
   if (selected?.key === 'knowledge') return (
     <KnowledgeAdmin
+      companyId={targetCompanyId}
+      activeRole={activeRole}
+      onBack={() => setSelected(null)}
+    />
+  )
+
+  if (selected?.key === 'routing') return (
+    <ChannelRoutingSettings
       companyId={targetCompanyId}
       activeRole={activeRole}
       onBack={() => setSelected(null)}

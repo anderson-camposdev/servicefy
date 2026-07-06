@@ -147,3 +147,63 @@ export const normalizeInbound = (
 export const routeValues = (event: NormalizedInboundEvent): string[] => [
   ...event.recipients, event.sender.email ?? '', event.sender.phone ?? '',
 ].filter(Boolean).map(value => value.toLowerCase())
+
+// ─── OUTBOUND ────────────────────────────────────────────────────────────────
+// Envio da resposta do analista de volta pelo canal de origem. Cada provider tem
+// a estrutura do envio real esboçada, mas retorna `not_configured` até haver
+// credenciais/registro de app. Quando implementado, cada branch faz a chamada
+// HTTP real e retorna { status: 'sent', providerEventId } — sem tocar no resto.
+
+export interface OutboundMessage {
+  subject?: string | null
+  body: string
+  to: { external_id?: string | null; email?: string | null; phone?: string | null; display_name?: string | null }
+}
+
+export interface OutboundResult {
+  status: 'sent' | 'not_configured' | 'failed'
+  providerEventId?: string
+  error?: string
+}
+
+const notConfigured = (provider: ChannelProvider): OutboundResult => ({
+  status: 'not_configured',
+  error: `Envio via ${provider} ainda não configurado (aguardando credenciais/registro de app).`,
+})
+
+export const sendOutbound = async (
+  provider: ChannelProvider,
+  message: OutboundMessage,
+  _secret: string | null,
+): Promise<OutboundResult> => {
+  // Guarda de dados mínimos por canal — falha cedo com motivo claro.
+  const needsPhone = provider === 'whatsapp_cloud'
+  const needsEmail = provider === 'microsoft_graph' || provider === 'gmail' || provider === 'imap_smtp'
+  if (needsPhone && !message.to.phone) return { status: 'failed', error: 'Destinatário sem telefone (WhatsApp).' }
+  if (needsEmail && !message.to.email) return { status: 'failed', error: 'Destinatário sem e-mail.' }
+  if (!message.body?.trim()) return { status: 'failed', error: 'Mensagem vazia.' }
+
+  switch (provider) {
+    case 'whatsapp_cloud':
+      // Real: POST https://graph.facebook.com/v20.0/{phone_number_id}/messages
+      //   headers Authorization: Bearer {_secret}; body { messaging_product:'whatsapp', to, type:'text', text:{ body } }
+      return notConfigured(provider)
+    case 'microsoft_graph':
+      // Real: POST https://graph.microsoft.com/v1.0/me/sendMail (token OAuth em _secret)
+      return notConfigured(provider)
+    case 'gmail':
+      // Real: POST https://gmail.googleapis.com/gmail/v1/users/me/messages/send (raw RFC822)
+      return notConfigured(provider)
+    case 'microsoft_teams':
+      // Real: Bot Framework — POST {serviceUrl}/v3/conversations/{id}/activities
+      return notConfigured(provider)
+    case 'google_chat':
+      // Real: POST https://chat.googleapis.com/v1/{space}/messages
+      return notConfigured(provider)
+    case 'imap_smtp':
+      // Real: SMTP send (deno-smtp) ou provedor transacional (Resend/SendGrid)
+      return notConfigured(provider)
+    default:
+      return notConfigured(provider)
+  }
+}
