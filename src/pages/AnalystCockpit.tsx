@@ -10,6 +10,7 @@ import { useAuth } from '../auth'
 import { useToast } from '../context'
 import type { IncidentRow, IncidentHistoryRow, IncidentState, TicketMessageRow, AssignmentGroupRow, ProfileRow, PendingReasonRow, ResponseMacroRow } from '../lib/database.types'
 import type { WorkspaceTicket } from './workspace.types'
+import KnowledgeCockpitPanel from './KnowledgeCockpitPanel'
 import SlaEventTimeline from './SlaEventTimeline'
 import TicketTasksPanel from '../components/TicketTasksPanel'
 import { priorityString, IMPACT_OPTIONS, URGENCY_OPTIONS } from '../lib/priority'
@@ -271,6 +272,7 @@ const AnalystCockpit = ({ ticket = FALLBACK_TICKET }: { ticket?: WorkspaceTicket
 
   // Form states for 'Condução do Chamado'
   const [formComment, setFormComment] = useState('')
+  const [kbOpen, setKbOpen] = useState(false)
   const [isInternal, setIsInternal] = useState(false)
   const [formState, setFormState] = useState('')
   const [formGroupId, setFormGroupId] = useState('')
@@ -864,7 +866,7 @@ const AnalystCockpit = ({ ticket = FALLBACK_TICKET }: { ticket?: WorkspaceTicket
           </div>
 
           <div className="flex items-center gap-2 shrink-0 pb-2">
-            <button className="flex items-center gap-1.5 px-3 py-2 text-sm font-semibold transition-colors border border-outline-variant text-text-main hover:bg-surface-container rounded-lg">
+            <button onClick={() => setKbOpen(true)} className="flex items-center gap-1.5 px-3 py-2 text-sm font-semibold transition-colors border border-outline-variant text-text-main hover:bg-surface-container rounded-lg">
               <BookOpen className="w-4 h-4" /> <span className="hidden lg:inline">Base de Conhecimento</span>
             </button>
             {isResolved ? (
@@ -1698,6 +1700,15 @@ const AnalystCockpit = ({ ticket = FALLBACK_TICKET }: { ticket?: WorkspaceTicket
             </div>
           </div>
         </>
+      )}
+
+      {kbOpen && (
+        <KnowledgeCockpitPanel
+          companyId={detail?.company_id ?? ticket.companyId ?? ''}
+          initialQuery={`${title} ${detail?.description ?? ''}`.trim()}
+          onInsert={text => setFormComment(prev => (prev.trim() ? `${prev}\n\n${text}` : text))}
+          onClose={() => setKbOpen(false)}
+        />
       )}
     </div>
   )

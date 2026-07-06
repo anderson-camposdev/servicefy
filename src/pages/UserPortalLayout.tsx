@@ -15,9 +15,10 @@ import { buildLabeledFormData, isEmptyFormValue, parseFormFields } from '../lib/
 import type { FormAnswers, FormFieldValue } from '../lib/catalogFormFields'
 import DynamicFormFields from './DynamicFormFields'
 import CatalogIcon from './CatalogIcon'
+import KnowledgePortal from './KnowledgePortal'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
-type Screen = 'home' | 'dept-cats' | 'inc-cats' | 'inc-services' | 'inc-symptoms' | 'inc-form' | 'req-cats' | 'req-subcats' | 'req-items' | 'req-form' | 'done' | 'tickets' | 'history' | 'ticket-detail'
+type Screen = 'home' | 'dept-cats' | 'inc-cats' | 'inc-services' | 'inc-symptoms' | 'inc-form' | 'req-cats' | 'req-subcats' | 'req-items' | 'req-form' | 'done' | 'tickets' | 'history' | 'ticket-detail' | 'knowledge'
 
 // Card virtual "Outros" no nível de subcategoria: agrupa itens legados sem subcategoria.
 const OTHERS_SUBCAT_ID = '__others__'
@@ -772,6 +773,7 @@ const UserPortalLayout = ({ companyId }: { companyId?: string } = {}) => {
   const isTickets     = screen === 'tickets'
   const isHistory     = screen === 'history'
   const isTicketDetail = screen === 'ticket-detail'
+  const isKnowledge   = screen === 'knowledge'
   const stepNum = ({ 'dept-cats':0,'inc-cats':1,'inc-services':2,'inc-symptoms':3,'inc-form':4,'req-cats':1,'req-subcats':2,'req-items':2,'req-form':3 } as Record<string,number>)[screen] || 0
   const flowStepCount = screen.startsWith('inc-') ? 4 : 3
 
@@ -815,6 +817,7 @@ const UserPortalLayout = ({ companyId }: { companyId?: string } = {}) => {
     'tickets':       'Meus Chamados',
     'history':       'Histórico',
     'ticket-detail': selectedTicket?.number ?? 'Detalhes do chamado',
+    'knowledge':     'Base de Conhecimento',
   }
 
   const prio = PRIORITY_MATRIX[`${impact}-${urgency}`] || PRIORITY_MATRIX['Media-Media']!
@@ -827,7 +830,7 @@ const UserPortalLayout = ({ companyId }: { companyId?: string } = {}) => {
     { key:'tickets', emoji:'🎫', label:'Meus Chamados',     badge: activeCount > 0 ? activeCount : null,
       active: isTickets, onClick: goTickets },
     { key:'kb',      emoji:'📚', label:'Base de Conhecimento', badge: null,
-      active: false, onClick: () => {} },
+      active: isKnowledge, onClick: () => setScreen('knowledge') },
     { key:'history', emoji:'📊', label:'Histórico',         badge: null,
       active: isHistory, onClick: () => setScreen('history') },
   ]
@@ -1212,6 +1215,13 @@ const UserPortalLayout = ({ companyId }: { companyId?: string } = {}) => {
                 </div>
               )}
             </div>
+          </div>
+        )}
+
+        {/* KNOWLEDGE BASE */}
+        {isKnowledge && (
+          <div style={{ flex:1, overflowY:'auto', padding:'26px 28px' }}>
+            <KnowledgePortal companyId={catalogCompanyId ?? ''} profileId={profile?.id ?? null} accent={brand} />
           </div>
         )}
 

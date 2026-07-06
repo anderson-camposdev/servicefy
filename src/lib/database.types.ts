@@ -225,16 +225,116 @@ export interface PortalTicketDetail extends IncidentRow {
   catalog_selection_name: string | null
 }
 
-// ─── Motor de SLA: Calendário Útil por cliente (migration 032) ──
+// ─── Base de Conhecimento (migrations 079 + 082) ───────────────
+export type KnowledgeStatus = 'draft' | 'review' | 'published' | 'archived'
+export type KnowledgeVisibility = 'public' | 'tenant' | 'internal' | 'restricted'
+export type KnowledgeUsage = 'suggested' | 'linked' | 'sent_to_user'
+export type KnowledgeGrantSubject = 'profile' | 'group'
+
+export interface KnowledgeCategoryRow {
+  id: string
+  company_id: string
+  name: string
+  slug: string
+  service_domain_id: string | null
+}
+
+export interface KnowledgeArticleRow {
+  id: string
+  company_id: string
+  category_id: string | null
+  service_domain_id: string | null
+  title: string
+  slug: string
+  summary: string | null
+  body: string
+  status: KnowledgeStatus
+  visibility: KnowledgeVisibility
+  author_id: string | null
+  reviewer_id: string | null
+  published_at: string | null
+  version: number
+  tags: string[]
+  scheduled_at: string | null
+  view_count: number
+  deflection_count: number
+  created_at: string
+  updated_at: string
+}
+
 export interface KnowledgeArticleFeedbackRow {
   id: string
-  article_id: string
   company_id: string
-  user_id: string
-  is_helpful: boolean
-  comments: string | null
+  article_id: string
+  profile_id: string | null
+  helpful: boolean
+  comment: string | null
   created_at: string
 }
+
+export interface KnowledgeArticleVersionRow {
+  id: string
+  company_id: string
+  article_id: string
+  version: number
+  title: string
+  summary: string | null
+  body: string
+  status: KnowledgeStatus
+  visibility: KnowledgeVisibility
+  snapshot_by: string | null
+  created_at: string
+}
+
+export interface KnowledgeArticleGrantRow {
+  id: string
+  company_id: string
+  article_id: string
+  subject_type: KnowledgeGrantSubject
+  subject_id: string
+  granted_by: string | null
+  expires_at: string | null
+  created_at: string
+}
+
+export interface KnowledgeArticleCaseRow {
+  id: string
+  company_id: string
+  article_id: string
+  case_id: string
+  linked_by: string | null
+  usage: KnowledgeUsage
+  created_at: string
+}
+
+/** Linha achatada retornada pela RPC kb_search_articles. */
+export interface KnowledgeSearchResult {
+  id: string
+  title: string
+  summary: string | null
+  slug: string
+  category_id: string | null
+  service_domain_id: string | null
+  visibility: KnowledgeVisibility
+  status: KnowledgeStatus
+  tags: string[]
+  view_count: number
+  updated_at: string
+  rank: number
+  total_count: number
+}
+
+/** Linha retornada pela RPC kb_suggest_for_case (cockpit). */
+export interface KnowledgeSuggestion {
+  id: string
+  title: string
+  summary: string | null
+  slug: string
+  visibility: KnowledgeVisibility
+  rank: number
+}
+
+// ─── Motor de SLA: Calendário Útil por cliente (migration 032) ──
 
 // ─── Departamentos e Tarefas (Migrations 046, 047, 048) ──────
 
