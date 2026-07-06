@@ -409,6 +409,210 @@ $$;
 REVOKE ALL ON FUNCTION public.kb_touch_article(uuid,boolean) FROM public, anon;
 GRANT EXECUTE ON FUNCTION public.kb_touch_article(uuid,boolean) TO authenticated;
 
+-- ─── 11. Integridade, autoria e auditoria completa ───────────────────────────
+-- As escritas administrativas continuam protegidas por RLS. Estes guards
+-- impedem referências cross-tenant inclusive para sysadmin e carimbam o ator.
+
+CREATE OR REPLACE FUNCTION public.tg_kb_article_guard()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF TG_OP = 'UPDATE' THEN
+    NEW.company_id := OLD.company_id;
+    NEW.author_id := OLD.author_id;
+  ELSE
+    NEW.author_id := COALESCE(NEW.author_id, public.get_current_profile_id());
+  END IF;
+
+  IF NEW.category_id IS NOT NULL AND NOT EXISTS (
+    SELECT 1 FROM public.knowledge_categories c
+    WHERE c.id = NEW.category_id AND c.company_id = NEW.company_id
+  ) THEN
+    RAISE EXCEPTION 'Categoria de outro tenant' USING ERRCODE = '23514';
+  END IF;
+
+  IF NEW.service_domain_id IS NOT NULL AND NOT EXISTS (
+    SELECT 1 FROM public.service_domains d
+    WHERE d.id = NEW.service_domain_id AND d.company_id = NEW.company_id
+  ) THEN
+    RAISE EXCEPTION 'Domínio de outro tenant' USING ERRCODE = '23514';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_kb_article_guard ON public.knowledge_articles;
+CREATE TRIGGER trg_kb_article_guard
+  BEFORE INSERT OR UPDATE ON public.knowledge_articles
+  FOR EACH ROW EXECUTE FUNCTION public.tg_kb_article_guard();
+
+CREATE OR REPLACE FUNCTION public.tg_kb_category_guard()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF TG_OP = 'UPDATE' THEN NEW.company_id := OLD.company_id; END IF;
+  IF NEW.service_domain_id IS NOT NULL AND NOT EXISTS (
+    SELECT 1 FROM public.service_domains d
+    WHERE d.id = NEW.service_domain_id AND d.company_id = NEW.company_id
+  ) THEN
+    RAISE EXCEPTION 'Domínio de outro tenant' USING ERRCODE = '23514';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_kb_category_guard ON public.knowledge_categories;
+CREATE TRIGGER trg_kb_category_guard
+  BEFORE INSERT OR UPDATE ON public.knowledge_categories
+  FOR EACH ROW EXECUTE FUNCTION public.tg_kb_category_guard();
+
+CREATE OR REPLACE FUNCTION public.tg_kb_grant_guard()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF TG_OP = 'UPDATE' THEN NEW.company_id := OLD.company_id; END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM public.knowledge_articles a
+    WHERE a.id = NEW.article_id AND a.company_id = NEW.company_id
+  ) THEN
+    RAISE EXCEPTION 'Artigo de outro tenant' USING ERRCODE = '23514';
+  END IF;
+
+  IF NEW.subject_type = 'profile' AND NOT EXISTS (
+    SELECT 1 FROM public.profiles p
+    WHERE p.id = NEW.subject_id AND p.company_id = NEW.company_id
+  ) THEN
+    RAISE EXCEPTION 'Perfil de outro tenant' USING ERRCODE = '23514';
+  ELSIF NEW.subject_type = 'group' AND NOT EXISTS (
+    SELECT 1 FROM public.assignment_groups g
+    WHERE g.id = NEW.subject_id AND g.company_id = NEW.company_id
+  ) THEN
+    RAISE EXCEPTION 'Grupo de outro tenant' USING ERRCODE = '23514';
+  END IF;
+
+  IF TG_OP = 'INSERT' THEN
+    NEW.granted_by := public.get_current_profile_id();
+  ELSE
+    NEW.granted_by := OLD.granted_by;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_kb_grant_guard ON public.knowledge_article_grants;
+CREATE TRIGGER trg_kb_grant_guard
+  BEFORE INSERT OR UPDATE ON public.knowledge_article_grants
+  FOR EACH ROW EXECUTE FUNCTION public.tg_kb_grant_guard();
+
+CREATE OR REPLACE FUNCTION public.tg_kb_case_link_guard()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM public.knowledge_articles a
+    WHERE a.id = NEW.article_id AND a.company_id = NEW.company_id
+  ) OR NOT EXISTS (
+    SELECT 1 FROM public.cases c
+    WHERE c.id = NEW.case_id AND c.company_id = NEW.company_id
+  ) THEN
+    RAISE EXCEPTION 'Caso e artigo devem pertencer ao mesmo tenant' USING ERRCODE = '23514';
+  END IF;
+  NEW.linked_by := public.get_current_profile_id();
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_kb_case_link_guard ON public.knowledge_article_cases;
+CREATE TRIGGER trg_kb_case_link_guard
+  BEFORE INSERT OR UPDATE ON public.knowledge_article_cases
+  FOR EACH ROW EXECUTE FUNCTION public.tg_kb_case_link_guard();
+
+-- Auditoria de CRUD. Atualizações exclusivas de métricas não geram ruído.
+CREATE OR REPLACE FUNCTION public.tg_kb_admin_audit()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_company uuid := CASE WHEN TG_OP = 'DELETE' THEN OLD.company_id ELSE NEW.company_id END;
+  v_id text := CASE WHEN TG_OP = 'DELETE' THEN OLD.id::text ELSE NEW.id::text END;
+  v_before jsonb;
+  v_after jsonb;
+BEGIN
+  IF NOT public.is_settings_admin(v_company) THEN
+    IF TG_OP = 'DELETE' THEN RETURN OLD; ELSE RETURN NEW; END IF;
+  END IF;
+
+  IF TG_TABLE_NAME = 'knowledge_articles' AND TG_OP = 'UPDATE'
+     AND (NEW.title, NEW.summary, NEW.body, NEW.category_id, NEW.service_domain_id,
+          NEW.status, NEW.visibility, NEW.tags, NEW.scheduled_at)
+         IS NOT DISTINCT FROM
+         (OLD.title, OLD.summary, OLD.body, OLD.category_id, OLD.service_domain_id,
+          OLD.status, OLD.visibility, OLD.tags, OLD.scheduled_at) THEN
+    RETURN NEW;
+  END IF;
+
+  v_before := CASE WHEN TG_OP = 'INSERT' THEN NULL
+    ELSE to_jsonb(OLD) - ARRAY['body','search_vector'] END;
+  v_after := CASE WHEN TG_OP = 'DELETE' THEN NULL
+    ELSE to_jsonb(NEW) - ARRAY['body','search_vector'] END;
+
+  PERFORM public.write_admin_audit(
+    v_company,
+    'kb.' || replace(TG_TABLE_NAME, 'knowledge_', '') || '.' || lower(TG_OP),
+    TG_TABLE_NAME,
+    v_id,
+    v_before,
+    v_after
+  );
+
+  IF TG_OP = 'DELETE' THEN RETURN OLD; ELSE RETURN NEW; END IF;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_kb_article_audit ON public.knowledge_articles;
+CREATE TRIGGER trg_kb_article_audit
+  AFTER INSERT OR UPDATE OR DELETE ON public.knowledge_articles
+  FOR EACH ROW EXECUTE FUNCTION public.tg_kb_admin_audit();
+
+DROP TRIGGER IF EXISTS trg_kb_category_audit ON public.knowledge_categories;
+CREATE TRIGGER trg_kb_category_audit
+  AFTER INSERT OR UPDATE OR DELETE ON public.knowledge_categories
+  FOR EACH ROW EXECUTE FUNCTION public.tg_kb_admin_audit();
+
+DROP TRIGGER IF EXISTS trg_kb_grant_audit ON public.knowledge_article_grants;
+CREATE TRIGGER trg_kb_grant_audit
+  AFTER INSERT OR UPDATE OR DELETE ON public.knowledge_article_grants
+  FOR EACH ROW EXECUTE FUNCTION public.tg_kb_admin_audit();
+
+REVOKE ALL ON FUNCTION public.tg_kb_article_guard() FROM public, anon, authenticated;
+REVOKE ALL ON FUNCTION public.tg_kb_category_guard() FROM public, anon, authenticated;
+REVOKE ALL ON FUNCTION public.tg_kb_grant_guard() FROM public, anon, authenticated;
+REVOKE ALL ON FUNCTION public.tg_kb_case_link_guard() FROM public, anon, authenticated;
+REVOKE ALL ON FUNCTION public.tg_kb_admin_audit() FROM public, anon, authenticated;
+
+-- O INSERT ... RETURNING do portal precisa ler o próprio feedback.
+DROP POLICY IF EXISTS knowledge_feedback_self_read ON public.knowledge_article_feedback;
+CREATE POLICY knowledge_feedback_self_read
+  ON public.knowledge_article_feedback FOR SELECT TO authenticated
+  USING (
+    profile_id = public.get_current_profile_id()
+    OR public.is_settings_admin(company_id)
+  );
 -- ─── Verificação (comentada) ─────────────────────────────────────────────────
 --   SELECT * FROM public.kb_search_articles('<company>', 'senha vpn');
 --   SELECT * FROM public.kb_suggest_for_case('<case>');

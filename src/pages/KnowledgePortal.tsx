@@ -43,7 +43,11 @@ export default function KnowledgePortal({ companyId, profileId, accent }: Props)
 
   const open = async (id: string) => {
     setOpeningId(id); setError(null)
-    try { setArticle(await knowledgeService.getArticle(id)) }
+    try {
+      const opened = await knowledgeService.getArticle(id)
+      setArticle(opened)
+      void knowledgeService.touchArticle(id, false).catch(() => undefined)
+    }
     catch { setError('Este artigo não está disponível.') }
     finally { setOpeningId(null) }
   }

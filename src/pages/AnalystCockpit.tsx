@@ -1705,6 +1705,7 @@ const AnalystCockpit = ({ ticket = FALLBACK_TICKET }: { ticket?: WorkspaceTicket
       {kbOpen && (
         <KnowledgeCockpitPanel
           companyId={detail?.company_id ?? ticket.companyId ?? ''}
+          caseId={detail?.case_id ?? ticket.caseId ?? null}
           initialQuery={`${title} ${detail?.description ?? ''}`.trim()}
           onInsert={text => setFormComment(prev => (prev.trim() ? `${prev}\n\n${text}` : text))}
           onClose={() => setKbOpen(false)}

@@ -14,6 +14,7 @@ import type { KnowledgeSearchResult, KnowledgeArticleRow } from '../lib/database
 
 interface Props {
   companyId: string
+  caseId?: string | null
   /** texto do chamado (assunto + descrição) para sugestão automática */
   initialQuery: string
   /** insere texto na resposta ao usuário (compositor do cockpit) */
@@ -21,7 +22,7 @@ interface Props {
   onClose: () => void
 }
 
-export default function KnowledgeCockpitPanel({ companyId, initialQuery, onInsert, onClose }: Props) {
+export default function KnowledgeCockpitPanel({ companyId, caseId, initialQuery, onInsert, onClose }: Props) {
   const [query, setQuery] = useState('')
   const [rows, setRows] = useState<KnowledgeSearchResult[]>([])
   const [loading, setLoading] = useState(true)
@@ -39,8 +40,32 @@ export default function KnowledgeCockpitPanel({ companyId, initialQuery, onInser
     finally { setLoading(false) }
   }, [companyId])
 
-  // Sugestão inicial pelo texto do chamado.
-  useEffect(() => { search(initialQuery.slice(0, 200)) }, [search, initialQuery])
+  // Quando o incidente já possui Case canônico, usa a sugestão contextual e
+  // registra vínculos reais; durante a transição mantém a busca textual.
+  const loadInitial = useCallback(async () => {
+    if (!caseId) {
+      await search(initialQuery.slice(0, 200))
+      return
+    }
+    setLoading(true); setError(null)
+    try {
+      const suggestions = await knowledgeService.suggestForCase(caseId, 20)
+      setRows(suggestions.map((item, index) => ({
+        ...item,
+        category_id: null,
+        service_domain_id: null,
+        status: 'published',
+        tags: [],
+        view_count: 0,
+        updated_at: '',
+        total_count: suggestions.length,
+        rank: item.rank ?? (suggestions.length - index),
+      })))
+    } catch (e) { setError((e as Error).message) }
+    finally { setLoading(false) }
+  }, [caseId, initialQuery, search])
+
+  useEffect(() => { void loadInitial() }, [loadInitial])
 
   const toggle = async (id: string) => {
     if (expanded === id) { setExpanded(null); return }
@@ -50,15 +75,21 @@ export default function KnowledgeCockpitPanel({ companyId, initialQuery, onInser
   }
 
   const flash = (m: string) => { setNote(m); setTimeout(() => setNote(null), 2000) }
+  const track = async (articleId: string, usage: 'linked' | 'sent_to_user') => {
+    try {
+      if (caseId) await knowledgeService.registerUsage(articleId, caseId, usage)
+      else await knowledgeService.touchArticle(articleId, usage === 'sent_to_user')
+    } catch { /* métrica não bloqueia o atendimento */ }
+  }
 
   const insertRef = async (r: KnowledgeSearchResult) => {
     onInsert(`📚 Artigo: **${r.title}**${r.summary ? ` — ${r.summary}` : ''}`)
-    try { await knowledgeService.touchArticle(r.id, true) } catch { /* métrica não bloqueia */ }
+    await track(r.id, 'sent_to_user')
     flash('Referência inserida na resposta.')
   }
   const insertBody = async (a: KnowledgeArticleRow) => {
     onInsert(`${a.title}\n\n${a.body}`)
-    try { await knowledgeService.touchArticle(a.id, true) } catch { /* idem */ }
+    await track(a.id, 'sent_to_user')
     flash('Conteúdo inserido na resposta.')
   }
 
@@ -114,6 +145,11 @@ export default function KnowledgeCockpitPanel({ companyId, initialQuery, onInser
                         ? <div className="kb-prose max-h-64 overflow-y-auto text-sm text-slate-700" dangerouslySetInnerHTML={{ __html: renderMarkdown(article.body) }} />
                         : <div className="flex items-center gap-2 py-2 text-xs text-slate-400"><Loader2 className="h-3.5 w-3.5 animate-spin" /> carregando…</div>}
                       <div className="mt-3 flex flex-wrap gap-2">
+                        {caseId && (
+                          <button onClick={() => { void track(r.id, 'linked'); flash('Artigo vinculado ao caso.') }} className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-200 px-3 py-1.5 text-xs font-bold text-indigo-700">
+                            <BookOpen className="h-3.5 w-3.5" /> Vincular ao caso
+                          </button>
+                        )}
                         <button onClick={() => insertRef(r)} className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-bold text-white">
                           <Link2 className="h-3.5 w-3.5" /> Inserir referência
                         </button>

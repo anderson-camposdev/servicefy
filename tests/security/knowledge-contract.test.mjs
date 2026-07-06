@@ -9,6 +9,7 @@ const markdown = read('src/lib/markdown.ts')
 const center = read('src/pages/SettingsCenter.tsx')
 const portal = read('src/pages/UserPortalLayout.tsx')
 const cockpit = read('src/pages/AnalystCockpit.tsx')
+const packageJson = read('package.json')
 
 const fnBody = (name) => {
   const parts = sql.split('CREATE OR REPLACE FUNCTION public.' + name)
@@ -105,4 +106,32 @@ test('UI foi conectada em admin, portal e cockpit (sem placeholders)', () => {
   assert.match(cockpit, /<KnowledgeCockpitPanel/)
   // O botão do cockpit não é mais um no-op vazio
   assert.doesNotMatch(cockpit, /onClick=\{\(\) => \{\}\}[\s\S]{0,120}Base de Conhecimento/)
+})
+test('Feedback pode retornar a própria linha sem expor respostas de terceiros', () => {
+  assert.match(sql, /CREATE POLICY knowledge_feedback_self_read/)
+  assert.match(sql, /profile_id = public.get_current_profile_id()/)
+})
+
+test('Guards impedem referências cross-tenant e carimbam autoria no servidor', () => {
+  assert.match(sql, /CREATE TRIGGER trg_kb_article_guard/)
+  assert.match(sql, /Categoria de outro tenant/)
+  assert.match(sql, /CREATE TRIGGER trg_kb_grant_guard/)
+  assert.match(sql, /Perfil de outro tenant/)
+  assert.match(sql, /Grupo de outro tenant/)
+  assert.match(sql, /CREATE TRIGGER trg_kb_case_link_guard/)
+  assert.match(sql, /Caso e artigo devem pertencer ao mesmo tenant/)
+  assert.ok(sql.includes('NEW.author_id := COALESCE(NEW.author_id, public.get_current_profile_id())'))
+  assert.ok(sql.includes('NEW.granted_by := public.get_current_profile_id()'))
+})
+
+test('CRUD administrativo da KB é auditado sem armazenar o corpo do artigo', () => {
+  assert.match(sql, /CREATE TRIGGER trg_kb_article_audit/)
+  assert.match(sql, /CREATE TRIGGER trg_kb_category_audit/)
+  assert.match(sql, /CREATE TRIGGER trg_kb_grant_audit/)
+  assert.match(sql, /public.write_admin_audit/)
+  assert.ok(sql.includes("to_jsonb(OLD) - ARRAY['body','search_vector']"))
+})
+
+test('Contrato da KB participa da suíte de segurança padrão', () => {
+  assert.match(packageJson, /tests\/security\/knowledge-contract\.test\.mjs/)
 })

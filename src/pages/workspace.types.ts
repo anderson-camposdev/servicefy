@@ -25,5 +25,6 @@ export interface WorkspaceTicket {
   ticketType?: 'incident' | 'request'
   // Referências reais para o Cockpit buscar o detalhe/histórico no Supabase
   incidentId?: string
+  caseId?: string | null
   companyId?: string
 }

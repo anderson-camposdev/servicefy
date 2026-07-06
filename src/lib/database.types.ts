@@ -102,6 +102,7 @@ export interface IncidentRow {
   id: string
   number: string
   company_id: string
+  case_id?: string | null
   short_description: string
   description: string | null
   priority: TicketPriority

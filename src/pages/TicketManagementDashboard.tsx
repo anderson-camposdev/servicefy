@@ -286,6 +286,7 @@ const TicketManagementDashboard = ({ onOpenTicket, companyId, isProvider, compan
         column: stateToColumn(i.state),
         ticketType: i.ticket_type,
         incidentId: i.id,
+        caseId: i.case_id ?? null,
         companyId: i.company_id,
         assignedToId: i.assigned_to_id,
         slaBreached: i.sla_breached,

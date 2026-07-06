@@ -101,6 +101,8 @@ test.describe('Base de Conhecimento — Portal', () => {
     await expect(page.getByText(/Esqueci minha senha|Redefinição/i).first()).toBeVisible({ timeout: 6_000 })
     // Bloco de feedback
     await expect(page.getByText(/Este artigo foi útil/i).first()).toBeVisible({ timeout: 5_000 })
+    await page.getByRole('button', { name: 'Sim' }).click()
+    await expect(page.getByText(/Obrigado pelo seu feedback/i)).toBeVisible()
   })
 
   test('busca por termo mantém a KB funcional', async ({ page }) => {
