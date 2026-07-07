@@ -24,6 +24,21 @@ export interface SaveActionInput {
   keywords: string[]
 }
 
+export interface ItsmReadinessCheck {
+  key: string
+  label: string
+  ready: boolean
+  details: string
+}
+
+export interface ItsmReadiness {
+  companyId: string
+  companyName: string
+  ready: boolean
+  checks: ItsmReadinessCheck[]
+  checkedAt: string
+}
+
 export const virtualAgentService = {
   // ─── Admin: catálogo de ações ───────────────────────────────
   async listActions(companyId: string): Promise<VirtualAgentActionRow[]> {
@@ -60,6 +75,12 @@ export const virtualAgentService = {
       .eq('company_id', companyId)
       .order('created_at', { ascending: false })
       .limit(limit))
+  },
+
+  async getReadiness(companyId: string): Promise<ItsmReadiness> {
+    return unwrap(await supabase.rpc('itsm_service_desk_readiness', {
+      p_company_id: companyId,
+    }))
   },
 
   // ─── Conversação (widget do portal + console de teste) ──────

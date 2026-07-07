@@ -10,7 +10,7 @@ import {
   ArrowLeft, Bot, Plus, Trash2, RefreshCw, AlertTriangle, Loader2,
   History, ListChecks, MessageSquareText, CheckCircle2,
 } from 'lucide-react'
-import { virtualAgentService, type SaveActionInput } from '../lib/virtual-agent-service'
+import { virtualAgentService, type ItsmReadiness, type SaveActionInput } from '../lib/virtual-agent-service'
 import type { VirtualAgentActionRow, VirtualAgentExecutionRow } from '../lib/database.types'
 import TriageChat from '../components/TriageChat'
 
@@ -28,6 +28,7 @@ export default function VirtualAgentAdmin({ companyId, onBack }: Props) {
   const [tab, setTab] = useState<'actions' | 'test' | 'history'>('actions')
   const [actions, setActions] = useState<VirtualAgentActionRow[]>([])
   const [executions, setExecutions] = useState<VirtualAgentExecutionRow[]>([])
+  const [readiness, setReadiness] = useState<ItsmReadiness | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [toast, setToast] = useState('')
@@ -37,11 +38,12 @@ export default function VirtualAgentAdmin({ companyId, onBack }: Props) {
   const load = useCallback(async () => {
     setLoading(true); setError('')
     try {
-      const [a, e] = await Promise.all([
+      const [a, e, r] = await Promise.all([
         virtualAgentService.listActions(companyId),
         virtualAgentService.listExecutions(companyId),
+        virtualAgentService.getReadiness(companyId),
       ])
-      setActions(a); setExecutions(e)
+      setActions(a); setExecutions(e); setReadiness(r)
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'Falha ao carregar.') }
     finally { setLoading(false) }
   }, [companyId])
@@ -69,6 +71,29 @@ export default function VirtualAgentAdmin({ companyId, onBack }: Props) {
       </div>
 
       {error && <div className="mt-5 flex gap-2 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700"><AlertTriangle className="h-4 w-4" />{error}</div>}
+
+      {readiness && (
+        <section className={`mt-5 rounded-2xl border p-5 ${readiness.ready ? 'border-emerald-200 bg-emerald-50' : 'border-amber-200 bg-amber-50'}`}>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h2 className={`font-extrabold ${readiness.ready ? 'text-emerald-900' : 'text-amber-900'}`}>Prontidão do Service Desk · {readiness.companyName}</h2>
+              <p className={`mt-1 text-xs ${readiness.ready ? 'text-emerald-700' : 'text-amber-700'}`}>{readiness.ready ? 'Configuração apta para abrir e consultar chamados.' : 'Existem configurações obrigatórias pendentes.'}</p>
+            </div>
+            <span className={`rounded-full px-3 py-1 text-xs font-black ${readiness.ready ? 'bg-emerald-600 text-white' : 'bg-amber-500 text-white'}`}>{readiness.ready ? 'PRONTO' : 'ATENÇÃO'}</span>
+          </div>
+          <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+            {readiness.checks.map(check => (
+              <div key={check.key} className="rounded-xl border border-white/70 bg-white/80 p-3">
+                <div className="flex items-center gap-2 text-xs font-bold text-slate-800">
+                  {check.ready ? <CheckCircle2 className="h-4 w-4 text-emerald-600" /> : <AlertTriangle className="h-4 w-4 text-amber-600" />}
+                  {check.label}
+                </div>
+                <p className="mt-1 pl-6 text-[11px] text-slate-500">{check.details}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {tab === 'actions' && (
         <ActionsPanel companyId={companyId} actions={actions} loading={loading} onChanged={load} onError={setError} onFlash={flash} />

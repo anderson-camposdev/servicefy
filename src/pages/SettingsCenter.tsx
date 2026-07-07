@@ -12,6 +12,7 @@ import ChannelConnectionsSettings from './ChannelConnectionsSettings'
 import ChannelRoutingSettings from './ChannelRoutingSettings'
 import KnowledgeAdmin from './KnowledgeAdmin'
 import VirtualAgentAdmin from './VirtualAgentAdmin'
+import PlatformModuleSettings, { type OperationalModuleKey } from './PlatformModuleSettings'
 
 interface Props {
   companyId: string
@@ -172,6 +173,15 @@ export default function SettingsCenter({ companyId, activeRole, onNavigate }: Pr
 
   if (selected?.key === 'virtual_agent') return (
     <VirtualAgentAdmin
+      companyId={targetCompanyId}
+      activeRole={activeRole}
+      onBack={() => setSelected(null)}
+    />
+  )
+
+  if (selected && ['domains', 'macros', 'templates', 'ci', 'compliance', 'licensing'].includes(selected.key)) return (
+    <PlatformModuleSettings
+      moduleKey={selected.key as OperationalModuleKey}
       companyId={targetCompanyId}
       activeRole={activeRole}
       onBack={() => setSelected(null)}
