@@ -76,4 +76,31 @@ export const virtualAgentService = {
       p_confirmed: confirmed,
     }))
   },
+
+  // ─── Condutor de triagem (widget + console admin) ───────────────
+  // Persiste a transcrição + o estado do wizard (conversations.metadata->triage)
+  // e devolve o id da conversa (reaproveitável entre turnos e sessões).
+  async triageSync(input: {
+    conversationId?: string | null
+    state: Record<string, unknown>
+    inbound?: string
+    outbound?: string
+  }): Promise<string> {
+    return unwrap(await supabase.rpc('virtual_agent_triage_sync', {
+      p_conversation_id: input.conversationId ?? null,
+      p_state: input.state,
+      p_inbound: input.inbound ?? '',
+      p_outbound: input.outbound ?? '',
+    }))
+  },
+
+  // Registra no histórico/auditoria a abertura concluída pela triagem.
+  async triageComplete(conversationId: string, incidentId: string, summary: Record<string, unknown>): Promise<void> {
+    const { error } = await supabase.rpc('virtual_agent_triage_complete', {
+      p_conversation_id: conversationId,
+      p_incident_id: incidentId,
+      p_summary: summary,
+    })
+    if (error) throw error
+  },
 }

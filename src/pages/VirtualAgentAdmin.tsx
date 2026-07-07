@@ -5,13 +5,14 @@
 // execuções. A segurança real é a RLS/RPC da migration 085.
 // ============================================================
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import {
-  ArrowLeft, Bot, Plus, Trash2, RefreshCw, AlertTriangle, Send, Loader2,
-  History, ListChecks, MessageSquareText, CheckCircle2, XCircle,
+  ArrowLeft, Bot, Plus, Trash2, RefreshCw, AlertTriangle, Loader2,
+  History, ListChecks, MessageSquareText, CheckCircle2,
 } from 'lucide-react'
 import { virtualAgentService, type SaveActionInput } from '../lib/virtual-agent-service'
-import type { VirtualAgentActionRow, VirtualAgentExecutionRow, VirtualAgentReply } from '../lib/database.types'
+import type { VirtualAgentActionRow, VirtualAgentExecutionRow } from '../lib/database.types'
+import TriageChat from '../components/TriageChat'
 
 interface Props { companyId: string; activeRole: string; onBack: () => void }
 
@@ -22,8 +23,6 @@ const RESULT_LABEL: Record<string, { label: string; cls: string }> = {
   blocked:     { label: 'Bloqueado',     cls: 'bg-slate-200 text-slate-600' },
   pending:     { label: 'Aguardando…',   cls: 'bg-amber-100 text-amber-700' },
 }
-
-interface ChatEntry { from: 'user' | 'bot'; text: string; executionId?: string | null; requiresConfirmation?: boolean }
 
 export default function VirtualAgentAdmin({ companyId, onBack }: Props) {
   const [tab, setTab] = useState<'actions' | 'test' | 'history'>('actions')
@@ -74,7 +73,7 @@ export default function VirtualAgentAdmin({ companyId, onBack }: Props) {
       {tab === 'actions' && (
         <ActionsPanel companyId={companyId} actions={actions} loading={loading} onChanged={load} onError={setError} onFlash={flash} />
       )}
-      {tab === 'test' && <TestConsole onError={setError} />}
+      {tab === 'test' && <TestConsole companyId={companyId} />}
       {tab === 'history' && <HistoryPanel executions={executions} loading={loading} actions={actions} />}
 
       {toast && <div className="fixed bottom-5 right-5 z-50 flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white shadow-lg"><CheckCircle2 className="h-4 w-4 text-emerald-400" />{toast}</div>}
@@ -162,63 +161,13 @@ function ActionsPanel({ companyId, actions, loading, onChanged, onError, onFlash
 }
 
 // ─── Console de teste (mesma RPC do widget) ─────────────────────
-function TestConsole({ onError }: { onError: (m: string) => void }) {
-  const [messages, setMessages] = useState<ChatEntry[]>([{ from: 'bot', text: 'Olá! Sou o assistente virtual. Pergunte sobre seus chamados, peça para abrir uma solicitação, ou fale "humano" para transferir.' }])
-  const [input, setInput] = useState('')
-  const [conversationId, setConversationId] = useState<string | null>(null)
-  const [sending, setSending] = useState(false)
-  const bottomRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages])
-
-  const applyReply = (reply: VirtualAgentReply) => {
-    if (reply.conversationId) setConversationId(reply.conversationId)
-    setMessages(m => [...m, { from: 'bot', text: reply.reply, executionId: reply.executionId, requiresConfirmation: reply.requiresConfirmation }])
-  }
-
-  const send = async () => {
-    const text = input.trim()
-    if (!text || sending) return
-    setMessages(m => [...m, { from: 'user', text }])
-    setInput(''); setSending(true)
-    try {
-      const reply = await virtualAgentService.processMessage(text, conversationId)
-      applyReply(reply)
-    } catch (cause) { onError(cause instanceof Error ? cause.message : 'Falha ao processar mensagem.') }
-    finally { setSending(false) }
-  }
-
-  const confirm = async (executionId: string, confirmed: boolean) => {
-    setSending(true)
-    try {
-      const reply = await virtualAgentService.confirmAction(executionId, confirmed)
-      setMessages(m => [...m, { from: 'bot', text: reply.reply }])
-    } catch (cause) { onError(cause instanceof Error ? cause.message : 'Falha ao confirmar.') }
-    finally { setSending(false) }
-  }
-
+function TestConsole({ companyId }: { companyId: string }) {
+  // Mesmo condutor do widget do portal — o admin testa a experiência real.
   return (
-    <div className="mt-6 mx-auto max-w-2xl rounded-2xl border bg-white shadow-sm">
-      <div className="flex h-[420px] flex-col gap-3 overflow-y-auto p-5">
-        {messages.map((m, i) => (
-          <div key={i} className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-sm ${m.from === 'user' ? 'ml-auto bg-indigo-600 text-white' : 'bg-slate-100 text-slate-800'}`}>
-            {m.text}
-            {m.from === 'bot' && m.requiresConfirmation && m.executionId && (
-              <div className="mt-2 flex gap-2">
-                <button onClick={() => void confirm(m.executionId!, true)} className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-1 text-xs font-bold text-white"><CheckCircle2 className="h-3.5 w-3.5" /> Sim</button>
-                <button onClick={() => void confirm(m.executionId!, false)} className="inline-flex items-center gap-1 rounded-lg border border-slate-300 px-3 py-1 text-xs font-bold text-slate-600"><XCircle className="h-3.5 w-3.5" /> Não</button>
-              </div>
-            )}
-          </div>
-        ))}
-        <div ref={bottomRef} />
-      </div>
-      <div className="flex gap-2 border-t p-3">
-        <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') void send() }}
-          placeholder="Digite uma mensagem de teste…" className="flex-1 rounded-xl border px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-200" />
-        <button onClick={() => void send()} disabled={sending || !input.trim()} className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50">
-          {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-        </button>
+    <div className="mt-6 mx-auto max-w-2xl">
+      <p className="mb-3 text-sm text-slate-500">Teste a experiência de triagem exatamente como o usuário final a vê no portal.</p>
+      <div className="h-[480px] overflow-hidden rounded-2xl border bg-white shadow-sm">
+        <TriageChat companyId={companyId} />
       </div>
     </div>
   )

@@ -87,10 +87,10 @@ test('Serviço tipado sem any e UI conectada à seção virtual_agent', () => {
   }
   assert.match(center, /selected\?\.key === 'virtual_agent'/)
   assert.match(center, /<VirtualAgentAdmin/)
-  assert.match(admin, /virtualAgentService\.processMessage/)
-  assert.match(admin, /virtualAgentService\.confirmAction/)
+  // O widget e o console admin agora usam o condutor de triagem (TriageChat).
+  assert.match(admin, /TriageChat/)
   assert.doesNotMatch(admin, /:\s*any\b/)
-  assert.match(widget, /virtualAgentService\.processMessage/)
+  assert.match(widget, /TriageChat/)
   assert.doesNotMatch(widget, /:\s*any\b/)
 })
 
