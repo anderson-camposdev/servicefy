@@ -44,9 +44,10 @@ async function setupWidgetMocks(page: Page, { entitled = true } = {}) {
         body: JSON.stringify({ conversationId: 'conv-1', reply: 'Vou te transferir para um atendente humano. Em breve alguém continua o atendimento por aqui.', executionId: 'exec-handoff', requiresConfirmation: false }),
       })
     } else {
+      // Mensagem não reconhecida (ex.: "oi") → menu amigável, SEM transferência (migration 087)
       await route.fulfill({
         status: 200, contentType: 'application/json',
-        body: JSON.stringify({ conversationId: 'conv-1', reply: 'Não entendi, pode reformular?', executionId: null, requiresConfirmation: false }),
+        body: JSON.stringify({ conversationId: 'conv-1', reply: 'Posso te ajudar a: consultar seus chamados, abrir uma solicitação simples, ou falar com um atendente humano. É só me dizer o que você precisa.', executionId: null, requiresConfirmation: false }),
       })
     }
   })
@@ -123,6 +124,22 @@ test.describe('Agente Virtual — Widget do Portal', () => {
     await input.fill('quero falar com um humano')
     await input.press('Enter')
 
-    await expect(page.getByText(/transferir para um atendente humano/i)).toBeVisible({ timeout: 6_000 })
+    // Frase exclusiva da resposta de handoff (a saudação inicial também menciona "transferir")
+    await expect(page.getByText(/Em breve alguém continua o atendimento/i)).toBeVisible({ timeout: 6_000 })
+  })
+
+  test('saudação não reconhecida mostra o menu e NÃO transfere (fix 087)', async ({ page }) => {
+    await setupWidgetMocks(page)
+    await navigateToPortal(page)
+
+    await page.getByRole('button', { name: /Assistente/i }).first().click()
+    const input = page.locator('input[placeholder="Digite sua mensagem…"]')
+    await expect(input).toBeVisible({ timeout: 4_000 })
+    await input.fill('oi')
+    await input.press('Enter')
+
+    await expect(page.getByText(/Posso te ajudar a: consultar seus chamados/i)).toBeVisible({ timeout: 6_000 })
+    // Não houve handoff: a frase exclusiva da transferência não aparece
+    await expect(page.getByText(/Em breve alguém continua o atendimento/i)).toHaveCount(0)
   })
 })

@@ -105,3 +105,28 @@ test('Migration 086 corrige a duplicação do seed (domain NULL não conflitava)
   // Helper continua nunca exposto ao cliente
   assert.match(dedupe, /REVOKE ALL ON FUNCTION public\.ensure_virtual_agent_connection\(uuid\) FROM public, anon, authenticated/)
 })
+
+const fallback = read('supabase/migrations/20260707020000_087_virtual_agent_fallback.sql')
+
+test('Migration 087: mensagem não reconhecida não transfere para humano', () => {
+  // Ação só qualifica com pelo menos uma palavra-chave casada (confiança > 0)
+  assert.match(fallback, /IF v_confidence > 0 AND v_confidence >= v_action\.min_confidence AND v_confidence > v_best_confidence THEN/)
+  // Nenhuma correspondência -> menu amigável (não é o branch de handoff)
+  assert.match(fallback, /IF v_best_action IS NULL THEN[\s\S]{0,160}v_reply := 'Posso te ajudar/)
+  // Handoff é um branch SEPARADO, só quando as keywords de handoff casam
+  assert.match(fallback, /ELSIF v_best_action\.action_key = 'handoff_to_human' THEN/)
+  // O fallback não marca a conversa como transferida
+  const nullBranch = fallback.split('IF v_best_action IS NULL THEN')[1].split('ELSIF')[0]
+  assert.doesNotMatch(nullBranch, /handed_off/)
+  assert.doesNotMatch(nullBranch, /INSERT INTO public\.virtual_agent_executions/)
+  // Contrato de segurança preservado
+  assert.match(fallback, /REVOKE ALL ON FUNCTION public\.virtual_agent_process_message\(text, uuid\) FROM public, anon/)
+  assert.match(fallback, /GRANT EXECUTE ON FUNCTION public\.virtual_agent_process_message\(text, uuid\) TO authenticated/)
+})
+
+const packageJson = read('package.json')
+
+test('Contrato do Agente Virtual participa da suíte de segurança padrão', () => {
+  assert.match(packageJson, /tests\/security\/virtual-agent-contract\.test\.mjs/)
+  assert.match(packageJson, /tests\/security\/omnichannel-outbound-contract\.test\.mjs/)
+})
