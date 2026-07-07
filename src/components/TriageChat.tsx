@@ -35,11 +35,12 @@ export default function TriageChat({ companyId }: { companyId: string }) {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [turn, setTurn] = useState<TriageTurn | null>(null)
   const [conductorState, setConductorState] = useState<TriageState>(initialState)
-  const [conversationId, setConversationId] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [text, setText] = useState('')
   const [ended, setEnded] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
+  const conversationIdRef = useRef<string | null>(null)
+  const syncQueueRef = useRef<Promise<string | null>>(Promise.resolve(null))
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages, turn])
 
@@ -96,12 +97,25 @@ export default function TriageChat({ companyId }: { companyId: string }) {
   }, [companyId])
 
   // Persistência best-effort da transcrição + estado (não bloqueia a conversa).
-  const sync = useCallback(async (state: TriageState, inbound: string, outbound: string) => {
-    try {
-      const id = await virtualAgentService.triageSync({ conversationId, state: state as unknown as Record<string, unknown>, inbound, outbound })
-      if (id) setConversationId(id)
-    } catch { /* auditoria é best-effort */ }
-  }, [conversationId])
+  const sync = useCallback((state: TriageState, inbound: string, outbound: string): Promise<string | null> => {
+    // Mantém os turnos na ordem e sempre usa o id devolvido pelo primeiro sync.
+    // Sem a fila, respostas rápidas podiam criar requests concorrentes com id nulo
+    // e a conclusão do chamado ficava sem conversa para auditar.
+    const queued = syncQueueRef.current.then(async () => {
+      try {
+        const id = await virtualAgentService.triageSync({
+          conversationId: conversationIdRef.current,
+          state: state as unknown as Record<string, unknown>,
+          inbound,
+          outbound,
+        })
+        if (id) conversationIdRef.current = id
+      } catch { /* auditoria é best-effort */ }
+      return conversationIdRef.current
+    })
+    syncQueueRef.current = queued
+    return queued
+  }, [])
 
   const pushBot = (t: string) => setMessages(m => [...m, { from: 'bot', text: t }])
 
@@ -145,20 +159,20 @@ export default function TriageChat({ companyId }: { companyId: string }) {
       pushBot(reply)
       setEnded(true)
 
-      if (conversationId) {
+      const activeConversationId = await sync({ ...state, step: 'done' }, '', reply)
+      if (activeConversationId) {
         try {
-          await virtualAgentService.triageComplete(conversationId, incidentId, {
+          await virtualAgentService.triageComplete(activeConversationId, incidentId, {
             number, ticket_type: s.ticketType, group: s.assignmentGroupName ?? null,
           })
         } catch { /* auditoria best-effort */ }
       }
-      void sync({ ...state, step: 'done' }, '', reply)
     } catch (cause) {
       pushBot('Não consegui abrir o chamado agora: ' + (cause instanceof Error ? cause.message : 'erro desconhecido') + '. Você pode tentar de novo dizendo "recomeçar".')
     } finally {
       setBusy(false)
     }
-  }, [companyId, callerId, callerName, conversationId, sync])
+  }, [companyId, callerId, callerName, sync])
 
   // Processa a resposta do usuário: dirige a FSM e trata intents/criação.
   const submit = useCallback(async (userInput: string) => {
@@ -175,8 +189,8 @@ export default function TriageChat({ companyId }: { companyId: string }) {
       setBusy(true)
       try {
         const msg = next.intent === 'check_tickets' ? 'consultar meus chamados' : 'falar com um atendente humano'
-        const reply = await virtualAgentService.processMessage(msg, conversationId)
-        if (reply.conversationId) setConversationId(reply.conversationId)
+        const reply = await virtualAgentService.processMessage(msg, conversationIdRef.current)
+        if (reply.conversationId) conversationIdRef.current = reply.conversationId
         pushBot(reply.reply)
         if (next.intent === 'handoff') { setEnded(true); return }
         // volta ao menu para continuar
@@ -191,6 +205,9 @@ export default function TriageChat({ companyId }: { companyId: string }) {
 
     if (next.readyToCreate) {
       setConductorState(next.state)
+      // Garante conversa + confirmação persistidas antes de criar o chamado;
+      // createTicket então registra a resposta final e a execução na mesma conversa.
+      await sync(next.state, value, '')
       await createTicket(next.state)
       return
     }
@@ -200,7 +217,7 @@ export default function TriageChat({ companyId }: { companyId: string }) {
     pushBot(next.prompt)
     if (next.inputType === 'terminal') setEnded(true)
     void sync(next.state, value, next.prompt)
-  }, [catalog, turn, busy, ended, conductorState, conversationId, createTicket, sync])
+  }, [catalog, turn, busy, ended, conductorState, createTicket, sync])
 
   const restart = () => {
     if (!catalog) return

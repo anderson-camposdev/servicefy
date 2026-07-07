@@ -58,6 +58,10 @@ test('TriageChat cria pelos serviços governados e audita a conclusão', () => {
   assert.match(chat, /serviceCatalogService\.openRequest/)
   assert.match(chat, /serviceCatalogService\.openServiceRequest/)
   assert.match(chat, /virtualAgentService\.triageComplete/)
+  assert.match(chat, /conversationIdRef\.current/)
+  assert.match(chat, /syncQueueRef\.current\.then/)
+  assert.match(chat, /await sync\(next\.state, value, ''\)/)
+  assert.match(chat, /triageComplete\(activeConversationId, incidentId/)
   assert.doesNotMatch(chat, /:\s*any\b/)
 })
 
