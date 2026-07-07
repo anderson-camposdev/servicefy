@@ -42,13 +42,27 @@ test.describe('Portal do Usuário — Catálogo de Serviços', () => {
   test.beforeEach(async ({ page }) => {
     await setupMockAuth(page)
 
-    // Override: catalog_items com dados reais de teste
-    await page.route(`${SUPABASE_URL}/rest/v1/catalog_items*`, async route => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify(MOCK_CATALOG_ITEMS),
-      })
+    // Mock catalog tables
+    await page.route(`${SUPABASE_URL}/rest/v1/departments*`, async route => {
+      await route.fulfill({ status: 200, contentType: 'application/json', body: '[]' })
+    })
+    await page.route(`${SUPABASE_URL}/rest/v1/catalog_categories*`, async route => {
+      await route.fulfill({ status: 200, contentType: 'application/json', body: '[]' })
+    })
+    await page.route(`${SUPABASE_URL}/rest/v1/catalog_services*`, async route => {
+      await route.fulfill({ status: 200, contentType: 'application/json', body: '[]' })
+    })
+    await page.route(`${SUPABASE_URL}/rest/v1/catalog_service_symptoms*`, async route => {
+      await route.fulfill({ status: 200, contentType: 'application/json', body: '[]' })
+    })
+    await page.route(`${SUPABASE_URL}/rest/v1/request_categories*`, async route => {
+      await route.fulfill({ status: 200, contentType: 'application/json', body: '[]' })
+    })
+    await page.route(`${SUPABASE_URL}/rest/v1/request_subcategories*`, async route => {
+      await route.fulfill({ status: 200, contentType: 'application/json', body: '[]' })
+    })
+    await page.route(`${SUPABASE_URL}/rest/v1/request_items*`, async route => {
+      await route.fulfill({ status: 200, contentType: 'application/json', body: '[]' })
     })
 
     // Mock insert de incident → retorna sucesso

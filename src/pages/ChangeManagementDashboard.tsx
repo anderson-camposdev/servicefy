@@ -9,6 +9,7 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../auth'
 import { useToast } from '../context'
 import type { ChangeRow, ChangeState, ChangeType, ChangeRisk } from '../lib/database.types'
+import { translateState } from '../lib/statusLabels'
 
 interface Profile {
   id: string
@@ -495,7 +496,7 @@ export default function ChangeManagementDashboard({ companyId }: { companyId?: s
                         </td>
                         <td className="py-4 px-4">
                           <span className={`text-xs px-2.5 py-0.5 border rounded-full font-extrabold ${STATE_COLORS[change.state]}`}>
-                            {change.state}
+                            {translateState(change.state)}
                           </span>
                         </td>
                         <td className="py-4 px-4 text-xs text-slate-500 font-medium">
@@ -1052,7 +1053,7 @@ export default function ChangeManagementDashboard({ companyId }: { companyId?: s
               <div>
                 {editingChange && (
                   <span className="text-xs text-slate-400 font-semibold">
-                    Criador: {editingChange.requested_by_name} • Status: <strong className="text-indigo-600">{editingChange.state}</strong>
+                    Criador: {editingChange.requested_by_name} • Status: <strong className="text-indigo-600">{translateState(editingChange.state)}</strong>
                   </span>
                 )}
               </div>

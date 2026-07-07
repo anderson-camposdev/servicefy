@@ -1,8 +1,28 @@
 import * as Icons from 'lucide-react'
 
+/**
+ * Renderiza o ícone de um item do catálogo de serviços.
+ *
+ * Suporta:
+ *  1. URLs de imagem (https://, blob:, data:image/)
+ *  2. Ícones Lucide com prefixo explícito (ex: "lucide:Monitor")
+ *  3. Nomes de ícones Lucide sem prefixo (ex: "Network", "Wifi", "Monitor")
+ *  4. Emojis / texto curto (ex: "🖥️")
+ *  5. Fallback: primeira letra do nome em maiúsculo
+ */
 export default function CatalogIcon({ icon, name, size = 64, bg, color }: { icon?: string | null; name?: string; size?: number; bg?: string; color?: string }) {
   const isImage = Boolean(icon && /^(https?:\/\/|blob:|data:image\/)/i.test(icon))
-  const isLucide = Boolean(icon && icon.startsWith('lucide:'))
+  const isLucideExplicit = Boolean(icon && icon.startsWith('lucide:'))
+
+  // Detecta se o valor é um nome de componente Lucide sem o prefixo "lucide:"
+  // Ex: "Network", "Wifi", "Monitor", "HardDrive", etc.
+  const isLucideImplicit = Boolean(
+    icon &&
+    !isImage &&
+    !isLucideExplicit &&
+    /^[A-Z][a-zA-Z0-9]*$/.test(icon) &&
+    (Icons as any)[icon]
+  )
 
   const customStyle = {
     width: size,
@@ -26,8 +46,8 @@ export default function CatalogIcon({ icon, name, size = 64, bg, color }: { icon
     )
   }
 
-  if (isLucide) {
-    const iconName = icon!.replace('lucide:', '')
+  if (isLucideExplicit || isLucideImplicit) {
+    const iconName = isLucideExplicit ? icon!.replace('lucide:', '') : icon!
     const Cmp = (Icons as any)[iconName] || Icons.Box
     return (
       <span

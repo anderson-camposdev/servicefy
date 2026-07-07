@@ -9,8 +9,20 @@
 import { test, expect } from '@playwright/test'
 import { setupMockAuth, tenants } from './helpers/mockAuth'
 
+const SUPABASE_URL = 'https://enxtvrvsfwvcnpyspyfl.supabase.co'
+
 // ── 1. Tela de login sem sessão ───────────────────────────────────
 test.describe('Autenticação — Tela de Login', () => {
+  test.beforeEach(async ({ page }) => {
+    // Intercepta rotas do Supabase para simular estado de não autenticado
+    await page.route(`${SUPABASE_URL}/rest/v1/**`, async route => {
+      await route.fulfill({ status: 200, contentType: 'application/json', body: '[]' })
+    })
+    await page.route(`${SUPABASE_URL}/auth/v1/**`, async route => {
+      await route.fulfill({ status: 401, contentType: 'application/json', body: '{"error":"not_authenticated"}' })
+    })
+  })
+
   test('deve renderizar o formulário de login quando não autenticado', async ({ page }) => {
     await page.goto('/')
 

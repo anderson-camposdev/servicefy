@@ -75,13 +75,35 @@ test.describe('Workflow Builder — Motor de Automação', () => {
     await page.goto('/')
     await page.waitForTimeout(3_000)
 
-    // Navega para o Motor de Automação via sidebar
+    // 1. Simula papel de admin se necessário
+    const roleSelector = page.locator('select:has(option[value="company_admin"])').first()
+    if (await roleSelector.isVisible({ timeout: 5_000 }).catch(() => false)) {
+      await roleSelector.selectOption('company_admin')
+      await page.waitForTimeout(1_500)
+    }
+
+    // 2. Clica em Configurações
+    const configBtn = page.locator('button').filter({ hasText: /Configurações/i }).first()
+    if (await configBtn.isVisible({ timeout: 5_000 }).catch(() => false)) {
+      await configBtn.click()
+      await page.waitForTimeout(2_000)
+
+      // 3. Clica no card "Motor de Automação"
+      const automationCard = page.getByText(/Motor de Automação/i).first()
+      if (await automationCard.isVisible({ timeout: 5_000 }).catch(() => false)) {
+        await automationCard.click()
+        await page.waitForTimeout(2_000)
+        return
+      }
+    }
+
+    // Fallback direct button
     const workflowNav = page
       .getByRole('button', { name: /automação|workflow|motor/i })
       .or(page.locator('button').filter({ hasText: /automação|workflow|motor/i }))
       .first()
 
-    if (await workflowNav.isVisible({ timeout: 5_000 })) {
+    if (await workflowNav.isVisible({ timeout: 5_000 }).catch(() => false)) {
       await workflowNav.click()
       await page.waitForTimeout(2_000)
     }

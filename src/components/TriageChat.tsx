@@ -57,6 +57,10 @@ export default function TriageChat({ companyId }: { companyId: string }) {
       serviceCatalogService.listRequestItems(companyId, { activeOnly: true }),
     ]).then(([cats, services, symptoms, reqCats, reqSubs, reqItems]) => {
       if (cancelled) return
+      console.log("TriageChat: Carregado catálogo para a empresa:", companyId);
+      console.log("TriageChat: Categorias de incidente retornadas:", cats);
+      console.log("TriageChat: Serviços retornados:", services);
+      console.log("TriageChat: Sintomas retornados:", symptoms);
       const built: TriageCatalog = {
         incidentCategories: cats.map(c => ({ id: c.id, name: c.name })),
         incidentServices: services.map(s => ({ id: s.id, name: s.name, category_id: s.category_id })),

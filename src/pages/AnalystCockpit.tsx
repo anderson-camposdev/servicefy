@@ -5,7 +5,7 @@ import {
   ShieldAlert, PlayCircle, ArrowRightLeft,
 } from 'lucide-react'
 import { incidentsService, messagesService, assignmentGroupsService, pendingReasonsService, responseMacrosService } from '../lib/services'
-import { translateState, STATE_LABELS_PT } from '../lib/statusLabels'
+import { translateState } from '../lib/statusLabels'
 import { useAuth } from '../auth'
 import { useToast } from '../context'
 import type { IncidentRow, IncidentHistoryRow, IncidentState, TicketMessageRow, AssignmentGroupRow, ProfileRow, PendingReasonRow, ResponseMacroRow } from '../lib/database.types'
@@ -200,7 +200,8 @@ const AnalystCockpit = ({ ticket = FALLBACK_TICKET }: { ticket?: WorkspaceTicket
     achievedAt: string | null | undefined,
     isBreached: boolean | undefined,
     nowTime: number,
-    createdAt: string | null | undefined
+    createdAt: string | null | undefined,
+    pausedAt?: string | null
   ) => {
     if (!deadline) {
       return (
@@ -215,12 +216,21 @@ const AnalystCockpit = ({ ticket = FALLBACK_TICKET }: { ticket?: WorkspaceTicket
     const startTime = createdAt ? new Date(createdAt).getTime() : targetTime - (4 * 3600 * 1000)
     const totalDuration = targetTime - startTime
 
-    let status: 'fulfilled' | 'breached' | 'warning' | 'normal' = 'normal'
+    let status: 'fulfilled' | 'breached' | 'warning' | 'normal' | 'paused' = 'normal'
     let text = ''
 
     if (achievedAt) {
       status = 'fulfilled'
       text = `Cumprido em ${fmt(achievedAt)}`
+    } else if (pausedAt) {
+      // Congelado no instante da pausa — não usa o relógio corrente, senão o
+      // cartão mostraria uma contagem regressiva "correndo" enquanto pausado
+      // (o prazo só é de fato estendido quando o chamado sai da pendência).
+      status = 'paused'
+      const remainingAtPause = targetTime - new Date(pausedAt).getTime()
+      text = remainingAtPause < 0
+        ? `Pausado (estourado há ${fmtDuration(Math.abs(remainingAtPause))})`
+        : `Pausado — ${fmtDuration(remainingAtPause)} restante`
     } else {
       const remaining = targetTime - nowTime
 
@@ -240,14 +250,15 @@ const AnalystCockpit = ({ ticket = FALLBACK_TICKET }: { ticket?: WorkspaceTicket
       fulfilled: 'bg-emerald-50 border-emerald-200 text-emerald-700',
       breached: 'bg-rose-50 border-rose-200 text-rose-700 animate-pulse',
       warning: 'bg-amber-50 border-amber-200 text-amber-700',
-      normal: 'bg-slate-50 border-zinc-200 text-slate-700'
+      normal: 'bg-slate-50 border-zinc-200 text-slate-700',
+      paused: 'bg-sky-50 border-sky-200 text-sky-700'
     }[status]
 
     return (
       <div className={`border rounded-xl p-4 flex flex-col justify-center transition-all shadow-sm ${styles}`}>
         <span className="text-[10px] font-bold uppercase tracking-wider opacity-75">{label}</span>
         <span className="text-sm font-extrabold tracking-tight mt-1">{text}</span>
-        {!achievedAt && status !== 'breached' && (
+        {!achievedAt && status !== 'breached' && status !== 'paused' && (
           <span className="text-[9px] opacity-75 mt-0.5">Prazo: {fmt(deadline)}</span>
         )}
       </div>
@@ -1006,8 +1017,8 @@ const AnalystCockpit = ({ ticket = FALLBACK_TICKET }: { ticket?: WorkspaceTicket
             {/* SLA Governance Timers */}
             {detail && (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {renderSlaTimer('Prazo Limite de Resposta', detail.sla_response_deadline, detail.responded_at, detail.is_response_breached, now, detail.created_at)}
-                {renderSlaTimer('Prazo Limite de Solução', detail.sla_resolution_deadline, detail.resolved_at, detail.is_resolution_breached, now, detail.created_at)}
+                {renderSlaTimer('Prazo Limite de Resposta', detail.sla_response_deadline, detail.responded_at, detail.is_response_breached, now, detail.created_at, detail.paused_at)}
+                {renderSlaTimer('Prazo Limite de Solução', detail.sla_resolution_deadline, detail.resolved_at, detail.is_resolution_breached, now, detail.created_at, detail.paused_at)}
               </div>
             )}
 
@@ -1366,11 +1377,10 @@ const AnalystCockpit = ({ ticket = FALLBACK_TICKET }: { ticket?: WorkspaceTicket
                           </label>
                           <select value={formState} onChange={e => setFormState(e.target.value)}
                             className={`w-full px-2.5 py-2 text-xs outline-none cursor-pointer font-medium ${inputClass}`}>
-                            {Object.entries(STATE_LABELS_PT)
-                              .filter(([value]) => !['Pending User', 'Resolved', 'Closed'].includes(value) || (isAdmin && value === 'Closed'))
-                              .filter(([value]) => value !== 'Resolved')
-                              .map(([value, label]) => (
-                                <option key={value} value={value}>{label}</option>
+                            {['New', 'In Progress', 'On Hold', 'Closed']
+                              .filter(value => value !== 'Closed' || isAdmin)
+                              .map(value => (
+                                <option key={value} value={value}>{translateState(value)}</option>
                               ))}
                           </select>
                           <p className="text-[10px] text-on-surface-variant mt-1">Para resolver o chamado, use o botão <b>Resolver Chamado</b>.</p>

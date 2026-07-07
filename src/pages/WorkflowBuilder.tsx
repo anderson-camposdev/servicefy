@@ -18,6 +18,7 @@ import {
 } from 'lucide-react'
 import { workflowService } from '../lib/services'
 import type { WorkflowRuleRow, WorkflowExecutionLogRow } from '../lib/database.types'
+import { translateState } from '../lib/statusLabels'
 
 // ─── Types ────────────────────────────────────────────────────
 
@@ -173,7 +174,7 @@ const VARIABLES_GROUPS = [
     { token: '{{chamado.numero}}',     desc: 'Número do chamado',      example: 'INC0001234' },
     { token: '{{chamado.titulo}}',     desc: 'Título / assunto',       example: 'Impressora não funciona' },
     { token: '{{chamado.prioridade}}', desc: 'Prioridade',             example: 'P1 - Critical' },
-    { token: '{{chamado.estado}}',     desc: 'Estado atual',           example: 'In Progress' },
+    { token: '{{chamado.estado}}',     desc: 'Estado atual',           example: 'Em Atendimento' },
     { token: '{{chamado.categoria}}',  desc: 'Categoria',              example: 'Hardware' },
     { token: '{{chamado.origem}}',     desc: 'Canal de abertura',      example: 'portal / email / api' },
     { token: '{{chamado.url}}',        desc: 'Link direto ao chamado', example: 'https://app.servicefy.com/...' },
@@ -287,7 +288,7 @@ const getSourceMeta  = (v: TicketSource) => TICKET_SOURCES.find(s => s.value ===
 
 const valuePlaceholder = (field: string) =>
   field === 'priority' ? 'P1 - Critical' : field === 'category' ? 'Hardware, Software…' :
-  field === 'state' ? 'In Progress…' : field === 'group' ? 'Suporte N1…' :
+  field === 'state' ? 'Em Atendimento…' : field === 'group' ? 'Suporte N1…' :
   field === 'department' ? 'TI, Financeiro…' : '72'
 
 // ─── FlowConnector ────────────────────────────────────────────
@@ -1326,7 +1327,7 @@ export default function WorkflowBuilder({ companyId }: { companyId: string }) {
                                     <select value={action.params.state ?? ''} onChange={e => updateAction(action.id, { params: { ...action.params, state: e.target.value } })}
                                       className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 bg-white outline-none focus:ring-2 focus:ring-emerald-300">
                                       <option value="">Selecione…</option>
-                                      {['In Progress','On Hold','Pending User','Resolved','Closed'].map(s => <option key={s}>{s}</option>)}
+                                      {['In Progress','On Hold','Pending User','Resolved','Closed'].map(s => <option key={s} value={s}>{translateState(s)}</option>)}
                                     </select>
                                   </div>
                                 )}

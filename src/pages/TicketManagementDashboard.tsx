@@ -135,7 +135,8 @@ function stateToColumn(state: string): string {
   return 'open'
 }
 
-function priorityClass(priority: string): string {
+function priorityClass(priority?: string): string {
+  if (!priority) return 'bg-slate-100 text-slate-600'
   const isCritical = priority.includes('P1') || priority === 'Crítica'
   const isHigh = priority.includes('P2') || priority === 'Alta'
   if (isCritical) return 'bg-red-100 text-red-700'
@@ -175,8 +176,8 @@ const AVAILABLE_METRICS = [
     icon: AlertTriangle,
     color: 'bg-red-50 text-red-700 border-red-200 hover:bg-red-100',
     activeColor: 'bg-red-600 text-white border-red-600 shadow-md ring-2 ring-red-600',
-    filterFn: (r: Row) => r.priority === 'Crítica' || r.priority === 'P1 - Critical' || r.priority.includes('P1'),
-    countFn: (rows: Row[]) => rows.filter(r => r.priority === 'Crítica' || r.priority === 'P1 - Critical' || r.priority.includes('P1')).length,
+    filterFn: (r: Row) => r.priority === 'Crítica' || r.priority === 'P1 - Critical' || (r.priority?.includes('P1') ?? false),
+    countFn: (rows: Row[]) => rows.filter(r => r.priority === 'Crítica' || r.priority === 'P1 - Critical' || (r.priority?.includes('P1') ?? false)).length,
   },
   {
     key: 'inProgress',
@@ -277,7 +278,7 @@ const TicketManagementDashboard = ({ onOpenTicket, companyId, isProvider, compan
         id: i.number,
         title: i.short_description,
         status: i.state,
-        priority: i.priority,
+        priority: i.priority || '—',
         requester: i.caller_name,
         client: companyName(i.company_id),
         techGroup: i.assigned_group_name ?? '—',

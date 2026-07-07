@@ -18,56 +18,70 @@ const SUPABASE_URL = 'https://enxtvrvsfwvcnpyspyfl.supabase.co'
 
 // ── Dados mockados ────────────────────────────────────────────────
 
-const MOCK_CATALOG_ITEMS = [
+const MOCK_CATEGORIES = [
   {
     id: 'cat-001',
     company_id: 'company-a-uuid',
-    title: 'Reportar um Problema',
-    description: 'Relate incidentes técnicos que afetam sua produtividade.',
-    icon: 'AlertCircle',
-    category: 'Suporte',
-    type: 'incident',
+    name: 'Suporte Técnico',
+    icon: 'Wrench',
     is_active: true,
-    sort_order: 1,
-    form_fields: JSON.stringify([
-      { id: 'f1', label: 'Título do Problema', type: 'text', required: true, placeholder: 'Descreva brevemente' },
-      { id: 'f2', label: 'Descrição Detalhada', type: 'textarea', required: true, placeholder: 'Forneça mais detalhes' },
-      { id: 'f3', label: 'Urgência', type: 'select', required: true, options: ['Baixa', 'Média', 'Alta', 'Crítica'] },
-    ]),
-    created_at: '2025-01-01T00:00:00Z',
-    updated_at: '2025-01-01T00:00:00Z',
-  },
+  }
+]
+const MOCK_SERVICES = [
   {
-    id: 'cat-002',
+    id: 'svc-001',
+    category_id: 'cat-001',
     company_id: 'company-a-uuid',
-    title: 'Solicitar Algo / Serviço',
-    description: 'Solicite novos acessos, equipamentos ou serviços de TI.',
-    icon: 'ShoppingCart',
-    category: 'Requisição',
-    type: 'service_request',
+    name: 'Equipamentos',
+    icon: 'Monitor',
     is_active: true,
-    sort_order: 2,
-    form_fields: JSON.stringify([
-      { id: 'f1', label: 'O que você precisa?', type: 'text', required: true, placeholder: 'Ex: Acesso ao sistema X' },
-      { id: 'f2', label: 'Justificativa', type: 'textarea', required: false, placeholder: 'Por que você precisa?' },
-    ]),
-    created_at: '2025-01-01T00:00:00Z',
-    updated_at: '2025-01-01T00:00:00Z',
-  },
+  }
+]
+const MOCK_SYMPTOMS = [
   {
-    id: 'cat-003',
+    id: 'sym-001',
+    service_id: 'svc-001',
     company_id: 'company-a-uuid',
-    title: 'Configurar VPN',
-    description: 'Solicite a configuração de acesso remoto via VPN.',
-    icon: 'Shield',
-    category: 'Acesso',
-    type: 'service_request',
-    is_active: true,
-    sort_order: 3,
-    form_fields: JSON.stringify([]),
-    created_at: '2025-01-01T00:00:00Z',
-    updated_at: '2025-01-01T00:00:00Z',
-  },
+    symptom_id: 'sys-sym-001',
+    active: true,
+    symptom: {
+      id: 'sys-sym-001',
+      name: 'Notebook com defeito',
+      icon: 'Laptop',
+    },
+    service: {
+      id: 'svc-001',
+      name: 'Equipamentos',
+      category_id: 'cat-001',
+    }
+  }
+]
+
+const MOCK_REQ_CATEGORIES = [
+  {
+    id: 'rcat-001',
+    company_id: 'company-a-uuid',
+    name: 'Acessos e Contas',
+    icon: 'Key',
+    active: true,
+  }
+]
+const MOCK_REQ_SUBCATEGORIES = [
+  {
+    id: 'rsub-001',
+    category_id: 'rcat-001',
+    name: 'Rede',
+    active: true,
+  }
+]
+const MOCK_REQ_ITEMS = [
+  {
+    id: 'ritem-001',
+    request_subcategory_id: 'rsub-001',
+    name: 'Configurar VPN',
+    description: 'Solicitação de acesso seguro remoto via VPN corporativa.',
+    active: true,
+  }
 ]
 
 const MOCK_USER_INCIDENTS = [
@@ -76,6 +90,7 @@ const MOCK_USER_INCIDENTS = [
     number: 'INC-00123',
     short_description: 'Computador não liga',
     state: 'In Progress',
+    priority: 'P3 - Moderate',
     priority_level: 3,
     company_id: 'company-a-uuid',
     caller_id: 'profile-test-uuid',
@@ -89,20 +104,27 @@ const MOCK_USER_INCIDENTS = [
 async function setupPortalMocks(page: Page) {
   await setupMockAuth(page)
 
-  // Catálogo de serviços
-  for (const table of ['catalog_items', 'incident_catalog_items', 'request_catalog_items']) {
-    await page.route(`${SUPABASE_URL}/rest/v1/${table}*`, async route => {
-      if (route.request().method() !== 'GET') {
-        await route.fulfill({ status: 201, contentType: 'application/json', body: '[{"id":"mock-id"}]' })
-        return
-      }
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify(MOCK_CATALOG_ITEMS),
-      })
-    })
-  }
+  await page.route(`${SUPABASE_URL}/rest/v1/departments*`, async route => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: '[]' })
+  })
+  await page.route(`${SUPABASE_URL}/rest/v1/catalog_categories*`, async route => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_CATEGORIES) })
+  })
+  await page.route(`${SUPABASE_URL}/rest/v1/catalog_services*`, async route => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_SERVICES) })
+  })
+  await page.route(`${SUPABASE_URL}/rest/v1/catalog_service_symptoms*`, async route => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_SYMPTOMS) })
+  })
+  await page.route(`${SUPABASE_URL}/rest/v1/request_categories*`, async route => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_REQ_CATEGORIES) })
+  })
+  await page.route(`${SUPABASE_URL}/rest/v1/request_subcategories*`, async route => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_REQ_SUBCATEGORIES) })
+  })
+  await page.route(`${SUPABASE_URL}/rest/v1/request_items*`, async route => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_REQ_ITEMS) })
+  })
 
   // Chamados do usuário (para "Meus Chamados")
   await page.route(`${SUPABASE_URL}/rest/v1/incidents*`, async route => {
@@ -161,12 +183,8 @@ test.describe('Portal do Usuário — Catálogo e Saudação', () => {
     await setupPortalMocks(page)
     await navigateToPortal(page)
 
-    // O UserPortal exibe "Olá, {firstName}! 👋"
-    // O perfil mockado é "Analista Teste" → firstName = "Analista"
-    const greeting = page
-      .getByText(/Olá.*Analista|Olá.*👋|bem-vindo/i)
-      .first()
-
+    // O topo exibe "Como posso te ajudar, Analista?"
+    const greeting = page.getByText(/Como posso te ajudar, Analista/i).first()
     await expect(greeting).toBeVisible({ timeout: 10_000 })
   })
 
@@ -174,12 +192,12 @@ test.describe('Portal do Usuário — Catálogo e Saudação', () => {
     await setupPortalMocks(page)
     await navigateToPortal(page)
 
-    // O mock do Tenant A define welcome_title = "Bem-vindo ao Suporte"
-    const welcomeTitle = page.getByText(/Bem-vindo ao Suporte/i).first()
-    await expect(welcomeTitle).toBeVisible({ timeout: 8_000 })
+    // O topo exibe "Como posso te ajudar, Analista?"
+    const greeting = page.getByText(/Como posso te ajudar, Analista/i).first()
+    await expect(greeting).toBeVisible({ timeout: 8_000 })
 
-    // welcome_subtitle = "Como podemos te ajudar hoje?"
-    const welcomeSubtitle = page.getByText(/Como podemos te ajudar hoje/i).first()
+    // A home exibe o subtítulo "O que você precisa?"
+    const welcomeSubtitle = page.getByText(/O que você precisa/i).first()
     await expect(welcomeSubtitle).toBeVisible({ timeout: 5_000 })
   })
 
@@ -187,24 +205,24 @@ test.describe('Portal do Usuário — Catálogo e Saudação', () => {
     await setupPortalMocks(page)
     await navigateToPortal(page)
 
-    // Card "Reportar um Problema"
+    // Card "Reportar Problema"
     const problemCard = page
-      .getByText(/Reportar um Problema/i)
+      .getByText(/Reportar (um )?Problema/i)
       .first()
     await expect(problemCard).toBeVisible({ timeout: 10_000 })
 
-    // Card "Solicitar Algo"
+    // Card "Solicitar Serviço"
     const serviceCard = page
-      .getByText(/Solicitar Algo|Solicitar Serviço/i)
+      .getByText(/Solicitar Serviço/i)
       .first()
     await expect(serviceCard).toBeVisible({ timeout: 5_000 })
   })
 
-  test('deve exibir as abas "Catálogo de Serviços" e "Meus Chamados"', async ({ page }) => {
+  test('deve exibir as abas "Início" e "Meus Chamados" no menu', async ({ page }) => {
     await setupPortalMocks(page)
     await navigateToPortal(page)
 
-    await expect(page.getByText(/Catálogo de Serviços/i).first()).toBeVisible({ timeout: 8_000 })
+    await expect(page.getByText(/Início/i).first()).toBeVisible({ timeout: 8_000 })
     await expect(page.getByText(/Meus Chamados/i).first()).toBeVisible({ timeout: 5_000 })
   })
 })
@@ -216,7 +234,7 @@ test.describe('Portal do Usuário — Formulário de Novo Chamado', () => {
 
     // Aguarda o card aparecer e clica
     const problemCard = page
-      .getByText(/Reportar um Problema/i)
+      .getByText(/Reportar (um )?Problema/i)
       .first()
 
     await expect(problemCard).toBeVisible({ timeout: 10_000 })
@@ -224,7 +242,7 @@ test.describe('Portal do Usuário — Formulário de Novo Chamado', () => {
     // Clica no card (pode ser button ou div clicável)
     const clickTarget = page
       .locator('button, [role="button"], div[class*="cursor"]')
-      .filter({ hasText: /Reportar um Problema/i })
+      .filter({ hasText: /Reportar (um )?Problema/i })
       .first()
 
     if (await clickTarget.isVisible({ timeout: 3_000 }).catch(() => false)) {
@@ -234,6 +252,23 @@ test.describe('Portal do Usuário — Formulário de Novo Chamado', () => {
     }
 
     await page.waitForTimeout(1_500)
+
+    // Se estiver usando o novo catálogo guiado (wizard), clica nos cards para chegar ao form
+    const catCard = page.getByText('Suporte Técnico').first()
+    if (await catCard.isVisible({ timeout: 5_000 }).catch(() => false)) {
+      await catCard.click()
+      await page.waitForTimeout(1_000)
+
+      const svcCard = page.getByText('Equipamentos').first()
+      await expect(svcCard).toBeVisible({ timeout: 5_000 })
+      await svcCard.click()
+      await page.waitForTimeout(1_000)
+
+      const symCard = page.getByText('Notebook com defeito').first()
+      await expect(symCard).toBeVisible({ timeout: 5_000 })
+      await symCard.click()
+      await page.waitForTimeout(1_500)
+    }
 
     // Formulário ou modal deve aparecer com campo de texto
     const formVisible =
@@ -252,11 +287,28 @@ test.describe('Portal do Usuário — Formulário de Novo Chamado', () => {
     // Abre o card de "Reportar um Problema"
     const clickTarget = page
       .locator('button, [role="button"], div[class*="cursor"]')
-      .filter({ hasText: /Reportar um Problema/i })
+      .filter({ hasText: /Reportar (um )?Problema/i })
       .first()
 
     if (await clickTarget.isVisible({ timeout: 8_000 }).catch(() => false)) {
       await clickTarget.click()
+      await page.waitForTimeout(1_500)
+    }
+
+    // Se estiver usando o novo catálogo guiado (wizard), clica nos cards para chegar ao form
+    const catCard = page.getByText('Suporte Técnico').first()
+    if (await catCard.isVisible({ timeout: 5_000 }).catch(() => false)) {
+      await catCard.click()
+      await page.waitForTimeout(1_000)
+
+      const svcCard = page.getByText('Equipamentos').first()
+      await expect(svcCard).toBeVisible({ timeout: 5_000 })
+      await svcCard.click()
+      await page.waitForTimeout(1_000)
+
+      const symCard = page.getByText('Notebook com defeito').first()
+      await expect(symCard).toBeVisible({ timeout: 5_000 })
+      await symCard.click()
       await page.waitForTimeout(1_500)
     }
 
@@ -311,8 +363,8 @@ test.describe('Portal do Usuário — Formulário de Novo Chamado', () => {
         bodyText.includes('SR-') ||
         bodyText.includes('99999') ||
         // Formulário fechou (voltou ao catálogo)
-        bodyText.includes('Catálogo de Serviços') ||
-        bodyText.includes('Reportar um Problema')
+        bodyText.includes('Início') ||
+        bodyText.includes('Reportar Problema')
 
       expect(hasConfirmation).toBeTruthy()
     }
@@ -372,7 +424,7 @@ test.describe('Portal do Usuário — Pesquisa no Catálogo', () => {
       await page.waitForTimeout(1_000)
 
       // Catálogo deve mostrar os cards novamente
-      const problemCard = page.getByText(/Reportar um Problema/i).first()
+      const problemCard = page.getByText(/Reportar (um )?Problema/i).first()
       await expect(problemCard).toBeVisible({ timeout: 5_000 })
     }
   })
@@ -402,7 +454,7 @@ test.describe('Portal do Usuário — Meus Chamados', () => {
       bodyText.includes('Nenhum chamado') ||
       bodyText.includes('sem chamados') ||
       bodyText.includes('Em andamento') ||
-      bodyText.includes('In Progress')
+      bodyText.includes('Em Atendimento')
 
     expect(hasTicketContent).toBeTruthy()
   })
@@ -417,7 +469,7 @@ test.describe('Portal do Usuário — Meus Chamados', () => {
 
     // Verifica que a área da aba contém texto numérico ou está presente
     const tabArea = page
-      .locator('[role="tab"], button')
+      .locator('[role="tab"], button, a')
       .filter({ hasText: /Meus Chamados/i })
       .first()
 

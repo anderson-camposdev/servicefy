@@ -17,6 +17,8 @@ import DynamicFormFields from './DynamicFormFields'
 import CatalogIcon from './CatalogIcon'
 import KnowledgePortal from './KnowledgePortal'
 import VirtualAgentWidget from '../components/VirtualAgentWidget'
+import TicketChat from './TicketChat'
+import SlaEventTimeline from './SlaEventTimeline'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type Screen = 'home' | 'dept-cats' | 'inc-cats' | 'inc-services' | 'inc-symptoms' | 'inc-form' | 'req-cats' | 'req-subcats' | 'req-items' | 'req-form' | 'done' | 'tickets' | 'history' | 'ticket-detail' | 'knowledge'
@@ -134,6 +136,40 @@ function fmtDate(iso: string): string {
 
 function fmtDateTime(iso: string): string {
   return new Date(iso).toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' })
+}
+
+function fmtDuration(ms: number): string {
+  const abs = Math.abs(ms)
+  const s = Math.floor(abs / 1000)
+  const d = Math.floor(s / 86400)
+  const h = Math.floor((s % 86400) / 3600)
+  const m = Math.floor((s % 3600) / 60)
+  const sec = s % 60
+  if (d > 0) return `${d}d ${h}h`
+  if (h > 0) return `${h}h ${m}m`
+  if (m > 0) return `${m}m ${sec}s`
+  return `${sec}s`
+}
+
+function translateImpact(val: string | null | undefined): string {
+  if (!val) return '—'
+  const m: Record<string, string> = {
+    Low: 'Apenas eu (Low)',
+    Medium: 'Minha equipe (Medium)',
+    High: 'Todo o departamento (High)',
+    Critical: 'Toda a empresa (Critical)'
+  }
+  return m[val] || val
+}
+
+function translateUrgency(val: string | null | undefined): string {
+  if (!val) return '—'
+  const m: Record<string, string> = {
+    Low: 'Consigo trabalhar, mas incomoda (Low)',
+    Medium: 'Trabalho parcialmente bloqueado (Medium)',
+    High: 'Totalmente impedido de trabalhar (High)'
+  }
+  return m[val] || val
 }
 
 const DEFAULT_CONFIG: PortalConfig = {
@@ -330,10 +366,21 @@ const UserPortalLayout = ({ companyId }: { companyId?: string } = {}) => {
   const [submitting, setSubmitting]         = useState(false)
   const [submitError, setSubmitError]       = useState<string | null>(null)
   const [selectedTicket, setSelectedTicket] = useState<IncidentRow | null>(null)
+  const [detailTab, setDetailTab] = useState<'messages' | 'form' | 'history'>('messages')
   const [csatSurvey, setCsatSurvey] = useState<CsatSurveyRow | null>(null)
   const [csatRating, setCsatRating] = useState<number | null>(null)
   const [csatComment, setCsatComment] = useState('')
   const [csatSubmitting, setCsatSubmitting] = useState(false)
+
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(t)
+  }, [])
+
+  useEffect(() => {
+    setDetailTab('messages')
+  }, [selectedTicket])
 
   useEffect(() => {
     if (!selectedTicket || !CLOSED_STATES.has(selectedTicket.state)) {
@@ -759,9 +806,15 @@ const UserPortalLayout = ({ companyId }: { companyId?: string } = {}) => {
     setScreen('tickets')
   }
 
-  const openTicketDetail = (t: IncidentRow) => {
+  const openTicketDetail = async (t: IncidentRow) => {
     setSelectedTicket(t)
     setScreen('ticket-detail')
+    try {
+      const detail = await incidentsService.getPortalDetail(t.id, catalogCompanyId || '')
+      setSelectedTicket(detail)
+    } catch (err) {
+      console.error('Erro ao buscar detalhes do chamado:', err)
+    }
   }
 
   const selectedIncidentService = dbSelIncService
@@ -1115,15 +1168,16 @@ const UserPortalLayout = ({ companyId }: { companyId?: string } = {}) => {
         {/* TICKET DETAIL */}
         {isTicketDetail && selectedTicket && (
           <div style={{ flex:1, overflowY:'auto', padding:'22px 28px' }}>
+            {/* Botão Voltar */}
             <button onClick={goBack}
               style={{ display:'inline-flex', alignItems:'center', gap:6, padding:'7px 13px', border:'1.5px solid #e2e8f0', borderRadius:9, font:'600 13px sans-serif', color:'#475569', background:'#fff', cursor:'pointer', marginBottom:20 }}>
               ← Voltar
             </button>
 
-            <div style={{ maxWidth:620 }}>
-              {/* Header */}
-              <div style={{ display:'flex', alignItems:'center', gap:10, flexWrap:'wrap', marginBottom:16 }}>
-                <span style={{ font:'800 17px monospace', color:brand }}>{selectedTicket.number}</span>
+            {/* Cabeçalho */}
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ display:'flex', alignItems:'center', gap:10, flexWrap:'wrap', marginBottom:8 }}>
+                <span style={{ font:'800 20px monospace', color:brand }}>{selectedTicket.number}</span>
                 <span style={{ font:'600 12px sans-serif', padding:'3px 10px', borderRadius:99,
                   background: STATE_STYLE[selectedTicket.state]?.bg || '#f1f5f9',
                   color: STATE_STYLE[selectedTicket.state]?.fg || '#475569' }}>
@@ -1138,84 +1192,279 @@ const UserPortalLayout = ({ companyId }: { companyId?: string } = {}) => {
                   {selectedTicket.ticket_type === 'incident' ? '⚠️ Incidente' : '✅ Requisição'}
                 </span>
               </div>
+              
+              {/* Caminho do Catálogo */}
+              {((selectedTicket as any).catalog_category_name || (selectedTicket as any).catalog_selection_name) && (
+                <div style={{ font: '500 12px sans-serif', color: '#64748b', marginBottom: 6 }}>
+                  {(selectedTicket as any).catalog_category_name || 'Geral'} — {(selectedTicket as any).catalog_selection_name || 'Chamado'}
+                </div>
+              )}
 
-              <h2 style={{ font:'700 22px/1.2 sans-serif', color:'#0f172a', marginBottom:10 }}>
+              <h2 style={{ font:'700 24px/1.2 sans-serif', color:'#0f172a', margin: '4px 0 0' }}>
                 {selectedTicket.short_description}
               </h2>
+            </div>
 
-              {selectedTicket.description && (
-                <p style={{ font:'400 14px/1.65 sans-serif', color:'#475569', marginBottom:20, padding:'14px 16px', background:'#f8fafc', borderRadius:10, border:'1px solid #e2e8f0' }}>
-                  {selectedTicket.description}
-                </p>
-              )}
+            {/* Painel de SLA (idêntico ao Cockpit do Analista) */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '14px', marginBottom: '24px' }}>
+              {(() => {
+                const renderPortalSlaTimer = (
+                  label: string,
+                  deadline: string | null | undefined,
+                  achievedAt: string | null | undefined,
+                  isBreached: boolean | undefined,
+                  nowTime: number,
+                  createdAt: string | null | undefined,
+                  pausedAt?: string | null
+                ) => {
+                  if (!deadline) {
+                    return (
+                      <div style={{ border: '1px solid #e2e8f0', padding: '16px', display: 'flex', flexDirection: 'column', justifyContent: 'center', background: '#f8fafc', borderRadius: '12px' }}>
+                        <span style={{ fontSize: '10px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '.05em', color: '#64748b' }}>{label}</span>
+                        <span style={{ fontSize: '13px', fontWeight: '600', fontStyle: 'italic', marginTop: '4px', color: '#94a3b8' }}>Sem prazo definido</span>
+                      </div>
+                    )
+                  }
 
-              {/* Metadata grid */}
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:24 }}>
-                {[
-                  { label:'Categoria',    value: selectedTicket.category || '—' },
-                  { label:'Tipo',         value: selectedTicket.ticket_type === 'incident' ? 'Incidente' : 'Requisição' },
-                  { label:'Aberto em',    value: fmtDateTime(selectedTicket.created_at) },
-                  { label:'Atualizado',   value: fmtDateTime(selectedTicket.updated_at) },
-                ].map(({ label, value }) => (
-                  <div key={label} style={{ padding:'12px 14px', background:'#fff', border:'1px solid #e2e8f0', borderRadius:10 }}>
-                    <div style={{ font:'700 10px sans-serif', textTransform:'uppercase', letterSpacing:'.07em', color:'#94a3b8', marginBottom:5 }}>{label}</div>
-                    <div style={{ font:'600 13px sans-serif', color:'#0f172a' }}>{value}</div>
-                  </div>
-                ))}
-              </div>
+                  const targetTime = new Date(deadline).getTime()
+                  const startTime = createdAt ? new Date(createdAt).getTime() : targetTime - (4 * 3600 * 1000)
+                  const totalDuration = targetTime - startTime
 
-              {selectedTicket.sla_breached && (
-                <div style={{ padding:'12px 14px', background:'#fee2e2', border:'1px solid #fecaca', borderRadius:10, marginBottom:20, font:'600 13px sans-serif', color:'#dc2626' }}>
-                  ⚠️ SLA deste chamado está vencido. Nossa equipe está ciente e priorizando.
-                </div>
-              )}
+                  let status: 'fulfilled' | 'breached' | 'warning' | 'normal' | 'paused' = 'normal'
+                  let text = ''
 
-              {csatSurvey?.status === 'pending' && (
-                <div style={{ padding:'18px', background:'#fff', border:'1px solid #dbeafe', borderRadius:12, marginBottom:20 }}>
-                  <div style={{ font:'700 14px sans-serif', color:'#0f172a', marginBottom:5 }}>Como foi o atendimento?</div>
-                  <p style={{ font:'400 12px/1.5 sans-serif', color:'#64748b', margin:'0 0 12px' }}>Sua avaliação ajuda a melhorar o serviço.</p>
-                  <div style={{ display:'flex', gap:7, marginBottom:12 }}>
-                    {[1, 2, 3, 4, 5].map(rating => (
-                      <button key={rating} onClick={() => setCsatRating(rating)}
-                        aria-label={`Avaliar com ${rating} estrela${rating > 1 ? 's' : ''}`}
-                        style={{ width:40, height:40, borderRadius:9, border:`1.5px solid ${csatRating === rating ? brand : '#e2e8f0'}`, background:csatRating === rating ? brandWash : '#fff', cursor:'pointer', fontSize:20 }}>
-                        ⭐
-                      </button>
-                    ))}
-                  </div>
-                  <textarea value={csatComment} onChange={e => setCsatComment(e.target.value)} rows={2}
-                    placeholder="Comentário opcional"
-                    style={{ width:'100%', boxSizing:'border-box', resize:'vertical', border:'1px solid #e2e8f0', borderRadius:9, padding:'10px 12px', font:'400 13px sans-serif', marginBottom:10 }} />
-                  <button onClick={() => void submitCsat()} disabled={!csatRating || csatSubmitting}
-                    style={{ width:'100%', padding:10, border:0, borderRadius:9, background:brand, color:'#fff', font:'700 13px sans-serif', cursor:csatRating ? 'pointer' : 'not-allowed', opacity:csatRating ? 1 : .5 }}>
-                    {csatSubmitting ? 'Enviando…' : 'Enviar avaliação'}
+                  if (achievedAt) {
+                    status = 'fulfilled'
+                    text = `Cumprido em ${new Date(achievedAt).toLocaleString('pt-BR')}`
+                  } else if (pausedAt) {
+                    // Congelado no instante da pausa — o prazo só é estendido de
+                    // fato quando o chamado sai da pendência (tg_handle_sla_pause).
+                    status = 'paused'
+                    const remainingAtPause = targetTime - new Date(pausedAt).getTime()
+                    text = remainingAtPause < 0
+                      ? `Pausado (estourado há ${fmtDuration(Math.abs(remainingAtPause))})`
+                      : `Pausado — ${fmtDuration(remainingAtPause)} restante`
+                  } else {
+                    const remaining = targetTime - nowTime
+
+                    if (isBreached || remaining < 0) {
+                      status = 'breached'
+                      text = remaining < 0 ? `Estourado há ${fmtDuration(Math.abs(remaining))}` : 'Estourado'
+                    } else {
+                      text = `${fmtDuration(remaining)} restante`
+                      if (remaining <= 0.25 * totalDuration || remaining <= 3600 * 1000) {
+                        status = 'warning'
+                      }
+                    }
+                  }
+
+                  const styles = {
+                    fulfilled: { bg: '#ecfdf5', border: '#a7f3d0', text: '#065f46' },
+                    breached: { bg: '#fff1f2', border: '#fecdd3', text: '#9f1239' },
+                    warning: { bg: '#fffbeb', border: '#fde68a', text: '#92400e' },
+                    normal: { bg: '#f8fafc', border: '#e2e8f0', text: '#334155' },
+                    paused: { bg: '#eff6ff', border: '#bfdbfe', text: '#1d4ed8' }
+                  }[status]
+
+                  return (
+                    <div style={{ border: `1px solid ${styles.border}`, borderRadius: '12px', padding: '16px', display: 'flex', flexDirection: 'column', justifyContent: 'center', backgroundColor: styles.bg, color: styles.text }}>
+                      <span style={{ fontSize: '10px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '.05em', opacity: 0.85 }}>{label}</span>
+                      <span style={{ fontSize: '15px', fontWeight: '800', marginTop: '4px' }}>{text}</span>
+                      {!achievedAt && status !== 'breached' && status !== 'paused' && (
+                        <span style={{ fontSize: '9px', opacity: 0.75, marginTop: '2px' }}>Prazo: {new Date(deadline).toLocaleString('pt-BR')}</span>
+                      )}
+                    </div>
+                  )
+                }
+
+                return (
+                  <>
+                    {renderPortalSlaTimer('Prazo Limite de Resposta', selectedTicket.sla_response_deadline, selectedTicket.responded_at, selectedTicket.is_response_breached, now, selectedTicket.created_at, selectedTicket.paused_at)}
+                    {renderPortalSlaTimer('Prazo Limite de Solução', selectedTicket.sla_resolution_deadline, selectedTicket.resolved_at, selectedTicket.is_resolution_breached, now, selectedTicket.created_at, selectedTicket.paused_at)}
+                  </>
+                )
+              })()}
+            </div>
+
+            {/* Layout em Duas Colunas */}
+            <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap', alignItems: 'flex-start' }}>
+              
+              {/* Coluna Esquerda: Descrição, Chat e Histórico */}
+              <div style={{ flex: '1 1 500px', minWidth: '320px' }}>
+                
+                {/* Seleção de Abas */}
+                <div style={{ display: 'flex', borderBottom: '1px solid #e2e8f0', marginBottom: 20 }}>
+                  <button
+                    onClick={() => setDetailTab('messages')}
+                    style={{
+                      padding: '10px 16px',
+                      border: 'none',
+                      background: 'none',
+                      borderBottom: detailTab === 'messages' ? `3px solid ${brand}` : '3px solid transparent',
+                      color: detailTab === 'messages' ? brand : '#64748b',
+                      fontWeight: detailTab === 'messages' ? '700' : '500',
+                      fontSize: '14px',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s',
+                    }}
+                  >
+                    💬 Descrição & Conversa
+                  </button>
+                  <button
+                    onClick={() => setDetailTab('history')}
+                    style={{
+                      padding: '10px 16px',
+                      border: 'none',
+                      background: 'none',
+                      borderBottom: detailTab === 'history' ? `3px solid ${brand}` : '3px solid transparent',
+                      color: detailTab === 'history' ? brand : '#64748b',
+                      fontWeight: detailTab === 'history' ? '700' : '500',
+                      fontSize: '14px',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s',
+                    }}
+                  >
+                    ⏳ Histórico de Ação Técnica
                   </button>
                 </div>
-              )}
 
-              {csatSurvey?.status === 'submitted' && (
-                <div style={{ padding:'12px 14px', background:'#ecfdf5', border:'1px solid #a7f3d0', borderRadius:10, marginBottom:20, font:'600 13px sans-serif', color:'#047857' }}>
-                  Obrigado pela avaliação de {csatSurvey.rating}/5.
-                </div>
-              )}
+                {detailTab === 'messages' ? (
+                  <div>
+                    {/* Descrição Original do Usuário */}
+                    {selectedTicket.description && (
+                      <div style={{ font:'400 14px/1.65 sans-serif', color:'#475569', marginBottom:20, padding:'14px 16px', background:'#f8fafc', borderRadius:10, border:'1px solid #e2e8f0' }}>
+                        <div style={{ font: '700 11px sans-serif', textTransform: 'uppercase', letterSpacing: '.05em', color: '#94a3b8', marginBottom: 4 }}>Descrição do Usuário</div>
+                        <div style={{ whiteSpace: 'pre-wrap' }}>{selectedTicket.description}</div>
+                      </div>
+                    )}
 
-              {CLOSED_STATES.has(selectedTicket.state) && (
-                <div style={{ padding:'14px 16px', background:'#fffbeb', border:'1px solid #fde68a', borderRadius:11, display:'flex', gap:10, alignItems:'flex-start' }}>
-                  <span style={{ fontSize:16, flexShrink:0 }}>ℹ️</span>
-                  <div style={{ flex:1 }}>
-                    <div style={{ font:'600 13px sans-serif', color:'#92400e', marginBottom:4 }}>
-                      Problema voltou a ocorrer?
+                    {/* Campos do Formulário Customizado */}
+                    {(() => {
+                      const formData = selectedTicket.form_data
+                      if (formData && typeof formData === 'object' && !Array.isArray(formData) && Object.keys(formData).length > 0) {
+                        return (
+                          <div style={{ font:'400 14px/1.65 sans-serif', color:'#475569', marginBottom:20, padding:'14px 16px', background:'#f0f9ff', borderRadius:10, border:'1px solid #bae6fd' }}>
+                            <div style={{ font: '700 11px sans-serif', textTransform: 'uppercase', letterSpacing: '.05em', color: '#0369a1', marginBottom: 8 }}>Dados do Formulário Customizado</div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                              {Object.entries(formData).map(([label, val]) => (
+                                <div key={label}>
+                                  <div style={{ font: '700 12px sans-serif', color: '#0284c7' }}>{label}</div>
+                                  <div style={{ font: '500 14px sans-serif', color: '#0f172a', whiteSpace: 'pre-wrap' }}>
+                                    {typeof val === 'boolean' ? (val ? 'Sim' : 'Não') : String(val || '—')}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )
+                      }
+                      return null
+                    })()}
+
+                    {/* Componente de Chat */}
+                    <div style={{ marginBottom: 20 }}>
+                      <TicketChat
+                        incidentId={selectedTicket.id}
+                        companyId={catalogCompanyId || ''}
+                        senderId={profile?.id}
+                        senderName={profile?.name || 'Usuário'}
+                        actorType="user"
+                        locked={CLOSED_STATES.has(selectedTicket.state)}
+                      />
                     </div>
-                    <p style={{ font:'400 13px/1.5 sans-serif', color:'#92400e', margin:0 }}>
-                      Abra um novo incidente descrevendo o problema atual. Nossa equipe irá vinculá-lo ao histórico.
-                    </p>
-                    <button onClick={() => { goHome(); setScreen('inc-cats') }}
-                      style={{ marginTop:10, padding:'8px 14px', background:'#b45309', borderRadius:8, font:'600 13px sans-serif', color:'#fff', border:'none', cursor:'pointer' }}>
-                      Abrir novo incidente
-                    </button>
+
+                    {selectedTicket.sla_breached && (
+                      <div style={{ padding:'12px 14px', background:'#fee2e2', border:'1px solid #fecaca', borderRadius:10, marginBottom:20, font:'600 13px sans-serif', color:'#dc2626' }}>
+                        ⚠️ SLA deste chamado está vencido. Nossa equipe está ciente e priorizando.
+                      </div>
+                    )}
+
+                    {csatSurvey?.status === 'pending' && (
+                      <div style={{ padding:'18px', background:'#fff', border:'1px solid #dbeafe', borderRadius:12, marginBottom:20 }}>
+                        <div style={{ font:'700 14px sans-serif', color:'#0f172a', marginBottom:5 }}>Como foi o atendimento?</div>
+                        <p style={{ font:'400 12px/1.5 sans-serif', color:'#64748b', margin:'0 0 12px' }}>Sua avaliação ajuda a melhorar o serviço.</p>
+                        <div style={{ display:'flex', gap:7, marginBottom:12 }}>
+                          {[1, 2, 3, 4, 5].map(rating => (
+                            <button key={rating} onClick={() => setCsatRating(rating)}
+                              aria-label={`Avaliar com ${rating} estrela${rating > 1 ? 's' : ''}`}
+                              style={{ width:40, height:40, borderRadius:9, border:`1.5px solid ${csatRating === rating ? brand : '#e2e8f0'}`, background:csatRating === rating ? brandWash : '#fff', cursor:'pointer', fontSize:20 }}>
+                              ⭐
+                            </button>
+                          ))}
+                        </div>
+                        <textarea value={csatComment} onChange={e => setCsatComment(e.target.value)} rows={2}
+                          placeholder="Comentário opcional"
+                          style={{ width:'100%', boxSizing:'border-box', resize:'vertical', border:'1px solid #e2e8f0', borderRadius:9, padding:'10px 12px', font:'400 13px sans-serif', marginBottom:10 }} />
+                        <button onClick={() => void submitCsat()} disabled={!csatRating || csatSubmitting}
+                          style={{ width:'100%', padding:10, border:0, borderRadius:9, background:brand, color:'#fff', font:'700 13px sans-serif', cursor:csatRating ? 'pointer' : 'not-allowed', opacity:csatRating ? 1 : .5 }}>
+                          {csatSubmitting ? 'Enviando…' : 'Enviar avaliação'}
+                        </button>
+                      </div>
+                    )}
+
+                    {csatSurvey?.status === 'submitted' && (
+                      <div style={{ padding:'12px 14px', background:'#ecfdf5', border:'1px solid #a7f3d0', borderRadius:10, marginBottom:20, font:'600 13px sans-serif', color:'#047857' }}>
+                        Obrigado pela avaliação de {csatSurvey.rating}/5.
+                      </div>
+                    )}
+
+                    {CLOSED_STATES.has(selectedTicket.state) && (
+                      <div style={{ padding:'14px 16px', background:'#fffbeb', border:'1px solid #fde68a', borderRadius:11, display:'flex', gap:10, alignItems:'flex-start' }}>
+                        <span style={{ fontSize:16, flexShrink:0 }}>ℹ️</span>
+                        <div style={{ flex:1 }}>
+                          <div style={{ font:'600 13px sans-serif', color:'#92400e', marginBottom:4 }}>
+                            Problema voltou a ocorrer?
+                          </div>
+                          <p style={{ font:'400 13px/1.5 sans-serif', color:'#92400e', margin:0 }}>
+                            Abra um novo incidente descrevendo o problema atual. Nossa equipe irá vinculá-lo ao histórico.
+                          </p>
+                          <button onClick={() => { goHome(); setScreen('inc-cats') }}
+                            style={{ marginTop:10, padding:'8px 14px', background:'#b45309', borderRadius:8, font:'600 13px sans-serif', color:'#fff', border:'none', cursor:'pointer' }}>
+                            Abrir novo incidente
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
+                ) : (
+                  <div>
+                    {/* Linha do tempo dos eventos técnicos */}
+                    <SlaEventTimeline incidentId={selectedTicket.id} />
+                  </div>
+                )}
+              </div>
+
+              {/* Coluna Direita: Metadados do Chamado (Visão do Solicitante) */}
+              <div style={{ flex: '0 0 300px', minWidth: '300px', background: '#fff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '20px' }}>
+                <h3 style={{ font: '700 14px sans-serif', color: '#0f172a', margin: '0 0 16px', borderBottom: '1px solid #f1f5f9', paddingBottom: '10px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  📋 Metadados do Chamado
+                </h3>
+                
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                  {[
+                    { label: 'Solicitante', value: selectedTicket.caller_name || 'Root Allied IT' },
+                    { label: 'Empresa', value: tenant?.name || 'Alpha Tech' },
+                    { label: 'Abertura', value: fmtDateTime(selectedTicket.created_at) },
+                    { label: 'Tipo', value: selectedTicket.ticket_type === 'incident' ? 'Incidente' : 'Requisição' },
+                    { label: 'Prioridade', value: selectedTicket.priority || '—' },
+                    { label: 'Impacto', value: translateImpact(selectedTicket.impact) },
+                    { label: 'Urgência', value: translateUrgency(selectedTicket.urgency) },
+                    { label: 'Estado', value: STATE_LABELS_PT[selectedTicket.state] || selectedTicket.state },
+                    { label: 'Responsável', value: selectedTicket.assigned_to_name || 'Não atribuído' },
+                    { label: 'Grupo Técnico', value: selectedTicket.assigned_group_name || selectedTicket.assigned_group_id || 'Não atribuído' },
+                  ].map(({ label, value }) => (
+                    <div key={label}>
+                      <div style={{ font: '700 10px sans-serif', textTransform: 'uppercase', letterSpacing: '.05em', color: '#94a3b8', marginBottom: '3px' }}>
+                        {label}
+                      </div>
+                      <div style={{ font: '600 13px sans-serif', color: '#334155' }}>
+                        {value}
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              )}
+              </div>
+
             </div>
           </div>
         )}

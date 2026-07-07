@@ -27,6 +27,72 @@ import { setupMockAuth } from './helpers/mockAuth'
 
 const SUPABASE_URL = 'https://enxtvrvsfwvcnpyspyfl.supabase.co'
 
+const MOCK_CATEGORIES = [
+  {
+    id: 'cat-001',
+    company_id: 'company-a-uuid',
+    name: 'Suporte Técnico',
+    icon: 'Wrench',
+    is_active: true,
+  }
+]
+const MOCK_SERVICES = [
+  {
+    id: 'svc-001',
+    category_id: 'cat-001',
+    company_id: 'company-a-uuid',
+    name: 'Equipamentos',
+    icon: 'Monitor',
+    is_active: true,
+  }
+]
+const MOCK_SYMPTOMS = [
+  {
+    id: 'sym-001',
+    service_id: 'svc-001',
+    company_id: 'company-a-uuid',
+    symptom_id: 'sys-sym-001',
+    active: true,
+    symptom: {
+      id: 'sys-sym-001',
+      name: 'Notebook com defeito',
+      icon: 'Laptop',
+    },
+    service: {
+      id: 'svc-001',
+      name: 'Equipamentos',
+      category_id: 'cat-001',
+    }
+  }
+]
+
+const MOCK_REQ_CATEGORIES = [
+  {
+    id: 'rcat-001',
+    company_id: 'company-a-uuid',
+    name: 'Acessos e Contas',
+    icon: 'Key',
+    active: true,
+  }
+]
+const MOCK_REQ_SUBCATEGORIES = [
+  {
+    id: 'rsub-001',
+    category_id: 'rcat-001',
+    name: 'Rede',
+    active: true,
+  }
+]
+const MOCK_REQ_ITEMS = [
+  {
+    id: 'ritem-001',
+    request_subcategory_id: 'rsub-001',
+    name: 'Configurar VPN',
+    description: 'Solicitação de acesso seguro remoto via VPN corporativa.',
+    active: true,
+  }
+]
+
 // ── Chamado mockado que o analista vai atender ─────────────────────
 const MOCK_INCIDENT = {
   id: 'inc-lifecycle-001',
@@ -75,6 +141,29 @@ const pause = (ms: number) => new Promise(r => setTimeout(r, ms))
 // ── Setup com incidents mockados ───────────────────────────────────
 async function setupLifecycleMocks(page: Page) {
   await setupMockAuth(page)
+
+  // Mock catalog tables to support user portal rendering
+  await page.route(`${SUPABASE_URL}/rest/v1/departments*`, async route => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: '[]' })
+  })
+  await page.route(`${SUPABASE_URL}/rest/v1/catalog_categories*`, async route => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_CATEGORIES) })
+  })
+  await page.route(`${SUPABASE_URL}/rest/v1/catalog_services*`, async route => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_SERVICES) })
+  })
+  await page.route(`${SUPABASE_URL}/rest/v1/catalog_service_symptoms*`, async route => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_SYMPTOMS) })
+  })
+  await page.route(`${SUPABASE_URL}/rest/v1/request_categories*`, async route => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_REQ_CATEGORIES) })
+  })
+  await page.route(`${SUPABASE_URL}/rest/v1/request_subcategories*`, async route => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_REQ_SUBCATEGORIES) })
+  })
+  await page.route(`${SUPABASE_URL}/rest/v1/request_items*`, async route => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_REQ_ITEMS) })
+  })
 
   // Override incidents → retorna o chamado do ciclo de vida
   await page.route(`${SUPABASE_URL}/rest/v1/incidents*`, async route => {
@@ -220,8 +309,8 @@ test('Ciclo de vida completo: Usuário abre chamado → Analista atende', async 
   // Saudação personalizada "Olá, Analista! 👋"
   await expect(page.locator('body')).toContainText(/Olá.*Analista|bem-vindo|ajudar/i)
 
-  // Tab "Catálogo de Serviços" está visível (renderizada por App.tsx)
-  await expect(page.getByText(/Catálogo de Serviços/i).first()).toBeVisible({ timeout: 5_000 })
+  // Tab "Início" está visível (renderizada por App.tsx)
+  await expect(page.getByText(/Início/i).first()).toBeVisible({ timeout: 5_000 })
   await pause(800)
 
   // Barra de busca preditiva (placeholder real do ServiceCatalog)
@@ -364,8 +453,8 @@ test('Portal: saudação e catálogo de serviços estão presentes', async ({ pa
   // Saudação "Olá, Analista!"
   await expect(page.getByText(/Olá.*Analista|bem-vindo|ajudar/i).first()).toBeVisible({ timeout: 8_000 })
 
-  // Tab "Catálogo de Serviços" visível
-  await expect(page.getByText(/Catálogo de Serviços/i).first()).toBeVisible({ timeout: 5_000 })
+  // Tab "Início" visível
+  await expect(page.getByText(/Início/i).first()).toBeVisible({ timeout: 5_000 })
 
   // Tab "Meus Chamados" visível (com emoji e contador)
   await expect(page.getByText(/Meus Chamados/i).first()).toBeVisible({ timeout: 5_000 })
