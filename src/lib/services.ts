@@ -2035,24 +2035,26 @@ export const serviceCatalogService = {
   },
 
   // ─ Itens de Requisição (Nível 3) ─
-  async listRequestItems(companyId: string, opts?: { categoryId?: string; activeOnly?: boolean }): Promise<RequestItemRow[]> {
+  async listRequestItems(companyId: string, opts?: { categoryId?: string; subcategoryId?: string; activeOnly?: boolean }): Promise<RequestItemRow[]> {
     let q = supabase
       .from('request_items')
-      .select('*, group:assignment_groups(id,name)')
+      // request_items também referencia assignment_groups por approval_group_id.
+      // Qualificar a FK evita o 300 Multiple Choices do PostgREST.
+      .select('*, group:assignment_groups!request_items_assignment_group_id_fkey(id,name)')
       .eq('company_id', companyId)
     if (opts?.categoryId) q = q.eq('request_category_id', opts.categoryId)
     // Se tiver request_subcategory_id, podemos filtrar (migração 047)
-    if ((opts as any)?.subcategoryId) q = q.eq('request_subcategory_id', (opts as any).subcategoryId)
+    if (opts?.subcategoryId) q = q.eq('request_subcategory_id', opts.subcategoryId)
     if (opts?.activeOnly) q = q.eq('active', true)
     const { data, error } = await q.order('sort_order')
     return throwIfError(data, error)
   },
   async createRequestItem(payload: Partial<RequestItemRow>): Promise<RequestItemRow> {
-    const { data, error } = await supabase.from('request_items').insert(payload).select('*, group:assignment_groups(id,name)').single()
+    const { data, error } = await supabase.from('request_items').insert(payload).select('*, group:assignment_groups!request_items_assignment_group_id_fkey(id,name)').single()
     return throwIfError(data, error)
   },
   async updateRequestItem(id: string, payload: Partial<RequestItemRow>): Promise<RequestItemRow> {
-    const { data, error } = await supabase.from('request_items').update(payload).eq('id', id).select('*, group:assignment_groups(id,name)').single()
+    const { data, error } = await supabase.from('request_items').update(payload).eq('id', id).select('*, group:assignment_groups!request_items_assignment_group_id_fkey(id,name)').single()
     return throwIfError(data, error)
   },
   async deleteRequestItem(id: string): Promise<void> {

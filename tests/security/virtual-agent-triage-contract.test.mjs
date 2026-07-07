@@ -5,6 +5,7 @@ import { test } from 'node:test'
 const read = path => readFileSync(new URL('../../' + path, import.meta.url), 'utf8')
 const sql = read('supabase/migrations/20260707030000_088_virtual_agent_triage.sql')
 const service = read('src/lib/virtual-agent-service.ts')
+const catalogService = read('src/lib/services.ts')
 const chat = read('src/components/TriageChat.tsx')
 const conductor = read('src/lib/triage-conductor.ts')
 const packageJson = read('package.json')
@@ -63,6 +64,11 @@ test('TriageChat cria pelos serviços governados e audita a conclusão', () => {
   assert.match(chat, /await sync\(next\.state, value, ''\)/)
   assert.match(chat, /triageComplete\(activeConversationId, incidentId/)
   assert.doesNotMatch(chat, /:\s*any\b/)
+})
+
+test('Catálogo de solicitações qualifica o grupo de atribuição sem ambiguidade no PostgREST', () => {
+  const qualifiedRelation = /group:assignment_groups!request_items_assignment_group_id_fkey\(id,name\)/g
+  assert.equal(catalogService.match(qualifiedRelation)?.length, 3)
 })
 
 test('Serviço tipado expõe triageSync/triageComplete (sem any)', () => {
