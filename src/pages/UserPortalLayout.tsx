@@ -367,7 +367,7 @@ const UserPortalLayout = ({ companyId }: { companyId?: string } = {}) => {
   const [submitting, setSubmitting]         = useState(false)
   const [submitError, setSubmitError]       = useState<string | null>(null)
   const [selectedTicket, setSelectedTicket] = useState<IncidentRow | null>(null)
-  const [detailTab, setDetailTab] = useState<'messages' | 'form' | 'history'>('messages')
+  const [detailTab, setDetailTab] = useState<'messages' | 'form' | 'history' | 'sla'>('messages')
   const [csatSurvey, setCsatSurvey] = useState<CsatSurveyRow | null>(null)
   const [csatRating, setCsatRating] = useState<number | null>(null)
   const [csatComment, setCsatComment] = useState('')
@@ -1325,7 +1325,23 @@ const UserPortalLayout = ({ companyId }: { companyId?: string } = {}) => {
                       transition: 'all 0.15s',
                     }}
                   >
-                    ⏳ Histórico de Ação Técnica
+                    📋 Histórico de Ação Técnica
+                  </button>
+                  <button
+                    onClick={() => setDetailTab('sla')}
+                    style={{
+                      padding: '10px 16px',
+                      border: 'none',
+                      background: 'none',
+                      borderBottom: detailTab === 'sla' ? `3px solid ${brand}` : '3px solid transparent',
+                      color: detailTab === 'sla' ? brand : '#64748b',
+                      fontWeight: detailTab === 'sla' ? '700' : '500',
+                      fontSize: '14px',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s',
+                    }}
+                  >
+                    ⏳ Controle de SLA
                   </button>
                 </div>
 
@@ -1427,11 +1443,14 @@ const UserPortalLayout = ({ companyId }: { companyId?: string } = {}) => {
                       </div>
                     )}
                   </div>
-                ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+                ) : detailTab === 'history' ? (
+                  <div>
                     {/* Histórico de ações (abertura, mudanças de estado, comentários) */}
                     <IncidentActionHistory incidentId={selectedTicket.id} companyId={catalogCompanyId || ''} />
-                    {/* Linha do tempo do controle de SLA */}
+                  </div>
+                ) : (
+                  <div>
+                    {/* Linha do tempo do controle de SLA, isolada para maior clareza */}
                     <SlaEventTimeline incidentId={selectedTicket.id} />
                   </div>
                 )}

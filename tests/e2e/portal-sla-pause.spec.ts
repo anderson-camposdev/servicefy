@@ -45,8 +45,16 @@ const PAUSED_INCIDENT = {
   form_data: null,
 }
 
+// Capturadas durante os testes para verificar que o cliente pede ordem
+// decrescente ao Postgrest (os mocks abaixo não executam ORDER BY de
+// verdade — só a query string prova que o pedido saiu correto).
+let historyRequestUrl = ''
+let slaEventsRequestUrl = ''
+
 async function setupMocks(page: Page) {
   await setupMockAuth(page)
+  historyRequestUrl = ''
+  slaEventsRequestUrl = ''
 
   await page.route(`${SUPABASE_URL}/rest/v1/incidents*`, async route => {
     if (route.request().method() !== 'GET') {
@@ -65,22 +73,29 @@ async function setupMocks(page: Page) {
     await route.fulfill({ status: 200, contentType: 'application/json', body: '[]' })
   })
   await page.route(`${SUPABASE_URL}/rest/v1/sla_events*`, async route => {
+    slaEventsRequestUrl = route.request().url()
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(SLA_EVENTS) })
   })
   await page.route(`${SUPABASE_URL}/rest/v1/csat_surveys*`, async route => {
     await route.fulfill({ status: 200, contentType: 'application/json', body: '[]' })
   })
   await page.route(`${SUPABASE_URL}/rest/v1/incident_history*`, async route => {
+    historyRequestUrl = route.request().url()
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(ACTION_HISTORY) })
   })
 }
 
+// Já em ordem decrescente (mais recente primeiro) — como o backend real
+// devolveria com order=created_at.desc — para validar que a UI não reordena
+// (nem inverte) o que a query já traz.
 const SLA_EVENTS = [
-  { id: 'ev-1', incident_id: PAUSED_INCIDENT.id, event_type: 'resolution_achieved', metadata: { at: new Date(NOW - 10 * 60 * 1000).toISOString(), breached: false }, created_at: new Date(NOW - 10 * 60 * 1000).toISOString() },
+  { id: 'ev-2', incident_id: PAUSED_INCIDENT.id, event_type: 'resolution_achieved', metadata: { at: new Date(NOW - 10 * 60 * 1000).toISOString(), breached: false }, created_at: new Date(NOW - 10 * 60 * 1000).toISOString() },
+  { id: 'ev-1', incident_id: PAUSED_INCIDENT.id, event_type: 'resolution_start', metadata: { deadline: PAUSED_INCIDENT.sla_resolution_deadline, priority_level: 3 }, created_at: PAUSED_INCIDENT.created_at },
 ]
 const ACTION_HISTORY = [
-  { id: 'h-1', incident_id: PAUSED_INCIDENT.id, changed_by_id: null, changed_by_name: 'Analista Teste', field_name: 'Criação', old_value: null, new_value: null, comment: 'Chamado registrado pelo portal.', is_public: true, created_at: PAUSED_INCIDENT.created_at },
+  { id: 'h-3', incident_id: PAUSED_INCIDENT.id, changed_by_id: null, changed_by_name: 'Suporte N1', field_name: 'state', old_value: 'In Progress', new_value: 'On Hold', comment: null, is_public: true, created_at: PAUSED_INCIDENT.paused_at },
   { id: 'h-2', incident_id: PAUSED_INCIDENT.id, changed_by_id: 'agent-1', changed_by_name: 'Suporte N1', field_name: 'comment', old_value: null, new_value: null, comment: 'Já estamos verificando o problema.', is_public: true, created_at: PAUSED_INCIDENT.responded_at },
+  { id: 'h-1', incident_id: PAUSED_INCIDENT.id, changed_by_id: null, changed_by_name: 'Analista Teste', field_name: 'Criação', old_value: null, new_value: null, comment: 'Chamado registrado pelo portal.', is_public: true, created_at: PAUSED_INCIDENT.created_at },
 ]
 
 async function openPortalTicketDetail(page: Page) {
@@ -117,21 +132,51 @@ test.describe('Portal — Controle de SLA', () => {
     await expect(page.getByText(/Cumprido em/i)).toBeVisible({ timeout: 6_000 })
   })
 
-  test('aba "Histórico de Ação Técnica" mostra o histórico de ações E o controle de SLA', async ({ page }) => {
+  test('aba "Histórico de Ação Técnica" mostra só o histórico de ações; aba "Controle de SLA" mostra só o SLA', async ({ page }) => {
     await setupMocks(page)
     await openPortalTicketDetail(page)
 
-    await page.getByText(/Histórico de Ação Técnica/i).first().click()
+    // Aba de histórico de ações — sem o cartão de Controle de SLA
+    await page.getByText(/^📋 Histórico de Ação Técnica$/).click()
     await page.waitForTimeout(800)
-
-    // Histórico de ações (incident_history) — não é só o controle de SLA
     await expect(page.getByText(/Histórico de Ações/i)).toBeVisible({ timeout: 6_000 })
     await expect(page.getByText(/Chamado registrado pelo portal/i)).toBeVisible({ timeout: 6_000 })
     await expect(page.getByText(/Já estamos verificando o problema/i)).toBeVisible({ timeout: 6_000 })
+    await expect(page.getByText(/^Controle de SLA$/i)).toHaveCount(0)
 
-    // Controle de SLA continua presente, agora informando o SLA de solução cumprido
-    await expect(page.getByText(/Controle de SLA/i)).toBeVisible({ timeout: 6_000 })
+    // Aba dedicada de Controle de SLA — sem o histórico de ações
+    await page.getByText(/^⏳ Controle de SLA$/).click()
+    await page.waitForTimeout(800)
+    await expect(page.getByText(/^Controle de SLA$/i)).toBeVisible({ timeout: 6_000 })
     await expect(page.getByText(/SLA de Solução Cumprido/i)).toBeVisible({ timeout: 6_000 })
     await expect(page.getByText(/dentro do prazo/i)).toBeVisible({ timeout: 6_000 })
+    await expect(page.getByText(/Histórico de Ações/i)).toHaveCount(0)
+  })
+
+  test('histórico de ações e controle de SLA pedem ordem decrescente e renderizam do mais recente para o mais antigo', async ({ page }) => {
+    await setupMocks(page)
+    await openPortalTicketDetail(page)
+
+    // Histórico de ações: h-2 (mais recente) aparece ACIMA de h-1 (mais antigo)
+    await page.getByText(/^📋 Histórico de Ação Técnica$/).click()
+    await page.waitForTimeout(800)
+    await expect(page.getByText(/Já estamos verificando o problema/i)).toBeVisible({ timeout: 6_000 })
+    expect(historyRequestUrl).toMatch(/order=created_at\.desc/)
+    const h2Box = await page.getByText(/Já estamos verificando o problema/i).boundingBox()
+    const h1Box = await page.getByText(/Chamado registrado pelo portal/i).boundingBox()
+    expect(h2Box).not.toBeNull()
+    expect(h1Box).not.toBeNull()
+    expect(h2Box!.y).toBeLessThan(h1Box!.y)
+
+    // Controle de SLA: ev-2 "Cumprido" (mais recente) aparece ACIMA de ev-1 "Iniciado" (mais antigo)
+    await page.getByText(/^⏳ Controle de SLA$/).click()
+    await page.waitForTimeout(800)
+    await expect(page.getByText(/SLA de Solução Cumprido/i)).toBeVisible({ timeout: 6_000 })
+    expect(slaEventsRequestUrl).toMatch(/order=created_at\.desc/)
+    const ev2Box = await page.getByText(/SLA de Solução Cumprido/i).boundingBox()
+    const ev1Box = await page.getByText(/SLA de Solução Iniciado/i).boundingBox()
+    expect(ev2Box).not.toBeNull()
+    expect(ev1Box).not.toBeNull()
+    expect(ev2Box!.y).toBeLessThan(ev1Box!.y)
   })
 })

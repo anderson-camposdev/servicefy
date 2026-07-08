@@ -61,7 +61,7 @@ export default function IncidentActionHistory({ incidentId, companyId }: { incid
 
     const channel = incidentsService.subscribeToHistory(incidentId, companyId, (row) => {
       if (!row.is_public) return
-      setRows(prev => prev.some(h => h.id === row.id) ? prev : [...prev, row].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()))
+      setRows(prev => prev.some(h => h.id === row.id) ? prev : [...prev, row].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()))
     })
     return () => { active = false; channel.unsubscribe() }
   }, [incidentId, companyId])

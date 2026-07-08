@@ -17,6 +17,8 @@ import { setTenantOverride } from './tenant/resolveTenant'
 import { useAuth } from './auth'
 import { UserPortalLayout, AdminPortalSettings, AnalystCockpit, TicketManagementDashboard, WorkspaceLayout, SettingsCenter, WorkflowBuilder, ChangeManagementDashboard, ApprovalInbox } from './pages'
 import BiApp from './features/bi/BiApp'
+import TicketDataTable from './components/TicketDataTable'
+import { PROBLEM_FIELDS } from './lib/ticketTableFields'
 
 const ACTIVE_VIEW_STORAGE_KEY = 'flowfy_active_view'
 
@@ -402,28 +404,6 @@ export function PageHeader({ title, subtitle }: { title: string; subtitle: strin
   )
 }
 
-// ─── TABLE WRAPPER ────────────────────────────────────────────
-
-function TableCard({ children, header }: { children: React.ReactNode; header?: React.ReactNode }) {
-  return (
-    <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
-      {header && <div className="border-b border-slate-100 bg-slate-50/80 px-5 py-3.5">{header}</div>}
-      <div className="overflow-x-auto">{children}</div>
-    </div>
-  )
-}
-
-function TableHead({ cols }: { cols: string[] }) {
-  return (
-    <thead>
-      <tr className="border-b border-slate-100">
-        {cols.map(h => <th key={h} className="px-5 py-3 text-left text-[11px] font-bold text-slate-400 uppercase tracking-wider">{h}</th>)}
-      </tr>
-    </thead>
-  )
-}
-
-
 // ─── PROBLEM DASHBOARD ────────────────────────────────────────
 
 function ProblemDashboard({ companyId }: { companyId: string }) {
@@ -458,46 +438,45 @@ function ProblemDashboard({ companyId }: { companyId: string }) {
 
   if (error) return <div className="text-red-500 text-sm p-4">{error}</div>
 
+  const problemStats: { label: string; value: number | string; accent: string; icon: React.ReactNode }[] = [
+    { label: 'Total', value: loading ? '…' : stats.total, accent: 'bg-slate-100 text-slate-500', icon: <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg> },
+    { label: 'Problemas Ativos', value: loading ? '…' : stats.active, accent: 'bg-orange-50 text-orange-500', icon: <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg> },
+    { label: 'Causa Raiz Identificada', value: loading ? '…' : stats.rootCause, accent: 'bg-teal-50 text-teal-500', icon: <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 21h7a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v11m0 5l4.879-4.879m0 0a3 3 0 104.243-4.242 3 3 0 00-4.243 4.242z" /></svg> },
+    { label: 'Erros Conhecidos (KEDB)', value: loading ? '…' : stats.knownError, accent: 'bg-amber-50 text-amber-500', icon: <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg> },
+  ]
+
   return (
-    <div>
-      <div className="flex items-start justify-between gap-4">
+    <div className="h-full flex flex-col">
+      <div className="flex items-start justify-between gap-4 shrink-0">
         <PageHeader title="Gerenciamento de Problemas" subtitle="Análise de Causa Raiz e KEDB — ITIL v4" />
         <button onClick={() => setShowNew(true)} className="mt-1 flex items-center gap-1.5 px-3.5 py-2 bg-teal-600 hover:bg-teal-700 text-white text-sm font-bold rounded-xl shadow-sm transition-all shrink-0">
           <Plus className="w-4 h-4" /> Novo Problema
         </button>
       </div>
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <StatCard label="Total" value={loading ? '…' : stats.total} accent="bg-slate-100 text-slate-500" icon={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg>} />
-        <StatCard label="Problemas Ativos" value={loading ? '…' : stats.active} accent="bg-orange-50 text-orange-500" icon={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>} />
-        <StatCard label="Causa Raiz Identificada" value={loading ? '…' : stats.rootCause} accent="bg-teal-50 text-teal-500" icon={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 21h7a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v11m0 5l4.879-4.879m0 0a3 3 0 104.243-4.242 3 3 0 00-4.243 4.242z" /></svg>} />
-        <StatCard label="Erros Conhecidos (KEDB)" value={loading ? '…' : stats.knownError} accent="bg-amber-50 text-amber-500" icon={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>} />
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 my-3 shrink-0">
+        {problemStats.map(s => (
+          <div key={s.label} className="bg-white rounded-lg border border-slate-200 px-3 py-2 flex items-center justify-between gap-2 shadow-sm">
+            <div className="min-w-0">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 truncate">{s.label}</p>
+              <p className="text-lg font-black text-slate-800 leading-none mt-0.5">{s.value}</p>
+            </div>
+            <span className={`p-1.5 rounded-lg shrink-0 ${s.accent}`}>{s.icon}</span>
+          </div>
+        ))}
       </div>
 
-      <TableCard header={<span className="text-xs font-bold text-slate-500 uppercase tracking-widest">Problemas Registrados</span>}>
-        <table className="w-full text-left text-sm min-w-[760px]">
-          <TableHead cols={['Número', 'Descrição', 'Prioridade', 'Estado', 'Categoria', 'Causa Raiz', 'KEDB', 'Incidentes']} />
-          <tbody className="divide-y divide-slate-50">
-            {base.length === 0 && !loading && <tr><td colSpan={8} className="py-12 text-center text-slate-400">Nenhum problema encontrado.</td></tr>}
-            {loading && base.length === 0 && <tr><td colSpan={8} className="py-12 text-center"><span className="text-slate-400 animate-pulse text-sm">Carregando…</span></td></tr>}
-            {base.map(prb => (
-              <tr key={prb.id} onClick={() => setDetail(prb)} className="hover:bg-slate-50 cursor-pointer transition-colors">
-                <td className="px-5 py-3.5 font-mono text-teal-600 text-xs font-bold">{prb.number}</td>
-                <td className="px-5 py-3.5 text-slate-700 font-medium max-w-[180px] truncate">{prb.short_description}</td>
-                <td className="px-5 py-3.5"><span className={`px-2 py-0.5 rounded-md text-[10px] uppercase tracking-wide ${priorityBadge[prb.priority]}`}>{prb.priority}</span></td>
-                <td className="px-5 py-3.5"><StateBadge state={prb.state} /></td>
-                <td className="px-5 py-3.5 text-slate-500 text-xs">{prb.category}</td>
-                <td className="px-5 py-3.5 text-slate-500 text-xs max-w-[160px] truncate">{prb.root_cause ?? <span className="italic text-slate-300">Em investigação</span>}</td>
-                <td className="px-5 py-3.5">
-                  {prb.known_error
-                    ? <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">KEDB</span>
-                    : <span className="text-slate-300">—</span>}
-                </td>
-                <td className="px-5 py-3.5 text-slate-500 text-xs">—</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </TableCard>
+      <div className="flex-1 min-h-0">
+        <TicketDataTable
+          rows={base}
+          fields={PROBLEM_FIELDS}
+          storageKey="problems"
+          getRowId={p => p.id}
+          onRowClick={setDetail}
+          leadingCheckbox={false}
+          loading={loading}
+          emptyLabel="Nenhum problema encontrado."
+        />
+      </div>
 
       {detail && (
         <Modal title={detail.number} subtitle="Detalhes do Problema" onClose={() => setDetail(null)}>

@@ -221,14 +221,14 @@ export const incidentsService = {
     return { ...inc!, history: hist ?? [] }
   },
 
-  /** Histórico PÚBLICO do chamado (linha do tempo p/ o solicitante, sem notas internas). */
+  /** Histórico PÚBLICO do chamado (linha do tempo p/ o solicitante, sem notas internas). Mais recente primeiro. */
   async listPublicHistory(incidentId: string, companyId: string): Promise<IncidentHistoryRow[]> {
     const { data, error } = await getClientForCompany(companyId)
       .from('incident_history')
       .select('*')
       .eq('incident_id', incidentId)
       .eq('is_public', true)
-      .order('created_at', { ascending: true })
+      .order('created_at', { ascending: false })
     return throwIfError(data, error)
   },
 
@@ -2163,13 +2163,13 @@ export const messagesService = {
 // ============================================================
 
 export const slaEventsService = {
-  /** Lista os eventos de SLA de um chamado em ordem cronológica. */
+  /** Lista os eventos de SLA de um chamado, mais recente primeiro. */
   async list(incidentId: string): Promise<SlaEventRow[]> {
     const { data, error } = await supabase
       .from('sla_events')
       .select('*')
       .eq('incident_id', incidentId)
-      .order('created_at', { ascending: true })
+      .order('created_at', { ascending: false })
     return throwIfError(data, error)
   },
 

@@ -1,0 +1,146 @@
+/**
+ * ticket-table-customization.spec.ts
+ *
+ * Cobre a customização da tabela de incidentes (TicketDataTable):
+ *  1. Colunas customizáveis — abre "Colunas", desmarca uma coluna default
+ *     e marca uma nova, salva, e confirma que a tabela reflete a mudança
+ *     e persiste após reload (localStorage).
+ *  2. Filtro por coluna — filtra por Prioridade e confirma que a lista
+ *     reduz aos chamados que batem.
+ *  3. Agrupamento por coluna — agrupa por Prioridade e confirma os
+ *     cabeçalhos de grupo com contagem.
+ */
+
+import { test, expect, type Page } from '@playwright/test'
+import { setupMockAuth } from './helpers/mockAuth'
+
+const SUPABASE_URL = 'https://enxtvrvsfwvcnpyspyfl.supabase.co'
+
+const MOCK_INCIDENTS = [
+  {
+    id: 'inc-001', number: 'INC-00101', short_description: 'Servidor de arquivos fora do ar',
+    description: 'Ninguém consegue acessar os arquivos compartilhados.', state: 'New',
+    priority: 'P1 - Critical', category: 'Hardware', company_id: 'company-a-uuid',
+    caller_id: 'user-1', caller_name: 'Ana Souza', assigned_to_id: null, assigned_to_name: null,
+    assigned_group_id: null, assigned_group_name: 'Infraestrutura', sla_breached: false,
+    sla_deadline: new Date(Date.now() + 3_600_000).toISOString(), ticket_type: 'incident',
+    impact: 'High', urgency: 'High', tags: [], opened_via: 'portal', close_code: null,
+    created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+    resolved_at: null, closed_at: null,
+  },
+  {
+    id: 'inc-002', number: 'INC-00102', short_description: 'VPN não conecta para ninguém',
+    description: 'Erro de autenticação ao tentar conectar na VPN corporativa.', state: 'In Progress',
+    priority: 'P1 - Critical', category: 'Network', company_id: 'company-a-uuid',
+    caller_id: 'user-2', caller_name: 'Bruno Lima', assigned_to_id: 'agent-1', assigned_to_name: 'Analista Teste',
+    assigned_group_id: null, assigned_group_name: 'Redes', sla_breached: false,
+    sla_deadline: new Date(Date.now() + 3_600_000 * 2).toISOString(), ticket_type: 'incident',
+    impact: 'High', urgency: 'Medium', tags: [], opened_via: 'portal', close_code: null,
+    created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+    resolved_at: null, closed_at: null,
+  },
+  {
+    id: 'inc-003', number: 'INC-00103', short_description: 'Impressora do 3º andar sem tinta',
+    description: 'Impressora HP parou de imprimir.', state: 'New',
+    priority: 'P3 - Moderate', category: 'Hardware', company_id: 'company-a-uuid',
+    caller_id: 'user-3', caller_name: 'Carla Dias', assigned_to_id: null, assigned_to_name: null,
+    assigned_group_id: null, assigned_group_name: 'Suporte N1', sla_breached: false,
+    sla_deadline: new Date(Date.now() + 3_600_000 * 24).toISOString(), ticket_type: 'incident',
+    impact: 'Low', urgency: 'Low', tags: [], opened_via: 'portal', close_code: null,
+    created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+    resolved_at: null, closed_at: null,
+  },
+]
+
+async function setupMocks(page: Page) {
+  await setupMockAuth(page)
+
+  await page.route(`${SUPABASE_URL}/rest/v1/incidents*`, async route => {
+    if (route.request().method() !== 'GET') {
+      await route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify([{ id: 'x' }]) })
+      return
+    }
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_INCIDENTS) })
+  })
+}
+
+async function openIncidentQueue(page: Page) {
+  await page.goto('/')
+  await page.waitForFunction(() => (document.body.textContent ?? '').length > 100, { timeout: 15_000 })
+  const incidentesNav = page.locator('button').filter({ hasText: 'Incidentes' }).first()
+  await expect(incidentesNav).toBeVisible({ timeout: 10_000 })
+  await incidentesNav.click()
+  await page.waitForTimeout(1_500)
+  await expect(page.getByText(/INC-00101/i).first()).toBeVisible({ timeout: 10_000 })
+}
+
+test.describe('Tabela de incidentes — colunas, filtro e agrupamento', () => {
+  test('customiza colunas e persiste após reload', async ({ page }) => {
+    await setupMocks(page)
+    await openIncidentQueue(page)
+
+    // SLA é coluna default — visível de início; Categoria não é default — ausente.
+    await expect(page.getByRole('columnheader', { name: 'SLA' })).toBeVisible()
+    await expect(page.getByRole('columnheader', { name: 'Categoria' })).toHaveCount(0)
+
+    await page.getByRole('button', { name: /Colunas/i }).click()
+    await expect(page.getByText('Customizar Colunas')).toBeVisible({ timeout: 5_000 })
+
+    // Marca "Categoria" (nova) e desmarca "SLA" (default) — os checkboxes ficam
+    // dentro de <label>, então clicar no label do modal alterna o checkbox.
+    await page.locator('label').filter({ hasText: 'Categoria' }).click()
+    await page.locator('label').filter({ hasText: /^SLA$/ }).click()
+    await page.getByRole('button', { name: 'Salvar Preferências' }).click()
+
+    await expect(page.getByRole('columnheader', { name: 'Categoria' })).toBeVisible({ timeout: 5_000 })
+    await expect(page.getByRole('columnheader', { name: 'SLA' })).toHaveCount(0)
+
+    // Persistência: sobrevive a um reload da página (localStorage)
+    await page.reload()
+    await page.waitForTimeout(2_500)
+    await expect(page.getByRole('columnheader', { name: 'Categoria' })).toBeVisible({ timeout: 10_000 })
+    await expect(page.getByRole('columnheader', { name: 'SLA' })).toHaveCount(0)
+  })
+
+  test('filtra por coluna (Prioridade)', async ({ page }) => {
+    await setupMocks(page)
+    await openIncidentQueue(page)
+
+    await expect(page.getByText('INC-00101')).toBeVisible()
+    await expect(page.getByText('INC-00102')).toBeVisible()
+    await expect(page.getByText('INC-00103')).toBeVisible()
+
+    // "Mudanças" também renderiza um TicketDataTable (sempre montado, só oculto
+    // via CSS até o usuário abrir a aba) — escopamos ao elemento visível.
+    await page.locator('button:visible').filter({ hasText: 'Filtro' }).click()
+    // Escolhe o campo no popover de seleção (botão, não o <th> nem o <option> do agrupar-por)
+    await page.getByRole('button', { name: 'Prioridade', exact: true }).click()
+    // Marca o valor "P1 - Critical" no checklist do filtro (dentro de <label>,
+    // diferente das duas células da tabela que também mostram esse texto)
+    await page.locator('label').filter({ hasText: 'P1 - Critical' }).click()
+    await page.getByRole('button', { name: 'Aplicar' }).click()
+
+    // Só os 2 chamados P1 permanecem
+    await expect(page.getByText('INC-00101')).toBeVisible({ timeout: 5_000 })
+    await expect(page.getByText('INC-00102')).toBeVisible()
+    await expect(page.getByText('INC-00103')).toHaveCount(0)
+    await expect(page.getByText(/Prioridade: P1 - Critical/i)).toBeVisible()
+  })
+
+  test('agrupa por coluna (Prioridade) com contagem por grupo', async ({ page }) => {
+    await setupMocks(page)
+    await openIncidentQueue(page)
+
+    // "Mudanças" também renderiza um TicketDataTable (sempre montado, só oculto
+    // via CSS até o usuário abrir a aba) — escopamos ao elemento visível.
+    await page.locator('select[aria-label="Agrupar por"]:visible').selectOption({ label: 'Prioridade' })
+
+    await expect(page.getByText(/Prioridade: P1 - Critical\s*\(2\)/i)).toBeVisible({ timeout: 5_000 })
+    await expect(page.getByText(/Prioridade: P3 - Moderate\s*\(1\)/i)).toBeVisible()
+
+    // Colapsa o primeiro grupo e confirma que suas linhas somem
+    await page.getByText(/Prioridade: P1 - Critical/i).click()
+    await expect(page.getByText('INC-00101')).toHaveCount(0)
+    await expect(page.getByText('INC-00103')).toBeVisible()
+  })
+})

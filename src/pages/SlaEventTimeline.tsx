@@ -34,7 +34,7 @@ export default function SlaEventTimeline({ incidentId }: { incidentId: string })
       setEvents(prev => {
         if (prev.some(e => e.id === newEvent.id)) return prev
         return [...prev, newEvent].sort(
-          (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+          (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
         )
       })
     })
