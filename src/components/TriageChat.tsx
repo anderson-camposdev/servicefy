@@ -14,7 +14,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Send, Loader2, RefreshCw } from 'lucide-react'
 import { useAuth } from '../auth'
-import { serviceCatalogService } from '../lib/services'
+import { serviceCatalogService, departmentsService } from '../lib/services'
 import { parseFormFields } from '../lib/catalogFormFields'
 import { virtualAgentService } from '../lib/virtual-agent-service'
 import {
@@ -23,6 +23,18 @@ import {
 } from '../lib/triage-conductor'
 
 interface ChatMessage { from: 'bot' | 'user'; text: string }
+
+// Erros do Supabase/Postgrest são objetos planos (PostgrestError), não
+// instâncias de Error — "cause instanceof Error" sempre falha para eles e
+// mascara a causa real atrás de uma mensagem genérica. Aqui também lemos
+// `.message`/`.details` quando existirem, para não esconder o problema.
+function errorMessage(cause: unknown, fallback: string): string {
+  if (cause instanceof Error) return cause.message
+  if (cause && typeof cause === 'object' && 'message' in cause && typeof (cause as { message?: unknown }).message === 'string') {
+    return (cause as { message: string }).message
+  }
+  return fallback
+}
 
 export default function TriageChat({ companyId }: { companyId: string }) {
   const { profile } = useAuth()
@@ -55,17 +67,16 @@ export default function TriageChat({ companyId }: { companyId: string }) {
       serviceCatalogService.listRequestCategories(companyId, { activeOnly: true }),
       serviceCatalogService.listRequestSubcategories(companyId, { activeOnly: true }),
       serviceCatalogService.listRequestItems(companyId, { activeOnly: true }),
-    ]).then(([cats, services, symptoms, reqCats, reqSubs, reqItems]) => {
+      departmentsService.list(companyId, { activeOnly: true }),
+    ]).then(([cats, services, symptoms, reqCats, reqSubs, reqItems, departments]) => {
       if (cancelled) return
-      console.log("TriageChat: Carregado catálogo para a empresa:", companyId);
-      console.log("TriageChat: Categorias de incidente retornadas:", cats);
-      console.log("TriageChat: Serviços retornados:", services);
-      console.log("TriageChat: Sintomas retornados:", symptoms);
       const built: TriageCatalog = {
-        incidentCategories: cats.map(c => ({ id: c.id, name: c.name })),
+        departments: departments.map(d => ({ id: d.id, name: d.name })),
+        incidentCategories: cats.map(c => ({ id: c.id, name: c.name, department_id: c.department_id ?? null })),
         incidentServices: services.map(s => ({ id: s.id, name: s.name, category_id: s.category_id })),
         incidentSymptoms: symptoms.map(sy => ({
           id: sy.id,
+          system_symptom_id: sy.symptom_id,
           service_id: sy.service_id,
           name: sy.symptom?.name ?? 'Sintoma',
           form_fields: parseFormFields(sy.form_fields) as TriageFormField[],
@@ -73,7 +84,7 @@ export default function TriageChat({ companyId }: { companyId: string }) {
           assignment_group_id: sy.assignment_group_id,
           assignment_group_name: sy.group?.name ?? null,
         })),
-        requestCategories: reqCats.map(c => ({ id: c.id, name: c.name })),
+        requestCategories: reqCats.map(c => ({ id: c.id, name: c.name, department_id: c.department_id ?? null })),
         requestSubcategories: reqSubs.map(s => ({ id: s.id, name: s.name, category_id: s.category_id })),
         requestItems: reqItems.map(it => ({
           id: it.id,
@@ -94,7 +105,7 @@ export default function TriageChat({ companyId }: { companyId: string }) {
       setPhase('ready')
     }).catch(cause => {
       if (cancelled) return
-      setError(cause instanceof Error ? cause.message : 'Falha ao carregar o catálogo.')
+      setError(errorMessage(cause, 'Falha ao carregar o catálogo.'))
       setPhase('error')
     })
     return () => { cancelled = true }
@@ -172,7 +183,7 @@ export default function TriageChat({ companyId }: { companyId: string }) {
         } catch { /* auditoria best-effort */ }
       }
     } catch (cause) {
-      pushBot('Não consegui abrir o chamado agora: ' + (cause instanceof Error ? cause.message : 'erro desconhecido') + '. Você pode tentar de novo dizendo "recomeçar".')
+      pushBot('Não consegui abrir o chamado agora: ' + errorMessage(cause, 'erro desconhecido') + '. Você pode tentar de novo dizendo "recomeçar".')
     } finally {
       setBusy(false)
     }
@@ -202,7 +213,7 @@ export default function TriageChat({ companyId }: { companyId: string }) {
         setConductorState(menu.state); setTurn(menu)
         pushBot(menu.prompt)
       } catch (cause) {
-        pushBot('Não consegui completar agora: ' + (cause instanceof Error ? cause.message : 'erro') + '.')
+        pushBot('Não consegui completar agora: ' + errorMessage(cause, 'erro') + '.')
       } finally { setBusy(false) }
       return
     }

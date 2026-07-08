@@ -65,12 +65,23 @@ async function setupMocks(page: Page) {
     await route.fulfill({ status: 200, contentType: 'application/json', body: '[]' })
   })
   await page.route(`${SUPABASE_URL}/rest/v1/sla_events*`, async route => {
-    await route.fulfill({ status: 200, contentType: 'application/json', body: '[]' })
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(SLA_EVENTS) })
   })
   await page.route(`${SUPABASE_URL}/rest/v1/csat_surveys*`, async route => {
     await route.fulfill({ status: 200, contentType: 'application/json', body: '[]' })
   })
+  await page.route(`${SUPABASE_URL}/rest/v1/incident_history*`, async route => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(ACTION_HISTORY) })
+  })
 }
+
+const SLA_EVENTS = [
+  { id: 'ev-1', incident_id: PAUSED_INCIDENT.id, event_type: 'resolution_achieved', metadata: { at: new Date(NOW - 10 * 60 * 1000).toISOString(), breached: false }, created_at: new Date(NOW - 10 * 60 * 1000).toISOString() },
+]
+const ACTION_HISTORY = [
+  { id: 'h-1', incident_id: PAUSED_INCIDENT.id, changed_by_id: null, changed_by_name: 'Analista Teste', field_name: 'Criação', old_value: null, new_value: null, comment: 'Chamado registrado pelo portal.', is_public: true, created_at: PAUSED_INCIDENT.created_at },
+  { id: 'h-2', incident_id: PAUSED_INCIDENT.id, changed_by_id: 'agent-1', changed_by_name: 'Suporte N1', field_name: 'comment', old_value: null, new_value: null, comment: 'Já estamos verificando o problema.', is_public: true, created_at: PAUSED_INCIDENT.responded_at },
+]
 
 async function openPortalTicketDetail(page: Page) {
   await page.goto('/')
@@ -104,5 +115,23 @@ test.describe('Portal — Controle de SLA', () => {
 
     await expect(page.getByText(/Prazo Limite de Resposta/i)).toBeVisible({ timeout: 8_000 })
     await expect(page.getByText(/Cumprido em/i)).toBeVisible({ timeout: 6_000 })
+  })
+
+  test('aba "Histórico de Ação Técnica" mostra o histórico de ações E o controle de SLA', async ({ page }) => {
+    await setupMocks(page)
+    await openPortalTicketDetail(page)
+
+    await page.getByText(/Histórico de Ação Técnica/i).first().click()
+    await page.waitForTimeout(800)
+
+    // Histórico de ações (incident_history) — não é só o controle de SLA
+    await expect(page.getByText(/Histórico de Ações/i)).toBeVisible({ timeout: 6_000 })
+    await expect(page.getByText(/Chamado registrado pelo portal/i)).toBeVisible({ timeout: 6_000 })
+    await expect(page.getByText(/Já estamos verificando o problema/i)).toBeVisible({ timeout: 6_000 })
+
+    // Controle de SLA continua presente, agora informando o SLA de solução cumprido
+    await expect(page.getByText(/Controle de SLA/i)).toBeVisible({ timeout: 6_000 })
+    await expect(page.getByText(/SLA de Solução Cumprido/i)).toBeVisible({ timeout: 6_000 })
+    await expect(page.getByText(/dentro do prazo/i)).toBeVisible({ timeout: 6_000 })
   })
 })

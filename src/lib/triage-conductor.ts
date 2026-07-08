@@ -24,11 +24,18 @@ export interface TriageFormField {
 }
 
 export interface TriageCatalog {
+  // Departamentos cadastrados no tenant (migration 046) — usados para o passo
+  // de escolha de catálogo (TI é o padrão implícito; RH e demais só aparecem
+  // se tiverem ao menos uma categoria vinculada, mesma regra do portal clássico).
+  departments?: Array<{ id: string; name: string }>
   // Caminho de incidente (catalog_categories → catalog_services → catalog_service_symptoms)
-  incidentCategories: Array<{ id: string; name: string }>
+  incidentCategories: Array<{ id: string; name: string; department_id?: string | null }>
   incidentServices: Array<{ id: string; name: string; category_id: string }>
   incidentSymptoms: Array<{
+    /** id da linha catalog_service_symptoms (junção serviço×sintoma) — usado só para seleção na lista. */
     id: string
+    /** id do sintoma mestre em system_symptoms — É este que incidents.symptom_id referencia (FK). */
+    system_symptom_id: string
     service_id: string
     name: string
     form_fields: TriageFormField[]
@@ -37,7 +44,7 @@ export interface TriageCatalog {
     assignment_group_name: string | null
   }>
   // Caminho de solicitação (request_categories → request_subcategories → request_items)
-  requestCategories: Array<{ id: string; name: string }>
+  requestCategories: Array<{ id: string; name: string; department_id?: string | null }>
   requestSubcategories: Array<{ id: string; name: string; category_id: string }>
   requestItems: Array<{
     id: string
@@ -52,7 +59,7 @@ export interface TriageCatalog {
 }
 
 export type TriageStep =
-  | 'choose_type'
+  | 'choose_type' | 'choose_domain'
   | 'inc_category' | 'inc_service' | 'inc_symptom' | 'inc_impact' | 'inc_urgency'
   | 'inc_form' | 'inc_description' | 'inc_confirm'
   | 'req_category' | 'req_subcategory' | 'req_item' | 'req_form' | 'req_description' | 'req_confirm'
@@ -60,6 +67,8 @@ export type TriageStep =
 
 export interface TriageSelections {
   ticketType?: 'incident' | 'request'
+  /** undefined = catálogo padrão (TI/Global); setado = departamento explícito (RH etc.) */
+  domainId?: string; domainName?: string
   categoryId?: string; categoryName?: string
   serviceId?: string; serviceName?: string
   symptomId?: string; symptomName?: string
@@ -116,6 +125,37 @@ const URGENCY_OPTIONS: TriageOption[] = [
 
 const GLOBAL_HELP = ' (você pode dizer "voltar", "recomeçar" ou "cancelar" a qualquer momento)'
 
+// TI é o catálogo padrão (mesma convenção do portal clássico, UserPortalLayout.tsx):
+// categorias sem departamento (Global) ou explicitamente do departamento "TI" entram
+// no catálogo padrão, sem exigir escolha. Departamentos como RH, Financeiro etc. só
+// aparecem quando têm ao menos uma categoria vinculada — e aí sim são oferecidos.
+const TI_ID = '__ti__'
+function isNonItDepartment(name: string): boolean {
+  const n = name.trim().toLowerCase()
+  return n !== 'ti' && n !== 't.i.' && n !== 'tecnologia da informação' && n !== 'infraestrutura de ti'
+}
+
+/** Departamentos elegíveis para o passo de escolha de catálogo (com categorias vinculadas, exceto TI). */
+function domainOptions(catalog: TriageCatalog): TriageOption[] {
+  const counts = new Map<string, number>()
+  for (const c of catalog.incidentCategories) if (c.department_id) counts.set(c.department_id, (counts.get(c.department_id) ?? 0) + 1)
+  for (const c of catalog.requestCategories) if (c.department_id) counts.set(c.department_id, (counts.get(c.department_id) ?? 0) + 1)
+  return (catalog.departments ?? [])
+    .filter(d => counts.has(d.id) && isNonItDepartment(d.name))
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .map(d => ({ id: d.id, label: d.name }))
+}
+
+/** Uma categoria pertence ao domínio selecionado (undefined/TI_ID = catálogo padrão). */
+function belongsToDomain(departmentId: string | null | undefined, domainId: string | undefined, catalog: TriageCatalog): boolean {
+  if (!domainId) {
+    if (!departmentId) return true
+    const dept = (catalog.departments ?? []).find(d => d.id === departmentId)
+    return !dept || !isNonItDepartment(dept.name)
+  }
+  return departmentId === domainId
+}
+
 export function initialState(): TriageState {
   return { step: 'choose_type', selections: {}, formFields: [], formCursor: 0, formAnswers: {} }
 }
@@ -170,9 +210,14 @@ export function renderTurn(state: TriageState, catalog: TriageCatalog): TriageTu
     case 'choose_type':
       return menuTurn(state)
 
+    case 'choose_domain': {
+      const opts = [{ id: TI_ID, label: 'TI / Catálogo padrão' }, ...domainOptions(catalog)]
+      return choiceTurn(state, 'Qual catálogo de serviços você quer usar?', opts)
+    }
+
     case 'inc_category': {
-      const opts = catalog.incidentCategories.map(c => ({ id: c.id, label: c.name }))
-      if (opts.length === 0) return backToMenu('Ainda não há categorias de incidente configuradas. Vamos recomeçar.')
+      const opts = catalog.incidentCategories.filter(c => belongsToDomain(c.department_id, s.domainId, catalog)).map(c => ({ id: c.id, label: c.name }))
+      if (opts.length === 0) return backToMenu('Ainda não há categorias de incidente configuradas para esse catálogo. Vamos recomeçar.')
       return choiceTurn(state, 'Qual a categoria do problema?', opts)
     }
     case 'inc_service': {
@@ -191,8 +236,8 @@ export function renderTurn(state: TriageState, catalog: TriageCatalog): TriageTu
       return choiceTurn(state, 'Qual a urgência para você agora?', URGENCY_OPTIONS)
 
     case 'req_category': {
-      const opts = catalog.requestCategories.map(c => ({ id: c.id, label: c.name }))
-      if (opts.length === 0) return backToMenu('Ainda não há categorias de solicitação configuradas. Vamos recomeçar.')
+      const opts = catalog.requestCategories.filter(c => belongsToDomain(c.department_id, s.domainId, catalog)).map(c => ({ id: c.id, label: c.name }))
+      if (opts.length === 0) return backToMenu('Ainda não há categorias de solicitação configuradas para esse catálogo. Vamos recomeçar.')
       return choiceTurn(state, 'Sobre o que é a sua solicitação?', opts)
     }
     case 'req_subcategory': {
@@ -269,7 +314,7 @@ export function nextTurn(state: TriageState, catalog: TriageCatalog, userInput: 
     return renderTurn(initialState(), catalog)
   }
   if (['voltar', 'volta'].includes(cmd)) {
-    return renderTurn(goBack(state), catalog)
+    return renderTurn(goBack(state, catalog), catalog)
   }
 
   return advance(state, catalog, raw).turn
@@ -290,13 +335,26 @@ function advance(state: TriageState, catalog: TriageCatalog, raw: string): Advan
       if (!opt) return reject(state, catalog, 'Não entendi. Escolha uma das opções abaixo:')
       if (opt.id === 'check_tickets') return step(state, catalog, 'check_tickets')
       if (opt.id === 'handoff') return step(state, catalog, 'handoff')
-      if (opt.id === 'incident') return step({ ...state, selections: { ...s, ticketType: 'incident' } }, catalog, 'inc_category')
-      return step({ ...state, selections: { ...s, ticketType: 'request' } }, catalog, 'req_category')
+      const ticketType: 'incident' | 'request' = opt.id === 'incident' ? 'incident' : 'request'
+      const withType = { ...state, selections: { ...s, ticketType } }
+      // Só pergunta o catálogo (TI/RH/...) quando há de fato outro departamento
+      // com categorias cadastradas — senão vai direto (catálogo padrão implícito).
+      const hasDomains = domainOptions(catalog).length > 0
+      return step(withType, catalog, hasDomains ? 'choose_domain' : (ticketType === 'incident' ? 'inc_category' : 'req_category'))
+    }
+
+    case 'choose_domain': {
+      const opts = [{ id: TI_ID, label: 'TI / Catálogo padrão' }, ...domainOptions(catalog)]
+      const opt = resolveChoice(raw, opts)
+      if (!opt) return reject(state, catalog, 'Escolha um catálogo da lista:')
+      if (opt.id === TI_ID) { delete s.domainId; delete s.domainName }
+      else { s.domainId = opt.id; s.domainName = opt.label }
+      return step({ ...state, selections: s }, catalog, s.ticketType === 'incident' ? 'inc_category' : 'req_category')
     }
 
     // ── Incidente ──
     case 'inc_category': {
-      const opts = catalog.incidentCategories.map(c => ({ id: c.id, label: c.name }))
+      const opts = catalog.incidentCategories.filter(c => belongsToDomain(c.department_id, s.domainId, catalog)).map(c => ({ id: c.id, label: c.name }))
       const opt = resolveChoice(raw, opts)
       if (!opt) return reject(state, catalog, 'Escolha uma categoria da lista:')
       s.categoryId = opt.id; s.categoryName = opt.label
@@ -314,7 +372,7 @@ function advance(state: TriageState, catalog: TriageCatalog, raw: string): Advan
       const opt = resolveChoice(raw, sym.map(x => ({ id: x.id, label: x.name })))
       if (!opt) return reject(state, catalog, 'Escolha o que está acontecendo:')
       const chosen = sym.find(x => x.id === opt.id)!
-      s.symptomId = chosen.id; s.symptomName = chosen.name
+      s.symptomId = chosen.system_symptom_id; s.symptomName = chosen.name
       s.slaHours = chosen.sla_hours
       s.assignmentGroupId = chosen.assignment_group_id
       s.assignmentGroupName = chosen.assignment_group_name
@@ -337,7 +395,7 @@ function advance(state: TriageState, catalog: TriageCatalog, raw: string): Advan
 
     // ── Solicitação ──
     case 'req_category': {
-      const opts = catalog.requestCategories.map(c => ({ id: c.id, label: c.name }))
+      const opts = catalog.requestCategories.filter(c => belongsToDomain(c.department_id, s.domainId, catalog)).map(c => ({ id: c.id, label: c.name }))
       const opt = resolveChoice(raw, opts)
       if (!opt) return reject(state, catalog, 'Escolha uma categoria da lista:')
       s.requestCategoryId = opt.id; s.requestCategoryName = opt.label
@@ -475,17 +533,25 @@ function backToMenu(msg: string): TriageTurn {
 
 // ─── Navegação "voltar" ─────────────────────────────────────────────────────
 const BACK: Partial<Record<TriageStep, TriageStep>> = {
-  inc_category: 'choose_type', inc_service: 'inc_category', inc_symptom: 'inc_service',
+  choose_domain: 'choose_type',
+  inc_service: 'inc_category', inc_symptom: 'inc_service',
   inc_impact: 'inc_symptom', inc_urgency: 'inc_impact', inc_form: 'inc_urgency',
   inc_description: 'inc_urgency', inc_confirm: 'inc_description',
-  req_category: 'choose_type', req_subcategory: 'req_category', req_item: 'req_subcategory',
+  req_subcategory: 'req_category', req_item: 'req_subcategory',
   req_form: 'req_item', req_description: 'req_item', req_confirm: 'req_description',
 }
 
-function goBack(state: TriageState): TriageState {
+function goBack(state: TriageState, catalog: TriageCatalog): TriageState {
   // Dentro do formulário, "voltar" recua um campo antes de sair do passo.
   if ((state.step === 'inc_form' || state.step === 'req_form') && state.formCursor > 0) {
     return { ...state, formCursor: state.formCursor - 1, multiPending: undefined }
+  }
+  // inc_category/req_category voltam para choose_domain só quando esse passo
+  // de fato foi oferecido (há outros catálogos além de TI cadastrados) — senão
+  // vão direto para choose_type, pulando um passo que nunca foi mostrado.
+  if (state.step === 'inc_category' || state.step === 'req_category') {
+    const prev = domainOptions(catalog).length > 0 ? 'choose_domain' : 'choose_type'
+    return { ...state, step: prev, multiPending: undefined }
   }
   const prev = BACK[state.step] ?? 'choose_type'
   // Ao voltar para req_item quando não houver subcategoria, pula direto a req_category
@@ -505,6 +571,7 @@ function buildSummary(state: TriageState): string {
   const s = state.selections
   const lines: string[] = ['Pronto! Revise o resumo antes de eu abrir o chamado:', '']
   lines.push(s.ticketType === 'incident' ? '• Tipo: Incidente' : '• Tipo: Solicitação')
+  if (s.domainName) lines.push(`• Catálogo: ${s.domainName}`)
   if (s.ticketType === 'incident') {
     lines.push(`• Categoria: ${s.categoryName}`)
     lines.push(`• Serviço: ${s.serviceName}`)

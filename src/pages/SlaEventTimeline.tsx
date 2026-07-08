@@ -55,14 +55,24 @@ export default function SlaEventTimeline({ incidentId }: { incidentId: string })
           bgColor: 'bg-slate-500/10 border-slate-500/25',
           textColor: 'text-slate-700 dark:text-slate-300'
         }
-      case 'response_achieved':
+      case 'response_achieved': {
+        // `breached` só existe em eventos gravados após a migration 091 — para
+        // eventos antigos (metadata sem esse campo), mantemos o texto neutro
+        // em vez de arriscar rotular errado um evento histórico incompleto.
+        const breached = metadata?.breached
+        const cumprido = breached === false
+        const estourado = breached === true
         return {
-          icon: <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />,
-          title: 'SLA de Resposta Cumprido',
-          description: `Primeira resposta do analista registrada em ${metadata.at ? fmt(metadata.at) : '—'}.`,
-          bgColor: 'bg-emerald-500/10 border-emerald-500/25',
-          textColor: 'text-emerald-700 dark:text-emerald-300'
+          icon: estourado
+            ? <AlertTriangle className="w-3.5 h-3.5 text-rose-500" />
+            : <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />,
+          title: estourado ? 'SLA de Resposta Cumprido — Fora do Prazo' : 'SLA de Resposta Cumprido',
+          description: `Primeira resposta do analista registrada em ${metadata.at ? fmt(metadata.at) : '—'}`
+            + (cumprido ? ' — dentro do prazo. ✅' : estourado ? ' — o prazo já havia sido ultrapassado. ⚠️' : '.'),
+          bgColor: estourado ? 'bg-rose-500/10 border-rose-500/25' : 'bg-emerald-500/10 border-emerald-500/25',
+          textColor: estourado ? 'text-rose-700 dark:text-rose-300' : 'text-emerald-700 dark:text-emerald-300'
         }
+      }
       case 'resolution_start':
         return {
           icon: <Clock className="w-3.5 h-3.5 text-indigo-500" />,
@@ -71,6 +81,21 @@ export default function SlaEventTimeline({ incidentId }: { incidentId: string })
           bgColor: 'bg-indigo-500/10 border-indigo-500/25',
           textColor: 'text-indigo-700 dark:text-indigo-300'
         }
+      case 'resolution_achieved': {
+        const breached = metadata?.breached
+        const cumprido = breached === false
+        const estourado = breached === true
+        return {
+          icon: estourado
+            ? <AlertTriangle className="w-3.5 h-3.5 text-rose-500" />
+            : <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />,
+          title: estourado ? 'SLA de Solução Cumprido — Fora do Prazo' : 'SLA de Solução Cumprido',
+          description: `Chamado resolvido em ${metadata.at ? fmt(metadata.at) : '—'}`
+            + (cumprido ? ' — dentro do prazo. ✅' : estourado ? ' — o prazo já havia sido ultrapassado. ⚠️' : '.'),
+          bgColor: estourado ? 'bg-rose-500/10 border-rose-500/25' : 'bg-emerald-500/10 border-emerald-500/25',
+          textColor: estourado ? 'text-rose-700 dark:text-rose-300' : 'text-emerald-700 dark:text-emerald-300'
+        }
+      }
       case 'paused':
         return {
           icon: <Pause className="w-3.5 h-3.5 text-amber-500" />,

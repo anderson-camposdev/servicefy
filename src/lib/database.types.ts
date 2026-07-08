@@ -180,6 +180,7 @@ export type SlaEventType =
   | 'response_start'
   | 'response_achieved'
   | 'resolution_start'
+  | 'resolution_achieved'
   | 'paused'
   | 'resumed'
   | 'breached'

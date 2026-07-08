@@ -19,6 +19,7 @@ import KnowledgePortal from './KnowledgePortal'
 import VirtualAgentWidget from '../components/VirtualAgentWidget'
 import TicketChat from './TicketChat'
 import SlaEventTimeline from './SlaEventTimeline'
+import IncidentActionHistory from './IncidentActionHistory'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type Screen = 'home' | 'dept-cats' | 'inc-cats' | 'inc-services' | 'inc-symptoms' | 'inc-form' | 'req-cats' | 'req-subcats' | 'req-items' | 'req-form' | 'done' | 'tickets' | 'history' | 'ticket-detail' | 'knowledge'
@@ -1427,8 +1428,10 @@ const UserPortalLayout = ({ companyId }: { companyId?: string } = {}) => {
                     )}
                   </div>
                 ) : (
-                  <div>
-                    {/* Linha do tempo dos eventos técnicos */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+                    {/* Histórico de ações (abertura, mudanças de estado, comentários) */}
+                    <IncidentActionHistory incidentId={selectedTicket.id} companyId={catalogCompanyId || ''} />
+                    {/* Linha do tempo do controle de SLA */}
                     <SlaEventTimeline incidentId={selectedTicket.id} />
                   </div>
                 )}

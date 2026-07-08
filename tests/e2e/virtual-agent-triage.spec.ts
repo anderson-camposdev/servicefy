@@ -142,3 +142,63 @@ test.describe('Agente de triagem — widget conduzido', () => {
     await expect(page.getByText(/Em breve alguém continua o atendimento/i)).toBeVisible({ timeout: 8_000 })
   })
 })
+
+// ─── Escolha de catálogo (TI/RH/...) quando há mais de um departamento ──────
+const DEPARTMENTS = [
+  { id: 'dept-rh', company_id: COMPANY, name: 'RH', description: null, icon: null, is_active: true, sort_order: 1, visible_to_groups: null, ui_config: null, created_at: '2025-01-01T00:00:00Z', updated_at: '2025-01-01T00:00:00Z' },
+]
+const RH_CATEGORY = { id: 'cat-rh', company_id: COMPANY, department_id: 'dept-rh', name: 'Benefícios', description: null, icon: '', sort_order: 1, is_active: true, created_at: '2025-01-01T00:00:00Z' }
+const RH_SERVICE = { id: 'svc-rh', company_id: COMPANY, category_id: 'cat-rh', name: 'Plano de saúde', description: null, icon: '', sort_order: 1, is_active: true, created_at: '2025-01-01T00:00:00Z' }
+const RH_SYMPTOM = {
+  id: 'sym-rh', company_id: COMPANY, service_id: 'svc-rh', symptom_id: 'ss-rh',
+  sla_hours: 24, assignment_group_id: 'g-rh', form_template_id: null,
+  form_fields: [], ui_config: {}, active: true, created_at: '2025-01-01T00:00:00Z',
+  symptom: { id: 'ss-rh', name: 'Dúvida sobre cobertura', icon: null, sort_order: 1 },
+  group: { id: 'g-rh', name: 'RH' },
+  service: { id: 'svc-rh', name: 'Plano de saúde', category_id: 'cat-rh', icon: null },
+}
+
+async function setupTriageMocksWithDepartments(page: Page) {
+  await setupTriageMocks(page)
+  const json = (rows: unknown) => async (route: import('@playwright/test').Route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(rows) })
+  }
+  await page.route(`${SUPABASE_URL}/rest/v1/departments*`, json(DEPARTMENTS))
+  await page.route(`${SUPABASE_URL}/rest/v1/catalog_categories*`, json([...CATALOG.categories, RH_CATEGORY]))
+  await page.route(`${SUPABASE_URL}/rest/v1/catalog_services*`, json([...CATALOG.services, RH_SERVICE]))
+  await page.route(`${SUPABASE_URL}/rest/v1/catalog_service_symptoms*`, json([...CATALOG.symptoms, RH_SYMPTOM]))
+}
+
+test.describe('Agente de triagem — escolha de catálogo (TI/RH)', () => {
+  test('com departamentos cadastrados, pergunta o catálogo e filtra as categorias corretamente', async ({ page }) => {
+    await setupTriageMocksWithDepartments(page)
+    await openWidget(page)
+
+    await expect(page.getByText(/o que você precisa hoje/i)).toBeVisible({ timeout: 8_000 })
+    await clickBtn(page, /Abrir um incidente/i)
+
+    // Pergunta o catálogo antes da categoria
+    await expect(page.getByText(/Qual catálogo de serviços você quer usar/i)).toBeVisible({ timeout: 8_000 })
+    await expect(page.getByRole('button', { name: /^TI \/ Catálogo padrão$/ })).toBeVisible()
+    await expect(page.getByRole('button', { name: /^RH$/ })).toBeVisible()
+
+    // Escolhendo RH, só aparece a categoria de RH (não "Rede", que é do catálogo padrão)
+    await clickBtn(page, /^RH$/)
+    await expect(page.getByRole('button', { name: /^Benefícios$/ })).toBeVisible({ timeout: 6_000 })
+    await expect(page.getByRole('button', { name: /^Rede$/ })).toHaveCount(0)
+
+    await clickBtn(page, /^Benefícios$/)
+    await clickBtn(page, /Plano de saúde/i)
+    await clickBtn(page, /Dúvida sobre cobertura/i)
+    await clickBtn(page, /Baixo —/i)          // impacto
+    await clickBtn(page, /posso esperar/i)    // urgência (Baixa)
+
+    const input = page.getByPlaceholder(/Digite sua resposta|escreva aqui/i)
+    await input.fill('pular'); await input.press('Enter') // descrição
+
+    // O resumo de confirmação menciona o catálogo escolhido
+    await expect(page.getByText(/Catálogo: RH/i)).toBeVisible({ timeout: 6_000 })
+    await clickBtn(page, /Confirmar e abrir/i)
+    await expect(page.getByText(/INC-77001/)).toBeVisible({ timeout: 8_000 })
+  })
+})
