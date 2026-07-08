@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   User, Building2, AlertTriangle, Send,
-  BookOpen, CheckCircle, History, FileText, ListTree, Link2, Lock, Pause, Timer, Edit3,
-  ShieldAlert, PlayCircle, ArrowRightLeft,
+  BookOpen, CheckCircle, History, FileText, ListTree, Link2, Lock, Pause, Edit3,
+  ShieldAlert, PlayCircle, ArrowRightLeft, X,
 } from 'lucide-react'
 import { incidentsService, messagesService, assignmentGroupsService, pendingReasonsService, responseMacrosService } from '../lib/services'
 import { translateState } from '../lib/statusLabels'
@@ -316,7 +316,8 @@ const AnalystCockpit = ({ ticket = FALLBACK_TICKET }: { ticket?: WorkspaceTicket
   const [pendingReasons, setPendingReasons] = useState<PendingReasonRow[]>([])
   const [savingConducao, setSavingConducao] = useState(false)
   // 'idle' → seletor de ação; 'start' → primeiro atendimento; 'update' → atualização; 'transfer' → transferência; 'resolve' → resolução; 'reopen' → reabertura
-  const [conducaoMode, setConducaoMode] = useState<'idle' | 'start' | 'update' | 'transfer' | 'resolve' | 'reopen'>('idle')
+  const [conducaoMode, setConducaoMode] = useState<'idle' | 'start' | 'update' | 'pending' | 'transfer' | 'resolve' | 'reopen'>('idle')
+  const actionDialogRef = useRef<HTMLDivElement>(null)
 
   // Status atual acessível dentro de callbacks do Realtime (sempre fresco).
   const statusRef = useRef<string>('')
@@ -327,6 +328,27 @@ const AnalystCockpit = ({ ticket = FALLBACK_TICKET }: { ticket?: WorkspaceTicket
     const t = setInterval(() => setNow(Date.now()), 1000)
     return () => clearInterval(t)
   }, [])
+
+  // Os fluxos de condução são modais. Escape fecha somente quando não há
+  // uma operação sendo persistida, evitando perda de contexto durante o save.
+  useEffect(() => {
+    if (conducaoMode === 'idle') return
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !savingConducao) {
+        setConducaoMode('idle')
+        setError(null)
+      }
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [conducaoMode, savingConducao])
+
+  useEffect(() => {
+    if (conducaoMode === 'idle') return
+    const trigger = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    actionDialogRef.current?.focus()
+    return () => trigger?.focus()
+  }, [conducaoMode])
 
   // Carrega o incidente + histórico
   useEffect(() => {
@@ -464,7 +486,10 @@ const AnalystCockpit = ({ ticket = FALLBACK_TICKET }: { ticket?: WorkspaceTicket
   const openEditForm = useCallback(() => {
     if (detail) {
       // Garante que o estado não fique em Resolved/Closed no modo update
-      const safeState = ['Resolved', 'Closed'].includes(detail.state || '') ? 'In Progress' : (detail.state || '')
+      // O modal de atualização não é uma rota alternativa para pendência ou
+      // encerramento. Chamados pendentes retomam explicitamente Em Andamento
+      // quando uma atualização operacional é salva.
+      const safeState = detail.state === 'New' ? 'New' : 'In Progress'
       setFormState(safeState)
       setFormGroupId(detail.assignment_group_id || detail.assigned_group_id || '')
       setFormAssigneeId(detail.assigned_to_id || '')
@@ -532,18 +557,6 @@ const AnalystCockpit = ({ ticket = FALLBACK_TICKET }: { ticket?: WorkspaceTicket
       setSavingConducao(false)
     }
   }, [ticket.incidentId, ticket.companyId, profile, formComment, toast, refreshIncident, refreshMessages])
-
-  const openTransferForm = useCallback(() => {
-    if (detail) {
-      setFormGroupId(detail.assignment_group_id || detail.assigned_group_id || '')
-      setFormAssigneeId(detail.assigned_to_id || '')
-      setFormComment('')
-    }
-    setError(null)
-    setActionMsg(null)
-    setConducaoMode('transfer')
-    setActiveContext('detalhes')
-  }, [detail])
 
   const handleTransfer = useCallback(async () => {
     const cid = detail?.company_id || ticket.companyId
@@ -616,7 +629,14 @@ const AnalystCockpit = ({ ticket = FALLBACK_TICKET }: { ticket?: WorkspaceTicket
   // preenchido (Pendente exige Motivo + justificativa obrigatórios).
   const openPendingForm = useCallback(() => {
     setFormState('On Hold')
-    setConducaoMode('update')
+    // Exige uma decisão consciente a cada nova pendência; não reaproveita um
+    // motivo antigo que possa ter ficado registrado no chamado.
+    setFormPendingReasonId('')
+    setFormComment('')
+    setIsInternal(true)
+    setError(null)
+    setActionMsg(null)
+    setConducaoMode('pending')
     setActiveContext('detalhes')
   }, [])
 
@@ -823,19 +843,6 @@ const AnalystCockpit = ({ ticket = FALLBACK_TICKET }: { ticket?: WorkspaceTicket
   const canEdit = canAct && (!isResolved || isAdmin)
 
 
-  // ─── Cronômetro de SLA / tempo decorrido (congela ao resolver) ─
-  const openedAt = detail?.created_at ? new Date(detail.created_at).getTime() : null
-  // Quando encerrado, o relógio para em resolved_at (ou closed_at).
-  const frozenAt = isResolved
-    ? (detail?.resolved_at ? new Date(detail.resolved_at).getTime()
-       : detail?.closed_at ? new Date(detail.closed_at).getTime()
-       : now)
-    : now
-  const elapsedMs = openedAt !== null ? frozenAt - openedAt : null
-  const deadlineAt = detail?.sla_deadline ? new Date(detail.sla_deadline).getTime() : null
-  const remainingMs = deadlineAt !== null ? deadlineAt - frozenAt : null
-  const slaBreached = !isResolved && (Boolean(detail?.sla_breached) || (remainingMs !== null && remainingMs < 0))
-
   return (
     <div className="h-full overflow-y-auto bg-background text-text-main font-sans">
       {/* BARRA SUPERIOR (STICKY): ações + abas de contexto */}
@@ -851,26 +858,6 @@ const AnalystCockpit = ({ ticket = FALLBACK_TICKET }: { ticket?: WorkspaceTicket
                 'Resolved':    'bg-resolved-bg text-resolved-fg',
                 'Closed':      'bg-closed-bg text-closed-fg',
               }[status ?? ''] ?? 'bg-surface-container text-on-surface-variant'}`}>{translateState(status)}</span>
-              {/* Cronômetro de SLA / tempo decorrido */}
-              {elapsedMs !== null && (
-                <span
-                  className={`inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-0.5 shrink-0 border rounded-full ${
-                    isResolved
-                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                      : slaBreached
-                        ? 'bg-rose-50 text-rose-700 border-rose-200 animate-pulse'
-                        : 'bg-surface-container text-on-surface-variant border-outline-variant'
-                  }`}
-                  title={deadlineAt ? `Prazo SLA: ${fmt(detail!.sla_deadline!)}` : 'Tempo desde a abertura'}
-                >
-                  <Timer className="w-3 h-3" />
-                  {isResolved
-                    ? `Encerrado · ${elapsedMs !== null ? fmtDuration(elapsedMs) : ''}`.trim()
-                    : remainingMs !== null
-                      ? (slaBreached ? `SLA estourado há ${fmtDuration(remainingMs)}` : `SLA: ${fmtDuration(remainingMs)} restante`)
-                      : `${fmtDuration(elapsedMs ?? 0)} em aberto`}
-                </span>
-              )}
               {loading && <span className="text-xs text-on-surface-variant animate-pulse">carregando…</span>}
             </div>
             <p className="text-xs text-on-surface-variant truncate">{title}</p>
@@ -893,14 +880,6 @@ const AnalystCockpit = ({ ticket = FALLBACK_TICKET }: { ticket?: WorkspaceTicket
                     className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold shadow-sm transition-all hover:opacity-90 active:scale-[0.98] border-2 border-primary text-primary bg-transparent hover:bg-primary/5 rounded-lg"
                   >
                     <PlayCircle className="w-4 h-4" /> Reabrir Chamado
-                  </button>
-                )}
-                {conducaoMode === 'reopen' && (
-                  <button
-                    onClick={handleCancelEdit}
-                    className="flex items-center gap-1.5 px-3 py-2 border text-sm font-semibold transition-colors border-outline-variant text-text-main hover:bg-surface-container rounded-lg"
-                  >
-                    Cancelar
                   </button>
                 )}
               </>
@@ -928,17 +907,15 @@ const AnalystCockpit = ({ ticket = FALLBACK_TICKET }: { ticket?: WorkspaceTicket
                       disabled={status === 'On Hold'}
                       className="flex items-center gap-1.5 px-3 py-2 border text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed border-outline-variant text-text-main hover:bg-amber-500/15 hover:text-amber-500 hover:border-amber-500/30 rounded-lg"
                     >
-                      <Pause className="w-4 h-4" /> <span className="hidden lg:inline">Pendente</span>
+                      <Pause className="w-4 h-4" /> <span className="hidden lg:inline">Colocar em pendência</span>
+                    </button>
+                    <button
+                      onClick={openResolveForm}
+                      className="flex items-center gap-1.5 px-3 py-2 border-2 text-sm font-semibold transition-colors border-emerald-500 text-emerald-600 hover:bg-emerald-500/10 rounded-lg"
+                    >
+                      <CheckCircle className="w-4 h-4" /> <span className="hidden lg:inline">Resolver chamado</span>
                     </button>
                   </>
-                )}
-                {canEdit && conducaoMode !== 'idle' && (
-                  <button
-                    onClick={handleCancelEdit}
-                    className="flex items-center gap-1.5 px-3 py-2 border text-sm font-semibold transition-colors border-outline-variant text-text-main hover:bg-surface-container rounded-lg"
-                  >
-                    Cancelar
-                  </button>
                 )}
               </>
             )}
@@ -1014,17 +991,39 @@ const AnalystCockpit = ({ ticket = FALLBACK_TICKET }: { ticket?: WorkspaceTicket
               </div>
             )}
 
-            {/* SLA Governance Timers */}
+            {/* Resumo operacional: contexto essencial para decisão do analista */}
             {detail && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {renderSlaTimer('Prazo Limite de Resposta', detail.sla_response_deadline, detail.responded_at, detail.is_response_breached, now, detail.created_at, detail.paused_at)}
-                {renderSlaTimer('Prazo Limite de Solução', detail.sla_resolution_deadline, detail.resolved_at, detail.is_resolution_breached, now, detail.created_at, detail.paused_at)}
-              </div>
+              <section data-testid="operational-summary" className={`${cardClass} p-5 space-y-5`}>
+                <div className="flex items-center gap-2 border-b pb-3 border-outline-variant">
+                  <Building2 className="w-5 h-5 text-primary" />
+                  <h2 className="text-sm font-bold uppercase tracking-wider text-text-main">Resumo operacional</h2>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+                  <Field label="Solicitante" value={requester} />
+                  <Field label="Empresa" value={company} accent="text-primary font-bold" />
+                  <Field label="Abertura" value={fmt(detail.created_at)} />
+                  <Field label="Tipo" value={(detail.ticket_type ?? ticket.ticketType) === 'request' ? 'Requisição' : 'Incidente'} />
+                  <Field label="Estado" value={translateState(status)} />
+                  <div>
+                    <p className="text-[11px] font-bold uppercase tracking-wider mb-1 text-on-surface-variant">Prioridade</p>
+                    {renderPriorityBadge(priority, detail.priority_level)}
+                  </div>
+                  <Field label="Impacto" value={translateImpact(detail.impact)} />
+                  <Field label="Urgência" value={translateUrgency(detail.urgency)} />
+                  <Field label="Categoria" value={category} />
+                  <Field label="Grupo técnico" value={group} />
+                  <Field label="Responsável" value={assignee} />
+                </div>
+                <div data-testid="operational-summary-slas" className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 border-t border-outline-variant">
+                  {renderSlaTimer('SLA de resposta', detail.sla_response_deadline, detail.responded_at, detail.is_response_breached, now, detail.created_at, detail.paused_at)}
+                  {renderSlaTimer('SLA de solução', detail.sla_resolution_deadline, detail.resolved_at, detail.is_resolution_breached, now, detail.created_at, detail.paused_at)}
+                </div>
+              </section>
             )}
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 gap-6">
               {/* COLUNA ESQUERDA (70% ou col-span-2) */}
-              <div className="lg:col-span-2 space-y-6">
+              <div className="space-y-6">
                 {/* DESCRIÇÃO E CHAT */}
                 <section className={`${cardClass} p-5 space-y-5`}>
                   <div className="flex items-center gap-2 border-b pb-3 border-outline-variant">
@@ -1110,7 +1109,7 @@ const AnalystCockpit = ({ ticket = FALLBACK_TICKET }: { ticket?: WorkspaceTicket
                       <AlertTriangle className={`w-8 h-8 text-amber-500 mx-auto mb-2 ${isAlpha ? 'animate-pulse' : ''}`} />
                       O chamado ainda não foi resolvido.
                       <p className={`text-xs mt-1 ${isAlpha ? 'text-zinc-500' : 'text-on-surface-variant'}`}>
-                        Para resolvê-lo, use o painel de <b>Condução do Chamado</b> na coluna lateral e altere o Estado para <b>"Resolvido"</b>.
+                        Para resolvê-lo, use o botão <b>Resolver chamado</b> na barra superior.
                       </p>
                     </div>
                   )}
@@ -1225,111 +1224,37 @@ const AnalystCockpit = ({ ticket = FALLBACK_TICKET }: { ticket?: WorkspaceTicket
                 </section>
               </div>
 
-              {/* COLUNA DIREITA (30% ou col-span-1) */}
-              <div className="space-y-6">
-                {/* CARTÃO DE RESUMO/METADADOS DO TICKET */}
-                <div className={`${cardClass} p-5 shadow-sm space-y-4`}>
-                  <div className={`flex items-center gap-2 border-b pb-3 ${
-                    isAlpha ? 'border-zinc-800' : isBeta ? 'border-zinc-200' : 'border-outline-variant'
-                  }`}>
-                    <Building2 className={`w-4 h-4 ${isBeta ? 'text-medical-blue' : 'text-primary'}`} />
-                    <h3 className={`text-xs font-bold uppercase tracking-wider ${isAlpha ? 'text-zinc-300 font-mono' : 'text-on-surface'}`}>
-                      Metadados do Chamado
-                    </h3>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4 text-xs">
-                    <Field label="Solicitante" value={requester} />
-                    <Field label="Empresa" value={company} accent={isBeta ? 'text-medical-blue font-bold' : 'text-primary font-bold'} />
-                    <Field label="Abertura" value={detail ? fmt(detail.created_at) : (ticket.date ?? '—')} />
-                    <Field label="Tipo" value={(detail?.ticket_type ?? ticket.ticketType) === 'request' ? 'Requisição' : 'Incidente'} />
-                    <div className="col-span-2">
-                      <p className={`text-[11px] font-bold uppercase tracking-wider mb-1 ${
-                        isAlpha ? 'text-zinc-500 font-mono' : 'text-on-surface-variant'
-                      }`}>Prioridade</p>
-                      {renderPriorityBadge(priority, detail?.priority_level)}
-                    </div>
-                    <Field label="Impacto" value={translateImpact(detail?.impact)} />
-                    <Field label="Urgência" value={translateUrgency(detail?.urgency)} />
-                    <Field label="Estado" value={translateState(status)} />
-                    <Field label="Categoria" value={category} />
-                    <Field label="Responsável" value={assignee} />
-                    <Field label="Grupo Técnico" value={group} />
-                  </div>
-                </div>
-
-                {/* CONDUÇÃO DO CHAMADO — idle: reabrir quando resolvido */}
-                {isResolved && canAct && conducaoMode === 'idle' && (
-                  <div className={`${cardClass} p-5 space-y-3`}>
-                    <div className="flex items-center gap-2 mb-1">
-                      <PlayCircle className="w-4 h-4 text-primary" />
-                      <h2 className="text-sm font-bold text-on-surface">Ações do Chamado</h2>
-                    </div>
-                    <p className="text-[11px] text-on-surface-variant leading-relaxed">
-                      Este chamado está <b>{translateState(status)}</b>. Se a solução não foi suficiente ou o problema voltou, reabra o chamado para retomar o atendimento.
-                    </p>
-                    <button
-                      onClick={openReopenForm}
-                      className="w-full px-4 py-2.5 text-xs font-semibold border-2 transition-all flex items-center justify-center gap-1.5 cursor-pointer rounded-lg border-primary text-primary hover:bg-primary/5 active:scale-[0.98]"
-                    >
-                      <PlayCircle className="w-4 h-4" /> Reabrir Chamado
-                    </button>
-                  </div>
-                )}
-
-                {/* CONDUÇÃO DO CHAMADO — idle: condicional por status */}
-                {canEdit && !isResolved && conducaoMode === 'idle' && isNew && (
-                  <div className={`${cardClass} p-5 space-y-3`}>
-                    <div className="flex items-center gap-2 mb-1">
-                      <PlayCircle className="w-4 h-4 text-primary" />
-                      <h2 className="text-sm font-bold text-on-surface">Primeiro Atendimento</h2>
-                    </div>
-                    <p className="text-[11px] text-on-surface-variant leading-relaxed">
-                      Este chamado está <b>Novo</b> e aguarda o primeiro atendimento. Ao iniciar, o <b>SLA de resposta</b> será registrado e o estado passará para <b>Em Andamento</b>.
-                    </p>
-                    <button
-                      onClick={openStartForm}
-                      className="w-full px-4 py-2.5 text-xs font-bold shadow-sm transition-all flex items-center justify-center gap-1.5 cursor-pointer rounded-lg bg-primary text-on-primary hover:opacity-90 active:scale-[0.98]"
-                    >
-                      <PlayCircle className="w-4 h-4" /> Iniciar Atendimento
-                    </button>
-                  </div>
-                )}
-
-                {canEdit && !isResolved && conducaoMode === 'idle' && !isNew && (
-                  <div className={`${cardClass} p-5 space-y-3`}>
-                    <div className="flex items-center gap-2 mb-1">
-                      <Send className="w-4 h-4 text-primary" />
-                      <h2 className="text-sm font-bold text-on-surface">Ações do Chamado</h2>
-                    </div>
-                    <button
-                      onClick={openEditForm}
-                      className="w-full px-4 py-2.5 text-xs font-semibold shadow-sm transition-all flex items-center justify-center gap-1.5 cursor-pointer rounded-lg bg-primary text-on-primary hover:opacity-90 active:scale-[0.98]"
-                    >
-                      <Edit3 className="w-4 h-4" /> Atualizar Chamado
-                    </button>
-                    <button
-                      onClick={openTransferForm}
-                      className="w-full px-4 py-2.5 text-xs font-semibold border transition-all flex items-center justify-center gap-1.5 cursor-pointer rounded-lg border-outline-variant text-on-surface hover:bg-surface-container active:scale-[0.98]"
-                    >
-                      <ArrowRightLeft className="w-4 h-4" /> Transferir Chamado
-                    </button>
-                    {!isResolved && (
-                      <button
-                        onClick={openResolveForm}
-                        className="w-full px-4 py-2.5 text-xs font-semibold border-2 transition-all flex items-center justify-center gap-1.5 cursor-pointer rounded-lg border-emerald-500 text-emerald-600 hover:bg-emerald-50 active:scale-[0.98]"
-                      >
-                        <CheckCircle className="w-4 h-4" /> Resolver Chamado
-                      </button>
-                    )}
-                  </div>
-                )}
+              {/* Modal de condução — a barra superior é o único ponto acionável. */}
+              {conducaoMode !== 'idle' && (
+              <div
+                ref={actionDialogRef}
+                tabIndex={-1}
+                className="fixed inset-0 z-50 flex items-start sm:items-center justify-center overflow-y-auto bg-black/55 p-3 sm:p-6"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="ticket-action-dialog-title"
+                onMouseDown={event => {
+                  if (event.target === event.currentTarget && !savingConducao) handleCancelEdit()
+                }}
+              >
+                <div className="relative w-full max-w-2xl max-h-[calc(100vh-1.5rem)] sm:max-h-[calc(100vh-3rem)] overflow-y-auto rounded-xl">
+                  <h2 id="ticket-action-dialog-title" className="sr-only">Ação do chamado</h2>
+                  <button
+                    type="button"
+                    aria-label="Fechar"
+                    disabled={savingConducao}
+                    onClick={handleCancelEdit}
+                    className="absolute right-3 top-3 z-10 rounded-lg p-1.5 text-on-surface-variant hover:bg-surface-container disabled:opacity-50"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
 
                 {/* MODO ATUALIZAÇÃO */}
-                {canEdit && conducaoMode === 'update' && (
+                {canEdit && (conducaoMode === 'update' || conducaoMode === 'pending') && (
                   <div className={`${cardClass} overflow-hidden`}>
                     <div className="px-5 py-4 border-b border-outline-variant bg-surface-container/30 flex items-center gap-2">
-                      <Edit3 className="w-4 h-4 text-primary" />
-                      <h2 className="text-sm font-bold text-on-surface">Atualizar Chamado</h2>
+                      {conducaoMode === 'pending' ? <Pause className="w-4 h-4 text-amber-500" /> : <Edit3 className="w-4 h-4 text-primary" />}
+                      <h2 className="text-sm font-bold text-on-surface">{conducaoMode === 'pending' ? 'Colocar em pendência' : 'Atualizar chamado'}</h2>
                     </div>
 
                     <div className="p-5 space-y-5">
@@ -1353,7 +1278,7 @@ const AnalystCockpit = ({ ticket = FALLBACK_TICKET }: { ticket?: WorkspaceTicket
                       {/* Mensagem */}
                       <div>
                         <label className="block text-[10px] font-bold uppercase tracking-widest mb-1.5 text-on-surface-variant">
-                          Mensagem / Ação
+                          {conducaoMode === 'pending' ? <>Justificativa da pendência <span className="text-error">*</span></> : 'Mensagem / Ação'}
                         </label>
                         {responseMacros.length > 0 && (
                           <select defaultValue="" onChange={e => { applyResponseMacro(e.target.value); e.currentTarget.value = '' }}
@@ -1365,29 +1290,27 @@ const AnalystCockpit = ({ ticket = FALLBACK_TICKET }: { ticket?: WorkspaceTicket
                           </select>
                         )}
                         <textarea rows={3} value={formComment} onChange={e => setFormComment(e.target.value)}
-                          placeholder={isInternal ? 'Anotações técnicas internas (oculto para o cliente)...' : 'Escreva sua resposta ou orientação para o cliente...'}
+                          placeholder={conducaoMode === 'pending' ? 'Explique por que o chamado ficará pendente...' : isInternal ? 'Anotações técnicas internas (oculto para o cliente)...' : 'Escreva sua resposta ou orientação para o cliente...'}
                           className={`w-full p-3 text-xs outline-none resize-none transition-all ${inputClass}`} />
                       </div>
 
                       {/* Estado — SEM Resolvido/Fechado (use o botão Resolver para isso) */}
                       <div className="space-y-4">
-                        <div>
+                        {conducaoMode === 'update' && <div>
                           <label className="block text-[10px] font-bold uppercase tracking-widest mb-1.5 text-on-surface-variant">
                             Estado (Status)
                           </label>
                           <select value={formState} onChange={e => setFormState(e.target.value)}
                             className={`w-full px-2.5 py-2 text-xs outline-none cursor-pointer font-medium ${inputClass}`}>
-                            {['New', 'In Progress', 'On Hold', 'Closed']
-                              .filter(value => value !== 'Closed' || isAdmin)
-                              .map(value => (
+                            {['New', 'In Progress'].map(value => (
                                 <option key={value} value={value}>{translateState(value)}</option>
                               ))}
                           </select>
                           <p className="text-[10px] text-on-surface-variant mt-1">Para resolver o chamado, use o botão <b>Resolver Chamado</b>.</p>
-                        </div>
+                        </div>}
 
                         {/* Motivo da Pendência */}
-                        {formState === 'On Hold' && (
+                        {conducaoMode === 'pending' && (
                           <div className="border-t pt-4 space-y-2 border-outline-variant">
                             <label className="block text-[10px] font-bold text-amber-500 uppercase tracking-wider">
                               Motivo da Pendência <span className="text-error">*</span>
@@ -1409,10 +1332,14 @@ const AnalystCockpit = ({ ticket = FALLBACK_TICKET }: { ticket?: WorkspaceTicket
                             {pendingReasons.length === 0 && (
                               <p className="text-[10px] text-error font-medium">Nenhum motivo cadastrado. Configure em Governança de SLA.</p>
                             )}
+                            <p className="text-[10px] leading-relaxed text-amber-600">
+                              Ao confirmar, o chamado ficará em pendência e os cronômetros de SLA serão pausados conforme a política configurada.
+                            </p>
                           </div>
                         )}
 
                         {/* Grupo / Analista */}
+                        {conducaoMode === 'update' && <>
                         <div>
                           <label className="block text-[10px] font-bold uppercase tracking-widest mb-1.5 text-on-surface-variant">Grupo Solucionador</label>
                           {loadingGroups ? (
@@ -1442,9 +1369,11 @@ const AnalystCockpit = ({ ticket = FALLBACK_TICKET }: { ticket?: WorkspaceTicket
                             )}
                           </select>
                         </div>
+                        </>}
                       </div>
 
                       {/* Impacto / Urgência / Prioridade */}
+                      {conducaoMode === 'update' && (
                       <div className="space-y-4 pt-3 border-t border-outline-variant">
                         <div>
                           <label className="block text-[10px] font-bold uppercase tracking-widest mb-1.5 text-on-surface-variant">Impacto — Quem é afetado?</label>
@@ -1465,6 +1394,7 @@ const AnalystCockpit = ({ ticket = FALLBACK_TICKET }: { ticket?: WorkspaceTicket
                           </div>
                         </div>
                       </div>
+                      )}
 
                       {/* Rodapé */}
                       <div className="flex gap-2 pt-3 border-t border-outline-variant justify-end">
@@ -1474,7 +1404,7 @@ const AnalystCockpit = ({ ticket = FALLBACK_TICKET }: { ticket?: WorkspaceTicket
                         <button type="button" disabled={savingConducao} onClick={handleGravarConducao}
                           className={`px-4 py-2 font-bold text-xs shadow transition-all active:scale-[0.98] disabled:opacity-50 flex items-center gap-1.5 cursor-pointer ${buttonPrimaryClass}`}>
                           <Send className="w-3.5 h-3.5" />
-                          {savingConducao ? 'Salvando…' : 'Salvar Atualização'}
+                          {savingConducao ? 'Salvando…' : conducaoMode === 'pending' ? 'Confirmar pendência' : 'Salvar atualização'}
                         </button>
                       </div>
                     </div>
@@ -1702,7 +1632,9 @@ const AnalystCockpit = ({ ticket = FALLBACK_TICKET }: { ticket?: WorkspaceTicket
                     </div>
                   </div>
                 )}
+                </div>
               </div>
+              )}
             </div>
 
             <div className="flex items-center gap-2 text-on-surface-variant text-xs justify-center pt-2">
