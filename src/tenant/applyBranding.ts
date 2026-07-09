@@ -34,6 +34,8 @@ export interface TenantBranding {
   backgroundUrl: string | null
   /** Escala da fonte dos títulos: 'compact' | 'standard' | 'large' | 'display'. */
   fontScale: string
+  greetingPrefix: string | null
+  greetingColor: string | null
 }
 
 /** Branding padrão do produto (ServiceFY) — usado fora de um tenant resolvido. */
@@ -55,6 +57,8 @@ export const DEFAULT_BRANDING: TenantBranding = {
   themeName: 'Midnight',
   backgroundUrl: null,
   fontScale: 'standard',
+  greetingPrefix: null,
+  greetingColor: null,
 }
 
 /** Monta o branding a partir da linha de `companies`, com fallbacks seguros. */
@@ -77,6 +81,8 @@ export function brandingFromCompany(row: CompanyRow): TenantBranding {
     themeName: row.primary_color || DEFAULT_BRANDING.themeName,
     backgroundUrl: row.background_url ?? null,
     fontScale: row.title_size || DEFAULT_BRANDING.fontScale,
+    greetingPrefix: row.greeting_prefix ?? null,
+    greetingColor: row.greeting_color ?? null,
   }
 }
 

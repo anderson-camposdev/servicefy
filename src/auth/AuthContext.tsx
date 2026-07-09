@@ -117,6 +117,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // onAuthStateChange limpa o estado.
   }, [])
 
+  // Listen to profile updates in real-time to detect administrative deactivation — migration 071/IAM
+  useEffect(() => {
+    if (!profile?.id) return
+
+    const channel = supabase
+      .channel(`profile-status-${profile.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'profiles',
+          filter: `id=eq.${profile.id}`,
+        },
+        (payload) => {
+          const newProfile = payload.new as ProfileRow
+          if (newProfile && newProfile.active === false) {
+            void signOut().then(() => {
+              alert('Sua sessão foi encerrada por decisões administrativas')
+            })
+          }
+        }
+      )
+      .subscribe()
+
+    return () => {
+      void channel.unsubscribe()
+    }
+  }, [profile?.id, signOut])
+
+
   // Re-busca profile + empresa da sessão atual (ex.: após salvar branding).
   const refreshCompany = useCallback(async () => {
     await loadProfile(session)

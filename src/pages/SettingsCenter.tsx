@@ -52,6 +52,7 @@ const SECTIONS: SettingsSection[] = [
   section('domains', 'service_management', 'Domínios de serviço', 'TI, RH, Jurídico e Facilities.', ['Caso unificado', 'Domínios privados', 'Tipos configuráveis'], { entitlementKey: 'esm' }),
   section('incident_catalog', 'service_management', 'Catálogo de incidentes', 'Categorias, serviços e sintomas.', ['Três níveis', 'SLA por item', 'Grupo solucionador'], { legacyTab: 'catalog_incidents', entitlementKey: 'itsm' }),
   section('request_catalog', 'service_management', 'Catálogo de requisições', 'Itens, aprovações e entrega.', ['Hierarquia', 'Formulários', 'Aprovações'], { legacyTab: 'catalog_requests', entitlementKey: 'itsm' }),
+  section('change_cab', 'service_management', 'Comitê de Mudanças (CAB)', 'Membros permanentes e aprovação padrão.', ['Aprovadores padrão', 'Janelas restritas', 'Notificações'], { legacyTab: 'change_cab', entitlementKey: 'itsm' }),
   section('forms', 'service_management', 'Biblioteca de formulários', 'Formulários reutilizáveis.', ['Schemas', 'Campos condicionais', 'Validação'], { legacyTab: 'form_templates' }),
   section('automation', 'service_management', 'Motor de Automação', 'Gatilhos, condições e ações.', ['Simulação', 'Histórico', 'Escalonamento'], { appView: 'workflow_builder', entitlementKey: 'automation' }),
   section('macros', 'service_management', 'Macros e taxonomias', 'Respostas, códigos, estados e tags.', ['Macros públicas e internas', 'Códigos de resolução', 'Tags']),
@@ -65,7 +66,7 @@ const SECTIONS: SettingsSection[] = [
   section('virtual_agent', 'knowledge_ai', 'Agente virtual', 'Ações, confiança e handoff.', ['Ações controladas', 'Confirmação', 'Transferência'], { entitlementKey: 'virtual_agent' }),
   section('ci', 'cmdb', 'Itens de configuração', 'Classes, ativos e ciclo de vida.', ['Manual', 'CSV/API', 'Relacionamentos'], { entitlementKey: 'cmdb' }),
   section('discovery', 'cmdb', 'Descoberta e reconciliação', 'Intune, Entra, AD e Google.', ['Precedência', 'Deduplicação', 'Agente local'], { status: 'locked', entitlementKey: 'cmdb_discovery' }),
-  section('branding', 'portal_brand', 'Identidade e portal', 'Marca, temas e pré-visualização.', ['White-label', 'Temas', 'Preview'], { legacyTab: 'appearance' }),
+  section('branding', 'portal_brand', 'Identidade e portal', 'Marca, temas e pré-visualização.', ['White-label', 'Temas', 'Preview']),
   section('compliance', 'security', 'LGPD e retenção', 'Retenção, anonimização e auditoria.', ['Políticas', 'Direitos do titular', 'Auditoria'], { entitlementKey: 'compliance' }),
   section('developer', 'integrations', 'API e webhooks', 'Documentação, escopos e diagnóstico.', ['API pública', 'Webhooks', 'Escopos'], { appView: 'api_docs', entitlementKey: 'api' }),
   section('analytics', 'analytics_licensing', 'Uso e qualidade', 'CSAT, canais e capacidade.', ['CSAT', 'Desempenho', 'Capacidade'], { appView: 'flowfy_bi', entitlementKey: 'analytics' }),
@@ -179,7 +180,7 @@ export default function SettingsCenter({ companyId, activeRole, onNavigate }: Pr
     />
   )
 
-  if (selected && ['domains', 'macros', 'templates', 'ci', 'compliance', 'licensing'].includes(selected.key)) return (
+  if (selected && ['domains', 'macros', 'templates', 'ci', 'compliance', 'licensing', 'branding'].includes(selected.key)) return (
     <PlatformModuleSettings
       moduleKey={selected.key as OperationalModuleKey}
       companyId={targetCompanyId}

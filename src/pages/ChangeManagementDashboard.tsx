@@ -8,6 +8,7 @@ import { changesService } from '../lib/services'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../auth'
 import { useToast } from '../context'
+import { useAppData } from '../hooks/useDbData'
 import type { ChangeRow, ChangeType, ChangeRisk } from '../lib/database.types'
 import { translateState } from '../lib/statusLabels'
 import TicketDataTable from '../components/TicketDataTable'
@@ -41,6 +42,7 @@ const RISK_COLORS: Record<ChangeRisk, string> = {
 export default function ChangeManagementDashboard({ companyId }: { companyId?: string }) {
   const { profile } = useAuth()
   const { toast } = useToast()
+  const { companies } = useAppData()
   
   const [activeSubTab, setActiveSubTab] = useState<'list' | 'calendar' | 'cab'>('list')
   const [changes, setChanges] = useState<ChangeRow[]>([])
@@ -181,7 +183,11 @@ export default function ChangeManagementDashboard({ companyId }: { companyId?: s
       setWindowEnd('')
       setImplementerId('')
       setImplementerName('')
-      setCabApprovers([])
+      
+      const comp = companies.find(c => c.id === companyId)
+      const defaultApprovers = (comp?.catalog_ui_config as Record<string, any>)?.default_cab_approvers || []
+      setCabApprovers(defaultApprovers)
+      
       setSelectedProblemId('')
       setSelectedIncidentIds([])
     }

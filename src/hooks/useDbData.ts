@@ -11,47 +11,71 @@ import {
   problemsService,
   changesService,
   setCompanySchemas,
+  assignmentGroupsService,
+  departmentsService,
 } from '../lib/services'
 import type {
   CompanyRow,
   ProfileRow,
   ProblemRow,
   ChangeRow,
+  AssignmentGroupRow,
+  DepartmentRow,
 } from '../lib/database.types'
+import { useAuth } from '../auth'
 
 // ─── COMPANIES + PROFILES (app-level, loaded once on mount) ──
 
 export function useAppData() {
   const [companies, setCompanies] = useState<CompanyRow[]>([])
   const [profiles, setProfiles] = useState<ProfileRow[]>([])
+  const [groups, setGroups] = useState<AssignmentGroupRow[]>([])
+  const [departments, setDepartments] = useState<DepartmentRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  const { profile } = useAuth()
+  const companyId = profile?.company_id
+
   useEffect(() => {
+    if (!companyId) {
+      if (profile === null) {
+        setLoading(false)
+      }
+      return
+    }
+
     setLoading(true)
+    setError(null)
+
     Promise.all([
       companiesService.list(),
-    ]).then(async ([comps]) => {
-      setCompanies(comps)
+      profilesService.listByCompany(companyId),
+      assignmentGroupsService.list(companyId),
+      departmentsService.list(companyId),
+    ])
+      .then(([comps, profs, grps, depts]) => {
+        setCompanies(comps)
+        setProfiles(profs)
+        setGroups(grps)
+        setDepartments(depts)
 
-      // Registry schemas
-      const mapping: Record<string, string> = {}
-      comps.forEach(c => {
-        if (c.schema_name) {
-          mapping[c.id] = c.schema_name
-        }
+        // Registry schemas
+        const mapping: Record<string, string> = {}
+        comps.forEach(c => {
+          if (c.schema_name) {
+            mapping[c.id] = c.schema_name
+          }
+        })
+        setCompanySchemas(mapping)
       })
-      setCompanySchemas(mapping)
+      .catch(err => {
+        setError(err instanceof Error ? err.message : 'Erro ao carregar dados.')
+      })
+      .finally(() => setLoading(false))
+  }, [companyId, profile])
 
-      // load profiles for all companies
-      const allProfiles = await Promise.all(comps.map(c => profilesService.listByCompany(c.id)))
-      setProfiles(allProfiles.flat())
-    }).catch(err => {
-      setError(err instanceof Error ? err.message : 'Erro ao carregar dados.')
-    }).finally(() => setLoading(false))
-  }, [])
-
-  return { companies, profiles, loading, error }
+  return { companies, profiles, groups, departments, loading, error }
 }
 
 // ─── PROBLEMS ─────────────────────────────────────────────────

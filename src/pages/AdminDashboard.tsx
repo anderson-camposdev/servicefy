@@ -6,7 +6,6 @@ import { companiesService, profilesService, assignmentGroupsService } from '../l
 import type { ProfileRow, AssignmentGroupRow, CompanyRow } from '../lib/database.types'
 import { setTenantOverride } from '../tenant/resolveTenant'
 import CatalogManager from './CatalogManager'
-import SlaSettings from './SlaSettings'
 import DepartmentManager from './DepartmentManager'
 
 interface AssignmentGroupsAdminProps {
@@ -322,7 +321,6 @@ export default function AdminDashboard({ refetchAppData, currentCompany, activeT
   const [tenantLocalLogin, _setTenantLocalLogin] = useState(true)
   const [tenantSchema, setTenantSchema] = useState('')
   const [tenantSaving, setTenantSaving] = useState(false)
-
   // States for tenant edition
   const [editingTenant, setEditingTenant] = useState<CompanyRow | null>(null)
   const [tenantUpdating, setTenantUpdating] = useState(false)
@@ -333,6 +331,7 @@ export default function AdminDashboard({ refetchAppData, currentCompany, activeT
   const [usrEmail, setUsrEmail] = useState('')
   const [usrRole, setUsrRole] = useState<Role>('end_user')
   const [usrDept, setUsrDept] = useState('')
+  const [usrManagerId, setUsrManagerId] = useState('')
   const [usrCompanyId, setUsrCompanyId] = useState(currentCompany.id)
   const [usrSaving, setUsrSaving] = useState(false)
 
@@ -352,21 +351,17 @@ export default function AdminDashboard({ refetchAppData, currentCompany, activeT
         welcome_title: tenantWelcomeTitle,
         welcome_subtitle: tenantWelcomeSubtitle,
         allow_local_login: tenantLocalLogin,
-        schema_name: tenantSchema || null,
-        sso_providers: [
-          { id: 'msft', type: 'microsoft', label: 'Microsoft Entra ID', tenantId: `${tenantDomain}-tenant`, enabled: true }
-        ],
-        active: true,
       }
+      if (tenantSchema) payload.schema_name = tenantSchema
       await companiesService.create(payload)
-      alert('Empresa cadastrada com sucesso!')
+      alert('Empresa provisionada com sucesso!')
       setTenantName('')
       setTenantDomain('')
       setTenantLogo('')
       setTenantSchema('')
       if (refetchAppData) await refetchAppData()
     } catch (err: any) {
-      alert('Erro ao cadastrar empresa: ' + err.message)
+      alert('Erro ao criar empresa: ' + err.message)
     } finally {
       setTenantSaving(false)
     }
@@ -377,25 +372,9 @@ export default function AdminDashboard({ refetchAppData, currentCompany, activeT
     if (!editingTenant) return
     setTenantUpdating(true)
     try {
-      const payload: Partial<CompanyRow> = {
-        name: editingTenant.name,
-        domain: editingTenant.domain,
-        logo_url: editingTenant.logo_url,
-        primary_color: editingTenant.primary_color,
-        accent_color: editingTenant.accent_color,
-        bg_color: editingTenant.bg_color,
-        welcome_title: editingTenant.welcome_title,
-        welcome_subtitle: editingTenant.welcome_subtitle,
-        title_color: editingTenant.title_color,
-        title_font: editingTenant.title_font,
-        title_size: editingTenant.title_size,
-        subtitle_color: editingTenant.subtitle_color,
-        subtitle_font: editingTenant.subtitle_font,
-        subtitle_size: editingTenant.subtitle_size,
-        allow_local_login: editingTenant.allow_local_login,
-        schema_name: editingTenant.schema_name
-      }
-      await companiesService.update(editingTenant.id, payload)
+      const { id, ...rest } = editingTenant
+      await companiesService.update(id, rest)
+      alert('Configurações da empresa atualizadas!')
       if (refetchAppData) await refetchAppData()
       setEditingTenant(null)
     } catch (err: any) {
@@ -432,12 +411,14 @@ export default function AdminDashboard({ refetchAppData, currentCompany, activeT
         company_id: usrCompanyId,
         avatar_url: `https://api.dicebear.com/7.x/avataaars/svg?seed=${usrName.split(' ')[0]}`,
         active: true,
+        manager_id: usrManagerId || null,
       }
       await profilesService.create(payload)
       alert('Usuário cadastrado com sucesso!')
       setUsrName('')
       setUsrEmail('')
       setUsrDept('')
+      setUsrManagerId('')
       if (refetchAppData) await refetchAppData()
     } catch (err: any) {
       alert('Erro ao cadastrar usuário: ' + err.message)
@@ -548,18 +529,39 @@ export default function AdminDashboard({ refetchAppData, currentCompany, activeT
           <div className="lg:col-span-2 bg-white border border-slate-200 rounded-2xl shadow-sm p-6 space-y-4">
             <h3 className="text-slate-800 font-bold text-sm uppercase tracking-widest border-b border-slate-100 pb-3">Usuários & Matriz de Acessos</h3>
             <div className="divide-y divide-slate-100 overflow-y-auto max-h-[500px]">
-              {rawProfiles.filter(p => p.company_id === currentCompany.id).map(p => (
-                <div key={p.id} className="py-3 flex items-center justify-between gap-4">
-                  <div className="flex items-center gap-3">
-                    <img src={p.avatar_url || ''} className="w-7 h-7 rounded-full" alt={p.name} />
-                    <div>
-                      <div className="text-xs font-bold text-slate-800">{p.name}</div>
-                      <div className="text-[10px] text-slate-400 font-mono">{p.email} · {p.department || 'Operações'}</div>
+              {rawProfiles.filter(p => p.company_id === currentCompany.id).map(p => {
+                const sameCompanyProfiles = rawProfiles.filter(x => x.company_id === p.company_id && x.id !== p.id)
+                return (
+                  <div key={p.id} className="py-3 flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                      <img src={p.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${p.name}`} className="w-7 h-7 rounded-full" alt={p.name} />
+                      <div>
+                        <div className="text-xs font-bold text-slate-800">{p.name}</div>
+                        <div className="text-[10px] text-slate-400 font-mono">{p.email} · {p.department || 'Operações'}</div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <select
+                        value={p.manager_id ?? ''}
+                        onChange={async (e) => {
+                          try {
+                            await profilesService.update(p.id, { manager_id: e.target.value || null })
+                            if (refetchAppData) await refetchAppData()
+                          } catch (err: any) {
+                            alert('Erro ao atualizar gestor: ' + err.message)
+                          }
+                        }}
+                        className="border border-slate-200 rounded px-2 py-1 text-[10px] bg-white min-w-[120px]"
+                        title="Gestor Direto"
+                      >
+                        <option value="">Sem gestor</option>
+                        {sameCompanyProfiles.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                      </select>
+                      <span className="text-[9px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded font-bold uppercase">{p.role}</span>
                     </div>
                   </div>
-                  <span className="text-[9px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded font-bold uppercase">{p.role}</span>
-                </div>
-              ))}
+                )
+              })}
             </div>
           </div>
           <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-6">
@@ -576,6 +578,15 @@ export default function AdminDashboard({ refetchAppData, currentCompany, activeT
               <div>
                 <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Departamento</label>
                 <input type="text" value={usrDept} onChange={e => setUsrDept(e.target.value)} className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-700 bg-white" placeholder="ex: TI" />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Gestor Direto</label>
+                <select value={usrManagerId} onChange={e => setUsrManagerId(e.target.value)} className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-700 bg-white">
+                  <option value="">Sem gestor</option>
+                  {rawProfiles.filter(p => p.company_id === usrCompanyId).map(m => (
+                    <option key={m.id} value={m.id}>{m.name}</option>
+                  ))}
+                </select>
               </div>
               <div>
                 <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Papel de Acesso (RBAC)</label>
@@ -630,11 +641,6 @@ export default function AdminDashboard({ refetchAppData, currentCompany, activeT
         </div>
       )}
 
-      {activeTab === 'sla_settings' && (
-        <div className="space-y-4">
-          <SlaSettings companyId={currentCompany.id} />
-        </div>
-      )}
 
       {/* MODAL DE EDIÇÃO DE TENANT (REFORMULADO) */}
       {editingTenant && (

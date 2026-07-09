@@ -1048,6 +1048,7 @@ function RequestCatalogManager({ companyId, groups, templates, departments, cale
                               checked={it.requires_approval ?? false}
                               onChange={e => patchItem(it, {
                                 requires_approval: e.target.checked,
+                                approval_type: e.target.checked ? (it.approval_type ?? 'group') : 'group',
                                 approval_group_id: e.target.checked ? (it.approval_group_id ?? groups[0]?.id ?? null) : null,
                               })}
                             />
@@ -1056,23 +1057,40 @@ function RequestCatalogManager({ companyId, groups, templates, departments, cale
                           {it.requires_approval && (
                             <>
                               <select
+                                value={it.approval_type ?? 'group'}
+                                onChange={e => patchItem(it, {
+                                  approval_type: e.target.value as 'group' | 'manager' | 'department_head',
+                                  approval_group_id: e.target.value === 'group' && !it.approval_group_id ? (groups[0]?.id ?? null) : it.approval_group_id
+                                })}
+                                className="border border-amber-200 rounded px-2 py-1 text-xs bg-amber-50 min-w-[140px]"
+                                title="Regra de aprovação"
+                              >
+                                <option value="group">Grupo aprovador</option>
+                                <option value="manager">Gestor do solicitante</option>
+                                <option value="department_head">Gestor do departamento</option>
+                              </select>
+
+                              <select
                                 value={it.approval_group_id ?? ''}
                                 onChange={e => patchItem(it, { approval_group_id: e.target.value || null })}
                                 className="border border-amber-200 rounded px-2 py-1 text-xs bg-amber-50 min-w-[150px]"
-                                title="Membros ativos deste grupo receberão a aprovação"
+                                title={it.approval_type === 'group' ? "Membros ativos deste grupo receberão a aprovação" : "Grupo de fallback caso o gestor não seja localizado"}
                               >
-                                <option value="">Grupo aprovador…</option>
+                                <option value="">{it.approval_type === 'group' ? "Grupo aprovador…" : "Grupo de fallback…"}</option>
                                 {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
                               </select>
-                              <select
-                                value={it.approval_mode ?? 'any'}
-                                onChange={e => patchItem(it, { approval_mode: e.target.value as 'any' | 'all' })}
-                                className="border border-amber-200 rounded px-2 py-1 text-xs bg-amber-50"
-                                title="Uma aprovação ou unanimidade do grupo"
-                              >
-                                <option value="any">Qualquer membro</option>
-                                <option value="all">Todos os membros</option>
-                              </select>
+
+                              {it.approval_type === 'group' && (
+                                <select
+                                  value={it.approval_mode ?? 'any'}
+                                  onChange={e => patchItem(it, { approval_mode: e.target.value as 'any' | 'all' })}
+                                  className="border border-amber-200 rounded px-2 py-1 text-xs bg-amber-50"
+                                  title="Uma aprovação ou unanimidade do grupo"
+                                >
+                                  <option value="any">Qualquer membro</option>
+                                  <option value="all">Todos os membros</option>
+                                </select>
+                              )}
                             </>
                           )}
                           <select value={it.sla_calendar_id ?? ''} onChange={e => patchItem(it, { sla_calendar_id: e.target.value || null })} className="border border-slate-200 rounded px-2 py-1 text-xs bg-white min-w-[130px]" title="Calendário de SLA específico deste item (vazio = padrão do tenant)">

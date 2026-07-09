@@ -78,6 +78,12 @@ function throwIfError<T>(data: T | null, error: unknown): T {
 
 // ─── COMPANIES ────────────────────────────────────────────────
 
+import {
+  validateBrandingFile,
+  buildBrandAssetPath,
+} from './branding.types'
+import type { BrandingSettings, CatalogUiConfig } from './branding.types'
+
 export const companiesService = {
   async list(): Promise<CompanyRow[]> {
     const { data, error } = await supabase
@@ -106,13 +112,98 @@ export const companiesService = {
     return throwIfError(data, error)
   },
 
-  async uploadBrandAsset(companyId: string, file: File): Promise<string> {
-    const ext = (file.name.split('.').pop() || 'png').toLowerCase()
-    const path = `brands/${companyId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
-    const { error } = await supabase.storage.from('catalog-icons').upload(path, file, { upsert: true, contentType: file.type || undefined })
-    if (error) throw error
-    const { data } = supabase.storage.from('catalog-icons').getPublicUrl(path)
+  /**
+   * Uploads a brand asset (logo or background) to the `branding_assets` bucket
+   * using a **deterministic, idempotent path** so that repeated uploads for the
+   * same tenant always overwrite the previous file rather than accumulating
+   * orphaned objects in storage.
+   *
+   * Path format: `brands/{companyId}/{assetType}.{ext}`
+   *
+   * @param companyId - The tenant's UUID (used to scope the storage path).
+   * @param file      - The File selected by the user.
+   * @param assetType - `'logo'` or `'background'` (defaults to `'logo'`).
+   * @returns Public URL of the uploaded asset.
+   * @throws `Error` if file validation fails or Supabase storage returns an error.
+   */
+  async uploadBrandAsset(
+    companyId: string,
+    file: File,
+    assetType: 'logo' | 'background' = 'logo',
+  ): Promise<string> {
+    const validation = validateBrandingFile(file)
+    if (!validation.valid) throw new Error(validation.error!)
+
+    const path = buildBrandAssetPath(companyId, assetType, file.type)
+
+    const { error } = await supabase.storage
+      .from('branding_assets')
+      .upload(path, file, { upsert: true, contentType: file.type })
+
+    if (error) throw new Error(`Upload falhou: ${error.message}`)
+
+    const { data } = supabase.storage
+      .from('branding_assets')
+      .getPublicUrl(path)
+
     return data.publicUrl
+  },
+
+  /**
+   * Persists all branding settings for a tenant in a single atomic update,
+   * mapping the `BrandingSettings` payload to the existing `companies` columns.
+   *
+   * RLS on the `companies` table ensures only the authenticated admin of the
+   * tenant can mutate their own row — cross-tenant mutations are blocked by the
+   * database, not by this function.
+   *
+   * @param companyId - UUID of the company/tenant to update.
+   * @param settings  - Strongly-typed branding payload.
+   * @returns The updated `CompanyRow`.
+   * @throws `Error` if Supabase returns an error.
+   */
+  async updateBrandingSettings(
+    companyId: string,
+    settings: BrandingSettings,
+    existingCatalogUiConfig: CatalogUiConfig | null = null,
+  ): Promise<CompanyRow> {
+    const baseConfig: CatalogUiConfig = existingCatalogUiConfig ?? {
+      card_settings:  { layout: 'grid' },
+      portal_buttons: {},
+    }
+
+    const updatedConfig: CatalogUiConfig = {
+      ...baseConfig,
+      card_settings: {
+        ...baseConfig.card_settings,
+        layout: settings.cardLayout,
+      },
+      portal_buttons: {
+        ...baseConfig.portal_buttons,
+        ...(settings.incidentButton?.label       != null && { incident_label: settings.incidentButton.label }),
+        ...(settings.incidentButton?.description != null && { incident_desc:  settings.incidentButton.description }),
+        ...(settings.incidentButton?.emoji       != null && { incident_emoji: settings.incidentButton.emoji }),
+        ...(settings.requestButton?.label        != null && { request_label:  settings.requestButton.label }),
+        ...(settings.requestButton?.description  != null && { request_desc:   settings.requestButton.description }),
+        ...(settings.requestButton?.emoji        != null && { request_emoji:  settings.requestButton.emoji }),
+      },
+    }
+
+    const payload: Partial<CompanyRow> = {
+      primary_color:    settings.themeName,
+      title_size:       settings.fontScale,
+      logo_url:         settings.logoUrl,
+      background_url:   settings.backgroundUrl,
+      brand_name:       settings.brandName,
+      welcome_title:    settings.welcomeTitle ?? undefined,
+      welcome_subtitle: settings.welcomeSubtitle ?? undefined,
+      bg_color:         settings.loginBackground ?? '',
+      greeting_prefix:  settings.greetingPrefix,
+      greeting_color:   settings.greetingColor,
+      catalog_ui_config: updatedConfig as unknown as import('./database.types').Json,
+    }
+
+    return this.update(companyId, payload)
   },
 }
 
@@ -797,7 +888,7 @@ export const pendingReasonsService = {
   },
 
   async create(payload: {
-    companyId: string; name: string; slug: string; requiresCustomerAction: boolean
+    companyId: string; name: string; slug: string; requiresCustomerAction: boolean; pausesSla?: boolean
   }): Promise<PendingReasonRow> {
     const { data, error } = await getClientForCompany(payload.companyId)
       .from('pending_reasons')
@@ -806,6 +897,7 @@ export const pendingReasonsService = {
         name: payload.name,
         slug: payload.slug,
         requires_customer_action: payload.requiresCustomerAction,
+        pauses_sla: payload.pausesSla !== false,
       })
       .select()
       .single()
@@ -815,7 +907,7 @@ export const pendingReasonsService = {
   async update(
     id: string,
     companyId: string,
-    patch: Partial<Pick<PendingReasonRow, 'name' | 'slug' | 'requires_customer_action' | 'active'>>,
+    patch: Partial<Pick<PendingReasonRow, 'name' | 'slug' | 'requires_customer_action' | 'active' | 'pauses_sla'>>,
   ): Promise<PendingReasonRow> {
     const { data, error } = await getClientForCompany(companyId)
       .from('pending_reasons')
@@ -2422,3 +2514,45 @@ export const ticketTasksService = {
     if (error) throw error
   },
 }
+
+// ============================================================
+// SERVIÇOS DO CMDB (Ativos e Relacionamentos) — migration 079 + 098
+// ============================================================
+export interface CmdbImpactRow {
+  ci_id: string
+  ci_name: string
+  class_name: string
+  criticality: 'low' | 'medium' | 'high' | 'critical'
+  depth: number
+  path: string[]
+}
+
+export const cmdbService = {
+  /** Resolve o ID do item de configuração associado ao caso */
+  async getCiForCase(caseId: string): Promise<string | null> {
+    const { data, error } = await supabase
+      .from('case_configuration_items')
+      .select('configuration_item_id')
+      .eq('case_id', caseId)
+      .limit(1)
+      .maybeSingle()
+    if (error || !data) return null
+    return data.configuration_item_id
+  },
+
+  /** Invoca a RPC de predição de impactos recursiva com cycle-prevention */
+  async predictIncidentImpact(
+    companyId: string,
+    ciId: string,
+    direction: 'upstream' | 'downstream' = 'upstream'
+  ): Promise<CmdbImpactRow[]> {
+    const { data, error } = await supabase.rpc('cmdb_predict_incident_impact', {
+      p_company_id: companyId,
+      p_root_ci_id: ciId,
+      p_direction: direction,
+      p_max_depth: 10
+    })
+    return throwIfError(data, error)
+  }
+}
+

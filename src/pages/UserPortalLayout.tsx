@@ -15,11 +15,14 @@ import { buildLabeledFormData, isEmptyFormValue, parseFormFields } from '../lib/
 import type { FormAnswers, FormFieldValue } from '../lib/catalogFormFields'
 import DynamicFormFields from './DynamicFormFields'
 import CatalogIcon from './CatalogIcon'
-import KnowledgePortal from './KnowledgePortal'
 import VirtualAgentWidget from '../components/VirtualAgentWidget'
 import TicketChat from './TicketChat'
 import SlaEventTimeline from './SlaEventTimeline'
 import IncidentActionHistory from './IncidentActionHistory'
+import { PortalSearchHeader } from '../components/portal/PortalSearchHeader'
+import { UserServiceCatalog } from '../components/portal/UserServiceCatalog'
+import { UserTicketList } from '../components/portal/UserTicketList'
+import { KnowledgeQuickView } from '../components/portal/KnowledgeQuickView'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type Screen = 'home' | 'dept-cats' | 'inc-cats' | 'inc-services' | 'inc-symptoms' | 'inc-form' | 'req-cats' | 'req-subcats' | 'req-items' | 'req-form' | 'done' | 'tickets' | 'history' | 'ticket-detail' | 'knowledge'
@@ -70,6 +73,30 @@ const PRIO_STYLE: Record<string, { bg: string; fg: string }> = {
   'P3 - Moderate': { bg:'#fef9c3', fg:'#d97706' },
   'P4 - Low':      { bg:'#dbeafe', fg:'#2563eb' },
   'P5 - Planning': { bg:'#f1f5f9', fg:'#6b7280' },
+}
+
+const themeClasses: Record<ThemeName, {
+  headerBg: string
+  headerBorder: string
+  headerText: string
+  accentBg: string
+  accentText: string
+}> = {
+  CorporateBlue: { headerBg: 'bg-slate-900', headerBorder: 'border-slate-700/50', headerText: 'text-white', accentBg: 'bg-sky-50', accentText: 'text-sky-600' },
+  Ocean: { headerBg: 'bg-blue-950', headerBorder: 'border-blue-800/30', headerText: 'text-white', accentBg: 'bg-blue-50', accentText: 'text-blue-600' },
+  Midnight: { headerBg: 'bg-slate-950', headerBorder: 'border-slate-800/50', headerText: 'text-white', accentBg: 'bg-indigo-50', accentText: 'text-indigo-600' },
+  Emerald: { headerBg: 'bg-emerald-950', headerBorder: 'border-emerald-800/40', headerText: 'text-white', accentBg: 'bg-emerald-50', accentText: 'text-emerald-600' },
+  Ruby: { headerBg: 'bg-rose-950', headerBorder: 'border-rose-900/40', headerText: 'text-white', accentBg: 'bg-rose-50', accentText: 'text-rose-600' },
+  Amethyst: { headerBg: 'bg-purple-950', headerBorder: 'border-purple-900/40', headerText: 'text-white', accentBg: 'bg-purple-50', accentText: 'text-purple-600' },
+  Sunset: { headerBg: 'bg-amber-950', headerBorder: 'border-amber-900/40', headerText: 'text-white', accentBg: 'bg-orange-50', accentText: 'text-orange-600' },
+  Graphite: { headerBg: 'bg-zinc-950', headerBorder: 'border-zinc-800/40', headerText: 'text-white', accentBg: 'bg-zinc-100', accentText: 'text-zinc-600' },
+  Crimson: { headerBg: 'bg-red-950', headerBorder: 'border-red-900/40', headerText: 'text-white', accentBg: 'bg-red-50', accentText: 'text-red-700' },
+  Forest: { headerBg: 'bg-teal-950', headerBorder: 'border-teal-900/40', headerText: 'text-white', accentBg: 'bg-teal-50', accentText: 'text-teal-700' },
+  Pearl: { headerBg: 'bg-slate-50', headerBorder: 'border-slate-200', headerText: 'text-slate-900', accentBg: 'bg-indigo-50', accentText: 'text-indigo-600' },
+  Breeze: { headerBg: 'bg-sky-50', headerBorder: 'border-sky-200', headerText: 'text-sky-900', accentBg: 'bg-sky-50', accentText: 'text-sky-600' },
+  Meadow: { headerBg: 'bg-green-50', headerBorder: 'border-green-200', headerText: 'text-green-900', accentBg: 'bg-green-50', accentText: 'text-green-700' },
+  Blush: { headerBg: 'bg-rose-50', headerBorder: 'border-rose-200', headerText: 'text-rose-900', accentBg: 'bg-rose-50', accentText: 'text-rose-600' },
+  Stone: { headerBg: 'bg-stone-50', headerBorder: 'border-stone-200', headerText: 'text-stone-900', accentBg: 'bg-amber-50', accentText: 'text-amber-700' },
 }
 
 // Maps portal incident category IDs to DB IncidentCategory values
@@ -131,9 +158,7 @@ function getPriorityDot(priority: string | null | undefined): string {
   return '#6b7280'
 }
 
-function fmtDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('pt-BR', { day:'2-digit', month:'2-digit', year:'numeric' })
-}
+
 
 function fmtDateTime(iso: string): string {
   return new Date(iso).toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' })
@@ -193,10 +218,12 @@ interface HomeContentProps {
   onIncident: () => void
   onRequest: () => void
   onReopenTicket: (t: IncidentRow) => void
-  dbCategories?: { id: string; name: string; icon: string | null; type: 'incident' | 'request'; departmentId: string | null; dbCat: any }[]
+  dbCategories?: { id: string; name: string; icon: string | null; type: 'incident' | 'request'; departmentId: string | null; dbCat: CatalogCategoryRow | RequestCategoryRow }[]
   departments?: DepartmentRow[]
   onSelectDept?: (deptId: string) => void
-  cardSettings?: any
+  cardSettings?: import('../lib/branding.types').CardSettings
+  portalButtons?: import('../lib/branding.types').PortalButtonsConfig
+  themeName: string
 }
 
 // TI é o catálogo padrão, já acessível pelos botões "Reportar Problema" / "Solicitar Serviço" —
@@ -207,8 +234,10 @@ const isNonItDepartment = (name: string) => {
   return n !== 'ti' && n !== 't.i.' && n !== 'tecnologia da informação' && n !== 'infraestrutura de ti'
 }
 
-function HomeContent({ config, brand, brandWash, brandBorder, lastClosedTicket, onIncident, onRequest, onReopenTicket, dbCategories, departments, onSelectDept, cardSettings }: HomeContentProps) {
-  const cardSettingsObj = cardSettings || {}
+function HomeContent({ config, brand, brandWash: _brandWash, brandBorder: _brandBorder, lastClosedTicket, onIncident, onRequest, onReopenTicket, dbCategories, departments, onSelectDept, cardSettings, portalButtons, themeName }: HomeContentProps) {
+  const cardSettingsObj = cardSettings || { layout: 'grid' }
+  const portalButtonsObj = portalButtons || {}
+  const currentTheme = themeClasses[themeName as ThemeName] || themeClasses.CorporateBlue
 
   // Um card por departamento (excluindo TI/Global, já coberto pelos botões padrão) —
   // as opções de catálogo dentro do departamento só aparecem depois que o usuário
@@ -224,6 +253,7 @@ function HomeContent({ config, brand, brandWash, brandBorder, lastClosedTicket, 
       .map(d => ({ id: d.id, name: d.name, icon: d.icon, count: counts.get(d.id) ?? 0 }))
       .sort((a, b) => a.name.localeCompare(b.name))
   }, [dbCategories, departments])
+
   const getIconSize = () => {
     switch (cardSettingsObj.icon_size) {
       case 'small': return 36
@@ -253,22 +283,38 @@ function HomeContent({ config, brand, brandWash, brandBorder, lastClosedTicket, 
       <h2 style={{ font:'700 17px sans-serif', color:'#0f172a', marginBottom:13 }}>O que você precisa?</h2>
 
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:24 }}>
-        <button onClick={onIncident} style={{ display:'flex', flexDirection:'column', gap:11, padding:20, background:'#fff', border:'2px solid #fecaca', borderRadius:14, textAlign:'left', boxShadow:'0 1px 3px rgba(220,38,38,.07)', cursor:'pointer', transition:'transform .15s,box-shadow .15s' }}>
-          <div style={{ display:'flex', alignItems:'center', gap:11 }}>
-            <div style={{ width:44, height:44, borderRadius:12, background:'#fee2e2', display:'flex', alignItems:'center', justifyContent:'center', fontSize:22, flexShrink:0 }}>⚠️</div>
-            <div style={{ font:'700 16px sans-serif', color:'#dc2626' }}>Reportar Problema</div>
+        <button onClick={onIncident} className="flex flex-col gap-3 p-5 bg-white border-2 border-red-100 hover:border-red-250 rounded-2xl text-left shadow-sm hover:shadow transition-all duration-150 cursor-pointer">
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 rounded-xl bg-red-50 flex items-center justify-center text-2xl shrink-0">
+              {portalButtonsObj.incident_emoji || '⚠️'}
+            </div>
+            <div className="font-bold text-base text-red-600">
+              {portalButtonsObj.incident_label || 'Reportar Problema'}
+            </div>
           </div>
-          <div style={{ font:'400 13.5px/1.5 sans-serif', color:'#64748b' }}>Algo está com erro, lento ou fora do ar. Diagnosticamos em 3 passos.</div>
-          <div style={{ font:'700 13px sans-serif', color:'#dc2626' }}>Abrir incidente →</div>
+          <div className="text-sm text-slate-500 leading-relaxed">
+            {portalButtonsObj.incident_desc || 'Algo está com erro, lento ou fora do ar. Diagnosticamos em 3 passos.'}
+          </div>
+          <div className="font-bold text-xs text-red-600">
+            Abrir incidente →
+          </div>
         </button>
 
-        <button onClick={onRequest} style={{ display:'flex', flexDirection:'column', gap:11, padding:20, background:'#fff', border:`2px solid ${brandBorder}`, borderRadius:14, textAlign:'left', boxShadow:'0 1px 3px rgba(15,23,42,.05)', cursor:'pointer', transition:'transform .15s,box-shadow .15s' }}>
-          <div style={{ display:'flex', alignItems:'center', gap:11 }}>
-            <div style={{ width:44, height:44, borderRadius:12, background:brandWash, display:'flex', alignItems:'center', justifyContent:'center', fontSize:22, flexShrink:0 }}>✅</div>
-            <div style={{ font:'700 16px sans-serif', color:brand }}>Solicitar Serviço</div>
+        <button onClick={onRequest} className="flex flex-col gap-3 p-5 bg-white border-2 border-slate-100 hover:border-slate-200 rounded-2xl text-left shadow-sm hover:shadow transition-all duration-150 cursor-pointer">
+          <div className="flex items-center gap-3">
+            <div className={`w-11 h-11 rounded-xl ${currentTheme.accentBg} flex items-center justify-center text-2xl shrink-0`}>
+              {portalButtonsObj.request_emoji || '✅'}
+            </div>
+            <div className={`font-bold text-base ${currentTheme.accentText}`}>
+              {portalButtonsObj.request_label || 'Solicitar Serviço'}
+            </div>
           </div>
-          <div style={{ font:'400 13.5px/1.5 sans-serif', color:'#64748b' }}>Peça equipamentos, acessos, softwares ou outros serviços do catálogo.</div>
-          <div style={{ font:'700 13px sans-serif', color:brand }}>Ver catálogo →</div>
+          <div className="text-sm text-slate-500 leading-relaxed">
+            {portalButtonsObj.request_desc || 'Peça equipamentos, acessos, softwares ou outros serviços do catálogo.'}
+          </div>
+          <div className={`font-bold text-xs ${currentTheme.accentText}`}>
+            Ver catálogo →
+          </div>
         </button>
       </div>
 
@@ -875,6 +921,21 @@ const UserPortalLayout = ({ companyId }: { companyId?: string } = {}) => {
     'knowledge':     'Base de Conhecimento',
   }
 
+  const handleSelectSearchResult = (r: any) => {
+    if (r.type === 'incident') {
+      setDbSelIncCat(r.dbCat)
+      setDbSelIncService(services.find(service => service.id === r.dbSymptom?.service_id) || null)
+      setDbSelSymptom(r.dbSymptom || null)
+      setScreen('inc-form')
+    } else {
+      setDbSelReqCat(r.dbCat)
+      setDbSelItem(r.dbItem || null)
+      setScreen('req-form')
+    }
+    setSearchQ('')
+    setSearchOpen(false)
+  }
+
   const prio = PRIORITY_MATRIX[`${impact}-${urgency}`] || PRIORITY_MATRIX['Media-Media']!
   const userName = profile?.name || 'Usuário'
 
@@ -1001,54 +1062,35 @@ const UserPortalLayout = ({ companyId }: { companyId?: string } = {}) => {
       }}>
 
         {/* Top bar */}
-        <div style={{ flexShrink:0, background:'#fff', borderBottom:'1px solid #e2e8f0', padding:'16px 28px' }}>
-          <div style={{ font:'400 13px sans-serif', color:'#94a3b8', marginBottom:2 }}>{getGreeting()}</div>
-          <div style={{ font:'800 25px/1.1 sans-serif', letterSpacing:'-.025em', color:'#0f172a' }}>{TOP_TITLES[screen]}</div>
-        </div>
-
-        {/* Search — home only */}
-        {isHome && (
-          <div style={{ flexShrink:0, padding:'14px 28px', background:'#fff', borderBottom:'1px solid #e2e8f0', position:'relative', zIndex:40 }}>
-            <div style={{ position:'relative' }}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round"
-                style={{ position:'absolute', left:15, top:'50%', transform:'translateY(-50%)', width:17, height:17, pointerEvents:'none' }}>
-                <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
-              </svg>
-              <input type="text" value={searchQ}
-                onChange={e => { setSearchQ(e.target.value); setSearchOpen(true) }}
-                onFocus={() => setSearchOpen(true)}
-                onBlur={() => setTimeout(() => setSearchOpen(false), 200)}
-                placeholder="Busque um problema ou serviço… (ex: VPN, senha, notebook)"
-                style={{ width:'100%', height:48, padding:'0 18px 0 46px', border:'2px solid #e2e8f0', borderRadius:13, background:'#f8fafc', font:'400 15px sans-serif', outline:'none', boxSizing:'border-box' }} />
-              {searchOpen && searchResults.length > 0 && (
-                <div style={{ position:'absolute', top:'calc(100% + 6px)', left:0, right:0, background:'#fff', border:'1px solid #e2e8f0', borderRadius:14, boxShadow:'0 8px 32px rgba(15,23,42,.12)', overflow:'hidden', zIndex:50 }}>
-                  {searchResults.map((r, i) => (
-                    <button key={i} onMouseDown={() => {
-                      if (r.type === 'incident') {
-                        setDbSelIncCat(r.dbCat);
-                        setDbSelIncService(services.find(service => service.id === r.dbSymptom?.service_id) || null);
-                        setDbSelSymptom(r.dbSymptom || null);
-                        setScreen('inc-form');
-                      } else {
-                        setDbSelReqCat(r.dbCat);
-                        setDbSelItem(r.dbItem || null);
-                        setScreen('req-form');
-                      }
-                      setSearchQ(''); setSearchOpen(false)
-                    }}
-                      style={{ display:'flex', alignItems:'center', gap:12, width:'100%', padding:'11px 16px', background:'none', textAlign:'left', borderBottom:'1px solid #f1f5f9', cursor:'pointer' }}>
-                      <span style={{ fontSize:17, flexShrink:0 }}>{r.type==='incident'?'⚠️':'✅'}</span>
-                      <div style={{ flex:1, minWidth:0 }}>
-                        <div style={{ font:'600 14px sans-serif', color:'#0f172a', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{r.label}</div>
-                        <div style={{ font:'400 12px sans-serif', color:'#94a3b8' }}>{r.sub}</div>
-                      </div>
-                      <span style={{ font:'600 11px monospace', padding:'2px 8px', borderRadius:5, flexShrink:0, background:r.tagBg, color:r.tagFg }}>{r.tag}</span>
-                    </button>
-                  ))}
+        {(() => {
+          const currentTheme = themeClasses[branding.themeName as ThemeName] || themeClasses.CorporateBlue
+          return (
+            <div className={`flex-shrink-0 border-b px-7 py-4 ${currentTheme.headerBg} ${currentTheme.headerBorder}`}>
+              <div className={`text-xs font-semibold ${currentTheme.headerText === 'text-white' ? 'text-slate-300' : 'text-slate-500'} mb-0.5`} style={{ color: branding.greetingColor || undefined }}>
+                {branding.greetingPrefix ? `${branding.greetingPrefix}, ${profile?.name?.split(' ')[0] || 'você'}` : getGreeting()}
+              </div>
+              <div className={`text-2xl font-black tracking-tight ${currentTheme.headerText}`}>
+                {screen === 'home' && branding.welcomeTitle ? branding.welcomeTitle : TOP_TITLES[screen]}
+              </div>
+              {screen === 'home' && branding.welcomeSubtitle && (
+                <div className={`text-sm ${currentTheme.headerText === 'text-white' ? 'text-slate-300' : 'text-slate-500'} mt-1`}>
+                  {branding.welcomeSubtitle}
                 </div>
               )}
             </div>
-          </div>
+          )
+        })()}
+
+        {/* Search — home only */}
+        {isHome && (
+          <PortalSearchHeader
+            searchQ={searchQ}
+            setSearchQ={setSearchQ}
+            searchOpen={searchOpen}
+            setSearchOpen={setSearchOpen}
+            searchResults={searchResults}
+            onSelectResult={handleSelectSearchResult}
+          />
         )}
 
         {/* HOME */}
@@ -1067,6 +1109,8 @@ const UserPortalLayout = ({ companyId }: { companyId?: string } = {}) => {
               departments={departments}
               onSelectDept={handleSelectDept}
               cardSettings={cardSettings}
+              portalButtons={(tenant?.catalog_ui_config as any)?.portal_buttons}
+              themeName={branding.themeName}
             />
           </div>
         )}
@@ -1074,95 +1118,28 @@ const UserPortalLayout = ({ companyId }: { companyId?: string } = {}) => {
         {/* MEUS CHAMADOS */}
         {isTickets && (
           <div style={{ flex:1, overflowY:'auto', padding:'22px 28px' }}>
-            {ticketsLoading ? (
-              <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:200, font:'500 14px sans-serif', color:'#94a3b8' }}>
-                Carregando chamados...
-              </div>
-            ) : activeTickets.length === 0 ? (
-              <div style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', height:200, gap:12, textAlign:'center' }}>
-                <span style={{ fontSize:40 }}>🎫</span>
-                <div style={{ font:'600 16px sans-serif', color:'#0f172a' }}>Nenhum chamado aberto</div>
-                <div style={{ font:'400 13px sans-serif', color:'#94a3b8' }}>Você não possui chamados ativos no momento.</div>
-                <button onClick={() => setScreen('inc-cats')}
-                  style={{ marginTop:8, padding:'10px 20px', background:brand, borderRadius:10, font:'600 14px sans-serif', color:'#fff', border:'none', cursor:'pointer' }}>
-                  Reportar problema
-                </button>
-              </div>
-            ) : (
-              <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
-                <div style={{ font:'700 11px sans-serif', color:'#94a3b8', textTransform:'uppercase', letterSpacing:'.08em', marginBottom:4 }}>
-                  {activeTickets.length} chamado{activeTickets.length !== 1 ? 's' : ''} ativo{activeTickets.length !== 1 ? 's' : ''}
-                </div>
-                {activeTickets.map(t => {
-                  const ss = STATE_STYLE[t.state] || { bg:'#f1f5f9', fg:'#475569' }
-                  const ps = PRIO_STYLE[t.priority || ''] || { bg:'#f1f5f9', fg:'#6b7280' }
-                  return (
-                    <button key={t.id} onClick={() => openTicketDetail(t)}
-                      style={{ display:'flex', flexDirection:'column', gap:10, padding:'16px 18px', background:'#fff', border:'1.5px solid #e2e8f0', borderRadius:14, textAlign:'left', boxShadow:'0 1px 2px rgba(15,23,42,.04)', cursor:'pointer', transition:'box-shadow .15s' }}>
-                      <div style={{ display:'flex', alignItems:'center', gap:10, flexWrap:'wrap' }}>
-                        <span style={{ font:'700 12px monospace', color:brand }}>{t.number}</span>
-                        <span style={{ font:'600 11px sans-serif', padding:'2px 9px', borderRadius:99, background:ss.bg, color:ss.fg }}>
-                          {STATE_LABELS_PT[t.state] || t.state}
-                        </span>
-                        <span style={{ font:'600 11px sans-serif', padding:'2px 9px', borderRadius:99, background:ps.bg, color:ps.fg, marginLeft:'auto' }}>
-                          {t.priority}
-                        </span>
-                      </div>
-                      <div style={{ font:'600 15px sans-serif', color:'#0f172a' }}>{t.short_description}</div>
-                      <div style={{ font:'400 12px sans-serif', color:'#94a3b8' }}>
-                        {t.ticket_type === 'incident' ? 'Incidente' : 'Requisição'} · Aberto em {fmtDate(t.created_at)}
-                        {t.sla_breached && <span style={{ marginLeft:10, color:'#dc2626', fontWeight:700 }}>⚠ SLA vencido</span>}
-                      </div>
-                    </button>
-                  )
-                })}
-              </div>
-            )}
+            <UserTicketList
+              ticketsLoading={ticketsLoading}
+              tickets={activeTickets}
+              brand={brand}
+              isHistory={false}
+              onSelectTicket={openTicketDetail}
+              onReportProblem={() => setScreen('inc-cats')}
+            />
           </div>
         )}
 
         {/* HISTÓRICO */}
         {isHistory && (
           <div style={{ flex:1, overflowY:'auto', padding:'22px 28px' }}>
-            {ticketsLoading ? (
-              <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:200, font:'500 14px sans-serif', color:'#94a3b8' }}>
-                Carregando histórico...
-              </div>
-            ) : closedTickets.length === 0 ? (
-              <div style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', height:200, gap:12, textAlign:'center' }}>
-                <span style={{ fontSize:40 }}>📊</span>
-                <div style={{ font:'600 16px sans-serif', color:'#0f172a' }}>Nenhum chamado no histórico</div>
-                <div style={{ font:'400 13px sans-serif', color:'#94a3b8' }}>Chamados resolvidos e fechados aparecerão aqui.</div>
-              </div>
-            ) : (
-              <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
-                <div style={{ font:'700 11px sans-serif', color:'#94a3b8', textTransform:'uppercase', letterSpacing:'.08em', marginBottom:4 }}>
-                  {closedTickets.length} chamado{closedTickets.length !== 1 ? 's' : ''} no histórico
-                </div>
-                {closedTickets.map(t => {
-                  const ss = STATE_STYLE[t.state] || { bg:'#f1f5f9', fg:'#475569' }
-                  const ps = PRIO_STYLE[t.priority || ''] || { bg:'#f1f5f9', fg:'#6b7280' }
-                  return (
-                    <button key={t.id} onClick={() => openTicketDetail(t)}
-                      style={{ display:'flex', flexDirection:'column', gap:10, padding:'16px 18px', background:'#fff', border:'1.5px solid #e2e8f0', borderRadius:14, textAlign:'left', opacity:.85, boxShadow:'0 1px 2px rgba(15,23,42,.03)', cursor:'pointer' }}>
-                      <div style={{ display:'flex', alignItems:'center', gap:10, flexWrap:'wrap' }}>
-                        <span style={{ font:'700 12px monospace', color:'#64748b' }}>{t.number}</span>
-                        <span style={{ font:'600 11px sans-serif', padding:'2px 9px', borderRadius:99, background:ss.bg, color:ss.fg }}>
-                          {STATE_LABELS_PT[t.state] || t.state}
-                        </span>
-                        <span style={{ font:'600 11px sans-serif', padding:'2px 9px', borderRadius:99, background:ps.bg, color:ps.fg, marginLeft:'auto' }}>
-                          {t.priority}
-                        </span>
-                      </div>
-                      <div style={{ font:'600 15px sans-serif', color:'#334155' }}>{t.short_description}</div>
-                      <div style={{ font:'400 12px sans-serif', color:'#94a3b8' }}>
-                        {t.ticket_type === 'incident' ? 'Incidente' : 'Requisição'} · Atualizado em {fmtDate(t.updated_at)}
-                      </div>
-                    </button>
-                  )
-                })}
-              </div>
-            )}
+            <UserTicketList
+              ticketsLoading={ticketsLoading}
+              tickets={closedTickets}
+              brand={brand}
+              isHistory={true}
+              onSelectTicket={openTicketDetail}
+              onReportProblem={() => setScreen('inc-cats')}
+            />
           </div>
         )}
 
@@ -1493,9 +1470,11 @@ const UserPortalLayout = ({ companyId }: { companyId?: string } = {}) => {
 
         {/* KNOWLEDGE BASE */}
         {isKnowledge && (
-          <div style={{ flex:1, overflowY:'auto', padding:'26px 28px' }}>
-            <KnowledgePortal companyId={catalogCompanyId ?? ''} profileId={profile?.id ?? null} accent={brand} />
-          </div>
+          <KnowledgeQuickView
+            catalogCompanyId={catalogCompanyId ?? ''}
+            profileId={profile?.id ?? null}
+            brand={brand}
+          />
         )}
 
         {/* FLOW screens */}
@@ -1553,142 +1532,54 @@ const UserPortalLayout = ({ companyId }: { companyId?: string } = {}) => {
                 </div>
               )}
 
-              {/* INC: Categorias */}
-              {screen === 'inc-cats' && (
-                <div>
-                  <h2 style={{ font:'700 20px sans-serif', color:'#0f172a', marginBottom:6 }}>Qual área está com problema?</h2>
-                  <p style={{ font:'400 14px sans-serif', color:'#94a3b8', marginBottom:20 }}>Selecione a categoria mais próxima do que está acontecendo.</p>
-
-                  {catalogLoading ? (
-                    <div style={{ padding:20, color:'#94a3b8', font:'500 14px sans-serif', textAlign:'center' }}>Carregando categorias...</div>
-                  ) : (
-                    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
-                      {visibleIncCategories.length > 0 ? (
-                        visibleIncCategories.map(c => {
-                          const catServices = services.filter(service => service.category_id === c.id)
-                          return (
-                            <button key={c.id} onClick={() => { setDbSelIncCat(c); setDbSelIncService(null); setDbSelSymptom(null); setScreen('inc-services') }}
-                              style={{
-                                display:'flex',
-                                alignItems:'center',
-                                gap:14,
-                                padding:18,
-                                background: customPillBg || '#fff',
-                                border: customPillBg ? `1.5px solid ${customPillBg}` : '1.5px solid #e2e8f0',
-                                borderRadius:14,
-                                textAlign:'left',
-                                boxShadow:'0 1px 2px rgba(15,23,42,.04)',
-                                cursor:'pointer',
-                                transition:'transform .15s,box-shadow .15s'
-                              }}>
-                              <CatalogIcon icon={c.icon} name={c.name} size={catalogIconSize} bg={customIconBg} />
-                              <div style={{ minWidth:0 }}>
-                                <div style={{ font:`700 ${catalogFontSize} sans-serif`, color: customPillColor || '#0f172a' }}>{c.name}</div>
-                                <div style={{ font:'400 12px sans-serif', color: customPillColor ? hexToRgba(customPillColor, 0.7) : '#94a3b8', marginTop:2 }}>{catServices.length} servi&ccedil;o{catServices.length === 1 ? '' : 's'}</div>
-                              </div>
-                            </button>
-                          )
-                        })
-                      ) : !selDeptId && categories.length === 0 ? (
-                        // Fallback legado caso use mocks (só no fluxo padrão de TI, sem dados no banco)
-                        config.incCats.map(c => (
-                          <button key={c.id} onClick={() => { setSelIncCat(c); setScreen('inc-symptoms') }}
-                            style={{ display:'flex', alignItems:'center', gap:14, padding:18, background:'#fff', border:'1.5px solid #e2e8f0', borderRadius:14, textAlign:'left', boxShadow:'0 1px 2px rgba(15,23,42,.04)', cursor:'pointer', transition:'transform .15s,box-shadow .15s' }}>
-                            <div style={{ width:52, height:52, borderRadius:14, background:c.bg, display:'flex', alignItems:'center', justifyContent:'center', fontSize:26, flexShrink:0 }}>{c.emoji}</div>
-                            <div style={{ minWidth:0 }}>
-                              <div style={{ font:'700 15px sans-serif', color:'#0f172a' }}>{c.name}</div>
-                              <div style={{ font:'400 12px sans-serif', color:'#94a3b8', marginTop:2 }}>{c.symptoms.length} sintomas</div>
-                            </div>
-                          </button>
-                        ))
-                      ) : (
-                        <div style={{ gridColumn:'1 / -1', padding:20, color:'#94a3b8', font:'500 14px sans-serif', textAlign:'center' }}>
-                          Nenhuma categoria de incidente cadastrada{selDept ? ` em ${selDept.name}` : ''}.
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )}
+              {/* INC: Categorias, Serviços, Sintomas, REQ: Categorias, Subcategorias, Itens */}
+              {['inc-cats', 'inc-services', 'inc-symptoms', 'req-cats', 'req-subcats', 'req-items'].includes(screen) ? (
+                <UserServiceCatalog
+                  screen={screen}
+                  catalogLoading={catalogLoading}
+                  visibleIncCategories={visibleIncCategories}
+                  visibleReqCategories={visibleReqCategories}
+                  services={services}
+                  serviceSymptoms={serviceSymptoms}
+                  reqSubcategories={reqSubcategories}
+                  reqItems={reqItems}
+                  selIncCat={selIncCat}
+                  selReqCat={selReqCat}
+                  dbSelIncCat={dbSelIncCat}
+                  dbSelIncService={dbSelIncService}
+                  dbSelReqCat={dbSelReqCat}
+                  dbSelReqSubcat={dbSelReqSubcat}
+                  catalogIconSize={catalogIconSize}
+                  catalogFontSize={catalogFontSize}
+                  customIconBg={customIconBg}
+                  customPillBg={customPillBg}
+                  customPillColor={customPillColor}
+                  selDept={selDept}
+                  config={config}
+                  categories={categories}
+                  reqCategories={reqCategories}
+                  onSelectIncCat={(c) => { setDbSelIncCat(c); setDbSelIncService(null); setDbSelSymptom(null); setScreen('inc-services') }}
+                  onSelectLegacyIncCat={(c) => { setSelIncCat(c); setScreen('inc-symptoms') }}
+                  onSelectIncService={(s) => { setDbSelIncService(s); setDbSelSymptom(null); setScreen('inc-symptoms') }}
+                  onSelectIncSymptom={(ss) => { setDbSelSymptom(ss); setScreen('inc-form') }}
+                  onSelectLegacyIncSymptom={(s) => { setSelSymptom(s); setScreen('inc-form') }}
+                  onSelectReqCat={(c) => {
+                    setDbSelReqCat(c); setDbSelReqSubcat(null)
+                    const hasSubcats = reqSubcategories.some(s => s.category_id === c.id && s.active)
+                    setScreen(hasSubcats ? 'req-subcats' : 'req-items')
+                  }}
+                  onSelectLegacyReqCat={(c) => { setSelReqCat(c); setScreen('req-items') }}
+                  onSelectReqSubcat={(s) => { setDbSelReqSubcat(s); setScreen('req-items') }}
+                  onSelectLegacyReqSubcatOthers={() => { setDbSelReqSubcat({ id: OTHERS_SUBCAT_ID, company_id: dbSelReqCat!.company_id, category_id: dbSelReqCat!.id, name: 'Outros', description: null, icon: '📂', active: true, sort_order: 999, created_at: '', updated_at: '' }); setScreen('req-items') }}
+                  onSelectReqItem={(item) => { setDbSelItem(item); setScreen('req-form') }}
+                  onSelectLegacyReqItem={(item) => { setSelItem(item); setScreen('req-form') }}
+                />
+              ) : null}
 
 
-              {/* INC: Servicos */}
-              {screen === 'inc-services' && dbSelIncCat && (
-                <div>
-                  <h2 style={{ font:'700 20px sans-serif', color:'#0f172a', marginBottom:6 }}>Qual servi&ccedil;o foi afetado?</h2>
-                  <p style={{ font:'400 14px sans-serif', color:'#94a3b8', marginBottom:20 }}>Selecione o servi&ccedil;o para visualizar os sintomas dispon&iacute;veis.</p>
-                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
-                    {(() => {
-                      const catServices = services.filter(service => service.category_id === dbSelIncCat.id)
-                      if (catServices.length === 0) {
-                        return <div style={{ gridColumn:'1 / -1', padding:20, color:'#94a3b8', font:'400 14px sans-serif', textAlign:'center' }}>Nenhum servi&ccedil;o cadastrado nesta categoria.</div>
-                      }
-                      return catServices.map(service => {
-                        const symptomCount = serviceSymptoms.filter(item => item.service_id === service.id).length
-                        return (
-                          <button key={service.id} onClick={() => { setDbSelIncService(service); setDbSelSymptom(null); setScreen('inc-symptoms') }}
-                            style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:12, padding:'16px 18px', background:'#fff', border:'1.5px solid #e2e8f0', borderRadius:13, textAlign:'left', width:'100%', cursor:'pointer', transition:'transform .15s,box-shadow .15s' }}>
-                            <div style={{ display:'flex', alignItems:'center', gap:12, minWidth:0 }}>
-                              <CatalogIcon icon={service.icon} name={service.name} size={36} />
-                              <div style={{ minWidth:0 }}>
-                                <div style={{ font:'700 14.5px sans-serif', color:'#0f172a' }}>{service.name}</div>
-                                <div style={{ font:'400 12px sans-serif', color:'#94a3b8', marginTop:2 }}>{symptomCount} sintoma{symptomCount === 1 ? '' : 's'}</div>
-                              </div>
-                            </div>
-                            <span style={{ fontSize:15, color:'#94a3b8', flexShrink:0 }}>&rarr;</span>
-                          </button>
-                        )
-                      })
-                    })()}
-                  </div>
-                </div>
-              )}
 
-              {/* INC: Sintomas */}
-              {screen === 'inc-symptoms' && (dbSelIncService || selIncCat) && (
-                <div>
-                  <h2 style={{ font:'700 20px sans-serif', color:'#0f172a', marginBottom:6 }}>O que está acontecendo?</h2>
-                  <p style={{ font:'400 14px sans-serif', color:'#94a3b8', marginBottom:20 }}>Selecione o sintoma que melhor descreve o problema.</p>
-                  <div style={{ display:'flex', flexDirection:'column', gap:9 }}>
-                    {dbSelIncService ? (
-                      (() => {
-                        const catSymptoms = serviceSymptoms.filter(ss => ss.service_id === dbSelIncService.id)
-                        
-                        if (catSymptoms.length === 0) {
-                          return <div style={{ padding:20, color:'#94a3b8', font:'400 14px sans-serif', textAlign:'center' }}>Nenhum sintoma cadastrado neste servi&ccedil;o.</div>
-                        }
-                        
-                        return catSymptoms.map(ss => {
-                          const svc = services.find(s => s.id === ss.service_id)
-                          const label = ss.symptom?.name ? `${svc?.name || ''} — ${ss.symptom.name}` : (svc?.name || '')
-                          const symptomLabel = ss.symptom?.name || label
-                          return (
-                            <button key={ss.id} onClick={() => { setDbSelSymptom(ss); setScreen('inc-form') }}
-                              style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:12, padding:'15px 18px', background:'#fff', border:'1.5px solid #e2e8f0', borderRadius:13, textAlign:'left', width:'100%', cursor:'pointer', transition:'transform .15s,box-shadow .15s' }}>
-                              <div style={{ display:'flex', alignItems:'center', gap:11 }}>
-                                <CatalogIcon icon={ss.symptom?.icon} name={symptomLabel} size={28} />
-                                <span style={{ font:'600 14.5px sans-serif', color:'#0f172a', marginLeft:8 }}>{symptomLabel}</span>
-                              </div>
-                              <span style={{ fontSize:15, color:'#94a3b8', flexShrink:0 }}>→</span>
-                            </button>
-                          )
-                        })
-                      })()
-                    ) : (
-                      selIncCat?.symptoms.map(s => (
-                        <button key={s} onClick={() => { setSelSymptom(s); setScreen('inc-form') }}
-                          style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:12, padding:'15px 18px', background:'#fff', border:'1.5px solid #e2e8f0', borderRadius:13, textAlign:'left', width:'100%', cursor:'pointer', transition:'transform .15s,box-shadow .15s' }}>
-                          <div style={{ display:'flex', alignItems:'center', gap:11 }}>
-                            <div style={{ width:8, height:8, borderRadius:'50%', background:'#e2e8f0', flexShrink:0 }} />
-                            <span style={{ font:'600 14.5px sans-serif', color:'#0f172a' }}>{s}</span>
-                          </div>
-                          <span style={{ fontSize:15, color:'#94a3b8', flexShrink:0 }}>→</span>
-                        </button>
-                      ))
-                    )}
-                  </div>
-                </div>
-              )}
+
+
 
               {/* INC: Form */}
               {screen === 'inc-form' && (
@@ -1768,152 +1659,11 @@ const UserPortalLayout = ({ companyId }: { companyId?: string } = {}) => {
                 </div>
               )}
 
-              {/* REQ: Categorias */}
-              {screen === 'req-cats' && (
-                <div>
-                  <h2 style={{ font:'700 20px sans-serif', color:'#0f172a', marginBottom:6 }}>O que você quer solicitar?</h2>
-                  <p style={{ font:'400 14px sans-serif', color:'#94a3b8', marginBottom:20 }}>Selecione a categoria da solicitação.</p>
 
-                  {catalogLoading ? (
-                    <div style={{ padding:20, color:'#94a3b8', font:'500 14px sans-serif', textAlign:'center' }}>Carregando categorias...</div>
-                  ) : (
-                    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
-                      {visibleReqCategories.length > 0 ? (
-                        visibleReqCategories.map(c => {
-                          const catItems = reqItems.filter(it => {
-                            if (it.request_category_id) return it.request_category_id === c.id
-                            const sub = reqSubcategories.find(s => s.id === it.request_subcategory_id)
-                            return sub ? sub.category_id === c.id : false
-                          })
-                          return (
-                            <button key={c.id} onClick={() => {
-                              setDbSelReqCat(c); setDbSelReqSubcat(null)
-                              const hasSubcats = reqSubcategories.some(s => s.category_id === c.id && s.active)
-                              setScreen(hasSubcats ? 'req-subcats' : 'req-items')
-                            }}
-                              style={{
-                                display:'flex',
-                                alignItems:'center',
-                                gap:14,
-                                padding:18,
-                                background: customPillBg || '#fff',
-                                border: customPillBg ? `1.5px solid ${customPillBg}` : '1.5px solid #e2e8f0',
-                                borderRadius:14,
-                                textAlign:'left',
-                                boxShadow:'0 1px 2px rgba(15,23,42,.04)',
-                                cursor:'pointer',
-                                transition:'transform .15s,box-shadow .15s'
-                              }}>
-                              <CatalogIcon icon={c.icon} name={c.name} size={catalogIconSize} bg={customIconBg} />
-                              <div style={{ minWidth:0 }}>
-                                <div style={{ font:`700 ${catalogFontSize} sans-serif`, color: customPillColor || '#0f172a' }}>{c.name}</div>
-                                <div style={{ font:'400 12px sans-serif', color: customPillColor ? hexToRgba(customPillColor, 0.7) : '#94a3b8', marginTop:2 }}>{catItems.length} itens</div>
-                              </div>
-                            </button>
-                          )
-                        })
-                      ) : !selDeptId && reqCategories.length === 0 ? (
-                        // Fallback legado caso use mocks (só no fluxo padrão de TI, sem dados no banco)
-                        config.reqCats.map(c => (
-                          <button key={c.id} onClick={() => { setSelReqCat(c); setScreen('req-items') }}
-                            style={{ display:'flex', alignItems:'center', gap:14, padding:18, background:'#fff', border:'1.5px solid #e2e8f0', borderRadius:14, textAlign:'left', boxShadow:'0 1px 2px rgba(15,23,42,.04)', cursor:'pointer', transition:'transform .15s,box-shadow .15s' }}>
-                            <div style={{ width:52, height:52, borderRadius:14, background:c.bg, display:'flex', alignItems:'center', justifyContent:'center', fontSize:26, flexShrink:0 }}>{c.emoji}</div>
-                            <div style={{ minWidth:0 }}>
-                              <div style={{ font:'700 15px sans-serif', color:'#0f172a' }}>{c.name}</div>
-                              <div style={{ font:'400 12px sans-serif', color:'#94a3b8', marginTop:2 }}>{c.items.length} itens</div>
-                            </div>
-                          </button>
-                        ))
-                      ) : (
-                        <div style={{ gridColumn:'1 / -1', padding:20, color:'#94a3b8', font:'500 14px sans-serif', textAlign:'center' }}>
-                          Nenhuma categoria de requisição cadastrada{selDept ? ` em ${selDept.name}` : ''}.
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )}
 
-              {/* REQ: Subcategorias (Nível 2 — migration 047) */}
-              {screen === 'req-subcats' && dbSelReqCat && (
-                <div>
-                  <h2 style={{ font:'700 20px sans-serif', color:'#0f172a', marginBottom:6 }}>{dbSelReqCat.name}</h2>
-                  <p style={{ font:'400 14px sans-serif', color:'#94a3b8', marginBottom:20 }}>Selecione a subcategoria.</p>
-                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
-                    {reqSubcategories.filter(s => s.category_id === dbSelReqCat.id && s.active).map(s => {
-                      const count = reqItems.filter(it => it.request_subcategory_id === s.id).length
-                      return (
-                        <button key={s.id} onClick={() => { setDbSelReqSubcat(s); setScreen('req-items') }}
-                          style={{ display:'flex', alignItems:'center', gap:14, padding:18, background: customPillBg || '#fff', border: customPillBg ? `1.5px solid ${customPillBg}` : '1.5px solid #e2e8f0', borderRadius:14, textAlign:'left', boxShadow:'0 1px 2px rgba(15,23,42,.04)', cursor:'pointer', transition:'transform .15s,box-shadow .15s' }}>
-                          <CatalogIcon icon={s.icon} name={s.name} size={catalogIconSize} bg={customIconBg} />
-                          <div style={{ minWidth:0 }}>
-                            <div style={{ font:`700 ${catalogFontSize} sans-serif`, color: customPillColor || '#0f172a' }}>{s.name}</div>
-                            <div style={{ font:'400 12px sans-serif', color: customPillColor ? hexToRgba(customPillColor, 0.7) : '#94a3b8', marginTop:2 }}>{count} iten{count === 1 ? '' : 's'}</div>
-                          </div>
-                        </button>
-                      )
-                    })}
-                    {/* Itens legados sem subcategoria: card "Outros" */}
-                    {reqItems.some(it => !it.request_subcategory_id && it.request_category_id === dbSelReqCat.id) && (
-                      <button onClick={() => { setDbSelReqSubcat({ id: OTHERS_SUBCAT_ID, company_id: dbSelReqCat.company_id, category_id: dbSelReqCat.id, name: 'Outros', description: null, icon: '📂', active: true, sort_order: 999, created_at: '', updated_at: '' }); setScreen('req-items') }}
-                        style={{ display:'flex', alignItems:'center', gap:14, padding:18, background: customPillBg || '#fff', border: customPillBg ? `1.5px solid ${customPillBg}` : '1.5px solid #e2e8f0', borderRadius:14, textAlign:'left', boxShadow:'0 1px 2px rgba(15,23,42,.04)', cursor:'pointer', transition:'transform .15s,box-shadow .15s' }}>
-                        <CatalogIcon icon="📂" name="Outros" size={catalogIconSize} bg={customIconBg} />
-                        <div style={{ minWidth:0 }}>
-                          <div style={{ font:`700 ${catalogFontSize} sans-serif`, color: customPillColor || '#0f172a' }}>Outros</div>
-                          <div style={{ font:'400 12px sans-serif', color: customPillColor ? hexToRgba(customPillColor, 0.7) : '#94a3b8', marginTop:2 }}>Demais solicitações</div>
-                        </div>
-                      </button>
-                    )}
-                  </div>
-                </div>
-              )}
 
-              {/* REQ: Itens */}
-              {screen === 'req-items' && (dbSelReqCat || selReqCat) && (
-                <div>
-                  <h2 style={{ font:'700 20px sans-serif', color:'#0f172a', marginBottom:6 }}>{dbSelReqSubcat && dbSelReqSubcat.id !== OTHERS_SUBCAT_ID ? dbSelReqSubcat.name : dbSelReqCat ? dbSelReqCat.name : selReqCat?.name}</h2>
-                  <p style={{ font:'400 14px sans-serif', color:'#94a3b8', marginBottom:20 }}>Selecione o item desejado.</p>
-                  <div style={{ display:'flex', flexDirection:'column', gap:9 }}>
-                    {dbSelReqCat ? (
-                      (() => {
-                        // Com subcategoria selecionada: itens dela; "Outros"/sem subcategorias: itens legados da categoria
-                        const catItems = dbSelReqSubcat && dbSelReqSubcat.id !== OTHERS_SUBCAT_ID
-                          ? reqItems.filter(it => it.request_subcategory_id === dbSelReqSubcat.id)
-                          : dbSelReqSubcat?.id === OTHERS_SUBCAT_ID
-                            ? reqItems.filter(it => !it.request_subcategory_id && it.request_category_id === dbSelReqCat.id)
-                            : reqItems.filter(it => {
-                                if (it.request_category_id) return it.request_category_id === dbSelReqCat.id
-                                const sub = reqSubcategories.find(s => s.id === it.request_subcategory_id)
-                                return sub ? sub.category_id === dbSelReqCat.id : false
-                              })
 
-                        if (catItems.length === 0) {
-                          return <div style={{ padding:20, color:'#94a3b8', font:'400 14px sans-serif', textAlign:'center' }}>Nenhum item disponível nesta categoria.</div>
-                        }
 
-                        return catItems.map(item => (
-                          <button key={item.id} onClick={() => { setDbSelItem(item); setScreen('req-form') }}
-                            style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:12, padding:'15px 18px', background:'#fff', border:'1.5px solid #e2e8f0', borderRadius:13, textAlign:'left', width:'100%', cursor:'pointer', transition:'transform .15s,box-shadow .15s' }}>
-                            <div style={{ display:'flex', alignItems:'center', gap:11 }}>
-                              <CatalogIcon icon={item.icon} name={item.name} size={28} />
-                              <span style={{ font:'600 14.5px sans-serif', color:'#0f172a', marginLeft:8 }}>{item.name}</span>
-                            </div>
-                            <span style={{ fontSize:15, color:'#94a3b8', flexShrink:0 }}>→</span>
-                          </button>
-                        ))
-                      })()
-                    ) : (
-                      selReqCat?.items.map(item => (
-                        <button key={item} onClick={() => { setSelItem(item); setScreen('req-form') }}
-                          style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:12, padding:'15px 18px', background:'#fff', border:'1.5px solid #e2e8f0', borderRadius:13, textAlign:'left', width:'100%', cursor:'pointer', transition:'transform .15s,box-shadow .15s' }}>
-                          <span style={{ font:'600 14.5px sans-serif', color:'#0f172a' }}>{item}</span>
-                          <span style={{ fontSize:15, color:'#94a3b8', flexShrink:0 }}>→</span>
-                        </button>
-                      ))
-                    )}
-                  </div>
-                </div>
-              )}
 
               {/* REQ: Form */}
               {screen === 'req-form' && (

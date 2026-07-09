@@ -72,6 +72,10 @@ export interface ProfileRow {
   phone: string | null
   avatar_url: string | null
   active: boolean
+  manager_id: string | null
+  alternate_manager_id: string | null
+  job_title_id: string | null
+  location_id: string | null
   created_at: string
   updated_at: string
 }
@@ -172,6 +176,7 @@ export interface PendingReasonRow {
   slug: string
   requires_customer_action: boolean
   active: boolean
+  pauses_sla: boolean
   created_at: string
 }
 
@@ -636,6 +641,7 @@ export interface RequestItemRow {
   requires_approval?: boolean
   approval_group_id?: string | null
   approval_mode?: 'any' | 'all'
+  approval_type?: 'group' | 'manager' | 'department_head'
   // join opcional
   group?: { id: string; name: string } | null
 }

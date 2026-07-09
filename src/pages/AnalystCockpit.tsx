@@ -2,9 +2,10 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   User, Building2, AlertTriangle, Send,
   BookOpen, CheckCircle, History, FileText, ListTree, Link2, Lock, Pause, Edit3,
-  ShieldAlert, PlayCircle, ArrowRightLeft, X,
+  ShieldAlert, PlayCircle, ArrowRightLeft, X, ChevronDown, ChevronUp,
 } from 'lucide-react'
-import { incidentsService, messagesService, assignmentGroupsService, pendingReasonsService, responseMacrosService } from '../lib/services'
+import { incidentsService, messagesService, assignmentGroupsService, pendingReasonsService, responseMacrosService, cmdbService } from '../lib/services'
+import type { CmdbImpactRow } from '../lib/services'
 import { translateState } from '../lib/statusLabels'
 import { useAuth } from '../auth'
 import { useToast } from '../context'
@@ -79,6 +80,62 @@ const fmtDuration = (ms: number) => {
   if (h > 0) return `${h}h ${m}m`
   if (m > 0) return `${m}m ${sec}s`
   return `${sec}s`
+}
+
+export interface SlaStateResult {
+  status: 'fulfilled' | 'breached' | 'warning' | 'normal' | 'paused' | 'none'
+  text: string
+  showDeadline: boolean
+}
+
+export function calculateSlaState(
+  deadline: string | null | undefined,
+  achievedAt: string | null | undefined,
+  isBreached: boolean | undefined,
+  nowTime: number,
+  createdAt: string | null | undefined,
+  pausedAt?: string | null
+): SlaStateResult {
+  if (!deadline) {
+    return {
+      status: 'none',
+      text: 'Sem prazo definido',
+      showDeadline: false
+    }
+  }
+
+  const targetTime = new Date(deadline).getTime()
+  const startTime = createdAt ? new Date(createdAt).getTime() : targetTime - (4 * 3600 * 1000)
+  const totalDuration = targetTime - startTime
+
+  let status: 'fulfilled' | 'breached' | 'warning' | 'normal' | 'paused' = 'normal'
+  let text = ''
+
+  if (achievedAt) {
+    status = 'fulfilled'
+    text = `Cumprido em ${fmt(achievedAt)}`
+  } else if (pausedAt) {
+    status = 'paused'
+    const remainingAtPause = targetTime - new Date(pausedAt).getTime()
+    text = remainingAtPause < 0
+      ? `Pausado (estourado há ${fmtDuration(Math.abs(remainingAtPause))})`
+      : `Pausado — ${fmtDuration(remainingAtPause)} restante`
+  } else {
+    const remaining = targetTime - nowTime
+
+    if (isBreached || remaining < 0) {
+      status = 'breached'
+      text = remaining < 0 ? `Estourado há ${fmtDuration(Math.abs(remaining))}` : 'Estourado'
+    } else {
+      text = `${fmtDuration(remaining)} restante`
+      if (remaining <= 0.25 * totalDuration || remaining <= 3600 * 1000) {
+        status = 'warning'
+      }
+    }
+  }
+
+  const showDeadline = !achievedAt && status !== 'breached' && status !== 'paused'
+  return { status, text, showDeadline }
 }
 
 
@@ -170,6 +227,9 @@ const AnalystCockpit = ({ ticket = FALLBACK_TICKET }: { ticket?: WorkspaceTicket
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [activeContext, setActiveContext] = useState<ContextTab>('detalhes')
+  const [impactCis, setImpactCis] = useState<CmdbImpactRow[]>([])
+  const [loadingImpact, setLoadingImpact] = useState(false)
+  const [impactExpanded, setImpactExpanded] = useState(true)
 
   // Helper to render Priority badges (P1–P5, dinâmico via priority_level das triggers)
   const renderPriorityBadge = (prio: string | null | undefined, level?: number | null) => {
@@ -203,47 +263,22 @@ const AnalystCockpit = ({ ticket = FALLBACK_TICKET }: { ticket?: WorkspaceTicket
     createdAt: string | null | undefined,
     pausedAt?: string | null
   ) => {
-    if (!deadline) {
+    const { status, text, showDeadline } = calculateSlaState(
+      deadline,
+      achievedAt,
+      isBreached,
+      nowTime,
+      createdAt,
+      pausedAt
+    )
+
+    if (status === 'none') {
       return (
         <div className="border border-outline-variant p-4 flex flex-col justify-center bg-surface-container/30 rounded-xl shadow-sm">
           <span className="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">{label}</span>
-          <span className="text-xs font-semibold italic mt-1">Sem prazo definido</span>
+          <span className="text-xs font-semibold italic mt-1">{text}</span>
         </div>
       )
-    }
-
-    const targetTime = new Date(deadline).getTime()
-    const startTime = createdAt ? new Date(createdAt).getTime() : targetTime - (4 * 3600 * 1000)
-    const totalDuration = targetTime - startTime
-
-    let status: 'fulfilled' | 'breached' | 'warning' | 'normal' | 'paused' = 'normal'
-    let text = ''
-
-    if (achievedAt) {
-      status = 'fulfilled'
-      text = `Cumprido em ${fmt(achievedAt)}`
-    } else if (pausedAt) {
-      // Congelado no instante da pausa — não usa o relógio corrente, senão o
-      // cartão mostraria uma contagem regressiva "correndo" enquanto pausado
-      // (o prazo só é de fato estendido quando o chamado sai da pendência).
-      status = 'paused'
-      const remainingAtPause = targetTime - new Date(pausedAt).getTime()
-      text = remainingAtPause < 0
-        ? `Pausado (estourado há ${fmtDuration(Math.abs(remainingAtPause))})`
-        : `Pausado — ${fmtDuration(remainingAtPause)} restante`
-    } else {
-      const remaining = targetTime - nowTime
-
-      if (isBreached || remaining < 0) {
-        status = 'breached'
-        text = remaining < 0 ? `Estourado há ${fmtDuration(Math.abs(remaining))}` : 'Estourado'
-      } else {
-        text = `${fmtDuration(remaining)} restante`
-        // Alerta amarelo ao consumir 75% do prazo (≤25% restante) ou na última hora.
-        if (remaining <= 0.25 * totalDuration || remaining <= 3600 * 1000) {
-          status = 'warning'
-        }
-      }
     }
 
     const styles = {
@@ -258,8 +293,8 @@ const AnalystCockpit = ({ ticket = FALLBACK_TICKET }: { ticket?: WorkspaceTicket
       <div className={`border rounded-xl p-4 flex flex-col justify-center transition-all shadow-sm ${styles}`}>
         <span className="text-[10px] font-bold uppercase tracking-wider opacity-75">{label}</span>
         <span className="text-sm font-extrabold tracking-tight mt-1">{text}</span>
-        {!achievedAt && status !== 'breached' && status !== 'paused' && (
-          <span className="text-[9px] opacity-75 mt-0.5">Prazo: {fmt(deadline)}</span>
+        {showDeadline && (
+          <span className="text-[9px] opacity-75 mt-0.5">Prazo: {fmt(deadline!)}</span>
         )}
       </div>
     )
@@ -322,12 +357,36 @@ const AnalystCockpit = ({ ticket = FALLBACK_TICKET }: { ticket?: WorkspaceTicket
   // Status atual acessível dentro de callbacks do Realtime (sempre fresco).
   const statusRef = useRef<string>('')
 
+  // Compensação de Drift de Relógio (Clock Drift Compensation)
+  const [serverClockOffset, setServerClockOffset] = useState<number>(0)
+  useEffect(() => {
+    const fetchServerTime = async () => {
+      try {
+        const url = import.meta.env.VITE_SUPABASE_URL as string
+        if (!url) return
+        const start = Date.now()
+        const res = await fetch(url, { method: 'HEAD' })
+        const serverDateHeader = res.headers.get('date')
+        if (serverDateHeader) {
+          const serverTime = new Date(serverDateHeader).getTime()
+          const end = Date.now()
+          const latency = (end - start) / 2
+          const offset = (serverTime + latency) - end
+          setServerClockOffset(offset)
+        }
+      } catch (err) {
+        console.error('Failed to sync server time:', err)
+      }
+    }
+    fetchServerTime()
+  }, [])
+
   // Relógio vivo para o cronômetro de SLA / tempo decorrido
   const [now, setNow] = useState(() => Date.now())
   useEffect(() => {
-    const t = setInterval(() => setNow(Date.now()), 1000)
+    const t = setInterval(() => setNow(Date.now() + serverClockOffset), 1000)
     return () => clearInterval(t)
-  }, [])
+  }, [serverClockOffset])
 
   // Os fluxos de condução são modais. Escape fecha somente quando não há
   // uma operação sendo persistida, evitando perda de contexto durante o save.
@@ -392,6 +451,49 @@ const AnalystCockpit = ({ ticket = FALLBACK_TICKET }: { ticket?: WorkspaceTicket
       .catch(() => { if (!cancelled) setPendingReasons([]) })
     return () => { cancelled = true }
   }, [detail?.company_id, ticket.companyId])
+
+  // Carrega a árvore de impactos em cascata (CMDB) — migration 098
+  useEffect(() => {
+    const caseId = detail?.case_id ?? ticket.caseId ?? null
+    const companyId = detail?.company_id ?? ticket.companyId ?? null
+    if (!caseId || !companyId) {
+      setImpactCis([])
+      return
+    }
+
+    let cancelled = false
+    setLoadingImpact(true)
+
+    // Resolve o CI associado ao caso primeiro
+    cmdbService.getCiForCase(caseId)
+      .then(ciId => {
+        if (cancelled) return
+        if (!ciId) {
+          setImpactCis([])
+          setLoadingImpact(false)
+          return
+        }
+        // Busca a predição de impactos
+        return cmdbService.predictIncidentImpact(companyId, ciId, 'upstream')
+      })
+      .then(impact => {
+        if (!cancelled && impact) {
+          setImpactCis(impact)
+        }
+      })
+      .catch(err => {
+        console.error('Erro ao resolver impactos do CMDB:', err)
+        if (!cancelled) setImpactCis([])
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingImpact(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [detail?.case_id, ticket.caseId, detail?.company_id, ticket.companyId])
+
 
   // Load active assignment groups for this company
   useEffect(() => {
@@ -489,7 +591,11 @@ const AnalystCockpit = ({ ticket = FALLBACK_TICKET }: { ticket?: WorkspaceTicket
       // O modal de atualização não é uma rota alternativa para pendência ou
       // encerramento. Chamados pendentes retomam explicitamente Em Andamento
       // quando uma atualização operacional é salva.
-      const safeState = detail.state === 'New' ? 'New' : 'In Progress'
+      // Se for admin, mantemos o status original se for Resolved ou Closed.
+      const isClosedOrResolved = detail.state === 'Resolved' || detail.state === 'Closed'
+      const safeState = (isAdmin && isClosedOrResolved)
+        ? detail.state
+        : (detail.state === 'New' ? 'New' : 'In Progress')
       setFormState(safeState)
       setFormGroupId(detail.assignment_group_id || detail.assigned_group_id || '')
       setFormAssigneeId(detail.assigned_to_id || '')
@@ -502,7 +608,7 @@ const AnalystCockpit = ({ ticket = FALLBACK_TICKET }: { ticket?: WorkspaceTicket
     setActionMsg(null)
     setConducaoMode('update')
     setActiveContext('detalhes')
-  }, [detail])
+  }, [detail, isAdmin])
 
   const openResolveForm = useCallback(() => {
     if (detail) {
@@ -1021,6 +1127,81 @@ const AnalystCockpit = ({ ticket = FALLBACK_TICKET }: { ticket?: WorkspaceTicket
               </section>
             )}
 
+            {/* Painel de Impacto em Cascata (CMDB) — migration 098 */}
+            {detail && (
+              <section data-testid="cmdb-impact-section" className={`${cardClass} p-5 space-y-4`}>
+                <div 
+                  onClick={() => setImpactExpanded(prev => !prev)}
+                  className="flex items-center justify-between gap-2 border-b pb-3 border-outline-variant cursor-pointer hover:opacity-80 transition-opacity select-none"
+                  data-testid="cmdb-impact-header"
+                >
+                  <div className="flex items-center gap-2">
+                    <ListTree className="w-5 h-5 text-primary" />
+                    <h2 className="text-sm font-bold uppercase tracking-wider text-text-main">Impacto em Cascata (CMDB)</h2>
+                  </div>
+                  <button className="text-on-surface-variant hover:text-text-main" aria-label="Toggle Impact Section">
+                    {impactExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                  </button>
+                </div>
+
+                {impactExpanded && (
+                  <div data-testid="cmdb-impact-content" className="space-y-3">
+                    {loadingImpact ? (
+                      <div className="space-y-2 py-2 animate-pulse" data-testid="cmdb-impact-loading">
+                        <div className="h-4 bg-surface-container rounded-md w-3/4"></div>
+                        <div className="h-4 bg-surface-container rounded-md w-1/2"></div>
+                      </div>
+                    ) : impactCis.length === 0 ? (
+                      <p className="text-sm text-on-surface-variant italic py-2" data-testid="cmdb-impact-empty">
+                        Nenhum impacto em cascata detectado
+                      </p>
+                    ) : (
+                      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3" data-testid="cmdb-impact-list">
+                        {impactCis.map((ci) => {
+                          const isHighOrCritical = ci.criticality === 'high' || ci.criticality === 'critical'
+                          return (
+                            <div 
+                              key={ci.ci_id} 
+                              data-testid={`cmdb-impact-card-${ci.criticality}`}
+                              className={`p-3 border rounded-xl flex flex-col justify-between transition-colors ${
+                                isHighOrCritical 
+                                  ? 'bg-red-500/5 border-red-500/20 text-red-700 dark:text-red-400' 
+                                  : 'bg-surface-container/30 border-outline-variant'
+                              }`}
+                            >
+                              <div>
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className="text-xs font-bold truncate max-w-[80%]" title={ci.ci_name}>{ci.ci_name}</span>
+                                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase shrink-0 ${
+                                    ci.criticality === 'critical'
+                                      ? 'bg-red-600 text-white'
+                                      : ci.criticality === 'high'
+                                        ? 'bg-orange-500 text-white'
+                                        : ci.criticality === 'medium'
+                                          ? 'bg-amber-500 text-white'
+                                          : 'bg-slate-500 text-white'
+                                  }`}>
+                                    {ci.criticality}
+                                  </span>
+                                </div>
+                                <p className="text-[10px] text-on-surface-variant mt-1">
+                                  Classe: <span className="font-semibold">{ci.class_name}</span>
+                                </p>
+                              </div>
+                              <div className="mt-3 flex items-center justify-between text-[10px] border-t pt-2 border-outline-variant/30">
+                                <span className="text-on-surface-variant">Profundidade</span>
+                                <span className="font-bold">Nível {ci.depth}</span>
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </section>
+            )}
+
             <div className="grid grid-cols-1 gap-6">
               {/* COLUNA ESQUERDA (70% ou col-span-2) */}
               <div className="space-y-6">
@@ -1302,7 +1483,7 @@ const AnalystCockpit = ({ ticket = FALLBACK_TICKET }: { ticket?: WorkspaceTicket
                           </label>
                           <select value={formState} onChange={e => setFormState(e.target.value)}
                             className={`w-full px-2.5 py-2 text-xs outline-none cursor-pointer font-medium ${inputClass}`}>
-                            {['New', 'In Progress'].map(value => (
+                            {(isAdmin ? ['New', 'In Progress', 'On Hold', 'Resolved', 'Closed'] : ['New', 'In Progress']).map(value => (
                                 <option key={value} value={value}>{translateState(value)}</option>
                               ))}
                           </select>

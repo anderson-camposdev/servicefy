@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { CalendarClock, Gauge, PauseCircle, Plus, Trash2, Save, X, Pencil, AlertCircle, Lock, Paintbrush, Building, Users, Network, BookOpen, FileText, Layout, Image as ImageIcon, Upload } from 'lucide-react'
+import { CalendarClock, Gauge, PauseCircle, Plus, Trash2, Save, X, Pencil, AlertCircle, Lock, Paintbrush, Building, Users, Network, BookOpen, FileText, Layout, Image as ImageIcon, Upload, ShieldCheck } from 'lucide-react'
 import { pendingReasonsService, slaPolicyService, companiesService } from '../lib/services'
 import { supabase } from '../lib/supabase'
 import { useToast } from '../context'
@@ -66,6 +66,7 @@ export type GovTab =
   | 'catalog_requests'
   | 'form_templates'
   | 'departments'
+  | 'change_cab'
 
 interface SettingsGovernanceProps {
   companyId: string
@@ -76,7 +77,7 @@ interface SettingsGovernanceProps {
 
 export default function SettingsGovernance({ companyId, activeRole, startInDetails = false, initialTab = 'appearance' }: SettingsGovernanceProps) {
   const { toast } = useToast()
-  const { companies } = useAppData()
+  const { companies, profiles } = useAppData()
   
   const isAlpha = false
   const isBeta = false
@@ -151,7 +152,42 @@ export default function SettingsGovernance({ companyId, activeRole, startInDetai
   const [slugTouched, setSlugTouched] = useState(false)
   const [requiresCustomerAction, setRequiresCustomerAction] = useState(false)
   const [pausesSLA, setPausesSLA] = useState(true)
+  const [reasonActive, setReasonActive] = useState(true)
   const [savingReason, setSavingReason] = useState(false)
+
+  // CAB States & Helpers
+  const [selectedCabIds, setSelectedCabIds] = useState<string[]>([])
+  const [savingCab, setSavingCab] = useState(false)
+  const [cabSearch, setCabSearch] = useState('')
+
+  useEffect(() => {
+    if (currentCompanyRow) {
+      const config = (currentCompanyRow.catalog_ui_config as Record<string, any>) || {}
+      setSelectedCabIds(config.default_cab_approvers || [])
+    }
+  }, [currentCompanyRow])
+
+  const handleSaveCab = async (selectedIds: string[]) => {
+    if (!currentCompanyRow) return
+    setSavingCab(true)
+    try {
+      const config = {
+        ...(currentCompanyRow.catalog_ui_config as Record<string, any> || {}),
+        default_cab_approvers: selectedIds
+      }
+      const { error } = await supabase
+        .from('companies')
+        .update({ catalog_ui_config: config })
+        .eq('id', currentCompanyRow.id)
+      if (error) throw error
+      toast.success('Membros padrão do CAB atualizados com sucesso!')
+      window.location.reload()
+    } catch (err: any) {
+      toast.error('Erro ao salvar membros do CAB: ' + err.message)
+    } finally {
+      setSavingCab(false)
+    }
+  }
 
   // Style Tokens matching theme variables
   const cardClass = 'bg-surface border border-outline-variant rounded-xl shadow-sm'
@@ -397,8 +433,20 @@ export default function SettingsGovernance({ companyId, activeRole, startInDetai
   const handleToggleSlaPausing = async (r: PendingReasonRow) => {
     setReasonError(null)
     try {
-      await pendingReasonsService.update(r.id, managedCompanyId, { active: !r.active })
+      await pendingReasonsService.update(r.id, managedCompanyId, { pauses_sla: !r.pauses_sla })
       toast.success(`Status de pausa de SLA alterado para o motivo: ${r.name}`)
+      loadReasons()
+    } catch (e) {
+      setReasonError(getMsg(e))
+    }
+  }
+
+  // Toggle Reason selection active/inactive on click
+  const handleToggleReasonActive = async (r: PendingReasonRow) => {
+    setReasonError(null)
+    try {
+      await pendingReasonsService.update(r.id, managedCompanyId, { active: !r.active })
+      toast.success(`Status de ativação alterado para o motivo: ${r.name}`)
       loadReasons()
     } catch (e) {
       setReasonError(getMsg(e))
@@ -426,6 +474,7 @@ export default function SettingsGovernance({ companyId, activeRole, startInDetai
     setSlugTouched(false)
     setRequiresCustomerAction(false)
     setPausesSLA(true)
+    setReasonActive(true)
     setIsModalOpen(true)
   }
 
@@ -435,7 +484,8 @@ export default function SettingsGovernance({ companyId, activeRole, startInDetai
     setReasonSlug(r.slug)
     setSlugTouched(true)
     setRequiresCustomerAction(r.requires_customer_action)
-    setPausesSLA(r.active) // active is mapped to pausesSLA
+    setPausesSLA(r.pauses_sla)
+    setReasonActive(r.active)
     setIsModalOpen(true)
   }
 
@@ -452,7 +502,8 @@ export default function SettingsGovernance({ companyId, activeRole, startInDetai
           name: reasonName.trim(),
           slug: reasonSlug.trim(),
           requires_customer_action: requiresCustomerAction,
-          active: pausesSLA,
+          active: reasonActive,
+          pauses_sla: pausesSLA,
         })
         toast.success('Motivo de pausa atualizado!')
       } else {
@@ -461,6 +512,7 @@ export default function SettingsGovernance({ companyId, activeRole, startInDetai
           name: reasonName.trim(),
           slug: reasonSlug.trim(),
           requiresCustomerAction,
+          pausesSla: pausesSLA,
         })
         toast.success('Novo motivo de pausa cadastrado!')
       }
@@ -524,7 +576,8 @@ export default function SettingsGovernance({ companyId, activeRole, startInDetai
       { key: 'groups', label: 'Equipes Solucionadoras', icon: <Network className="w-5 h-5" /> },
       { key: 'catalog_incidents', label: 'Catálogo de Incidentes', icon: <BookOpen className="w-5 h-5" /> },
       { key: 'catalog_requests', label: 'Catálogo de Requisições', icon: <FileText className="w-5 h-5" /> },
-      { key: 'form_templates', label: 'Biblioteca de Formulários', icon: <Layout className="w-5 h-5" /> }
+      { key: 'form_templates', label: 'Biblioteca de Formulários', icon: <Layout className="w-5 h-5" /> },
+      { key: 'change_cab', label: 'Comitê de Mudanças (CAB)', icon: <ShieldCheck className="w-5 h-5" /> }
     )
   }
 
@@ -752,6 +805,181 @@ export default function SettingsGovernance({ companyId, activeRole, startInDetai
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Saudação (Prefixo)</label>
+                    <input
+                      type="text" value={appearanceForm.greeting_prefix}
+                      onChange={e => setAppearanceForm({ ...appearanceForm, greeting_prefix: e.target.value })}
+                      placeholder="Ex: Bom dia, Olá"
+                      className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Cor da Saudação</label>
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="color"
+                        value={appearanceForm.greeting_color?.startsWith('#') && appearanceForm.greeting_color.length === 7 ? appearanceForm.greeting_color : '#94a3b8'}
+                        onChange={e => setAppearanceForm({ ...appearanceForm, greeting_color: e.target.value })}
+                        className="w-12 h-10 border border-slate-200 rounded-lg cursor-pointer p-0.5 bg-white shrink-0"
+                      />
+                      <span className="text-xs font-mono text-slate-500">{appearanceForm.greeting_color || '#94a3b8'}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Layout dos Cards do Portal</label>
+                  <select
+                    value={appearanceForm.catalog_ui_config?.card_settings?.layout || 'grid'}
+                    onChange={e => setAppearanceForm({
+                      ...appearanceForm,
+                      catalog_ui_config: {
+                        ...appearanceForm.catalog_ui_config,
+                        card_settings: {
+                          ...(appearanceForm.catalog_ui_config?.card_settings || {}),
+                          layout: e.target.value
+                        }
+                      }
+                    })}
+                    className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm bg-white outline-none focus:ring-2 focus:ring-indigo-500"
+                  >
+                    <option value="grid">Grade (Grid)</option>
+                    <option value="list">Lista (List)</option>
+                  </select>
+                </div>
+
+                <div className="border-t border-outline-variant pt-4 space-y-4">
+                  <h5 className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">Customização dos Botões de Abertura</h5>
+                  
+                  <div className="space-y-3">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Botão de Incidente</p>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div className="sm:col-span-2">
+                        <label className="block text-[10px] text-slate-500 font-bold mb-1">Rótulo do Botão</label>
+                        <input
+                          type="text"
+                          value={appearanceForm.catalog_ui_config?.portal_buttons?.incident_label || ''}
+                          onChange={e => setAppearanceForm({
+                            ...appearanceForm,
+                            catalog_ui_config: {
+                              ...appearanceForm.catalog_ui_config,
+                              portal_buttons: {
+                                ...(appearanceForm.catalog_ui_config?.portal_buttons || {}),
+                                incident_label: e.target.value
+                              }
+                            }
+                          })}
+                          placeholder="Reportar Problema"
+                          className="w-full border border-slate-200 rounded-lg px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-indigo-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] text-slate-500 font-bold mb-1">Emoji</label>
+                        <input
+                          type="text"
+                          value={appearanceForm.catalog_ui_config?.portal_buttons?.incident_emoji || ''}
+                          onChange={e => setAppearanceForm({
+                            ...appearanceForm,
+                            catalog_ui_config: {
+                              ...appearanceForm.catalog_ui_config,
+                              portal_buttons: {
+                                ...(appearanceForm.catalog_ui_config?.portal_buttons || {}),
+                                incident_emoji: e.target.value
+                              }
+                            }
+                          })}
+                          placeholder="⚠️"
+                          className="w-full border border-slate-200 rounded-lg px-3 py-2 text-xs text-center outline-none focus:ring-2 focus:ring-indigo-500"
+                        />
+                      </div>
+                      <div className="sm:col-span-3">
+                        <label className="block text-[10px] text-slate-500 font-bold mb-1">Descrição</label>
+                        <input
+                          type="text"
+                          value={appearanceForm.catalog_ui_config?.portal_buttons?.incident_desc || ''}
+                          onChange={e => setAppearanceForm({
+                            ...appearanceForm,
+                            catalog_ui_config: {
+                              ...appearanceForm.catalog_ui_config,
+                              portal_buttons: {
+                                ...(appearanceForm.catalog_ui_config?.portal_buttons || {}),
+                                incident_desc: e.target.value
+                              }
+                            }
+                          })}
+                          placeholder="Algo está com erro, lento ou fora do ar..."
+                          className="w-full border border-slate-200 rounded-lg px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-indigo-500"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3 pt-2">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Botão de Requisição</p>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div className="sm:col-span-2">
+                        <label className="block text-[10px] text-slate-500 font-bold mb-1">Rótulo do Botão</label>
+                        <input
+                          type="text"
+                          value={appearanceForm.catalog_ui_config?.portal_buttons?.request_label || ''}
+                          onChange={e => setAppearanceForm({
+                            ...appearanceForm,
+                            catalog_ui_config: {
+                              ...appearanceForm.catalog_ui_config,
+                              portal_buttons: {
+                                ...(appearanceForm.catalog_ui_config?.portal_buttons || {}),
+                                request_label: e.target.value
+                              }
+                            }
+                          })}
+                          placeholder="Solicitar Serviço"
+                          className="w-full border border-slate-200 rounded-lg px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-indigo-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] text-slate-500 font-bold mb-1">Emoji</label>
+                        <input
+                          type="text"
+                          value={appearanceForm.catalog_ui_config?.portal_buttons?.request_emoji || ''}
+                          onChange={e => setAppearanceForm({
+                            ...appearanceForm,
+                            catalog_ui_config: {
+                              ...appearanceForm.catalog_ui_config,
+                              portal_buttons: {
+                                ...(appearanceForm.catalog_ui_config?.portal_buttons || {}),
+                                request_emoji: e.target.value
+                              }
+                            }
+                          })}
+                          placeholder="✅"
+                          className="w-full border border-slate-200 rounded-lg px-3 py-2 text-xs text-center outline-none focus:ring-2 focus:ring-indigo-500"
+                        />
+                      </div>
+                      <div className="sm:col-span-3">
+                        <label className="block text-[10px] text-slate-500 font-bold mb-1">Descrição</label>
+                        <input
+                          type="text"
+                          value={appearanceForm.catalog_ui_config?.portal_buttons?.request_desc || ''}
+                          onChange={e => setAppearanceForm({
+                            ...appearanceForm,
+                            catalog_ui_config: {
+                              ...appearanceForm.catalog_ui_config,
+                              portal_buttons: {
+                                ...(appearanceForm.catalog_ui_config?.portal_buttons || {}),
+                                request_desc: e.target.value
+                              }
+                            }
+                          })}
+                          placeholder="Peça equipamentos, acessos, softwares..."
+                          className="w-full border border-slate-200 rounded-lg px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-indigo-500"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {/* Escala da Fonte */}
                   <div>
                     <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Escala da Fonte</label>
@@ -936,7 +1164,9 @@ export default function SettingsGovernance({ companyId, activeRole, startInDetai
 
                       {/* 2. Hero Banner */}
                       <div className="relative z-10 px-3 py-6 text-center">
-                        <div className={`text-[8px] font-medium ${theme.textMuted} mb-1.5`}>Olá, Usuário! 👋</div>
+                        <div className={`text-[8px] font-medium mb-1.5`} style={{ color: appearanceForm.greeting_color || undefined }}>
+                          {appearanceForm.greeting_prefix ? `${appearanceForm.greeting_prefix} Usuário!` : 'Olá, Usuário! 👋'}
+                        </div>
                         {appearanceForm.welcome_title ? (
                           <div className={`${PREVIEW_TITLE_SIZE[appearanceForm.title_size || ''] || 'text-sm'} font-extrabold leading-tight drop-shadow-lg ${theme.headerText}`}>
                             {appearanceForm.welcome_title}
@@ -955,15 +1185,19 @@ export default function SettingsGovernance({ companyId, activeRole, startInDetai
                           <div className="grid grid-cols-2 gap-2">
                             <div className="bg-white rounded-lg border border-slate-200/60 shadow-sm p-2.5">
                               <div className={`w-7 h-7 rounded-lg ${theme.iconBg} flex items-center justify-center mb-2 text-sm`}>
-                                <AlertCircle className="w-4 h-4" />
+                                {appearanceForm.catalog_ui_config?.portal_buttons?.incident_emoji || '⚠️'}
                               </div>
-                              <div className="text-[10px] font-bold text-slate-800 leading-tight">Reportar Problema</div>
+                              <div className="text-[10px] font-bold text-slate-800 leading-tight">
+                                {appearanceForm.catalog_ui_config?.portal_buttons?.incident_label || 'Reportar Problema'}
+                              </div>
                             </div>
                             <div className="bg-white rounded-lg border border-slate-200/60 shadow-sm p-2.5">
                               <div className={`w-7 h-7 rounded-lg ${theme.primaryBg} ${theme.primaryText} flex items-center justify-center mb-2 text-sm`}>
-                                <Plus className="w-4 h-4" />
+                                {appearanceForm.catalog_ui_config?.portal_buttons?.request_emoji || '✅'}
                               </div>
-                              <div className="text-[10px] font-bold text-slate-800 leading-tight">Solicitar Serviço</div>
+                              <div className="text-[10px] font-bold text-slate-800 leading-tight">
+                                {appearanceForm.catalog_ui_config?.portal_buttons?.request_label || 'Solicitar Serviço'}
+                              </div>
                             </div>
                           </div>
                         </div>
@@ -1098,6 +1332,7 @@ export default function SettingsGovernance({ companyId, activeRole, startInDetai
                   <th className="px-6 py-4.5 text-left">Motivo</th>
                   <th className="px-6 py-4.5 text-left">Slug</th>
                   <th className="px-6 py-4.5 text-center">Exige Ação do Usuário</th>
+                  <th className="px-6 py-4.5 text-center">Ativo?</th>
                   <th className="px-6 py-4.5 text-center">Pausa o SLA?</th>
                   <th className="px-6 py-4.5 text-right">Ações</th>
                 </tr>
@@ -1105,13 +1340,13 @@ export default function SettingsGovernance({ companyId, activeRole, startInDetai
               <tbody className={`divide-y ${isAlpha ? 'divide-zinc-800' : 'divide-outline-variant'}`}>
                 {loadingReasons ? (
                   <tr>
-                    <td colSpan={5} className="px-6 py-8 text-center text-on-surface-variant animate-pulse">
+                    <td colSpan={6} className="px-6 py-8 text-center text-on-surface-variant animate-pulse">
                       Carregando motivos de pendência...
                     </td>
                   </tr>
                 ) : reasons.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="px-6 py-8 text-center text-on-surface-variant">
+                    <td colSpan={6} className="px-6 py-8 text-center text-on-surface-variant">
                       Nenhum motivo cadastrado.
                     </td>
                   </tr>
@@ -1133,14 +1368,26 @@ export default function SettingsGovernance({ companyId, activeRole, startInDetai
                       </td>
                       <td className="px-6 py-4.5 text-center">
                         <button
-                          onClick={() => handleToggleSlaPausing(r)}
+                          onClick={() => handleToggleReasonActive(r)}
                           className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold border transition-colors cursor-pointer ${
                             r.active
                               ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20 hover:bg-emerald-500/20'
                               : 'bg-red-500/10 text-red-500 border-red-500/20 hover:bg-red-500/20'
                           }`}
                         >
-                          {r.active ? 'Pausa SLA' : 'Não Pausa'}
+                          {r.active ? 'Ativo' : 'Inativo'}
+                        </button>
+                      </td>
+                      <td className="px-6 py-4.5 text-center">
+                        <button
+                          onClick={() => handleToggleSlaPausing(r)}
+                          className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold border transition-colors cursor-pointer ${
+                            r.pauses_sla
+                              ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20 hover:bg-emerald-500/20'
+                              : 'bg-red-500/10 text-red-500 border-red-500/20 hover:bg-red-500/20'
+                          }`}
+                        >
+                          {r.pauses_sla ? 'Pausa SLA' : 'Não Pausa'}
                         </button>
                       </td>
                       <td className="px-6 py-4.5">
@@ -1182,6 +1429,77 @@ export default function SettingsGovernance({ companyId, activeRole, startInDetai
                 await loadReasons()
               }}
             />
+          </div>
+        )}
+
+        {activeTab === 'change_cab' && (
+          <div className={`${cardClass} p-8 space-y-6 bg-surface`}>
+            <div>
+              <h3 className="text-2xl font-bold text-text-main flex items-center gap-2.5">
+                <ShieldCheck className="w-6 h-6 text-primary" /> Comitê de Aprovação de Mudanças (CAB)
+              </h3>
+              <p className="text-sm text-on-surface-variant mt-1.5">
+                Defina os membros permanentes do comitê. Estes usuários serão pré-selecionados automaticamente ao criar novas solicitações de mudança do tipo Normal ou Crítica.
+              </p>
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-3">
+              <input
+                type="text"
+                value={cabSearch}
+                onChange={e => setCabSearch(e.target.value)}
+                placeholder="Buscar usuário por nome ou e-mail..."
+                className="flex-1 border border-slate-200 rounded-xl px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+              />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 max-h-[350px] overflow-y-auto pr-1">
+              {profiles
+                .filter(p => p.company_id === managedCompanyId && p.active)
+                .filter(p => {
+                  const needle = cabSearch.toLowerCase()
+                  return p.name.toLowerCase().includes(needle) || (p.email || '').toLowerCase().includes(needle)
+                })
+                .map(p => {
+                  const checked = selectedCabIds.includes(p.id)
+                  return (
+                    <label
+                      key={p.id}
+                      className={`flex items-center gap-3 px-4 py-3 border rounded-xl cursor-pointer hover:bg-slate-50 transition-colors ${
+                        checked ? 'border-indigo-600 bg-indigo-50/20' : 'border-slate-200'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => {
+                          setSelectedCabIds(prev =>
+                            prev.includes(p.id) ? prev.filter(id => id !== p.id) : [...prev, p.id]
+                          )
+                        }}
+                        className="w-4 h-4 rounded text-indigo-600 border-slate-300 focus:ring-indigo-500 cursor-pointer"
+                      />
+                      <div className="flex flex-col min-w-0">
+                        <span className="text-xs font-bold text-slate-700 truncate">{p.name}</span>
+                        <span className="text-[10px] text-slate-400 truncate uppercase tracking-wider">{p.role}</span>
+                      </div>
+                    </label>
+                  )
+                })}
+            </div>
+
+            <div className="flex items-center justify-between border-t border-slate-100 pt-5 mt-4">
+              <span className="text-xs text-slate-500 font-semibold">
+                {selectedCabIds.length} membros selecionados
+              </span>
+              <button
+                onClick={() => void handleSaveCab(selectedCabIds)}
+                disabled={savingCab}
+                className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm rounded-xl disabled:opacity-50 transition-all cursor-pointer"
+              >
+                <Save className="w-4 h-4" /> {savingCab ? 'Salvando...' : 'Salvar Membros do CAB'}
+              </button>
+            </div>
           </div>
         )}
       </div>
@@ -1233,6 +1551,21 @@ export default function SettingsGovernance({ companyId, activeRole, startInDetai
               </div>
 
               <div className="pt-2 space-y-3">
+                <label className="flex items-center gap-3 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={reasonActive}
+                    onChange={e => setReasonActive(e.target.checked)}
+                    className={`w-4 h-4 border-outline-variant text-primary focus:ring-primary ${
+                      isBeta ? 'rounded-sm' : isAlpha ? 'rounded-lg' : 'rounded'
+                    }`}
+                  />
+                  <div>
+                    <span className="text-sm font-medium text-on-surface">Motivo Ativo?</span>
+                    <p className="text-xs text-on-surface-variant">Define se este motivo de pausa estará disponível para seleção pelos analistas.</p>
+                  </div>
+                </label>
+
                 <label className="flex items-center gap-3 cursor-pointer select-none">
                   <input
                     type="checkbox"

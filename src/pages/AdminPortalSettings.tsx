@@ -105,6 +105,15 @@ const AdminPortalSettings = () => {
   const [welcomeTitle,  setWelcomeTitle]  = useState(target?.welcome_title ?? '')
   const [welcomeSubtitle, setWelcomeSubtitle] = useState(target?.welcome_subtitle ?? '')
   const [bgColor,       setBgColor]       = useState(target?.bg_color ?? '')
+  const [greetingPrefix, setGreetingPrefix] = useState(target?.greeting_prefix ?? '')
+  const [greetingColor,  setGreetingColor]  = useState(target?.greeting_color ?? '')
+  const [cardLayout,     setCardLayout]     = useState<'grid' | 'list'>((target?.catalog_ui_config as any)?.card_settings?.layout || 'grid')
+  const [incidentLabel, setIncidentLabel] = useState((target?.catalog_ui_config as any)?.portal_buttons?.incident_label || '')
+  const [incidentDesc,  setIncidentDesc]  = useState((target?.catalog_ui_config as any)?.portal_buttons?.incident_desc || '')
+  const [incidentEmoji, setIncidentEmoji] = useState((target?.catalog_ui_config as any)?.portal_buttons?.incident_emoji || '')
+  const [requestLabel,  setRequestLabel]  = useState((target?.catalog_ui_config as any)?.portal_buttons?.request_label || '')
+  const [requestDesc,   setRequestDesc]   = useState((target?.catalog_ui_config as any)?.portal_buttons?.request_desc || '')
+  const [requestEmoji,  setRequestEmoji]  = useState((target?.catalog_ui_config as any)?.portal_buttons?.request_emoji || '')
 
   const [logoUploading, setLogoUploading] = useState(false)
   const [bgUploading,   setBgUploading]   = useState(false)
@@ -168,6 +177,24 @@ const AdminPortalSettings = () => {
     setSaving(true)
     setFeedback(null)
     try {
+      const existingConfig = (target?.catalog_ui_config as Record<string, any>) || {}
+      const newConfig = {
+        ...existingConfig,
+        card_settings: {
+          ...(existingConfig.card_settings || {}),
+          layout: cardLayout,
+        },
+        portal_buttons: {
+          ...(existingConfig.portal_buttons || {}),
+          incident_label: incidentLabel || undefined,
+          incident_desc:  incidentDesc  || undefined,
+          incident_emoji: incidentEmoji || undefined,
+          request_label:  requestLabel  || undefined,
+          request_desc:   requestDesc   || undefined,
+          request_emoji:  requestEmoji  || undefined,
+        }
+      }
+
       await companiesService.update(companyId, {
         primary_color:   themeName,
         title_size:      fontScale,
@@ -177,6 +204,9 @@ const AdminPortalSettings = () => {
         welcome_title:   welcomeTitle   || undefined,
         welcome_subtitle: welcomeSubtitle || undefined,
         bg_color:        bgColor        || undefined,
+        greeting_prefix: greetingPrefix || null,
+        greeting_color:  greetingColor  || null,
+        catalog_ui_config: newConfig,
       })
       await refreshCompany()
       setFeedback({ kind:'ok', msg:'Identidade visual salva e aplicada.' })
@@ -444,6 +474,125 @@ const AdminPortalSettings = () => {
               </div>
             </div>
 
+            {/* Card 3.5 — Configurações do Portal */}
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+              <div className="flex items-center gap-3 border-b pb-4 mb-5">
+                <LayoutGrid className="w-5 h-5 text-indigo-600" />
+                <h2 className="text-lg font-bold text-slate-900">Configurações de Saudação e Layout</h2>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Saudação (Prefixo)</label>
+                  <input
+                    type="text"
+                    value={greetingPrefix}
+                    onChange={e => setGreetingPrefix(e.target.value)}
+                    placeholder="Ex.: Bom dia, Olá"
+                    className="w-full h-10 rounded-lg border border-slate-200 px-3 text-sm focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Cor da Saudação</label>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="color"
+                      value={greetingColor.startsWith('#') && greetingColor.length === 7 ? greetingColor : '#94a3b8'}
+                      onChange={e => setGreetingColor(e.target.value)}
+                      className="w-12 h-10 border border-slate-200 rounded-lg cursor-pointer p-0.5 bg-white shrink-0"
+                    />
+                    <span className="text-sm font-mono text-slate-500">{greetingColor || '#94a3b8'}</span>
+                  </div>
+                </div>
+              </div>
+              <div className="mt-4">
+                <label className="block text-sm font-medium text-slate-700 mb-1">Layout dos Cards do Portal</label>
+                <select
+                  value={cardLayout}
+                  onChange={e => setCardLayout(e.target.value as 'grid' | 'list')}
+                  className="w-full h-10 rounded-lg border border-slate-200 px-3 text-sm focus:ring-2 focus:ring-indigo-500 bg-white"
+                >
+                  <option value="grid">Grade (Grid)</option>
+                  <option value="list">Lista (List)</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Card 3.6 — Customização de Botões Principais */}
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+              <div className="flex items-center gap-3 border-b pb-4 mb-5">
+                <LayoutGrid className="w-5 h-5 text-indigo-600" />
+                <h2 className="text-lg font-bold text-slate-900">Customização dos Botões de Abertura</h2>
+              </div>
+              
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Botão de Incidente</p>
+              <div className="grid grid-cols-3 gap-3 mb-5">
+                <div className="col-span-2">
+                  <label className="block text-xs font-medium text-slate-600 mb-1">Rótulo do Botão</label>
+                  <input
+                    type="text"
+                    value={incidentLabel}
+                    onChange={e => setIncidentLabel(e.target.value)}
+                    placeholder="Ex.: Reportar Problema"
+                    className="w-full h-9 rounded-lg border border-slate-200 px-3 text-xs focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">Emoji</label>
+                  <input
+                    type="text"
+                    value={incidentEmoji}
+                    onChange={e => setIncidentEmoji(e.target.value)}
+                    placeholder="⚠️"
+                    className="w-full h-9 rounded-lg border border-slate-200 px-3 text-xs text-center focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+                <div className="col-span-3">
+                  <label className="block text-xs font-medium text-slate-600 mb-1">Descrição</label>
+                  <input
+                    type="text"
+                    value={incidentDesc}
+                    onChange={e => setIncidentDesc(e.target.value)}
+                    placeholder="Algo está com erro, lento ou fora do ar..."
+                    className="w-full h-9 rounded-lg border border-slate-200 px-3 text-xs focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+              </div>
+
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Botão de Requisição</p>
+              <div className="grid grid-cols-3 gap-3">
+                <div className="col-span-2">
+                  <label className="block text-xs font-medium text-slate-600 mb-1">Rótulo do Botão</label>
+                  <input
+                    type="text"
+                    value={requestLabel}
+                    onChange={e => setRequestLabel(e.target.value)}
+                    placeholder="Ex.: Solicitar Serviço"
+                    className="w-full h-9 rounded-lg border border-slate-200 px-3 text-xs focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">Emoji</label>
+                  <input
+                    type="text"
+                    value={requestEmoji}
+                    onChange={e => setRequestEmoji(e.target.value)}
+                    placeholder="✅"
+                    className="w-full h-9 rounded-lg border border-slate-200 px-3 text-xs text-center focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+                <div className="col-span-3">
+                  <label className="block text-xs font-medium text-slate-600 mb-1">Descrição</label>
+                  <input
+                    type="text"
+                    value={requestDesc}
+                    onChange={e => setRequestDesc(e.target.value)}
+                    placeholder="Peça equipamentos, acessos, softwares..."
+                    className="w-full h-9 rounded-lg border border-slate-200 px-3 text-xs focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+              </div>
+            </div>
+
             {/* Card 4 — Fundo da tela de Login */}
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
               <div className="flex items-center gap-3 border-b pb-4 mb-5">
@@ -548,8 +697,8 @@ const AdminPortalSettings = () => {
                 }}>
                   {/* Top bar */}
                   <div style={{ background:'rgba(255,255,255,.95)', borderBottom:'1px solid #e2e8f0', padding:'6px 10px', flexShrink:0 }}>
-                    <div style={{ font:'400 6.5px sans-serif', color:'#94a3b8', marginBottom:1 }}>Bom dia ☀️</div>
-                    <div style={{ font:'800 10px sans-serif', color:'#0f172a', letterSpacing:'-.01em' }}>Como posso te ajudar?</div>
+                    <div style={{ font:'400 6.5px sans-serif', color: greetingColor || '#94a3b8', marginBottom:1 }}>{greetingPrefix || 'Bom dia ☀️'}</div>
+                    <div style={{ font:'800 10px sans-serif', color:'#0f172a', letterSpacing:'-.01em' }}>{welcomeTitle || 'Como posso te ajudar?'}</div>
                   </div>
                   {/* Search */}
                   <div style={{ background:'rgba(255,255,255,.9)', borderBottom:'1px solid #e2e8f0', padding:'5px 10px', flexShrink:0 }}>
@@ -564,24 +713,28 @@ const AdminPortalSettings = () => {
                     <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:5, marginBottom:7 }}>
                       <div style={{ padding:7, background:'rgba(255,255,255,.95)', border:'1.5px solid #fecaca', borderRadius:7 }}>
                         <div style={{ display:'flex', alignItems:'center', gap:4, marginBottom:3 }}>
-                          <div style={{ width:16, height:16, borderRadius:4, background:'#fee2e2', display:'flex', alignItems:'center', justifyContent:'center', fontSize:9, flexShrink:0 }}>⚠️</div>
-                          <div style={{ font:'700 7px sans-serif', color:'#dc2626', lineHeight:1.2 }}>Reportar Problema</div>
+                          <div style={{ width:16, height:16, borderRadius:4, background:'#fee2e2', display:'flex', alignItems:'center', justifyContent:'center', fontSize:9, flexShrink:0 }}>
+                            {incidentEmoji || '⚠️'}
+                          </div>
+                          <div style={{ font:'700 7px sans-serif', color:'#dc2626', lineHeight:1.2 }}>{incidentLabel || 'Reportar Problema'}</div>
                         </div>
-                        <div style={{ font:'700 6.5px sans-serif', color:'#dc2626' }}>Abrir incidente →</div>
+                        <div style={{ font:'700 6.5px sans-serif', color:'#dc2626' }}>{(incidentLabel || 'Abrir incidente') + ' →'}</div>
                       </div>
                       <div style={{ padding:7, background:'rgba(255,255,255,.95)', border:`1.5px solid ${hexToRgba(brand,0.3)}`, borderRadius:7 }}>
                         <div style={{ display:'flex', alignItems:'center', gap:4, marginBottom:3 }}>
-                          <div style={{ width:16, height:16, borderRadius:4, background:hexToRgba(brand,0.12), display:'flex', alignItems:'center', justifyContent:'center', fontSize:9, flexShrink:0 }}>✅</div>
-                          <div style={{ font:'700 7px sans-serif', color:brand, lineHeight:1.2 }}>Solicitar Serviço</div>
+                          <div style={{ width:16, height:16, borderRadius:4, background:hexToRgba(brand,0.12), display:'flex', alignItems:'center', justifyContent:'center', fontSize:9, flexShrink:0 }}>
+                            {requestEmoji || '✅'}
+                          </div>
+                          <div style={{ font:'700 7px sans-serif', color:brand, lineHeight:1.2 }}>{requestLabel || 'Solicitar Serviço'}</div>
                         </div>
-                        <div style={{ font:'700 6.5px sans-serif', color:brand }}>Ver catálogo →</div>
+                        <div style={{ font:'700 6.5px sans-serif', color:brand }}>{(requestLabel || 'Ver catálogo') + ' →'}</div>
                       </div>
                     </div>
-                    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:4 }}>
+                    <div style={{ display:'grid', gridTemplateColumns: cardLayout === 'list' ? '1fr' : '1fr 1fr 1fr', gap:4 }}>
                       {[['🧑‍💼','RH','#eff6ff'],['🛒','Compras','#fef9c3'],['📚','Conhecimento','#f5f3ff']].map(([e,n,bg]) => (
-                        <div key={n} style={{ padding:5, background:'rgba(255,255,255,.9)', border:'1px solid #e2e8f0', borderRadius:5 }}>
-                          <div style={{ width:16, height:16, borderRadius:4, background:bg as string, display:'flex', alignItems:'center', justifyContent:'center', fontSize:9, marginBottom:2 }}>{e}</div>
-                          <div style={{ font:'600 6px sans-serif', color:'#0f172a' }}>{n}</div>
+                        <div key={n} style={{ display:'flex', flexDirection: cardLayout === 'list' ? 'row' : 'column', alignItems:'center', gap: cardLayout === 'list' ? 6 : 2, padding:5, background:'rgba(255,255,255,.9)', border:'1px solid #e2e8f0', borderRadius:5 }}>
+                          <div style={{ width:16, height:16, borderRadius:4, background:bg as string, display:'flex', alignItems:'center', justifyContent:'center', fontSize:9, flexShrink:0 }}>{e}</div>
+                          <div style={{ font:'600 6px sans-serif', color:'#0f172a', whiteSpace:'nowrap' }}>{n}</div>
                         </div>
                       ))}
                     </div>
