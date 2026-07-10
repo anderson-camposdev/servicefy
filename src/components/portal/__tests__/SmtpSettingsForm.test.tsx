@@ -2,29 +2,34 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { SmtpSettingsForm } from '../SmtpSettingsForm'
 
-const { mockFrom, mockMaybeSingle, mockUpsert, mockTestSmtpConnection } = vi.hoisted(() => ({
+const { mockFrom, mockMaybeSingle, mockUpsert, mockInvoke } = vi.hoisted(() => ({
   mockFrom: vi.fn(),
   mockMaybeSingle: vi.fn(),
   mockUpsert: vi.fn(),
-  mockTestSmtpConnection: vi.fn(),
+  mockInvoke: vi.fn(),
 }))
 
 vi.mock('../../../lib/supabase', () => ({
-  supabase: { from: mockFrom },
+  supabase: {
+    from: mockFrom,
+    functions: { invoke: mockInvoke },
+  },
 }))
 
-vi.mock('../../../lib/smtp', () => ({
-  SMTP_ENCRYPTION_TYPES: ['tls', 'ssl', 'none'],
-  testSmtpConnection: mockTestSmtpConnection,
-}))
+function fillSmtpPassword(password = 'secret-value') {
+  fireEvent.change(screen.getByLabelText('Senha'), { target: { value: password } })
+}
 
 describe('SmtpSettingsForm', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockUpsert.mockResolvedValue({ error: null })
-    mockTestSmtpConnection.mockResolvedValue({
-      success: true,
-      message: 'Conexão estabelecida com sucesso. E-mail de teste enviado.',
+    mockInvoke.mockResolvedValue({
+      data: {
+        success: true,
+        message: 'Conexão estabelecida com sucesso. E-mail de teste enviado.',
+      },
+      error: null,
     })
     mockMaybeSingle.mockResolvedValue({
       data: {
@@ -66,8 +71,10 @@ describe('SmtpSettingsForm', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Mostrar senha' }))
     expect(password.type).toBe('text')
-    fireEvent.change(password, { target: { value: 'secret-value' } })
+    fillSmtpPassword()
     fireEvent.change(screen.getByLabelText('Host'), { target: { value: 'smtp.new.example.com' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Testar Conexão' }))
+    await screen.findByRole('status')
     fireEvent.click(screen.getByRole('button', { name: 'Salvar configurações SMTP' }))
 
     await waitFor(() => expect(mockUpsert).toHaveBeenCalledTimes(1))
@@ -83,41 +90,62 @@ describe('SmtpSettingsForm', () => {
     expect(screen.getByText('Configurações SMTP salvas.')).toBeTruthy()
   })
 
-  it('exibe erro quando a senha não é informada', async () => {
+  it('mantém o botão Salvar desabilitado até uma conexão SMTP ser validada', async () => {
     render(<SmtpSettingsForm companyId="company-123" />)
     await screen.findByDisplayValue('smtp.example.com')
 
-    fireEvent.click(screen.getByRole('button', { name: 'Salvar configurações SMTP' }))
-
-    expect(await screen.findByText('Informe a senha para salvar as configurações.')).toBeTruthy()
-    expect(mockUpsert).not.toHaveBeenCalled()
+    expect(screen.getByRole('button', { name: 'Salvar configurações SMTP' }).hasAttribute('disabled')).toBe(true)
   })
 
-  it('testa a conexão e exibe o sucesso do envio', async () => {
+  it('exibe o toast de sucesso e habilita Salvar quando a Edge Function confirma a conexão', async () => {
     render(<SmtpSettingsForm companyId="company-123" />)
-    const password = await screen.findByLabelText('Senha')
+    await screen.findByLabelText('Senha')
 
-    fireEvent.change(password, { target: { value: 'secret-value' } })
+    fillSmtpPassword()
     fireEvent.click(screen.getByRole('button', { name: 'Testar Conexão' }))
 
-    await waitFor(() => expect(mockTestSmtpConnection).toHaveBeenCalledWith(expect.objectContaining({
-      companyId: 'company-123',
-      host: 'smtp.example.com',
-      port: 587,
-      password: 'secret-value',
-      encryptionType: 'tls',
-    })))
-    expect(await screen.findByText('Conexão estabelecida com sucesso. E-mail de teste enviado.')).toBeTruthy()
+    await waitFor(() => expect(mockInvoke).toHaveBeenCalledWith('test-smtp-connection', {
+      body: expect.objectContaining({
+        companyId: 'company-123',
+        host: 'smtp.example.com',
+        port: 587,
+        password: 'secret-value',
+        encryptionType: 'tls',
+      }),
+    }))
+    expect((await screen.findByRole('status')).textContent).toContain('Conexão estabelecida com sucesso. E-mail de teste enviado.')
+    expect(screen.getByRole('button', { name: 'Salvar configurações SMTP' }).hasAttribute('disabled')).toBe(false)
   })
 
-  it('exibe a falha retornada pelo handshake SMTP', async () => {
-    mockTestSmtpConnection.mockRejectedValueOnce(new Error('Falha na conexão SMTP: autenticação recusada.'))
+  it('exibe alerta de autenticação e mantém Salvar desabilitado quando a Edge Function falha', async () => {
+    mockInvoke.mockResolvedValueOnce({
+      data: null,
+      error: { message: 'Falha na conexão SMTP: autenticação recusada.' },
+    })
     render(<SmtpSettingsForm companyId="company-123" />)
-    const password = await screen.findByLabelText('Senha')
+    await screen.findByLabelText('Senha')
 
-    fireEvent.change(password, { target: { value: 'wrong-password' } })
+    fillSmtpPassword('wrong-password')
     fireEvent.click(screen.getByRole('button', { name: 'Testar Conexão' }))
 
-    expect(await screen.findByText('Falha na conexão SMTP: autenticação recusada.')).toBeTruthy()
+    expect((await screen.findByRole('alert')).textContent).toContain('Falha na conexão SMTP: autenticação recusada.')
+    expect(screen.getByRole('button', { name: 'Salvar configurações SMTP' }).hasAttribute('disabled')).toBe(true)
+  })
+
+  it('desabilita o botão e mostra estado de carregamento enquanto testa a conexão', async () => {
+    let resolveInvoke: (value: { data: { success: boolean; message: string }; error: null }) => void = () => undefined
+    mockInvoke.mockImplementationOnce(() => new Promise(resolve => { resolveInvoke = resolve }))
+    render(<SmtpSettingsForm companyId="company-123" />)
+    await screen.findByLabelText('Senha')
+
+    fillSmtpPassword()
+    fireEvent.click(screen.getByRole('button', { name: 'Testar Conexão' }))
+
+    const testingButton = screen.getByRole('button', { name: 'Testar Conexão' }) as HTMLButtonElement
+    expect(testingButton.disabled).toBe(true)
+    expect(testingButton.textContent).toContain('Testando conexão...')
+
+    resolveInvoke({ data: { success: true, message: 'ok' }, error: null })
+    await waitFor(() => expect((screen.getByRole('button', { name: 'Testar Conexão' }) as HTMLButtonElement).disabled).toBe(false))
   })
 })

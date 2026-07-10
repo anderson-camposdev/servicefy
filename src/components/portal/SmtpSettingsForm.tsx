@@ -34,6 +34,7 @@ export function SmtpSettingsForm({ companyId }: SmtpSettingsFormProps) {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [testing, setTesting] = useState(false)
+  const [smtpConnectionValidated, setSmtpConnectionValidated] = useState(false)
   const [passwordVisible, setPasswordVisible] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
@@ -73,11 +74,17 @@ export function SmtpSettingsForm({ companyId }: SmtpSettingsFormProps) {
 
   const setField = <K extends keyof SmtpFormState>(field: K, value: SmtpFormState[K]) => {
     setForm(current => ({ ...current, [field]: value }))
+    setSmtpConnectionValidated(false)
     setSuccess('')
     setError('')
   }
 
   const save = async () => {
+    if (!smtpConnectionValidated) {
+      setError('Teste a conexão SMTP antes de salvar as configurações.')
+      return
+    }
+
     if (!form.smtpPassword) {
       setError('Informe a senha para salvar as configurações.')
       return
@@ -126,6 +133,7 @@ export function SmtpSettingsForm({ companyId }: SmtpSettingsFormProps) {
     }
 
     setTesting(true)
+    setSmtpConnectionValidated(false)
     setError('')
     setSuccess('')
     try {
@@ -139,6 +147,7 @@ export function SmtpSettingsForm({ companyId }: SmtpSettingsFormProps) {
         fromName: form.fromName.trim(),
         encryptionType: form.encryptionType,
       })
+      setSmtpConnectionValidated(true)
       setSuccess('Conexão estabelecida com sucesso. E-mail de teste enviado.')
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Falha na conexão SMTP.')
@@ -196,7 +205,7 @@ export function SmtpSettingsForm({ companyId }: SmtpSettingsFormProps) {
           {testing ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
           {testing ? 'Testando conexão...' : 'Testar Conexão'}
         </button>
-        <button type="button" aria-label="Salvar configurações SMTP" onClick={() => void save()} disabled={saving || testing} className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-indigo-700 disabled:opacity-50">
+        <button type="button" aria-label="Salvar configurações SMTP" onClick={() => void save()} disabled={saving || testing || !smtpConnectionValidated} className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-indigo-700 disabled:opacity-50">
           {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
           Salvar configurações
         </button>
