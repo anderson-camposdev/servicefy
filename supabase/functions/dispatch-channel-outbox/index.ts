@@ -38,13 +38,10 @@ interface OutboxRow {
 
 Deno.serve(async (req) => {
   // Chamado pelo cron (Bearer service_role) ou por um trigger interno com a chave.
-  if (INTERNAL_KEY) {
-    const provided = req.headers.get('x-servicefy-internal-key') ?? ''
-    const auth = req.headers.get('authorization') ?? ''
-    if (provided !== INTERNAL_KEY && !auth.includes(SERVICE_ROLE_KEY)) {
-      // O cron envia o service_role como Bearer; aceitamos ambos os modos.
-    }
-  }
+  const authorization = req.headers.get('authorization') ?? ''
+  const isServiceRole = authorization === `Bearer ${SERVICE_ROLE_KEY}`
+  const isInternalCall = Boolean(INTERNAL_KEY) && req.headers.get('x-servicefy-internal-key') === INTERNAL_KEY
+  if (!isServiceRole && !isInternalCall) return json({ error: 'Nao autorizado.' }, 401)
 
   try {
     const { data: batch, error } = await admin.rpc('claim_channel_outbox', { p_limit: 25 })
