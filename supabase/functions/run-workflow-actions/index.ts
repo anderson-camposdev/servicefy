@@ -141,7 +141,12 @@ async function processWebhook(row: QueueRow, incident: any): Promise<{ ok: boole
   }
 }
 
-Deno.serve(async (_req) => {
+Deno.serve(async (req) => {
+  const authorization = req.headers.get('authorization') ?? ''
+  if (authorization !== `Bearer ${SERVICE_ROLE_KEY}`) {
+    return new Response(JSON.stringify({ error: 'Nao autorizado.' }), { status: 401 })
+  }
+
   try {
     const { data: batch, error: claimErr } = await admin.rpc('workflow_claim_queue_batch', { p_limit: 50 })
     if (claimErr) {

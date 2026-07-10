@@ -26,6 +26,11 @@ const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
 })
 
 Deno.serve(async (req) => {
+  const authorization = req.headers.get('authorization') ?? ''
+  if (authorization !== `Bearer ${SERVICE_ROLE_KEY}`) {
+    return new Response(JSON.stringify({ error: 'Nao autorizado.' }), { status: 401 })
+  }
+
   try {
     const payload = await req.json()
     const record = payload.record ?? payload // suporta Database Webhook { record } ou body direto
