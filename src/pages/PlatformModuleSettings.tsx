@@ -10,6 +10,7 @@ import type { CompanyRow } from '../lib/database.types'
 import { UserImportZone } from '../components/portal/UserImportZone'
 import { SmtpSettingsForm } from '../components/portal/SmtpSettingsForm'
 import { EmailDeliveryPolicyForm } from '../components/portal/EmailDeliveryPolicyForm'
+import { EmailDeliveryHistoryTable } from '../components/portal/EmailDeliveryHistoryTable'
 
 export type OperationalModuleKey = 'domains' | 'macros' | 'templates' | 'ci' | 'compliance' | 'licensing' | 'branding' | 'iam' | 'smtp'
 
@@ -482,6 +483,7 @@ export default function PlatformModuleSettings({ moduleKey, companyId, activeRol
       <div className="mt-6 space-y-6">
         <SmtpSettingsForm companyId={companyId} />
         {activeRole === 'sysadmin' && <EmailDeliveryPolicyForm companyId={companyId} />}
+        <EmailDeliveryHistoryTable companyId={companyId} />
       </div>
     ) : moduleKey === 'branding' ? (
       <div className="mt-6 space-y-6">

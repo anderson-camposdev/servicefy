@@ -31,7 +31,7 @@ function localServiceRoleKey() {
 
 function runSql(sql) {
   return execFileSync('docker', [
-    'exec', '-i', 'supabase_db_servicefy', 'psql', '-U', 'postgres', '-d', 'postgres', '-v', 'ON_ERROR_STOP=1',
+    'exec', '-i', 'supabase_db_servicefy', 'psql', '-U', 'postgres', '-d', 'postgres', '-v', 'ON_ERROR_STOP=1', '-t', '-A',
   ], { input: sql, encoding: 'utf8' })
 }
 
@@ -79,7 +79,10 @@ test('falha SMTP do tenant usa fallback global e preserva o rodape de contingenc
   const deliveryState = runSql(`SELECT o.status || ':' || COALESCE(o.last_error, '') || ':' || string_agg(e.event_type, ',' ORDER BY e.created_at) FROM public.ticket_email_outbox o JOIN public.ticket_email_delivery_events e ON e.outbox_id = o.id WHERE o.idempotency_key = '${outboxKey}' GROUP BY o.status, o.last_error;`).trim()
   assert.deepEqual(workerResult, { claimed: 1, sent: 1, retried: 0, dead_letter: 0 }, deliveryState)
 
-  const fallbackPayload = JSON.parse(execFileSync('docker', ['logs', fallbackContainer], { encoding: 'utf8' }))
+  // O mock e um container de longa duracao (pode ja ter atendido chamadas de execucoes
+  // anteriores) — usamos apenas a ultima linha de log, correspondente a esta chamada.
+  const fallbackLog = execFileSync('docker', ['logs', '--tail', '1', fallbackContainer], { encoding: 'utf8' }).trim()
+  const fallbackPayload = JSON.parse(fallbackLog)
   assert.equal(fallbackPayload.to[0], 'fallback-recipient@local.test')
   assert.match(fallbackPayload.html, /canal de contingencia do ServiceFY/)
 
