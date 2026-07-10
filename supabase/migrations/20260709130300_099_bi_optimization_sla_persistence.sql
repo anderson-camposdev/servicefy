@@ -43,6 +43,8 @@ CREATE TRIGGER tg_persist_bi_sla_minutes
   EXECUTE FUNCTION public.tg_persist_bi_sla_minutes();
 
 -- 3. EXECUTAR BACKFILL DOS TICKETS EXISTENTES
+ALTER TABLE public.tickets DISABLE TRIGGER set_incident_priority_trigger;
+
 UPDATE public.tickets t
    SET mtta_minutes = CASE WHEN t.responded_at IS NOT NULL THEN
          GREATEST(0, public.sla_business_minutes_between(co.default_sla_calendar_id, t.created_at, t.responded_at))
@@ -53,6 +55,8 @@ UPDATE public.tickets t
        END
   FROM public.companies co
  WHERE co.id = t.company_id;
+
+ALTER TABLE public.tickets ENABLE TRIGGER set_incident_priority_trigger;
 
 -- 4. REFORMULAR A VIEW DE BI PUBLIC.BI_TICKETS_UNIFIED COM OS CAMPOS FÍSICOS
 DROP VIEW IF EXISTS public.bi_tickets_unified CASCADE;
@@ -70,9 +74,9 @@ SELECT
   public.bi_normalize_state(i.state::text)        AS state_group,
   i.priority::text                                AS priority,
   i.priority_level,
-  i.impact::text                                  AS impact,
-  i.urgency::text                                 AS urgency,
-  i.category::text                                AS category,
+  NULL::text                                      AS impact,
+  NULL::text                                      AS urgency,
+  NULL::text                                      AS category,
   i.caller_id,
   i.caller_name,
   i.assigned_to_id,
@@ -89,7 +93,7 @@ SELECT
   i.opened_via::text                              AS opened_via,
   i.close_code,
   i.tags,
-  i.form_data,
+  NULL::jsonb                                     AS form_data,
   NULL::text                                      AS change_type,
   NULL::text                                      AS risk,
   NULL::timestamptz                               AS change_window_start,
@@ -120,7 +124,7 @@ LEFT JOIN public.assignment_groups ag  ON ag.id  = i.assignment_group_id
 LEFT JOIN public.catalog_services cs   ON cs.id  = i.catalog_service_id
 LEFT JOIN public.catalog_categories cc ON cc.id  = cs.category_id
 LEFT JOIN public.system_symptoms ss    ON ss.id  = i.symptom_id
-LEFT JOIN public.request_items ri      ON ri.id  = i.request_item_id
+LEFT JOIN public.request_items ri      ON false
 LEFT JOIN public.request_categories rc ON rc.id  = ri.request_category_id
 LEFT JOIN public.departments dep       ON dep.id = COALESCE(cc.department_id, rc.department_id)
 

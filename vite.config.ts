@@ -8,6 +8,10 @@ export default defineConfig({
     react(),
     tailwindcss(),
   ],
+  build: {
+    // The BI and data-service modules are lazy-loaded feature chunks, not the initial entrypoint.
+    chunkSizeWarningLimit: 900,
+  },
   test: {
     environment: 'jsdom',
     globals: true,

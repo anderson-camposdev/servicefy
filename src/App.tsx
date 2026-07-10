@@ -1,11 +1,8 @@
-import { useState, useMemo, useEffect } from 'react'
+import { lazy, Suspense, useState, useMemo, useEffect } from 'react'
 import { Plus, Settings, ShieldAlert, ClipboardList, AlertOctagon, RefreshCw, Home, BarChart3, CircleCheckBig } from 'lucide-react'
 import { useToast } from './context'
 import type { AppView, User, Company, Role } from './types'
-import {
-  mockApiEndpoints,
-  mockNotifications,
-} from './services'
+import { mockApiEndpoints, mockNotifications } from './services/appMocks'
 import { useIncidents } from './hooks/useIncidents'
 import { useAppData, useProblems, useChanges } from './hooks/useDbData'
 import { usePersistentState } from './hooks/usePersistentState'
@@ -15,12 +12,25 @@ import { translateState } from './lib/statusLabels'
 import { useTenant } from './tenant'
 import { setTenantOverride } from './tenant/resolveTenant'
 import { useAuth } from './auth'
-import { UserPortalLayout, AdminPortalSettings, AnalystCockpit, TicketManagementDashboard, WorkspaceLayout, SettingsCenter, WorkflowBuilder, ChangeManagementDashboard, ApprovalInbox } from './pages'
-import BiApp from './features/bi/BiApp'
+const UserPortalLayout = lazy(() => import('./pages/UserPortalLayout'))
+const AdminPortalSettings = lazy(() => import('./pages/AdminPortalSettings'))
+const AnalystCockpit = lazy(() => import('./pages/AnalystCockpit'))
+const TicketManagementDashboard = lazy(() => import('./pages/TicketManagementDashboard'))
+const WorkspaceLayout = lazy(() => import('./pages/WorkspaceLayout'))
+const SettingsCenter = lazy(() => import('./pages/SettingsCenter'))
+const WorkflowBuilder = lazy(() => import('./pages/WorkflowBuilder'))
+const ChangeManagementDashboard = lazy(() => import('./pages/ChangeManagementDashboard'))
+const ApprovalInbox = lazy(() => import('./pages/ApprovalInbox'))
+const BiApp = lazy(() => import('./features/bi/BiApp'))
 import TicketDataTable from './components/TicketDataTable'
+import { LoadingSkeleton } from './components/portal/LoadingSkeleton'
 import { PROBLEM_FIELDS } from './lib/ticketTableFields'
 
 const ACTIVE_VIEW_STORAGE_KEY = 'flowfy_active_view'
+
+function LazyBoundary({ children }: { children: React.ReactNode }) {
+  return <Suspense fallback={<LoadingSkeleton />}>{children}</Suspense>
+}
 
 const PERSISTED_APP_VIEWS: readonly AppView[] = [
   'dashboard_incidents',
@@ -999,11 +1009,11 @@ export default function App() {
   // tree-shaking do Vite, impedindo acesso sem autenticação a componentes admin.
   if (import.meta.env.DEV) {
     const previewMode = new URLSearchParams(window.location.search).get('preview')
-    if (previewMode === 'portal')    return <UserPortalLayout companyId={currentCompany?.id} />
-    if (previewMode === 'admin')     return <AdminPortalSettings />
-    if (previewMode === 'cockpit')   return <AnalystCockpit />
-    if (previewMode === 'tickets')   return <TicketManagementDashboard />
-    if (previewMode === 'workspace') return <div className="h-screen"><WorkspaceLayout /></div>
+    if (previewMode === 'portal')    return <LazyBoundary><UserPortalLayout companyId={currentCompany?.id} /></LazyBoundary>
+    if (previewMode === 'admin')     return <LazyBoundary><AdminPortalSettings /></LazyBoundary>
+    if (previewMode === 'cockpit')   return <LazyBoundary><AnalystCockpit /></LazyBoundary>
+    if (previewMode === 'tickets')   return <LazyBoundary><TicketManagementDashboard /></LazyBoundary>
+    if (previewMode === 'workspace') return <LazyBoundary><div className="h-screen"><WorkspaceLayout /></div></LazyBoundary>
   }
 
   if (dbLoading || authStatus === 'loading') {
@@ -1095,7 +1105,7 @@ export default function App() {
           )}
           <button onClick={handleLogout} className="px-3 py-1.5 rounded-xl bg-white border border-slate-200 text-slate-500 text-xs hover:bg-slate-50 hover:border-slate-300 transition-all cursor-pointer shadow-sm">Sair</button>
         </div>
-        <UserPortalLayout companyId={currentCompany.id} />
+        <LazyBoundary><UserPortalLayout companyId={currentCompany.id} /></LazyBoundary>
       </div>
     )
   }
@@ -1339,10 +1349,10 @@ export default function App() {
         {/* Main Content */}
         <main className={`flex-1 min-h-0 min-w-0 w-0 bg-background ${showWorkspace ? 'overflow-hidden' : 'overflow-y-auto'}`} onClick={() => setIsUserMenuOpen(false)}>
           {showWorkspace ? (
-            renderActiveDashboard()
+            <LazyBoundary>{renderActiveDashboard()}</LazyBoundary>
           ) : (
             <div className="max-w-7xl mx-auto p-6 lg:p-8">
-              {renderActiveDashboard()}
+              <LazyBoundary>{renderActiveDashboard()}</LazyBoundary>
             </div>
           )}
         </main>

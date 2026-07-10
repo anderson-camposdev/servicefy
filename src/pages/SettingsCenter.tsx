@@ -60,6 +60,7 @@ const SECTIONS: SettingsSection[] = [
   section('pending', 'sla_contracts', 'Motivos de pausa', 'Pausas auditáveis do SLA.', ['Pausa governada', 'Ação do cliente', 'Ledger'], { legacyTab: 'pending_reasons', entitlementKey: 'itsm' }),
   section('contracts', 'sla_contracts', 'Contratos e fornecedores', 'Contratos, OLA e direitos.', ['Contratos por serviço', 'OLA/UC', 'Entitlements'], { status: 'locked', entitlementKey: 'contracts' }),
   section('connections', 'channels', 'Conexões omnichannel', 'Microsoft, Google, WhatsApp e SMTP.', ['Canais próprios/compartilhados', 'Segredos write-only', 'Diagnóstico'], { entitlementKey: 'omnichannel' }),
+  section('smtp', 'channels', 'Configurações de E-mail', 'Servidor de envio por tenant.', ['TLS, SSL e conexão sem criptografia', 'Remetente configurável', 'Senha protegida'], { entitlementKey: 'omnichannel' }),
   section('routing', 'channels', 'Rotas e filas', 'Identificação, destinatários e fallback.', ['Roteamento', 'Fila ambígua MSP', 'Idempotência'], { entitlementKey: 'omnichannel' }),
   section('templates', 'channels', 'Templates e notificações', 'Mensagens por evento, canal e idioma.', ['Variáveis', 'Políticas de envio', 'Entrega'], { entitlementKey: 'omnichannel' }),
   section('knowledge', 'knowledge_ai', 'Base de conhecimento', 'Artigos, revisão e publicação.', ['Publicação', 'Feedback', 'Uso pelo agente'], { entitlementKey: 'knowledge' }),
@@ -180,7 +181,7 @@ export default function SettingsCenter({ companyId, activeRole, onNavigate }: Pr
     />
   )
 
-  if (selected && ['domains', 'macros', 'templates', 'ci', 'compliance', 'licensing', 'branding'].includes(selected.key)) return (
+  if (selected && ['domains', 'macros', 'templates', 'ci', 'compliance', 'licensing', 'branding', 'smtp'].includes(selected.key)) return (
     <PlatformModuleSettings
       moduleKey={selected.key as OperationalModuleKey}
       companyId={targetCompanyId}

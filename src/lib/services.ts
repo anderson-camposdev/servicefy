@@ -252,6 +252,11 @@ export const profilesService = {
       .rpc('update_profile_secure', { p_profile_id: id, p_patch: payload })
     return throwIfError(data, error)
   },
+
+  async batchInvite(payload: import('./iam.types').BatchInvitePayload): Promise<void> {
+    const { error } = await supabase.rpc('batch_invite_users', { p_payload: payload })
+    if (error) throw error
+  },
 }
 
 // ─── INCIDENTS ────────────────────────────────────────────────

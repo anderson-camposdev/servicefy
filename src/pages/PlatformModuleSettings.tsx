@@ -7,8 +7,10 @@ import type { BrandingSettings, CatalogUiConfig } from '../lib/branding.types'
 import type { ThemeName, FontScale } from '../lib/theme-engine'
 import { THEME_HEX_COLORS, getPortalSidebar } from '../lib/theme-engine'
 import type { CompanyRow } from '../lib/database.types'
+import { UserImportZone } from '../components/portal/UserImportZone'
+import { SmtpSettingsForm } from '../components/portal/SmtpSettingsForm'
 
-export type OperationalModuleKey = 'domains' | 'macros' | 'templates' | 'ci' | 'compliance' | 'licensing' | 'branding'
+export type OperationalModuleKey = 'domains' | 'macros' | 'templates' | 'ci' | 'compliance' | 'licensing' | 'branding' | 'iam' | 'smtp'
 
 interface Props { moduleKey: OperationalModuleKey; companyId: string; activeRole: string; onBack: () => void }
 type Row = Record<string, unknown>
@@ -33,7 +35,7 @@ interface ModuleDef {
   payload: (form: Record<string, FormValue>, companyId: string) => Row
 }
 
-const defs: Record<Exclude<OperationalModuleKey, 'compliance' | 'licensing' | 'branding'>, ModuleDef> = {
+const defs: Record<Exclude<OperationalModuleKey, 'compliance' | 'licensing' | 'branding' | 'iam' | 'smtp'>, ModuleDef> = {
   domains: {
     title: 'Domínios de serviço', description: 'Separe TI, RH, Jurídico e Facilities com privacidade e ciclo próprios.',
     table: 'service_domains', order: 'name', activeField: 'active',
@@ -86,9 +88,9 @@ const text = (row: Row, key: string) => typeof row[key] === 'string' ? row[key] 
 const bool = (row: Row, key: string) => row[key] === true
 
 export default function PlatformModuleSettings({ moduleKey, companyId, activeRole, onBack }: Props) {
-  const def = (moduleKey === 'compliance' || moduleKey === 'licensing' || moduleKey === 'branding')
+  const def = (moduleKey === 'compliance' || moduleKey === 'licensing' || moduleKey === 'branding' || moduleKey === 'iam' || moduleKey === 'smtp')
     ? null
-    : defs[moduleKey as Exclude<OperationalModuleKey, 'compliance' | 'licensing' | 'branding'>]
+    : defs[moduleKey as Exclude<OperationalModuleKey, 'compliance' | 'licensing' | 'branding' | 'iam' | 'smtp'>]
   const [rows, setRows] = useState<Row[]>([])
   const [classes, setClasses] = useState<Row[]>([])
   const [groups, setGroups] = useState<Row[]>([])
@@ -241,7 +243,9 @@ export default function PlatformModuleSettings({ moduleKey, companyId, activeRol
         ])
         if (entitlements.error) throw entitlements.error
         setRows(entitlements.data ?? []); setUsage((license.data ?? null) as Row | null)
-      } else if (moduleKey === 'branding') {
+      } else if (moduleKey === 'smtp') {
+        setRows([])
+      } else if (moduleKey === 'branding' || moduleKey === 'iam') {
         const { data, error: companyErr } = await supabase
           .from('companies')
           .select('*')
@@ -442,11 +446,13 @@ export default function PlatformModuleSettings({ moduleKey, companyId, activeRol
     }
   }
 
-  const title = def?.title ?? (moduleKey === 'compliance' ? 'LGPD, retenção e segurança' : moduleKey === 'branding' ? 'Identidade visual e portal' : 'Módulos contratados e licenças')
+  const title = def?.title ?? (moduleKey === 'compliance' ? 'LGPD, retenção e segurança' : moduleKey === 'branding' ? 'Identidade visual e portal' : moduleKey === 'smtp' ? 'Configurações de E-mail' : 'Módulos contratados e licenças')
   const description = def?.description ?? (moduleKey === 'compliance'
     ? 'Políticas de anexo, retenção, verificação de malware e trilha administrativa.'
     : moduleKey === 'branding'
       ? 'Personalize as cores, logotipos, fontes e mensagens de boas-vindas do portal.'
+      : moduleKey === 'smtp'
+        ? 'Configure o servidor SMTP e a identidade de envio deste tenant.'
       : 'Entitlements, origem da habilitação e consumo de licenças concorrentes.')
 
   return <div className="h-full overflow-y-auto bg-slate-50 p-6"><div className="mx-auto max-w-6xl">
@@ -470,6 +476,10 @@ export default function PlatformModuleSettings({ moduleKey, companyId, activeRol
       <div className="mt-6 space-y-6">
         {usage && <section className="grid gap-3 rounded-2xl border bg-white p-5 sm:grid-cols-4"><Metric label="Plano" value={text(usage, 'license_plan')} /><Metric label="Em uso" value={String(usage.active_connections ?? 0)} /><Metric label="Limite" value={String(usage.license_limit ?? 0)} /><Metric label="Status" value={text(usage, 'license_status')} /></section>}
         <section className="rounded-2xl border bg-white p-5"><h2 className="font-extrabold">Entitlements do tenant</h2><div className="mt-4 grid gap-2 md:grid-cols-2">{rows.map(row => <div key={text(row, 'id')} className="flex items-center gap-3 rounded-xl border p-3"><span className={`h-2.5 w-2.5 rounded-full ${bool(row, 'enabled') ? 'bg-emerald-500' : 'bg-slate-300'}`} /><div className="flex-1"><b className="text-sm">{text(row, 'module_key')}</b><p className="text-xs text-slate-500">{text(row, 'source')}</p></div>{activeRole === 'sysadmin' && <button onClick={() => void toggleEntitlement(row)} className="rounded-lg border px-2 py-1 text-xs font-bold">{bool(row, 'enabled') ? 'Desativar' : 'Ativar'}</button>}</div>)}</div></section>
+      </div>
+    ) : moduleKey === 'smtp' ? (
+      <div className="mt-6">
+        <SmtpSettingsForm companyId={companyId} />
       </div>
     ) : moduleKey === 'branding' ? (
       <div className="mt-6 space-y-6">
@@ -745,6 +755,17 @@ export default function PlatformModuleSettings({ moduleKey, companyId, activeRol
             )}
           </button>
         </div>
+      </div>
+    ) : moduleKey === 'iam' ? (
+      <div className="mt-6">
+        <section className="rounded-2xl border bg-white p-6 shadow-sm">
+          <h2 className="text-lg font-bold text-slate-900 mb-6">Importação em Lote de Usuários</h2>
+          <UserImportZone 
+            companyId={companyId} 
+            tenantDomain={text(rows[0] ?? {}, 'domain') || 'tenant.local'} 
+            onSuccess={() => void load()} 
+          />
+        </section>
       </div>
     ) : (
       <div className="mt-6 grid gap-6 lg:grid-cols-[380px_1fr]">
