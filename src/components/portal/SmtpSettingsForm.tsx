@@ -27,8 +27,6 @@ const EMPTY_FORM: SmtpFormState = {
   encryptionType: 'tls',
 }
 
-const toPasswordBytes = (password: string) => new TextEncoder().encode(password)
-
 export function SmtpSettingsForm({ companyId }: SmtpSettingsFormProps) {
   const [form, setForm] = useState<SmtpFormState>(EMPTY_FORM)
   const [loading, setLoading] = useState(true)
@@ -99,16 +97,16 @@ export function SmtpSettingsForm({ companyId }: SmtpSettingsFormProps) {
     setSaving(true)
     setError('')
     setSuccess('')
-    const { error: saveError } = await supabase.from('tenant_smtp_settings').upsert({
-      company_id: companyId,
-      smtp_host: form.smtpHost.trim(),
-      smtp_port: port,
-      smtp_user: form.smtpUser.trim(),
-      smtp_password_encrypted: toPasswordBytes(form.smtpPassword),
-      from_email: form.fromEmail.trim(),
-      from_name: form.fromName.trim(),
-      encryption_type: form.encryptionType,
-    }, { onConflict: 'company_id' })
+    const { error: saveError } = await supabase.rpc('save_tenant_smtp_settings', {
+      p_company_id: companyId,
+      p_smtp_host: form.smtpHost.trim(),
+      p_smtp_port: port,
+      p_smtp_user: form.smtpUser.trim(),
+      p_from_email: form.fromEmail.trim(),
+      p_from_name: form.fromName.trim(),
+      p_encryption_type: form.encryptionType,
+      p_password: form.smtpPassword,
+    })
     setSaving(false)
 
     if (saveError) {

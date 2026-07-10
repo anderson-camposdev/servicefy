@@ -2,16 +2,17 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { SmtpSettingsForm } from '../SmtpSettingsForm'
 
-const { mockFrom, mockMaybeSingle, mockUpsert, mockInvoke } = vi.hoisted(() => ({
+const { mockFrom, mockMaybeSingle, mockRpc, mockInvoke } = vi.hoisted(() => ({
   mockFrom: vi.fn(),
   mockMaybeSingle: vi.fn(),
-  mockUpsert: vi.fn(),
+  mockRpc: vi.fn(),
   mockInvoke: vi.fn(),
 }))
 
 vi.mock('../../../lib/supabase', () => ({
   supabase: {
     from: mockFrom,
+    rpc: mockRpc,
     functions: { invoke: mockInvoke },
   },
 }))
@@ -23,7 +24,7 @@ function fillSmtpPassword(password = 'secret-value') {
 describe('SmtpSettingsForm', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mockUpsert.mockResolvedValue({ error: null })
+    mockRpc.mockResolvedValue({ data: { id: 'smtp-settings-123' }, error: null })
     mockInvoke.mockResolvedValue({
       data: {
         success: true,
@@ -46,7 +47,6 @@ describe('SmtpSettingsForm', () => {
       select: vi.fn(() => ({
         eq: vi.fn(() => ({ maybeSingle: mockMaybeSingle })),
       })),
-      upsert: mockUpsert,
     })
   })
 
@@ -77,16 +77,16 @@ describe('SmtpSettingsForm', () => {
     await screen.findByRole('status')
     fireEvent.click(screen.getByRole('button', { name: 'Salvar configurações SMTP' }))
 
-    await waitFor(() => expect(mockUpsert).toHaveBeenCalledTimes(1))
-    const [payload, options] = mockUpsert.mock.calls[0]
-    expect(payload).toEqual(expect.objectContaining({
-      company_id: 'company-123',
-      smtp_host: 'smtp.new.example.com',
-      smtp_port: 587,
-      encryption_type: 'tls',
+    await waitFor(() => expect(mockRpc).toHaveBeenCalledWith('save_tenant_smtp_settings', {
+      p_company_id: 'company-123',
+      p_smtp_host: 'smtp.new.example.com',
+      p_smtp_port: 587,
+      p_smtp_user: 'mailer@example.com',
+      p_from_email: 'support@example.com',
+      p_from_name: 'Support',
+      p_encryption_type: 'tls',
+      p_password: 'secret-value',
     }))
-    expect(Array.from(payload.smtp_password_encrypted)).toEqual(Array.from(new TextEncoder().encode('secret-value')))
-    expect(options).toEqual({ onConflict: 'company_id' })
     expect(screen.getByText('Configurações SMTP salvas.')).toBeTruthy()
   })
 

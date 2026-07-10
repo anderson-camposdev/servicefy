@@ -9,6 +9,7 @@ import { THEME_HEX_COLORS, getPortalSidebar } from '../lib/theme-engine'
 import type { CompanyRow } from '../lib/database.types'
 import { UserImportZone } from '../components/portal/UserImportZone'
 import { SmtpSettingsForm } from '../components/portal/SmtpSettingsForm'
+import { EmailDeliveryPolicyForm } from '../components/portal/EmailDeliveryPolicyForm'
 
 export type OperationalModuleKey = 'domains' | 'macros' | 'templates' | 'ci' | 'compliance' | 'licensing' | 'branding' | 'iam' | 'smtp'
 
@@ -478,8 +479,9 @@ export default function PlatformModuleSettings({ moduleKey, companyId, activeRol
         <section className="rounded-2xl border bg-white p-5"><h2 className="font-extrabold">Entitlements do tenant</h2><div className="mt-4 grid gap-2 md:grid-cols-2">{rows.map(row => <div key={text(row, 'id')} className="flex items-center gap-3 rounded-xl border p-3"><span className={`h-2.5 w-2.5 rounded-full ${bool(row, 'enabled') ? 'bg-emerald-500' : 'bg-slate-300'}`} /><div className="flex-1"><b className="text-sm">{text(row, 'module_key')}</b><p className="text-xs text-slate-500">{text(row, 'source')}</p></div>{activeRole === 'sysadmin' && <button onClick={() => void toggleEntitlement(row)} className="rounded-lg border px-2 py-1 text-xs font-bold">{bool(row, 'enabled') ? 'Desativar' : 'Ativar'}</button>}</div>)}</div></section>
       </div>
     ) : moduleKey === 'smtp' ? (
-      <div className="mt-6">
+      <div className="mt-6 space-y-6">
         <SmtpSettingsForm companyId={companyId} />
+        {activeRole === 'sysadmin' && <EmailDeliveryPolicyForm companyId={companyId} />}
       </div>
     ) : moduleKey === 'branding' ? (
       <div className="mt-6 space-y-6">
