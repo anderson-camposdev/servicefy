@@ -1,13 +1,15 @@
 name: CI/CD Staging
 
-# Gatilhos: valida todo PR contra main e toda push em main; permite disparo manual.
-# Nao ha job de deploy aqui de proposito — ver docs/CI_CD_STAGING.md para o porque
-# e para o plano de secrets do estagio de deploy futuro.
+# Gatilhos: toda PR e todo push contra staging ou main. Job 3 (deploy real) só
+# roda em push — nunca em PR, mesmo de dentro do repositório — para que migrations
+# e Edge Functions só sejam aplicadas quando o código já estiver na branch de
+# destino, não a cada rodada de revisão. Ver docs/CI_CD_STAGING.md para o plano
+# completo de secrets e a estratégia de isolamento Dev vs Staging.
 on:
   pull_request:
-    branches: [main]
+    branches: [staging, main]
   push:
-    branches: [main]
+    branches: [staging, main]
   workflow_dispatch: {}
 
 concurrency:
@@ -18,8 +20,9 @@ env:
   NODE_VERSION: '24'
 
 jobs:
+  # ── Job 1: Lint & Build ──────────────────────────────────────────────────
   lint-and-build:
-    name: Lint & Build
+    name: 'Job 1 — Lint & Build'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -37,8 +40,10 @@ jobs:
       - name: Build (tsc + vite)
         run: npm run build
 
+  # ── Job 2: Testes Automatizados — só roda se o Job 1 passar ─────────────
   automated-tests:
-    name: Testes Automatizados
+    name: 'Job 2 — Testes Automatizados'
+    needs: [lint-and-build]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -50,15 +55,25 @@ jobs:
 
       - run: npm ci
 
-      - name: Vitest (componentes)
+      - name: Vitest (suíte completa)
         run: npm run test:unit:vitest
 
       - name: Contratos de segurança do banco
         run: npm run test:security
 
-  migration-validation:
-    name: Validação de Migrations
+  # ── Job 3: Supabase Dry-Run & Deploy — só roda se o Job 2 passar, e só em
+  #    push (nunca em pull_request). Usa o Environment "staging" do GitHub:
+  #    configure um required reviewer nele em Settings → Environments para
+  #    exigir aprovação manual antes deste job rodar, se desejado.
+  supabase-dry-run-deploy:
+    name: 'Job 3 — Supabase Dry-Run & Deploy'
+    needs: [automated-tests]
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
+    environment: staging
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_STAGING_DB_PASSWORD }}
     steps:
       - uses: actions/checkout@v4
 
@@ -76,49 +91,39 @@ jobs:
         with:
           version: latest
 
-      # `supabase start` sobe um Postgres/GoTrue/PostgREST descartáveis dentro do
-      # próprio runner (via Docker, já presente em ubuntu-latest). Nenhum dado real
-      # é tocado — o Postgres nasce vazio e morre com o job.
-      - name: Subir stack local efêmero
-        run: supabase start
-
-      # `db reset` aqui aplica TODAS as migrations (incluindo 100→107) do zero
-      # contra esse Postgres descartável. Se qualquer migration tiver erro de DDL,
-      # o passo falha e o PR é bloqueado — exatamente o "dry-run" pedido, só que
-      # sem depender de nenhum projeto/segredo remoto.
-      - name: Replay completo das migrations (dry-run local)
-        run: supabase db reset
-
-      - name: Parar stack local
-        if: always()
-        run: supabase stop
-
-  # ── Estágio opcional, só roda quando o staging remoto existir e os secrets
-  #    abaixo estiverem configurados no repositório. Ver docs/CI_CD_STAGING.md.
-  remote-staging-dry-run:
-    name: Dry-run contra Supabase Staging (opcional)
-    runs-on: ubuntu-latest
-    needs: [migration-validation]
-    if: ${{ github.event_name == 'pull_request' && vars.STAGING_ENABLED == 'true' }}
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: supabase/setup-cli@v1
-        with:
-          version: latest
+      # Rede de segurança extra, 100% local: sobe um Postgres descartável dentro
+      # do runner e faz o replay de TODAS as migrations (009→107) do zero. Se
+      # houver erro de DDL, falha aqui — antes de qualquer coisa tocar o projeto
+      # de staging real. Não é o passo exigido pelo enunciado, mas é a maneira
+      # mais segura de pegar um problema de migration sem nenhum risco.
+      - name: Replay local completo das migrations (rede de segurança)
+        run: |
+          supabase start
+          supabase db reset
+          supabase stop
 
       - name: Link ao projeto de staging
-        run: supabase link --project-ref "$SUPABASE_STAGING_PROJECT_ID"
+        run: supabase link --project-ref "$SUPABASE_PROJECT_ID_STAGING"
         env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-          SUPABASE_STAGING_PROJECT_ID: ${{ secrets.SUPABASE_STAGING_PROJECT_ID }}
-          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_STAGING_DB_PASSWORD }}
+          SUPABASE_PROJECT_ID_STAGING: ${{ secrets.SUPABASE_PROJECT_ID_STAGING }}
 
-      # --dry-run: apenas mostra o que SERIA aplicado, nunca escreve no banco de
-      # staging. Nenhum comando destrutivo (db reset / push sem --dry-run) roda
-      # contra um projeto remoto neste workflow.
-      - name: Dry-run das migrations pendentes contra staging
-        run: supabase db push --dry-run
+      # "Dry-run": lista o diff entre migrations locais e as já aplicadas no
+      # projeto de staging, sem escrever nada. `migration up` (abaixo) não tem
+      # flag --dry-run própria — esta é a forma correta de pré-visualizar antes
+      # dela.
+      - name: Dry-run — diff de migrations local vs. staging
+        run: supabase migration list --linked
+
+      # Aplica estritamente as migrations PENDENTES (009→107 incluídas) contra
+      # staging. `migration up` só soma migrations novas ao histórico — nunca
+      # dropa, reseta ou força sobrescrita de nada já existente. Sem --force,
+      # sem db reset, sem db push de escrita.
+      - name: Deploy — aplicar migrations pendentes em staging
+        run: supabase migration up --linked
+
+      - name: Deploy — Edge Functions (test-smtp-connection, dispatch-ticket-email-outbox)
+        run: |
+          supabase functions deploy test-smtp-connection --project-ref "$SUPABASE_PROJECT_ID_STAGING"
+          supabase functions deploy dispatch-ticket-email-outbox --project-ref "$SUPABASE_PROJECT_ID_STAGING"
         env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_STAGING_DB_PASSWORD }}
+          SUPABASE_PROJECT_ID_STAGING: ${{ secrets.SUPABASE_PROJECT_ID_STAGING }}

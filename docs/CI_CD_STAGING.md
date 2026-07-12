@@ -2,67 +2,85 @@
 
 Workflow: [`.github/workflows/ci-cd-staging.yml`](../.github/workflows/ci-cd-staging.yml)
 
-## O que roda sempre (sem segredo nenhum)
+Disparado em toda PR e todo push contra `staging` ou `main`, e manualmente via
+`workflow_dispatch`. Três jobs **sequenciais** (`needs:`) — cada um só roda se o
+anterior passar:
 
-Três jobs em paralelo, disparados em todo PR contra `main`, todo push em `main`,
-e manualmente via `workflow_dispatch`:
+## Job 1 — Lint & Build
 
-1. **Lint & Build** — `npm run lint` (ESLint) + `npm run build` (`tsc -b && vite build`).
-2. **Testes Automatizados** — `npm run test:unit:vitest` (Vitest dos componentes) +
-   `npm run test:security` (21 contratos de segurança do banco, checagem estática
-   das migrations/RPCs via regex — não precisa de banco vivo).
-3. **Validação de Migrations** — `npm run audit:migrations` (checagem estática rápida:
-   tabelas core, prefixos duplicados, `config.toml` presente) e, se passar, sobe um
-   Postgres **descartável** dentro do próprio runner (`supabase start`, via Docker) e
-   roda `supabase db reset` — isso replica **todas** as migrations do zero, incluindo
-   100→107, contra um banco que nasce vazio e morre com o job. Qualquer erro de DDL
-   quebra o job. Esse é o "dry-run" pedido: nenhum projeto remoto é tocado, então não
-   existe risco de dado real, e nenhum segredo é necessário.
+`npm ci && npm run lint && npm run build` (ESLint + `tsc -b && vite build`). Não
+precisa de nenhuma credencial.
 
-Nenhum desses três jobs precisa de nenhuma credencial Supabase — todos os testes
-mockam o client (`vi.mock('../../../lib/supabase', ...)`), e a validação de migrations
-roda 100% local.
+## Job 2 — Testes Automatizados
 
-## Estágio opcional: dry-run contra Supabase Staging real
+`npm run test:unit:vitest` (suíte Vitest completa) + `npm run test:security`
+(contratos de segurança do banco — checagem estática de migrations/RPCs via
+regex, não abre conexão nenhuma). Também não precisa de credencial: todo teste
+mocka o client Supabase (`vi.mock('../../../lib/supabase', ...)`).
 
-Hoje **não existe projeto de staging** na conta Supabase (só o de produção,
-`Flowfy ITSM` / ref `enxtvrvsfwvcnpyspyfl`). O job `remote-staging-dry-run` existe no
-workflow mas fica **desligado por padrão** (`if: vars.STAGING_ENABLED == 'true'`) até
-que:
+## Job 3 — Supabase Dry-Run & Deploy
 
-1. Um projeto Supabase novo seja criado especificamente para staging (nunca reutilizar
-   o ref de produção).
-2. Os secrets abaixo sejam configurados em **Settings → Secrets and variables →
-   Actions** do repositório GitHub.
-3. A variável de repositório (não secret) `STAGING_ENABLED` seja criada com valor
-   `true` em **Settings → Secrets and variables → Actions → Variables**.
+**Só roda em `push`, nunca em `pull_request`** — aplicar migrations e publicar
+Edge Functions a cada PR aberta seria um efeito colateral perigoso; deploy real
+só deve acontecer quando o código já estiver na branch de destino. O job usa o
+GitHub Environment `staging`: configure um *required reviewer* nele (Settings →
+Environments → staging) se quiser um gate manual de aprovação antes do deploy
+rodar, sem precisar tocar no YAML.
 
-| Nome | Tipo | Onde conseguir | Uso |
-|---|---|---|---|
-| `SUPABASE_ACCESS_TOKEN` | Secret | [supabase.com/dashboard/account/tokens](https://supabase.com/dashboard/account/tokens) — gerar um token pessoal ou de service account dedicado ao CI (não reusar o seu token pessoal de uso diário) | Autentica o `supabase` CLI (`supabase link`, `supabase db push`) |
-| `SUPABASE_STAGING_PROJECT_ID` | Secret | Painel do projeto de staging → Settings → General → "Reference ID" | Identifica qual projeto o CLI deve linkar (`supabase link --project-ref`) |
-| `SUPABASE_STAGING_DB_PASSWORD` | Secret | Definida na criação do projeto de staging (ou resetável em Settings → Database) | Necessária para o CLI conectar ao Postgres do projeto ao fazer `db push` |
+Passos, nesta ordem:
+1. **Rede de segurança local** — sobe um Postgres descartável dentro do próprio
+   runner (`supabase start` + `supabase db reset`) e faz o replay de todas as
+   migrations (009→107) do zero. Se qualquer uma tiver erro de DDL, o job falha
+   aqui, antes de tocar o projeto de staging real.
+2. **Link** — `supabase link --project-ref $SUPABASE_PROJECT_ID_STAGING`.
+3. **Dry-run** — `supabase migration list --linked`, que mostra o diff entre
+   migrations locais e as já aplicadas em staging, sem escrever nada. `migration
+   up` (próximo passo) não tem flag `--dry-run` própria; isso cobre a
+   pré-visualização antes dela.
+4. **Deploy de migrations** — `supabase migration up --linked`. Aplica
+   estritamente as migrations **pendentes** (as 100→107 desta fase, e qualquer
+   futura); não dropa, não reseta, não sobrescreve nada existente. Sem
+   `--force`, sem `db reset` remoto, sem `db push` de escrita.
+5. **Deploy de Edge Functions** — `supabase functions deploy test-smtp-connection`
+   e `supabase functions deploy dispatch-ticket-email-outbox`, contra o mesmo
+   `--project-ref` de staging.
 
-Variável de repositório (pública, não sensível):
+Nenhum comando destrutivo em nenhum passo: `db reset` só roda contra o Postgres
+efêmero local do passo 1, nunca contra staging.
 
-| Nome | Tipo | Valor |
+## Secrets a cadastrar no GitHub
+
+Em **Settings → Secrets and variables → Actions → Secrets** do repositório:
+
+| Nome | Onde conseguir | Uso |
 |---|---|---|
-| `STAGING_ENABLED` | Variable | `true` — só depois que os 3 secrets acima existirem |
+| `SUPABASE_ACCESS_TOKEN` | [supabase.com/dashboard/account/tokens](https://supabase.com/dashboard/account/tokens) — gere um token dedicado ao CI, não reuse o seu pessoal de uso diário | Autentica o `supabase` CLI (`link`, `migration up`, `functions deploy`) |
+| `SUPABASE_PROJECT_ID_STAGING` | Painel do projeto de staging → Settings → General → "Reference ID" | Identifica qual projeto o CLI deve linkar/deployar (`--project-ref`) |
+| `SUPABASE_STAGING_DB_PASSWORD` | Definida na criação do projeto de staging (ou resetável em Settings → Database) | Necessária para o CLI conectar ao Postgres ao rodar `migration up` |
 
-Mesmo com tudo configurado, o job usa **exclusivamente** `supabase db push --dry-run`
-— ele só imprime o que seria aplicado, nunca escreve nada. Não há, em lugar nenhum
-deste workflow, um `db push` sem `--dry-run`, um `db reset` contra projeto remoto, ou
-qualquer outro comando que apague ou sobrescreva dado real. Promover de fato as
-migrations 100→107 (ou futuras) para staging continua sendo uma ação manual e
-deliberada, fora deste pipeline — mesmo padrão já usado nesta sessão para produção
-(aplicação via MCP, uma migration por vez, com verificação em cada passo).
+Recomendo também criar o Environment `staging` (Settings → Environments → New
+environment) e anexar esses mesmos 3 secrets **a ele** em vez de deixá-los como
+secrets globais do repositório — isso permite exigir aprovação manual antes do
+Job 3 rodar e restringe quem pode ver/usar essas credenciais.
 
-## Por que não há job de deploy do frontend aqui
+## Pré-requisito ainda pendente: o projeto de staging não existe
 
-O escopo desta fase (Fase 11) é validação — lint, testes, compatibilidade de
-migrations. Um job de deploy do frontend (Vercel/Netlify/etc.) ou de deploy de Edge
-Functions para staging é um próximo passo natural, mas depende de decisões ainda não
-tomadas (onde hospedar o staging do frontend, se as Edge Functions de staging
-reusam os mesmos secrets de produção como `RESEND_API_KEY` ou têm os seus próprios).
-Fica como proposta para uma "Fase 11.1" separada, uma vez que o projeto de staging
-exista.
+Hoje a conta Supabase só tem o projeto de produção (`Flowfy ITSM` /
+`enxtvrvsfwvcnpyspyfl`). O Job 3 vai falhar no passo de link até que:
+
+1. Um projeto Supabase **novo** seja criado especificamente para staging (nunca
+   reutilizar o ref de produção — isso misturaria dados de teste com dados reais
+   de clientes).
+2. Os 3 secrets acima sejam cadastrados apontando para esse novo projeto.
+
+Não criei esse projeto automaticamente nesta sessão porque provisionar infra
+nova na nuvem (e potencialmente gerar custo, dependendo do plano da
+organização) é uma decisão que cabe ao usuário confirmar antes — posso criar
+via MCP do Supabase se você autorizar.
+
+## Sobre o deploy do frontend
+
+Este workflow cobre banco (migrations) e Edge Functions, conforme pedido nesta
+fase. Deploy do frontend (Vercel/Netlify/etc.) para staging fica como próximo
+passo natural, dependente de onde vocês decidirem hospedar esse ambiente —
+ainda não coberto aqui.
