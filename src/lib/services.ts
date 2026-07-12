@@ -691,6 +691,20 @@ export const incidentsService = {
   },
 
   /**
+   * Fase 17 — Take Ownership: analista se auto-atribui um ticket da fila do
+   * seu grupo. claim_ticket_secure valida pertencimento ao grupo e resolve
+   * concorrência atomicamente no próprio UPDATE (ver migration 114); o erro
+   * 40001 sinaliza que outro analista já assumiu o ticket primeiro.
+   */
+  async claimTicket(id: string): Promise<IncidentRow> {
+    const { data, error } = await supabase.rpc('claim_ticket_secure', {
+      p_ticket_id: id,
+    })
+    if (error) throw error
+    return data as IncidentRow
+  },
+
+  /**
    * Reabertura pelo solicitante: grava a justificativa no chat (ticket_messages,
    * actor 'user') — o trigger reopen_incident_on_user_message volta o estado para
    * In Progress, zera resolved_at e registra a transição no histórico.

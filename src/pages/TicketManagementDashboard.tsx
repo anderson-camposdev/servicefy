@@ -1,11 +1,14 @@
-import { useState, useEffect } from 'react'
-import { Search, Clock, AlertTriangle, CheckCircle, MoreHorizontal, Building2, LayoutGrid, List, ChevronRight, Settings, X, User, Users, Plus } from 'lucide-react'
+import { useState, useEffect, type MouseEvent } from 'react'
+import { Search, Clock, AlertTriangle, CheckCircle, MoreHorizontal, Building2, LayoutGrid, List, ChevronRight, Settings, X, User, Users, Plus, UserCheck } from 'lucide-react'
 import NewTicketModal from './NewTicketModal'
 import { useIncidents } from '../hooks/useIncidents'
 import { useAuth } from '../auth'
 import type { WorkspaceTicket, CompanyLite } from './workspace.types'
+import type { AssignmentGroupRow } from '../lib/database.types'
 import TicketDataTable from '../components/TicketDataTable'
 import { INCIDENT_REQUEST_FIELDS } from '../lib/ticketTableFields'
+import { incidentsService, assignmentGroupsService } from '../lib/services'
+import { useToast } from '../context'
 
 /**
  * Gestão de Tickets MSP (multi-cliente, Kanban/Tabela).
@@ -26,6 +29,7 @@ type Row = WorkspaceTicket & {
   column: string
   companyId?: string
   assignedToId?: string | null
+  assignmentGroupId?: string | null
   slaBreached?: boolean
   slaDeadline?: string | null
   updatedAt?: string
@@ -229,6 +233,19 @@ const AVAILABLE_METRICS = [
     countFn: (rows: Row[]) => rows.filter(r => !r.assignedToId).length,
   },
   {
+    key: 'myGroupsQueue',
+    title: 'Fila dos Meus Grupos',
+    icon: UserCheck,
+    color: 'bg-cyan-50 text-cyan-700 border-cyan-200 hover:bg-cyan-100',
+    activeColor: 'bg-cyan-600 text-white border-cyan-600 shadow-md ring-2 ring-cyan-600',
+    // ITIL v4 (Fase 17): tickets sem analista (assigned_to_id NULL) cujo grupo
+    // de atendimento é um dos grupos do analista logado — fila para "Assumir".
+    filterFn: (r: Row, _profileId?: string, myGroupIds?: string[]) =>
+      !r.assignedToId && !!r.assignmentGroupId && (myGroupIds ?? []).includes(r.assignmentGroupId),
+    countFn: (rows: Row[], _profileId?: string, myGroupIds?: string[]) =>
+      rows.filter(r => !r.assignedToId && !!r.assignmentGroupId && (myGroupIds ?? []).includes(r.assignmentGroupId)).length,
+  },
+  {
     key: 'resolvedToday',
     title: 'Resolvidos Hoje',
     icon: CheckCircle,
@@ -245,11 +262,28 @@ const TicketManagementDashboard = ({ onOpenTicket, companyId, isProvider, compan
   const realMode = Boolean(companyId)
   const { incidents, loading, filterCompanyId, setFilterCompanyId, setSearch } = useIncidents(companyId ?? '', undefined, ticketType)
   const { profile } = useAuth()
+  const { toast } = useToast()
 
   const [localClient, setLocalClient] = useState('all')
   const [localSearch, setLocalSearch] = useState('')
   const [viewMode, setViewMode] = useState<'table' | 'kanban'>('table')
   const [showNewTicket, setShowNewTicket] = useState(false)
+  const [myGroupIds, setMyGroupIds] = useState<string[]>([])
+  const [claimingId, setClaimingId] = useState<string | null>(null)
+
+  // Grupos do analista logado — usado pelo card "Fila dos Meus Grupos" e para
+  // decidir quando mostrar o botão "Assumir Ticket" em cada linha.
+  useEffect(() => {
+    if (!realMode || !profile?.id) {
+      setMyGroupIds([])
+      return
+    }
+    let cancelled = false
+    assignmentGroupsService.listForUser(profile.id)
+      .then((groups: AssignmentGroupRow[]) => { if (!cancelled) setMyGroupIds(groups.map(g => g.id)) })
+      .catch(() => { if (!cancelled) setMyGroupIds([]) })
+    return () => { cancelled = true }
+  }, [realMode, profile?.id])
 
   // Estados dos Indicadores e Customização Self-Service
   const [activeFilterCard, setActiveFilterCard] = useState<string | null>(null)
@@ -294,6 +328,7 @@ const TicketManagementDashboard = ({ onOpenTicket, companyId, isProvider, compan
         caseId: i.case_id ?? null,
         companyId: i.company_id,
         assignedToId: i.assigned_to_id,
+        assignmentGroupId: i.assignment_group_id,
         slaBreached: i.sla_breached,
         slaDeadline: i.sla_deadline,
         updatedAt: i.updated_at,
@@ -339,9 +374,27 @@ const TicketManagementDashboard = ({ onOpenTicket, companyId, isProvider, compan
   const finalFilteredRows = activeFilterCard
     ? typedRows.filter(r => {
         const metric = AVAILABLE_METRICS.find(m => m.key === activeFilterCard)
-        return metric ? metric.filterFn(r, profileIdForMetrics) : true
+        return metric ? metric.filterFn(r, profileIdForMetrics, myGroupIds) : true
       })
     : typedRows
+
+  const canClaim = (row: Row) =>
+    realMode && !row.assignedToId && !!row.assignmentGroupId && myGroupIds.includes(row.assignmentGroupId)
+
+  const handleClaimTicket = async (row: Row, e: MouseEvent) => {
+    e.stopPropagation()
+    if (!row.incidentId || claimingId) return
+    setClaimingId(row.incidentId)
+    try {
+      await incidentsService.claimTicket(row.incidentId)
+      toast.success(`Ticket ${row.id} assumido com sucesso.`)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Falha ao assumir o ticket.'
+      toast.error(message)
+    } finally {
+      setClaimingId(null)
+    }
+  }
 
   const handleSearchChange = (value: string) => {
     if (realMode) setSearch(value)
@@ -441,7 +494,7 @@ const TicketManagementDashboard = ({ onOpenTicket, companyId, isProvider, compan
             const metric = AVAILABLE_METRICS.find(m => m.key === key)
             if (!metric) return null
             const Icon = metric.icon
-            const count = metric.countFn(typedRows, profileIdForMetrics)
+            const count = metric.countFn(typedRows, profileIdForMetrics, myGroupIds)
             const isActive = activeFilterCard === key
 
             return (
@@ -485,7 +538,19 @@ const TicketManagementDashboard = ({ onOpenTicket, companyId, isProvider, compan
             onRowClick={openTicket}
             loading={realMode && loading}
             emptyLabel="Nenhum chamado encontrado."
-            actions={() => <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-indigo-600" />}
+            actions={(row: Row) => canClaim(row) ? (
+              <button
+                onClick={e => handleClaimTicket(row, e)}
+                disabled={claimingId === row.incidentId}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-bold bg-cyan-600 text-white hover:bg-cyan-700 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+                title="Assumir este ticket para sua fila"
+              >
+                <UserCheck className="w-3.5 h-3.5" />
+                {claimingId === row.incidentId ? 'Assumindo…' : 'Assumir'}
+              </button>
+            ) : (
+              <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-indigo-600" />
+            )}
           />
 
         ) : (
