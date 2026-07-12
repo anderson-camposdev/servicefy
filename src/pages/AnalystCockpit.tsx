@@ -14,6 +14,7 @@ import type { WorkspaceTicket } from './workspace.types'
 import KnowledgeCockpitPanel from './KnowledgeCockpitPanel'
 import SlaEventTimeline from './SlaEventTimeline'
 import TicketTasksPanel from '../components/TicketTasksPanel'
+import ResolutionModal from '../components/portal/ResolutionModal'
 import { priorityString, IMPACT_OPTIONS, URGENCY_OPTIONS } from '../lib/priority'
 
 /**
@@ -154,14 +155,6 @@ const CONTEXT_TABS: { id: ContextTab; label: string; icon: React.ReactNode }[] =
   { id: 'historico', label: 'Histórico de Chamados', icon: <History className="w-4 h-4" /> },
   { id: 'subchamados', label: 'Sub Chamados', icon: <ListTree className="w-4 h-4" /> },
   { id: 'relacionamentos', label: 'Relacionamentos', icon: <Link2 className="w-4 h-4" /> },
-]
-
-// Códigos de encerramento (padrão ServiceNow)
-const CLOSE_CODES: { group: string; options: string[] }[] = [
-  { group: 'Solução Definitiva', options: ['Correção de Aplicação', 'Ajuste de Configuração', 'Substituição de Hardware'] },
-  { group: 'Workaround', options: ['Solução de Contorno Aplicada', 'Ativação de Contingência'] },
-  { group: 'Cancelado', options: ['Abertura em Duplicidade', 'Erro de Operação do Usuário'] },
-  { group: 'Encerrado sem Ação', options: ['Falta de Retorno do Solicitante'] },
 ]
 
 const MOCK_MESSAGES: TicketMessageRow[] = [
@@ -872,50 +865,23 @@ const AnalystCockpit = ({ ticket = FALLBACK_TICKET }: { ticket?: WorkspaceTicket
     }
   }, [detail])
 
-  // Resolução focada: só grava close_code + close_notes + estado=Resolved
-  const handleResolve = useCallback(async () => {
+  // Fase 18 — Motor de Resolução Estruturada (ITIL v4): resolution_code +
+  // resolution_notes + kb_candidate, validados no banco (trg_guard_
+  // resolution_governance, migration 115) e coletados pelo ResolutionModal.
+  const handleResolveStructured = useCallback(async (resolutionCode: string, resolutionNotes: string, kbCandidate: boolean) => {
     const cid = detail?.company_id || ticket.companyId
-    if (!ticket.incidentId || !cid) return
+    if (!ticket.incidentId || !cid) throw new Error('Ticket ou empresa não resolvidos.')
 
-    if (!closeCode) {
-      const msg = 'Selecione o Código de Encerramento.'
-      setError(msg); toast.error(msg); return
-    }
-    if (!closeNotes.trim()) {
-      const msg = 'Preencha as Notas de Resolução descrevendo a solução aplicada.'
-      setError(msg); toast.error(msg); return
-    }
-
-    setSavingConducao(true)
-    setError(null)
-    try {
-      const notes = timeSpent ? `${closeNotes.trim()}\n\n[Tempo gasto: ${timeSpent}]` : closeNotes.trim()
-      const updated = await incidentsService.conduct(ticket.incidentId, cid, {
-        changes: {
-          state: 'Resolved',
-          close_code: closeCode,
-          close_notes: notes,
-          resolved_at: new Date().toISOString(),
-        },
-        comment: formComment.trim() || undefined,
-        isInternal: false,
-        senderId: profile?.id ?? null,
-        senderName: profile?.name ?? 'Analista',
-      })
-      setDetail(prev => prev ? { ...prev, ...updated } : null)
-      setStateOverride('Resolved')
-      toast.success('Chamado resolvido com sucesso!')
-      setConducaoMode('idle')
-      refreshIncident()
-      refreshMessages()
-    } catch (e) {
-      const errMsg = dbErrMsg(e, 'Falha ao resolver o chamado.')
-      setError(errMsg)
-      toast.error(errMsg)
-    } finally {
-      setSavingConducao(false)
-    }
-  }, [ticket.incidentId, ticket.companyId, detail?.company_id, closeCode, closeNotes, timeSpent, formComment, profile, toast, refreshIncident, refreshMessages])
+    const updated = await incidentsService.resolveStructured(
+      ticket.incidentId, cid, resolutionCode, resolutionNotes, kbCandidate, profile?.name ?? 'Analista',
+    )
+    setDetail(prev => prev ? { ...prev, ...updated } : null)
+    setStateOverride('Resolved')
+    toast.success('Chamado resolvido com sucesso!')
+    setConducaoMode('idle')
+    refreshIncident()
+    refreshMessages()
+  }, [ticket.incidentId, ticket.companyId, detail?.company_id, profile, toast, refreshIncident, refreshMessages])
 
   // Valores de exibição
   const number = ticket.id
@@ -1593,76 +1559,16 @@ const AnalystCockpit = ({ ticket = FALLBACK_TICKET }: { ticket?: WorkspaceTicket
                 )}
 
                 {/* MODO RESOLUÇÃO */}
-                {canEdit && conducaoMode === 'resolve' && (
-                  <div className={`${cardClass} overflow-hidden`}>
-                    <div className="px-5 py-4 border-b border-emerald-200 bg-emerald-50 flex items-center gap-2">
-                      <CheckCircle className="w-4 h-4 text-emerald-600" />
-                      <h2 className="text-sm font-bold text-emerald-800">Resolver Chamado</h2>
-                      <span className="ml-auto text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-200">Status → Resolvido</span>
-                    </div>
-
-                    <div className="p-5 space-y-4">
-                      <p className="text-[11px] text-on-surface-variant leading-relaxed">
-                        Preencha os dados de encerramento. O chamado será marcado como <b>Resolvido</b> e o SLA será registrado.
-                      </p>
-
-                      {/* Código de Encerramento */}
-                      <div>
-                        <label className="block text-[10px] font-bold uppercase tracking-wider mb-1.5 text-on-surface-variant">
-                          Código de Encerramento <span className="text-error">*</span>
-                        </label>
-                        <select value={closeCode} onChange={e => setCloseCode(e.target.value)}
-                          className={`w-full px-2.5 py-2 text-xs outline-none cursor-pointer font-medium ${inputClass}`}>
-                          <option value="">Selecione…</option>
-                          {CLOSE_CODES.map(grp => (
-                            <optgroup key={grp.group} label={grp.group}>
-                              {grp.options.map(opt => <option key={opt} value={`${grp.group} / ${opt}`}>{opt}</option>)}
-                            </optgroup>
-                          ))}
-                        </select>
-                      </div>
-
-                      {/* Notas de Resolução */}
-                      <div>
-                        <label className="block text-[10px] font-bold uppercase tracking-wider mb-1.5 text-on-surface-variant">
-                          Notas de Resolução <span className="text-error">*</span>
-                        </label>
-                        <textarea rows={3} value={closeNotes} onChange={e => setCloseNotes(e.target.value)}
-                          placeholder="Descreva a solução aplicada (visível ao cliente)..."
-                          className={`w-full p-3 text-xs outline-none resize-none transition-all ${inputClass}`} />
-                      </div>
-
-                      {/* Tempo Gasto */}
-                      <div>
-                        <label className="block text-[10px] font-bold uppercase tracking-wider mb-1.5 text-on-surface-variant">Tempo Gasto</label>
-                        <input value={timeSpent} onChange={e => setTimeSpent(e.target.value)}
-                          type="text" placeholder="ex: 1h 30m"
-                          className={`w-full px-2.5 py-2 text-xs outline-none font-medium ${inputClass}`} />
-                      </div>
-
-                      {/* Mensagem opcional ao cliente */}
-                      <div>
-                        <label className="block text-[10px] font-bold uppercase tracking-wider mb-1.5 text-on-surface-variant">
-                          Mensagem ao Cliente <span className="text-on-surface-variant font-normal">(opcional)</span>
-                        </label>
-                        <textarea rows={2} value={formComment} onChange={e => setFormComment(e.target.value)}
-                          placeholder="Informe o cliente sobre a resolução..."
-                          className={`w-full p-3 text-xs outline-none resize-none transition-all ${inputClass}`} />
-                      </div>
-
-                      {/* Rodapé */}
-                      <div className="flex gap-2 pt-3 border-t border-emerald-100 justify-end">
-                        <button type="button" onClick={handleCancelEdit} className={`px-3 py-2 text-xs font-semibold transition-colors cursor-pointer ${buttonSecondaryClass}`}>
-                          Cancelar
-                        </button>
-                        <button type="button" disabled={savingConducao} onClick={handleResolve}
-                          className="px-4 py-2 font-bold text-xs shadow-sm transition-all active:scale-[0.98] disabled:opacity-50 flex items-center gap-1.5 cursor-pointer rounded-lg bg-emerald-600 text-white hover:bg-emerald-700">
-                          <CheckCircle className="w-3.5 h-3.5" />
-                          {savingConducao ? 'Resolvendo…' : 'Confirmar Resolução'}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
+                {/* Fase 18 — Motor de Resolução Estruturada (ITIL v4): substitui o
+                    painel inline de close_code/close_notes por um modal com os
+                    códigos de resolução padronizados + kb_candidate. */}
+                {canEdit && (
+                  <ResolutionModal
+                    open={conducaoMode === 'resolve'}
+                    ticketLabel={ticket.id}
+                    onClose={handleCancelEdit}
+                    onConfirm={handleResolveStructured}
+                  />
                 )}
 
                 {/* MODO PRIMEIRO ATENDIMENTO */}

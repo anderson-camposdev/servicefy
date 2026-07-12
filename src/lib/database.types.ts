@@ -130,6 +130,10 @@ export interface IncidentRow {
   // Encerramento padrão ServiceNow (migration 013)
   close_code: string | null
   close_notes: string | null
+  // Fase 18 — Motor de Resolução Estruturada (migration 115)
+  resolution_code: string | null
+  resolution_notes: string | null
+  kb_candidate: boolean
   // Service Catalog (migration 019)
   ticket_type: 'incident' | 'request'
   catalog_item_id: string | null

@@ -680,6 +680,38 @@ export const incidentsService = {
     return data!
   },
 
+  /**
+   * Fase 18 — Motor de Resolução Estruturada (ITIL v4): grava
+   * resolution_code/resolution_notes/kb_candidate e move para "Resolved".
+   * O banco (trg_guard_resolution_governance, migration 115) rejeita a
+   * transição se resolution_code/resolution_notes vierem vazios — esta
+   * função só encaminha o que o modal coletou, a validação de verdade é
+   * sempre a do banco.
+   */
+  async resolveStructured(
+    id: string, companyId: string, resolutionCode: string, resolutionNotes: string, kbCandidate: boolean, actorName: string,
+  ): Promise<IncidentRow> {
+    const client = getClientForCompany(companyId)
+    const { data, error } = await client
+      .from('incidents')
+      .update({
+        state: 'Resolved',
+        resolution_code: resolutionCode,
+        resolution_notes: resolutionNotes,
+        kb_candidate: kbCandidate,
+        resolved_at: new Date().toISOString(),
+      })
+      .eq('id', id)
+      .select()
+      .single()
+    if (error) throw error
+    await client.from('incident_history').insert({
+      incident_id: id, changed_by_name: actorName, field_name: 'state',
+      new_value: 'Resolved', comment: `Resolvido (${resolutionCode}): ${resolutionNotes}`.trim(), is_public: true,
+    })
+    return data!
+  },
+
   /** Solicitante aceita a solução → fecha o chamado (Closed). */
   async acceptResolution(id: string, companyId: string, actorName: string): Promise<void> {
     void companyId
