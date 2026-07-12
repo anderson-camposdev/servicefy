@@ -2,9 +2,10 @@ import { lazy, Suspense, useState, useMemo, useEffect } from 'react'
 import { Plus, Settings, ShieldAlert, ClipboardList, AlertOctagon, RefreshCw, Home, BarChart3, CircleCheckBig } from 'lucide-react'
 import { useToast } from './context'
 import type { AppView, User, Company, Role } from './types'
-import { mockApiEndpoints, mockNotifications } from './services/appMocks'
+import { mockApiEndpoints } from './services/appMocks'
 import { useIncidents } from './hooks/useIncidents'
 import { useAppData, useProblems, useChanges } from './hooks/useDbData'
+import { useRealtimeNotifications } from './hooks/useRealtimeNotifications'
 import { usePersistentState } from './hooks/usePersistentState'
 import type { ProblemRow, CompanyRow, ProfileRow, TicketPriority, IncidentCategory } from './lib/database.types'
 import { incidentsService, cioService, problemsService } from './lib/services'
@@ -1002,7 +1003,7 @@ export default function App() {
     await signOut()
   }
 
-  const unreadNotifs = useMemo(() => mockNotifications.filter(n => !n.read).length, [])
+  const { unreadCount: unreadNotifs } = useRealtimeNotifications(profile?.id ?? null, currentCompany?.id ?? null)
 
   // Atalho de preview: /?preview=portal | admin — SOMENTE em desenvolvimento.
   // Em produção (import.meta.env.DEV === false) este bloco é eliminado pelo

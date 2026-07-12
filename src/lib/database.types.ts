@@ -757,6 +757,7 @@ export interface WorkflowActionQueueRow {
 
 export interface NotificationRow {
   id: string
+  company_id: string
   user_id: string
   title: string
   message: string
@@ -764,6 +765,7 @@ export interface NotificationRow {
   read: boolean
   linked_ticket_id: string | null
   linked_ticket_type: string | null
+  link: string | null
   created_at: string
 }
 
