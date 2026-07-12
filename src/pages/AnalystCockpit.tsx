@@ -113,8 +113,21 @@ export function calculateSlaState(
   let text = ''
 
   if (achievedAt) {
-    status = 'fulfilled'
-    text = `Cumprido em ${fmt(achievedAt)}`
+    // Fase 19: is_resolution_breached é calculado no banco no instante da
+    // transição (zzz_consolidate_sla_resolution) — comparando achievedAt
+    // contra o deadline já ajustado por pausa. Aqui só refletimos o veredito,
+    // sem recalcular: se o banco disse que estourou, mostramos "estourado",
+    // não "cumprido", mesmo que o achievedAt em si pareça dentro do prazo.
+    if (isBreached) {
+      status = 'breached'
+      const overshoot = new Date(achievedAt).getTime() - targetTime
+      text = overshoot > 0
+        ? `Estourado (resolvido ${fmtDuration(overshoot)} após o prazo)`
+        : `Estourado — resolvido em ${fmt(achievedAt)}`
+    } else {
+      status = 'fulfilled'
+      text = `Cumprido em ${fmt(achievedAt)}`
+    }
   } else if (pausedAt) {
     status = 'paused'
     const remainingAtPause = targetTime - new Date(pausedAt).getTime()
