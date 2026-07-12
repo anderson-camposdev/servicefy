@@ -11,6 +11,7 @@ import { UserImportZone } from '../components/portal/UserImportZone'
 import { SmtpSettingsForm } from '../components/portal/SmtpSettingsForm'
 import { EmailDeliveryPolicyForm } from '../components/portal/EmailDeliveryPolicyForm'
 import { EmailDeliveryHistoryTable } from '../components/portal/EmailDeliveryHistoryTable'
+import { useTenantFeatureAccess } from '../hooks/useTenantFeatureAccess'
 
 export type OperationalModuleKey = 'domains' | 'macros' | 'templates' | 'ci' | 'compliance' | 'licensing' | 'branding' | 'iam' | 'smtp'
 
@@ -103,6 +104,11 @@ export default function PlatformModuleSettings({ moduleKey, companyId, activeRol
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+
+  // Fase 12: gate de 'custom_smtp' por plano/assinatura. Consultado uma única
+  // vez aqui (não dentro de SmtpSettingsForm) e repassado como prop, evitando
+  // uma segunda chamada de RPC quando o componente re-renderiza.
+  const customSmtpAccess = useTenantFeatureAccess(companyId, 'custom_smtp', moduleKey === 'smtp')
 
   // States and refs for branding uploads
   const [logoUploading, setLogoUploading] = useState(false)
@@ -481,7 +487,12 @@ export default function PlatformModuleSettings({ moduleKey, companyId, activeRol
       </div>
     ) : moduleKey === 'smtp' ? (
       <div className="mt-6 space-y-6">
-        <SmtpSettingsForm companyId={companyId} />
+        <SmtpSettingsForm
+          companyId={companyId}
+          checkingAccess={customSmtpAccess.checking}
+          hasCustomSmtpAccess={customSmtpAccess.hasAccess}
+          accessCheckError={customSmtpAccess.error}
+        />
         {activeRole === 'sysadmin' && <EmailDeliveryPolicyForm companyId={companyId} />}
         <EmailDeliveryHistoryTable companyId={companyId} />
       </div>

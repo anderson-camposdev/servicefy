@@ -21,6 +21,8 @@ function fillSmtpPassword(password = 'secret-value') {
   fireEvent.change(screen.getByLabelText('Senha'), { target: { value: password } })
 }
 
+const unlockedAccess = { checkingAccess: false, hasCustomSmtpAccess: true, accessCheckError: '' }
+
 describe('SmtpSettingsForm', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -51,7 +53,7 @@ describe('SmtpSettingsForm', () => {
   })
 
   it('carrega as configurações do tenant e mantém a senha write-only', async () => {
-    render(<SmtpSettingsForm companyId="company-123" />)
+    render(<SmtpSettingsForm companyId="company-123" {...unlockedAccess} />)
 
     expect(await screen.findByDisplayValue('smtp.example.com')).toBeTruthy()
     expect(screen.getByDisplayValue('587')).toBeTruthy()
@@ -66,7 +68,7 @@ describe('SmtpSettingsForm', () => {
   })
 
   it('alterna a visibilidade da senha e salva o payload do tenant', async () => {
-    render(<SmtpSettingsForm companyId="company-123" />)
+    render(<SmtpSettingsForm companyId="company-123" {...unlockedAccess} />)
     const password = await screen.findByLabelText('Senha') as HTMLInputElement
 
     fireEvent.click(screen.getByRole('button', { name: 'Mostrar senha' }))
@@ -91,14 +93,14 @@ describe('SmtpSettingsForm', () => {
   })
 
   it('mantém o botão Salvar desabilitado até uma conexão SMTP ser validada', async () => {
-    render(<SmtpSettingsForm companyId="company-123" />)
+    render(<SmtpSettingsForm companyId="company-123" {...unlockedAccess} />)
     await screen.findByDisplayValue('smtp.example.com')
 
     expect(screen.getByRole('button', { name: 'Salvar configurações SMTP' }).hasAttribute('disabled')).toBe(true)
   })
 
   it('exibe o toast de sucesso e habilita Salvar quando a Edge Function confirma a conexão', async () => {
-    render(<SmtpSettingsForm companyId="company-123" />)
+    render(<SmtpSettingsForm companyId="company-123" {...unlockedAccess} />)
     await screen.findByLabelText('Senha')
 
     fillSmtpPassword()
@@ -122,7 +124,7 @@ describe('SmtpSettingsForm', () => {
       data: null,
       error: { message: 'Falha na conexão SMTP: autenticação recusada.' },
     })
-    render(<SmtpSettingsForm companyId="company-123" />)
+    render(<SmtpSettingsForm companyId="company-123" {...unlockedAccess} />)
     await screen.findByLabelText('Senha')
 
     fillSmtpPassword('wrong-password')
@@ -135,7 +137,7 @@ describe('SmtpSettingsForm', () => {
   it('desabilita o botão e mostra estado de carregamento enquanto testa a conexão', async () => {
     let resolveInvoke: (value: { data: { success: boolean; message: string }; error: null }) => void = () => undefined
     mockInvoke.mockImplementationOnce(() => new Promise(resolve => { resolveInvoke = resolve }))
-    render(<SmtpSettingsForm companyId="company-123" />)
+    render(<SmtpSettingsForm companyId="company-123" {...unlockedAccess} />)
     await screen.findByLabelText('Senha')
 
     fillSmtpPassword()
@@ -147,5 +149,29 @@ describe('SmtpSettingsForm', () => {
 
     resolveInvoke({ data: { success: true, message: 'ok' }, error: null })
     await waitFor(() => expect((screen.getByRole('button', { name: 'Testar Conexão' }) as HTMLButtonElement).disabled).toBe(false))
+  })
+
+  it('mostra o gate de recurso premium e não busca configurações quando o tenant não tem a feature', () => {
+    render(<SmtpSettingsForm companyId="company-123" checkingAccess={false} hasCustomSmtpAccess={false} accessCheckError="" />)
+
+    expect(screen.getByText('Recurso Premium')).toBeTruthy()
+    expect(screen.getByText(/Faça o upgrade do seu plano/)).toBeTruthy()
+    expect(screen.queryByLabelText('Host')).toBeNull()
+    expect(mockFrom).not.toHaveBeenCalled()
+  })
+
+  it('mostra estado de verificação enquanto a checagem de plano está em andamento', () => {
+    render(<SmtpSettingsForm companyId="company-123" checkingAccess={true} hasCustomSmtpAccess={false} accessCheckError="" />)
+
+    expect(screen.getByText('Verificando plano do tenant...')).toBeTruthy()
+    expect(screen.queryByText('Recurso Premium')).toBeNull()
+    expect(mockFrom).not.toHaveBeenCalled()
+  })
+
+  it('mostra erro distinto quando a checagem de acesso falha (não confunde com "sem acesso")', () => {
+    render(<SmtpSettingsForm companyId="company-123" checkingAccess={false} hasCustomSmtpAccess={false} accessCheckError="conexão perdida" />)
+
+    expect(screen.getByText(/Não foi possível verificar o acesso a este recurso: conexão perdida/)).toBeTruthy()
+    expect(screen.queryByText('Recurso Premium')).toBeNull()
   })
 })

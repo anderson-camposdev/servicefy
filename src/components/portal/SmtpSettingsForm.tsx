@@ -1,10 +1,16 @@
 import { useEffect, useState } from 'react'
-import { Eye, EyeOff, Loader2, Save } from 'lucide-react'
+import { Eye, EyeOff, Loader2, Lock, Save, Sparkles } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { SMTP_ENCRYPTION_TYPES, testSmtpConnection, type SmtpEncryptionType } from '../../lib/smtp'
 
 interface SmtpSettingsFormProps {
   companyId: string
+  /** Verificação da feature 'custom_smtp' ainda em andamento (RPC check_tenant_feature_access). */
+  checkingAccess: boolean
+  /** Resultado da verificação: tenant tem a feature 'custom_smtp' ativa no plano. */
+  hasCustomSmtpAccess: boolean
+  /** Mensagem de erro da checagem de acesso (falha de rede/RPC), distinta de "sem acesso". */
+  accessCheckError: string
 }
 
 interface SmtpFormState {
@@ -27,7 +33,7 @@ const EMPTY_FORM: SmtpFormState = {
   encryptionType: 'tls',
 }
 
-export function SmtpSettingsForm({ companyId }: SmtpSettingsFormProps) {
+export function SmtpSettingsForm({ companyId, checkingAccess, hasCustomSmtpAccess, accessCheckError }: SmtpSettingsFormProps) {
   const [form, setForm] = useState<SmtpFormState>(EMPTY_FORM)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -39,6 +45,14 @@ export function SmtpSettingsForm({ companyId }: SmtpSettingsFormProps) {
 
   useEffect(() => {
     let cancelled = false
+
+    // Sem acesso à feature (ou checagem ainda em andamento): não busca as
+    // configurações — evita uma chamada desnecessária e mantém a tela em
+    // estado de bloqueio até a checagem resolver.
+    if (checkingAccess || !hasCustomSmtpAccess) {
+      setLoading(false)
+      return
+    }
 
     const loadSettings = async () => {
       setLoading(true)
@@ -68,7 +82,7 @@ export function SmtpSettingsForm({ companyId }: SmtpSettingsFormProps) {
 
     void loadSettings()
     return () => { cancelled = true }
-  }, [companyId])
+  }, [companyId, checkingAccess, hasCustomSmtpAccess])
 
   const setField = <K extends keyof SmtpFormState>(field: K, value: SmtpFormState[K]) => {
     setForm(current => ({ ...current, [field]: value }))
@@ -155,6 +169,36 @@ export function SmtpSettingsForm({ companyId }: SmtpSettingsFormProps) {
   }
 
   const inputClass = 'mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 disabled:bg-slate-50'
+
+  if (checkingAccess) {
+    return <div className="flex items-center gap-2 py-8 text-sm font-semibold text-slate-500"><Loader2 className="h-4 w-4 animate-spin" /> Verificando plano do tenant...</div>
+  }
+
+  if (accessCheckError) {
+    return (
+      <section className="rounded-2xl border border-red-200 bg-red-50 p-6 text-sm font-semibold text-red-700">
+        Não foi possível verificar o acesso a este recurso: {accessCheckError}
+      </section>
+    )
+  }
+
+  if (!hasCustomSmtpAccess) {
+    return (
+      <section className="rounded-2xl border border-indigo-200 bg-gradient-to-br from-indigo-50 to-white p-8 text-center shadow-sm">
+        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-indigo-100">
+          <Lock className="h-6 w-6 text-indigo-600" />
+        </div>
+        <h2 className="mt-4 text-lg font-extrabold text-slate-900">Recurso Premium</h2>
+        <p className="mx-auto mt-2 max-w-md text-sm text-slate-500">
+          O SMTP customizado por tenant não está disponível no plano atual deste cliente.
+          Faça o upgrade do plano para liberar o envio de e-mails pelo próprio servidor SMTP.
+        </p>
+        <div className="mt-5 inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-bold text-white opacity-90">
+          <Sparkles className="h-4 w-4" /> Faça o upgrade do seu plano
+        </div>
+      </section>
+    )
+  }
 
   if (loading) {
     return <div className="flex items-center gap-2 py-8 text-sm font-semibold text-slate-500"><Loader2 className="h-4 w-4 animate-spin" /> Carregando configurações SMTP...</div>
