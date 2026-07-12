@@ -33,7 +33,7 @@ const json = (body: Record<string, unknown>, status = 200) => new Response(JSON.
 const isValidEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
 
 const isPrivateHost = (host: string) => {
-  const normalized = host.trim().toLowerCase().replace(/[\[\]]/g, '')
+  const normalized = host.trim().toLowerCase().replace(/[[\]]/g, '')
   return normalized === 'localhost'
     || normalized === '127.0.0.1'
     || normalized === '::1'
