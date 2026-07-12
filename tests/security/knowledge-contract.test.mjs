@@ -8,6 +8,7 @@ const service = read('src/lib/knowledge-service.ts')
 const markdown = read('src/lib/markdown.ts')
 const center = read('src/pages/SettingsCenter.tsx')
 const portal = read('src/pages/UserPortalLayout.tsx')
+const portalQuickView = read('src/components/portal/KnowledgeQuickView.tsx')
 const cockpit = read('src/pages/AnalystCockpit.tsx')
 const packageJson = read('package.json')
 
@@ -101,7 +102,12 @@ test('UI foi conectada em admin, portal e cockpit (sem placeholders)', () => {
   assert.match(center, /selected\?\.key === 'knowledge'/)
   assert.match(center, /<KnowledgeAdmin/)
   assert.match(portal, /setScreen\('knowledge'\)/)
-  assert.match(portal, /<KnowledgePortal/)
+  // A tela 'knowledge' renderiza <KnowledgeQuickView>, um wrapper fino que por
+  // sua vez renderiza <KnowledgePortal> (a UI de busca/leitura/feedback) — ver
+  // src/components/portal/KnowledgeQuickView.tsx. Checamos a cadeia completa
+  // em vez de exigir o JSX de KnowledgePortal diretamente em UserPortalLayout.
+  assert.match(portal, /<KnowledgeQuickView/)
+  assert.match(portalQuickView, /<KnowledgePortal/)
   assert.match(cockpit, /setKbOpen\(true\)/)
   assert.match(cockpit, /<KnowledgeCockpitPanel/)
   // O botão do cockpit não é mais um no-op vazio
