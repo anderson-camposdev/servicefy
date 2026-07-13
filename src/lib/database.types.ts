@@ -393,6 +393,17 @@ export interface GlobalSearchResult {
   slug: string | null
 }
 
+// Fase 23 — Analytics e Relatórios Executivos (migration 120)
+export interface ExecutiveMetrics {
+  period: { start: string; end: string }
+  total_opened: number
+  total_resolved: number
+  sla_compliance_pct: number | null
+  mttr_minutes: number | null
+  mttr_hours: number | null
+  by_status: Record<string, number>
+}
+
 /** Linha retornada pela RPC kb_suggest_for_case (cockpit). */
 export interface KnowledgeSuggestion {
   id: string

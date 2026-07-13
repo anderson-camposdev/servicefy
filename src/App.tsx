@@ -1,5 +1,5 @@
 import { lazy, Suspense, useState, useMemo, useEffect } from 'react'
-import { Plus, Settings, ShieldAlert, ClipboardList, AlertOctagon, RefreshCw, Home, BarChart3, CircleCheckBig } from 'lucide-react'
+import { Plus, Settings, ShieldAlert, ClipboardList, AlertOctagon, RefreshCw, Home, BarChart3, CircleCheckBig, TrendingUp } from 'lucide-react'
 import { useToast } from './context'
 import type { AppView, User, Company, Role } from './types'
 import { mockApiEndpoints } from './services/appMocks'
@@ -23,6 +23,7 @@ const SettingsCenter = lazy(() => import('./pages/SettingsCenter'))
 const WorkflowBuilder = lazy(() => import('./pages/WorkflowBuilder'))
 const ChangeManagementDashboard = lazy(() => import('./pages/ChangeManagementDashboard'))
 const ApprovalCenter = lazy(() => import('./pages/ApprovalCenter'))
+const AnalyticsDashboard = lazy(() => import('./pages/admin/AnalyticsDashboard'))
 const BiApp = lazy(() => import('./features/bi/BiApp'))
 import TicketDataTable from './components/TicketDataTable'
 import { LoadingSkeleton } from './components/portal/LoadingSkeleton'
@@ -1125,6 +1126,13 @@ export default function App() {
   // O ServiceFY BI fica disponível para todos os perfis gerenciais/técnicos que alcançam esta tela
   navItems.push({ view: 'flowfy_bi', label: 'ServiceFY BI Analytics', icon: <BarChart3 className="w-5 h-5" /> })
 
+  // Fase 23 — Analytics Executivo: camada gerencial (a RPC get_executive_metrics
+  // já bloqueia end_user no banco; este filtro é só conveniência de navegação).
+  const managerialRoles: Role[] = ['sysadmin', 'company_admin', 'cio', 'client_manager', 'it_manager', 'area_manager']
+  if (managerialRoles.includes(activeRole)) {
+    navItems.push({ view: 'analytics_executive', label: 'Analytics Executivo', icon: <TrendingUp className="w-5 h-5" /> })
+  }
+
   // Configurações, integrações e automações são exclusivas dos administradores.
   const isConfigEligible = activeRole === 'sysadmin' || activeRole === 'company_admin'
   if (isConfigEligible) {
@@ -1168,6 +1176,7 @@ export default function App() {
     if (activeView === 'dashboard_problems') return <ProblemDashboard companyId={currentCompany.id} />
     if (activeView === 'dashboard_changes') return <ChangeManagementDashboard companyId={currentCompany.id} />
     if (activeView === 'approval_inbox') return <ApprovalCenter />
+    if (activeView === 'analytics_executive') return <AnalyticsDashboard />
     if (activeView === 'api_docs') return isConfigEligible ? <ApiDocs /> : <WorkspaceLayout companyId={currentCompany.id} isProvider={isProvider} companies={companies} />
     if (activeView === 'flowfy_bi') return <BiApp companyId={currentCompany.id} themeName={(currentCompany as any).primary_color} />
     if (activeView === 'workflow_builder') return isConfigEligible ? <WorkflowBuilder companyId={currentCompany.id} /> : <WorkspaceLayout companyId={currentCompany.id} isProvider={isProvider} companies={companies} />

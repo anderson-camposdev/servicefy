@@ -19,7 +19,7 @@ import type {
   AssignmentGroupRow, PendingReasonRow, DepartmentRow, RequestSubcategoryRow, TicketTaskRow, RequestApprovalRow, CsatSurveyRow, ResponseMacroRow,
   SlaCalendarRow, SlaCalendarShiftRow, SlaCalendarHolidayRow, SLAPolicyRow, SlaEventRow,
   WorkflowRuleRow, WorkflowExecutionLogRow, WorkflowActionQueueRow,
-  GlobalSearchResult,
+  GlobalSearchResult, ExecutiveMetrics,
 } from './database.types'
 
 const url  = import.meta.env.VITE_SUPABASE_URL  as string
@@ -2606,6 +2606,18 @@ export const cmdbService = {
     })
     return throwIfError(data, error)
   }
+}
+
+// ─── ANALYTICS EXECUTIVO (Fase 23) ──────────────────────────────
+export const executiveAnalyticsService = {
+  /** Toda a agregação (contagens, % de SLA, MTTR) roda em SQL — o cliente só exibe (migration 120). */
+  async getMetrics(startDate: string, endDate: string): Promise<ExecutiveMetrics> {
+    const { data, error } = await supabase.rpc('get_executive_metrics', {
+      p_start_date: startDate,
+      p_end_date: endDate,
+    })
+    return throwIfError<ExecutiveMetrics>(data, error)
+  },
 }
 
 // ─── BUSCA OMNICHANNEL (Fase 22) ────────────────────────────────

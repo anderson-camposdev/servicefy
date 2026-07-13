@@ -359,7 +359,8 @@ export type AppView =
   | 'admin_dashboard'
   | 'settings_governance'
   | 'flowfy_bi'
-  | 'workflow_builder';
+  | 'workflow_builder'
+  | 'analytics_executive';
 
 // ─── Catálogo Hierárquico de Incidentes (3 Níveis + SLA) ─────
 
