@@ -19,6 +19,7 @@ import type {
   AssignmentGroupRow, PendingReasonRow, DepartmentRow, RequestSubcategoryRow, TicketTaskRow, RequestApprovalRow, CsatSurveyRow, ResponseMacroRow,
   SlaCalendarRow, SlaCalendarShiftRow, SlaCalendarHolidayRow, SLAPolicyRow, SlaEventRow,
   WorkflowRuleRow, WorkflowExecutionLogRow, WorkflowActionQueueRow,
+  GlobalSearchResult,
 } from './database.types'
 
 const url  = import.meta.env.VITE_SUPABASE_URL  as string
@@ -2605,5 +2606,19 @@ export const cmdbService = {
     })
     return throwIfError(data, error)
   }
+}
+
+// ─── BUSCA OMNICHANNEL (Fase 22) ────────────────────────────────
+export const globalSearchService = {
+  /** Catálogo de incidentes + KB publicada, unificados. Tolerante a acentuação e stemming (migration 119). */
+  async search(query: string, limit = 10): Promise<GlobalSearchResult[]> {
+    const trimmed = query.trim()
+    if (!trimmed) return []
+    const { data, error } = await supabase.rpc('search_portal_omnichannel', {
+      p_query: trimmed,
+      p_limit: limit,
+    })
+    return throwIfError<GlobalSearchResult[]>(data, error)
+  },
 }
 

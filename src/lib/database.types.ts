@@ -381,6 +381,18 @@ export interface KnowledgeSearchResult {
   total_count: number
 }
 
+// Fase 22 — Busca Omnichannel (migration 119)
+export type GlobalSearchResultType = 'catalog' | 'kb_article'
+
+export interface GlobalSearchResult {
+  id: string
+  type: GlobalSearchResultType
+  title: string
+  snippet: string | null
+  rank: number
+  slug: string | null
+}
+
 /** Linha retornada pela RPC kb_suggest_for_case (cockpit). */
 export interface KnowledgeSuggestion {
   id: string

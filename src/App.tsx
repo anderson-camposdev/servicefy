@@ -6,6 +6,7 @@ import { mockApiEndpoints } from './services/appMocks'
 import { useIncidents } from './hooks/useIncidents'
 import { useAppData, useProblems, useChanges } from './hooks/useDbData'
 import { useRealtimeNotifications } from './hooks/useRealtimeNotifications'
+import GlobalSearchSpotlight from './components/portal/GlobalSearchSpotlight'
 import { usePersistentState } from './hooks/usePersistentState'
 import type { ProblemRow, CompanyRow, ProfileRow, TicketPriority, IncidentCategory } from './lib/database.types'
 import { incidentsService, cioService, problemsService } from './lib/services'
@@ -952,6 +953,7 @@ export default function App() {
   const { tenant: resolvedTenant } = useTenant()
   const { companies: dbCompanies, loading: dbLoading, error: dbError } = useAppData()
   const { status: authStatus, profile, company: authCompany, isProvider, signOut } = useAuth()
+  const { toast } = useToast()
 
   // Lista de empresas (leitura pública) — usada pelo Portal do Provedor MSP.
   const companies = useMemo(() => dbCompanies.map(mapCompany), [dbCompanies])
@@ -1283,6 +1285,12 @@ export default function App() {
             </div>
           )}
         </div>
+
+        {/* Busca Global (Fase 22) */}
+        <GlobalSearchSpotlight
+          onSelectArticle={result => toast.info(`Artigo: ${result.title}`)}
+          onSelectCatalogSymptom={result => toast.info(`Catálogo: ${result.title}`)}
+        />
 
         {/* Notification Bell */}
         <button className="relative p-2 rounded-xl text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all cursor-pointer">
