@@ -5,6 +5,14 @@
 -- duas tabelas fica no caminho de escrita de tickets — catálogo é curado por
 -- admin, KB só muda por edição manual ou pelo motor da Fase 20. Um índice GIN
 -- aqui tem custo zero sobre INSERT/UPDATE em tickets.
+--
+-- Restrição desta fase: não alterar estruturas de fases anteriores, só
+-- adicionar a camada de leitura rápida. incident_catalog_symptoms.search_vector
+-- é coluna nova (não existia antes) — puramente aditivo. knowledge_articles já
+-- tinha um search_vector (migration 079); em vez de alterá-lo, adicionamos
+-- search_vector_unaccent como coluna paralela só para esta RPC — o original
+-- permanece intocado, servindo kb_search_articles/kb_suggest_for_case sem
+-- qualquer mudança de comportamento.
 
 CREATE EXTENSION IF NOT EXISTS unaccent WITH SCHEMA extensions;
 
@@ -35,24 +43,24 @@ ALTER TABLE public.incident_catalog_symptoms
 CREATE INDEX IF NOT EXISTS idx_incident_catalog_symptoms_search
   ON public.incident_catalog_symptoms USING GIN (search_vector);
 
--- ─── 2) knowledge_articles: retrofit do search_vector existente (Fase 20)
--- para incluir peso por campo (título > resumo > corpo) e tolerância a
--- acentuação — sem isso, a busca unificada teria comportamento inconsistente
--- entre os dois ramos (catálogo tolerante a acento, KB não), e o pedido
--- explícito desta fase ("resultados de knowledge_articles devem ter peso no
--- título") não seria atendido. DROP/ADD força reescrita da tabela — custo
--- pontual de migration, não recorrente, e não é tickets. ────────────────────
-ALTER TABLE public.knowledge_articles DROP COLUMN IF EXISTS search_vector;
+-- ─── 2) knowledge_articles: coluna NOVA, aditiva — search_vector (migration
+-- 079, fase anterior) permanece intocada e continua servindo
+-- kb_search_articles/kb_suggest_for_case exatamente como antes. Em vez de
+-- alterar essa estrutura pré-existente, adicionamos search_vector_unaccent
+-- só para esta RPC: peso por campo (título=A > resumo=B > corpo=C) e
+-- tolerância a acentuação, sem tocar em nada de fase anterior. ─────────────
 ALTER TABLE public.knowledge_articles
-  ADD COLUMN search_vector tsvector
+  ADD COLUMN IF NOT EXISTS search_vector_unaccent tsvector
   GENERATED ALWAYS AS (
     setweight(to_tsvector('portuguese', public.immutable_unaccent(coalesce(title, ''))), 'A') ||
     setweight(to_tsvector('portuguese', public.immutable_unaccent(coalesce(summary, ''))), 'B') ||
     setweight(to_tsvector('portuguese', public.immutable_unaccent(coalesce(body, ''))), 'C')
   ) STORED;
 
-CREATE INDEX IF NOT EXISTS knowledge_articles_search
-  ON public.knowledge_articles USING GIN (search_vector);
+COMMENT ON COLUMN public.knowledge_articles.search_vector_unaccent IS 'Fase 22: coluna aditiva para search_portal_omnichannel — peso por campo + tolerância a acentuação. Não substitui search_vector (migration 079), que continua servindo kb_search_articles/kb_suggest_for_case sem alteração.';
+
+CREATE INDEX IF NOT EXISTS idx_knowledge_articles_search_unaccent
+  ON public.knowledge_articles USING GIN (search_vector_unaccent);
 
 -- ─── 3) RPC unificada ───────────────────────────────────────────────────────
 -- SECURITY DEFINER com company_id explícito (não repassa para RLS por trás —
@@ -123,13 +131,13 @@ BEGIN
         'kb_article'::text AS type,
         a.title,
         left(coalesce(a.summary, a.body, ''), 160) AS snippet,
-        ts_rank(a.search_vector, v_tsq) AS rank,
+        ts_rank(a.search_vector_unaccent, v_tsq) AS rank,
         a.slug
       FROM public.knowledge_articles a
       WHERE (a.company_id = v_company_id OR v_is_msp_admin)
         AND a.status = 'published'
         AND public.can_read_knowledge_article(a.id)
-        AND a.search_vector @@ v_tsq
+        AND a.search_vector_unaccent @@ v_tsq
     )
   ) combined
   ORDER BY rank DESC

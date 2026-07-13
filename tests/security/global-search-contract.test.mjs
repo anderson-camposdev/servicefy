@@ -20,12 +20,20 @@ test('incident_catalog_symptoms ganha search_vector gerado com peso (name=A, des
   assert.match(sql, /CREATE INDEX IF NOT EXISTS idx_incident_catalog_symptoms_search\s+ON public\.incident_catalog_symptoms USING GIN \(search_vector\)/)
 })
 
-test('knowledge_articles.search_vector é retrofitado com peso por campo (title=A, summary=B, body=C) e tolerância a acentuação', () => {
-  assert.match(sql, /ALTER TABLE public\.knowledge_articles DROP COLUMN IF EXISTS search_vector/)
+test('knowledge_articles ganha search_vector_unaccent (coluna NOVA, aditiva) com peso por campo — search_vector original (migration 079) não é tocado', () => {
+  assert.doesNotMatch(sql, /DROP COLUMN IF EXISTS search_vector\b/)
+  assert.doesNotMatch(sql, /DROP COLUMN search_vector\b/)
+  assert.match(sql, /ALTER TABLE public\.knowledge_articles\s+ADD COLUMN IF NOT EXISTS search_vector_unaccent tsvector/)
   assert.match(sql, /setweight\(to_tsvector\('portuguese', public\.immutable_unaccent\(coalesce\(title, ''\)\)\), 'A'\)/)
   assert.match(sql, /setweight\(to_tsvector\('portuguese', public\.immutable_unaccent\(coalesce\(summary, ''\)\)\), 'B'\)/)
   assert.match(sql, /setweight\(to_tsvector\('portuguese', public\.immutable_unaccent\(coalesce\(body, ''\)\)\), 'C'\)/)
-  assert.match(sql, /CREATE INDEX IF NOT EXISTS knowledge_articles_search\s+ON public\.knowledge_articles USING GIN \(search_vector\)/)
+  assert.match(sql, /CREATE INDEX IF NOT EXISTS idx_knowledge_articles_search_unaccent\s+ON public\.knowledge_articles USING GIN \(search_vector_unaccent\)/)
+})
+
+test('RPC lê search_vector_unaccent para o ramo de KB, não a coluna original (kb_search_articles/kb_suggest_for_case continuam intocadas)', () => {
+  const body = fnBody('search_portal_omnichannel(p_query text, p_limit integer DEFAULT 10)', '\nEND;\n$$;')
+  assert.match(body, /ts_rank\(a\.search_vector_unaccent, v_tsq\) AS rank/)
+  assert.match(body, /AND a\.search_vector_unaccent @@ v_tsq/)
 })
 
 test('search_portal_omnichannel é SECURITY DEFINER com company_id explícito (não depende de RLS por trás)', () => {
