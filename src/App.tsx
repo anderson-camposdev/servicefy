@@ -21,7 +21,7 @@ const WorkspaceLayout = lazy(() => import('./pages/WorkspaceLayout'))
 const SettingsCenter = lazy(() => import('./pages/SettingsCenter'))
 const WorkflowBuilder = lazy(() => import('./pages/WorkflowBuilder'))
 const ChangeManagementDashboard = lazy(() => import('./pages/ChangeManagementDashboard'))
-const ApprovalInbox = lazy(() => import('./pages/ApprovalInbox'))
+const ApprovalCenter = lazy(() => import('./pages/ApprovalCenter'))
 const BiApp = lazy(() => import('./features/bi/BiApp'))
 import TicketDataTable from './components/TicketDataTable'
 import { LoadingSkeleton } from './components/portal/LoadingSkeleton'
@@ -1165,7 +1165,7 @@ export default function App() {
 
     if (activeView === 'dashboard_problems') return <ProblemDashboard companyId={currentCompany.id} />
     if (activeView === 'dashboard_changes') return <ChangeManagementDashboard companyId={currentCompany.id} />
-    if (activeView === 'approval_inbox') return <ApprovalInbox />
+    if (activeView === 'approval_inbox') return <ApprovalCenter />
     if (activeView === 'api_docs') return isConfigEligible ? <ApiDocs /> : <WorkspaceLayout companyId={currentCompany.id} isProvider={isProvider} companies={companies} />
     if (activeView === 'flowfy_bi') return <BiApp companyId={currentCompany.id} themeName={(currentCompany as any).primary_color} />
     if (activeView === 'workflow_builder') return isConfigEligible ? <WorkflowBuilder companyId={currentCompany.id} /> : <WorkspaceLayout companyId={currentCompany.id} isProvider={isProvider} companies={companies} />
