@@ -271,6 +271,8 @@ export interface KnowledgeArticleRow {
   deflection_count: number
   created_at: string
   updated_at: string
+  // Fase 20 — Automação de KEDB (migration 117)
+  source_ticket_id: string | null
 }
 
 export interface KnowledgeArticleFeedbackRow {

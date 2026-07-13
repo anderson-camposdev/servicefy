@@ -10,7 +10,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
   ArrowLeft, Plus, Search, Eye, EyeOff, Archive, Copy, Trash2, Save, Lock,
-  BookOpen, History, FolderTree, X, CheckCircle2, AlertTriangle,
+  BookOpen, History, FolderTree, X, CheckCircle2, AlertTriangle, Sparkles,
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { knowledgeService, type ArticleInput } from '../lib/knowledge-service'
@@ -53,6 +53,9 @@ export default function KnowledgeAdmin({ companyId, onBack }: Props) {
   const [fVis, setFVis] = useState<KnowledgeVisibility | ''>('')
   const [fCat, setFCat] = useState('')
   const [query, setQuery] = useState('')
+  // Fase 20 (KEDB): rascunhos gerados automaticamente por resolução de ticket.
+  const [fSourceTicketOnly, setFSourceTicketOnly] = useState(false)
+  const [pendingDrafts, setPendingDrafts] = useState(0)
 
   const [editing, setEditing] = useState<KnowledgeArticleRow | null>(null)
   const [creating, setCreating] = useState(false)
@@ -66,12 +69,17 @@ export default function KnowledgeAdmin({ companyId, onBack }: Props) {
       const { rows, total } = await knowledgeService.listArticles(companyId, {
         status: fStatus || undefined, visibility: fVis || undefined,
         categoryId: fCat || undefined, query: query || undefined,
+        sourceTicketOnly: fSourceTicketOnly || undefined,
         limit: PAGE, offset: page * PAGE,
       })
       setRows(rows); setTotal(total)
     } catch (e) { setError((e as Error).message) }
     finally { setLoading(false) }
-  }, [companyId, fStatus, fVis, fCat, query, page])
+  }, [companyId, fStatus, fVis, fCat, query, fSourceTicketOnly, page])
+
+  const refreshPendingDrafts = useCallback(() => {
+    knowledgeService.countPendingDrafts(companyId).then(setPendingDrafts).catch(e => setError((e as Error).message))
+  }, [companyId])
 
   useEffect(() => {
     let cancel = false
@@ -87,12 +95,22 @@ export default function KnowledgeAdmin({ companyId, onBack }: Props) {
   }, [companyId])
 
   useEffect(() => { loadArticles() }, [loadArticles])
+  useEffect(() => { refreshPendingDrafts() }, [refreshPendingDrafts])
+
+  const toggleSourceTicketFilter = () => {
+    setPage(0)
+    setFSourceTicketOnly(prev => {
+      const next = !prev
+      if (next) setFStatus('draft')
+      return next
+    })
+  }
 
   const pages = Math.max(1, Math.ceil(total / PAGE))
   const catName = (id: string | null) => categories.find(c => c.id === id)?.name ?? '—'
 
   const doAction = async (fn: () => Promise<unknown>, msg: string) => {
-    try { await fn(); flash(msg); loadArticles() }
+    try { await fn(); flash(msg); loadArticles(); refreshPendingDrafts() }
     catch (e) { setError((e as Error).message) }
   }
 
@@ -125,6 +143,18 @@ export default function KnowledgeAdmin({ companyId, onBack }: Props) {
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
+            {pendingDrafts > 0 && (
+              <button
+                onClick={toggleSourceTicketFilter}
+                title="Rascunhos gerados automaticamente ao resolver tickets marcados como candidatos a KB (Fase 20)"
+                className={`inline-flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-bold transition-colors ${
+                  fSourceTicketOnly ? 'border-indigo-600 bg-indigo-600 text-white' : 'border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100'
+                }`}
+              >
+                <Sparkles className="w-4 h-4" />
+                {pendingDrafts} Rascunho{pendingDrafts === 1 ? '' : 's'} Pendente{pendingDrafts === 1 ? '' : 's'}
+              </button>
+            )}
             <button onClick={() => setShowCats(true)} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700">
               <FolderTree className="w-4 h-4" /> Categorias
             </button>
@@ -175,6 +205,11 @@ export default function KnowledgeAdmin({ companyId, onBack }: Props) {
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="truncate font-bold text-slate-800">{a.title}</span>
                       {a.visibility === 'restricted' && <Lock className="w-3.5 h-3.5 text-amber-500 shrink-0" />}
+                      {a.source_ticket_id && (
+                        <span title="Gerado automaticamente ao resolver um ticket (Fase 20)" className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700">
+                          <Sparkles className="w-3 h-3" /> Auto-gerado
+                        </span>
+                      )}
                     </div>
                     <p className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-400">
                       <span className={`rounded-full px-2 py-0.5 font-bold ${STATUS_META[a.status].cls}`}>{STATUS_META[a.status].label}</span>

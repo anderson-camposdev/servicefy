@@ -36,6 +36,8 @@ export interface ArticleListFilters {
   query?: string
   limit?: number
   offset?: number
+  /** Fase 20 (KEDB): só rascunhos gerados automaticamente por resolução de ticket (source_ticket_id preenchido). */
+  sourceTicketOnly?: boolean
 }
 
 export interface ArticleInput {
@@ -87,9 +89,22 @@ export const knowledgeService = {
     if (filters.categoryId) q = q.eq('category_id', filters.categoryId)
     if (filters.domainId) q = q.eq('service_domain_id', filters.domainId)
     if (filters.query && filters.query.trim()) q = q.ilike('title', `%${filters.query.trim()}%`)
+    if (filters.sourceTicketOnly) q = q.not('source_ticket_id', 'is', null)
     const { data, error, count } = await q.order('updated_at', { ascending: false }).range(offset, offset + limit - 1)
     if (error) throw error
     return { rows: (data ?? []) as KnowledgeArticleRow[], total: count ?? 0 }
+  },
+
+  /** Fase 20 (KEDB): rascunhos gerados automaticamente por resolução de ticket, ainda não revisados. */
+  async countPendingDrafts(companyId: string): Promise<number> {
+    const { count, error } = await supabase
+      .from('knowledge_articles')
+      .select('id', { count: 'exact', head: true })
+      .eq('company_id', companyId)
+      .eq('status', 'draft')
+      .not('source_ticket_id', 'is', null)
+    if (error) throw error
+    return count ?? 0
   },
 
   async getArticle(id: string): Promise<KnowledgeArticleRow> {
