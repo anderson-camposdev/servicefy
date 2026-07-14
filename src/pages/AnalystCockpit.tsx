@@ -15,6 +15,7 @@ import KnowledgeCockpitPanel from './KnowledgeCockpitPanel'
 import SlaEventTimeline from './SlaEventTimeline'
 import TicketTasksPanel from '../components/TicketTasksPanel'
 import ResolutionModal from '../components/portal/ResolutionModal'
+import MacroDropdown from '../components/portal/MacroDropdown'
 import { priorityString, IMPACT_OPTIONS, URGENCY_OPTIONS } from '../lib/priority'
 
 /**
@@ -1003,6 +1004,15 @@ const AnalystCockpit = ({ ticket = FALLBACK_TICKET }: { ticket?: WorkspaceTicket
                   </>
                 )}
               </>
+            )}
+            {canEdit && ticket.incidentId && (
+              <MacroDropdown
+                companyId={detail?.company_id ?? ticket.companyId ?? ''}
+                ticketId={ticket.incidentId}
+                onApplied={() => { refreshIncident(); refreshMessages() }}
+                onSuccess={message => toast.success(message)}
+                onError={message => toast.error(message)}
+              />
             )}
           </div>
         </div>

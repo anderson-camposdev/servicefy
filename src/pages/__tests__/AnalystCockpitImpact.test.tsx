@@ -60,6 +60,10 @@ vi.mock('../../lib/services', () => ({
   responseMacrosService: {
     list: mockListMacros,
   },
+  ticketMacrosService: {
+    list: vi.fn().mockResolvedValue([]),
+    apply: vi.fn(),
+  },
   cmdbService: {
     getCiForCase: mockGetCiForCase,
     predictIncidentImpact: mockPredictIncidentImpact,

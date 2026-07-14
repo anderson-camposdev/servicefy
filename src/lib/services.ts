@@ -20,6 +20,7 @@ import type {
   SlaCalendarRow, SlaCalendarShiftRow, SlaCalendarHolidayRow, SLAPolicyRow, SlaEventRow,
   WorkflowRuleRow, WorkflowExecutionLogRow, WorkflowActionQueueRow,
   GlobalSearchResult, ExecutiveMetrics, OutboundWebhookRow, OutboundWebhookEvent,
+  TicketMacroRow,
 } from './database.types'
 
 const url  = import.meta.env.VITE_SUPABASE_URL  as string
@@ -2606,6 +2607,28 @@ export const cmdbService = {
     })
     return throwIfError(data, error)
   }
+}
+
+// ─── MOTOR DE MACROS / QUICK ACTIONS (Fase 26) ──────────────────
+export const ticketMacrosService = {
+  async list(companyId: string): Promise<TicketMacroRow[]> {
+    const { data, error } = await supabase
+      .from('ticket_macros')
+      .select('id,company_id,name,description,operations,is_active,created_by,created_at,updated_at')
+      .eq('company_id', companyId)
+      .eq('is_active', true)
+      .order('name')
+    return throwIfError<TicketMacroRow[]>(data, error)
+  },
+
+  /** Toda a mutação (set_fields/add_comment) roda em SQL, atrás da view incidents — o cliente só dispara. */
+  async apply(ticketId: string, macroId: string): Promise<IncidentRow> {
+    const { data, error } = await supabase.rpc('apply_ticket_macro', {
+      p_ticket_id: ticketId,
+      p_macro_id: macroId,
+    })
+    return throwIfError<IncidentRow>(data, error)
+  },
 }
 
 // ─── WEBHOOKS OUTBOUND (Fase 25) ────────────────────────────────

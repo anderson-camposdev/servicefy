@@ -393,6 +393,39 @@ export interface GlobalSearchResult {
   slug: string | null
 }
 
+// Fase 26 — Motor de Macros / Quick Actions (migration 123)
+export interface TicketMacroSetFields {
+  state?: string
+  assignment_group_id?: string
+  priority?: string
+  resolution_code?: string
+  resolution_notes?: string
+  pending_reason_id?: string
+  kb_candidate?: boolean
+}
+
+export interface TicketMacroAddComment {
+  body: string
+  is_internal?: boolean
+}
+
+export interface TicketMacroOperations {
+  set_fields?: TicketMacroSetFields
+  add_comment?: TicketMacroAddComment
+}
+
+export interface TicketMacroRow {
+  id: string
+  company_id: string
+  name: string
+  description: string | null
+  operations: TicketMacroOperations
+  is_active: boolean
+  created_by: string | null
+  created_at: string
+  updated_at: string
+}
+
 // Fase 25 — API Pública e Webhooks Outbound (migration 122)
 export type OutboundWebhookEvent = 'ticket.created' | 'ticket.resolved'
 
