@@ -7,7 +7,7 @@
 // ============================================================
 
 import { supabase } from '../supabase'
-import { MSP_COMPANY_ID } from '../services'
+import { isProviderTenantId } from '../services'
 import type {
   BiCubeQuery, BiCubeRow, BiDrilldownRow, BiFilter,
   BiRecordType, BiDateField, BiBacklogTrendPoint,
@@ -15,7 +15,7 @@ import type {
 
 /** MSP enxerga todos os tenants quando não há um tenant selecionado. */
 function toServerCompanyId(companyId: string): string | null {
-  return companyId === MSP_COMPANY_ID ? null : companyId
+  return isProviderTenantId(companyId) ? null : companyId
 }
 
 function serializeFilters(filters?: BiFilter[]): unknown[] {

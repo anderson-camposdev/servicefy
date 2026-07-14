@@ -11,6 +11,7 @@ import {
   problemsService,
   changesService,
   setCompanySchemas,
+  setProviderTenantIds,
   assignmentGroupsService,
   departmentsService,
 } from '../lib/services'
@@ -68,6 +69,7 @@ export function useAppData() {
           }
         })
         setCompanySchemas(mapping)
+        setProviderTenantIds(comps.filter(c => c.is_provider_tenant).map(c => c.id))
       })
       .catch(err => {
         setError(err instanceof Error ? err.message : 'Erro ao carregar dados.')

@@ -29,12 +29,6 @@ const key  = import.meta.env.VITE_SUPABASE_ANON_KEY as string
 // Dynamic schema clients cache to avoid recreating them constantly
 const schemaClientsCache: Record<string, any> = {}
 
-// TODO(security): Migrar para verificação via is_provider_tenant no perfil do usuário.
-// Hoje a lógica MSP depende deste UUID hardcoded, o que cria um ponto de falha
-// único: qualquer brecha na RLS com este ID bypassa o filtro de company_id.
-// Quando o backend implementar verificação server-side, remover este UUID.
-export const MSP_COMPANY_ID = '44444444-4444-4444-4444-444444444444'
-
 // Registro dinâmico companyId → schemaName do PostgreSQL.
 // Alimentado em runtime por setCompanySchemas() (ver useAppData).
 // Empresas ausentes do mapa usam o schema 'public' por padrão, de
@@ -44,6 +38,20 @@ let companySchemaMap: Record<string, string> = {}
 export const setCompanySchemas = (mapping: Record<string, string>) => {
   companySchemaMap = { ...companySchemaMap, ...mapping }
 }
+
+// Conjunto dinâmico de company_id que são tenants provedores (MSP).
+// Alimentado em runtime por setProviderTenantIds() (ver useAppData) a
+// partir de companies.is_provider_tenant — mesma fonte de verdade já
+// usada em authService.isProviderUser() e public.is_current_user_msp_admin().
+// Substitui o antigo UUID fixo MSP_COMPANY_ID, que quebrava entre
+// ambientes com seeds diferentes.
+let providerTenantIds = new Set<string>()
+
+export const setProviderTenantIds = (ids: Iterable<string>) => {
+  providerTenantIds = new Set(ids)
+}
+
+export const isProviderTenantId = (companyId: string): boolean => providerTenantIds.has(companyId)
 
 // Schemas reservados do Supabase que nunca devem ser usados como schema de tenant.
 const RESERVED_SCHEMAS = new Set(['auth', 'storage', 'extensions', 'graphql', 'graphql_public', 'realtime', 'supabase_functions', 'vault'])
@@ -280,7 +288,7 @@ export type IncidentFilters = {
 export const incidentsService = {
   /** Fetch a filtered, paginated list of incidents */
   async list(filters: IncidentFilters): Promise<IncidentRow[]> {
-    const isMSP = filters.companyId === MSP_COMPANY_ID
+    const isMSP = isProviderTenantId(filters.companyId)
     let client = getClientForCompany(filters.companyId)
     let q = client.from('incidents').select('*')
 
@@ -372,7 +380,7 @@ export const incidentsService = {
 
   /** KPI aggregates for the dashboard */
   async getKPIs(companyId: string, filterCompanyId?: string, ticketType?: 'incident' | 'request') {
-    const isMSP = companyId === MSP_COMPANY_ID
+    const isMSP = isProviderTenantId(companyId)
     let q = getClientForCompany(companyId)
       .from('incidents')
       .select('state, priority, sla_breached, assigned_to_id, company_id, ticket_type')
@@ -760,7 +768,7 @@ export const incidentsService = {
     callerId?: string,
   ) {
     const schema = companySchemaMap[companyId] || 'public'
-    const isMSP = companyId === MSP_COMPANY_ID
+    const isMSP = isProviderTenantId(companyId)
     const channelName = callerId ? `incidents:caller:${callerId}` : isMSP ? 'incidents:msp' : `incidents:${companyId}`
     const callerFilter = callerId ? `caller_id=eq.${callerId}` : null
     const insertConfig: any = callerFilter
@@ -1561,19 +1569,33 @@ export const incidentCatalogService = {
   },
 
   // ─ Carga completa em cascata para o seletor de incidente ─
-  async loadCascade(companyId: string) {
-    const items = await this.listItems(companyId)
-    const result = []
-    for (const item of items) {
-      const subitems = await this.listSubitems(item.id)
-      const subitemsWithSymptoms = []
-      for (const subitem of subitems) {
-        const symptoms = await this.listSymptoms(subitem.id)
-        subitemsWithSymptoms.push({ ...subitem, symptoms })
-      }
-      result.push({ item, subitems: subitemsWithSymptoms })
-    }
-    return result
+  // Embed nativo do PostgREST em vez de N+1 round-trips: item → subitens
+  // → sintomas em uma única requisição de rede.
+  async loadCascade(companyId: string): Promise<Array<{
+    item: IncidentCatalogItemRow
+    subitems: Array<IncidentCatalogSubitemRow & { symptoms: IncidentCatalogSymptomRow[] }>
+  }>> {
+    const { data, error } = await supabase
+      .from('incident_catalog_items')
+      .select(`
+        *,
+        subitems:incident_catalog_subitems(
+          *,
+          symptoms:incident_catalog_symptoms(*)
+        )
+      `)
+      .eq('company_id', companyId)
+      .eq('active', true)
+      .eq('incident_catalog_subitems.active', true)
+      .eq('incident_catalog_subitems.incident_catalog_symptoms.active', true)
+      .order('sort_order')
+      .order('sort_order', { foreignTable: 'incident_catalog_subitems' })
+      .order('sort_order', { foreignTable: 'incident_catalog_subitems.incident_catalog_symptoms' })
+
+    const rows = throwIfError(data, error) as unknown as Array<IncidentCatalogItemRow & {
+      subitems: Array<IncidentCatalogSubitemRow & { symptoms: IncidentCatalogSymptomRow[] }>
+    }>
+    return rows.map(({ subitems, ...item }) => ({ item: item as IncidentCatalogItemRow, subitems }))
   },
 }
 
@@ -1642,14 +1664,31 @@ export const requestCatalogService = {
   },
 
   // ─ Carga completa em cascata para o seletor de requisição ─
-  async loadCascade(companyId: string, role?: string) {
-    const items = await this.listItems(companyId)
-    const result = []
-    for (const item of items) {
-      const subitems = await this.listSubitems(item.id, role)
-      result.push({ item, subitems })
+  // Embed nativo do PostgREST em vez de N+1 round-trips: item → subitens
+  // em uma única requisição de rede (filtro de visibilidade por papel
+  // aplicado no próprio embed via visible_to_roles @> ARRAY[role]).
+  async loadCascade(companyId: string, role?: string): Promise<Array<{
+    item: RequestCatalogItemRow
+    subitems: RequestCatalogSubitemRow[]
+  }>> {
+    let query = supabase
+      .from('request_catalog_items')
+      .select('*, subitems:request_catalog_subitems(*)')
+      .eq('company_id', companyId)
+      .eq('active', true)
+      .eq('request_catalog_subitems.active', true)
+      .order('sort_order')
+      .order('sort_order', { foreignTable: 'request_catalog_subitems' })
+
+    if (role) {
+      query = query.contains('request_catalog_subitems.visible_to_roles', [role])
     }
-    return result
+
+    const { data, error } = await query
+    const rows = throwIfError(data, error) as unknown as Array<RequestCatalogItemRow & {
+      subitems: RequestCatalogSubitemRow[]
+    }>
+    return rows.map(({ subitems, ...item }) => ({ item: item as RequestCatalogItemRow, subitems }))
   },
 }
 
@@ -2427,7 +2466,7 @@ export const biService = {
 
     // Provedor MSP enxerga todos os clientes (cross-company via RLS);
     // tenant comum só os próprios chamados.
-    const isMSP = companyId === MSP_COMPANY_ID
+    const isMSP = isProviderTenantId(companyId)
     const client = getClientForCompany(companyId)
 
     // Consulta otimizada trazendo apenas as colunas úteis (+ company_id real).

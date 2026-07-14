@@ -6,7 +6,7 @@
 // ============================================================
 
 import { supabase } from '../supabase'
-import { MSP_COMPANY_ID } from '../services'
+import { isProviderTenantId } from '../services'
 import type { BiDimensionDef, BiMeasureDef, BiRecordType } from './types'
 
 interface RawDimension {
@@ -57,7 +57,7 @@ export const catalogService = {
 
   async getFormDimensions(companyId: string): Promise<BiDimensionDef[]> {
     // MSP sem tenant selecionado: sem dimensões de formulário (são por tenant).
-    if (companyId === MSP_COMPANY_ID) return []
+    if (isProviderTenantId(companyId)) return []
     const cached = formDimensionsCache.get(companyId)
     if (cached) return cached
     const { data, error } = await supabase.rpc('bi_form_dimensions', {
