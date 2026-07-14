@@ -360,7 +360,8 @@ export type AppView =
   | 'settings_governance'
   | 'flowfy_bi'
   | 'workflow_builder'
-  | 'analytics_executive';
+  | 'analytics_executive'
+  | 'developer_settings';
 
 // ─── Catálogo Hierárquico de Incidentes (3 Níveis + SLA) ─────
 

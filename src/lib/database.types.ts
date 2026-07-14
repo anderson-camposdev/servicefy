@@ -393,6 +393,21 @@ export interface GlobalSearchResult {
   slug: string | null
 }
 
+// Fase 25 — API Pública e Webhooks Outbound (migration 122)
+export type OutboundWebhookEvent = 'ticket.created' | 'ticket.resolved'
+
+export interface OutboundWebhookRow {
+  id: string
+  company_id: string
+  target_url: string
+  events_subscribed: OutboundWebhookEvent[]
+  is_active: boolean
+  consecutive_failures: number
+  created_by: string | null
+  created_at: string
+  updated_at: string
+}
+
 // Fase 23 — Analytics e Relatórios Executivos (migration 120)
 export interface ExecutiveMetrics {
   period: { start: string; end: string }

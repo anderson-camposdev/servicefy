@@ -19,7 +19,7 @@ import type {
   AssignmentGroupRow, PendingReasonRow, DepartmentRow, RequestSubcategoryRow, TicketTaskRow, RequestApprovalRow, CsatSurveyRow, ResponseMacroRow,
   SlaCalendarRow, SlaCalendarShiftRow, SlaCalendarHolidayRow, SLAPolicyRow, SlaEventRow,
   WorkflowRuleRow, WorkflowExecutionLogRow, WorkflowActionQueueRow,
-  GlobalSearchResult, ExecutiveMetrics,
+  GlobalSearchResult, ExecutiveMetrics, OutboundWebhookRow, OutboundWebhookEvent,
 } from './database.types'
 
 const url  = import.meta.env.VITE_SUPABASE_URL  as string
@@ -2606,6 +2606,39 @@ export const cmdbService = {
     })
     return throwIfError(data, error)
   }
+}
+
+// ─── WEBHOOKS OUTBOUND (Fase 25) ────────────────────────────────
+export const outboundWebhooksService = {
+  async list(companyId: string): Promise<OutboundWebhookRow[]> {
+    const { data, error } = await supabase
+      .from('outbound_webhooks')
+      .select('id,company_id,target_url,events_subscribed,is_active,consecutive_failures,created_by,created_at,updated_at')
+      .eq('company_id', companyId)
+      .order('created_at', { ascending: false })
+    return throwIfError<OutboundWebhookRow[]>(data, error)
+  },
+
+  /** Cria (webhookId=null) ou atualiza um webhook. O segredo só é gravado/rotacionado quando informado (vai para o Vault, nunca em texto puro). */
+  async save(
+    companyId: string, webhookId: string | null, targetUrl: string,
+    eventsSubscribed: OutboundWebhookEvent[], isActive: boolean, secret?: string,
+  ): Promise<OutboundWebhookRow> {
+    const { data, error } = await supabase.rpc('save_outbound_webhook', {
+      p_company_id: companyId,
+      p_webhook_id: webhookId,
+      p_target_url: targetUrl,
+      p_events_subscribed: eventsSubscribed,
+      p_is_active: isActive,
+      p_secret: secret?.trim() || null,
+    })
+    return throwIfError<OutboundWebhookRow>(data, error)
+  },
+
+  async remove(id: string): Promise<void> {
+    const { error } = await supabase.from('outbound_webhooks').delete().eq('id', id)
+    if (error) throw error
+  },
 }
 
 // ─── ANALYTICS EXECUTIVO (Fase 23) ──────────────────────────────

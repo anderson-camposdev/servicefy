@@ -1,5 +1,5 @@
 import { lazy, Suspense, useState, useMemo, useEffect } from 'react'
-import { Plus, Settings, ShieldAlert, ClipboardList, AlertOctagon, RefreshCw, Home, BarChart3, CircleCheckBig, TrendingUp } from 'lucide-react'
+import { Plus, Settings, ShieldAlert, ClipboardList, AlertOctagon, RefreshCw, Home, BarChart3, CircleCheckBig, TrendingUp, Code2 } from 'lucide-react'
 import { useToast } from './context'
 import type { AppView, User, Company, Role } from './types'
 import { mockApiEndpoints } from './services/appMocks'
@@ -24,6 +24,7 @@ const WorkflowBuilder = lazy(() => import('./pages/WorkflowBuilder'))
 const ChangeManagementDashboard = lazy(() => import('./pages/ChangeManagementDashboard'))
 const ApprovalCenter = lazy(() => import('./pages/ApprovalCenter'))
 const AnalyticsDashboard = lazy(() => import('./pages/admin/AnalyticsDashboard'))
+const DeveloperSettings = lazy(() => import('./pages/admin/DeveloperSettings'))
 const BiApp = lazy(() => import('./features/bi/BiApp'))
 import TicketDataTable from './components/TicketDataTable'
 import { LoadingSkeleton } from './components/portal/LoadingSkeleton'
@@ -1143,6 +1144,13 @@ export default function App() {
     })
   }
 
+  // Fase 25 — Webhooks Outbound: acessível apenas a company_admin (a RPC
+  // save_outbound_webhook já valida is_settings_admin no banco; este filtro
+  // de navegação é só conveniência de UI).
+  if (activeRole === 'company_admin') {
+    navItems.push({ view: 'developer_settings', label: 'Desenvolvedor', icon: <Code2 className="w-5 h-5" /> })
+  }
+
   const customDashRoles: Role[] = ['cio', 'client_manager', 'it_manager', 'area_manager', 'technician']
   const showWorkspace = (activeView === 'dashboard_incidents' || activeView === 'dashboard_requests') && (isProvider || !customDashRoles.includes(activeRole))
 
@@ -1177,6 +1185,7 @@ export default function App() {
     if (activeView === 'dashboard_changes') return <ChangeManagementDashboard companyId={currentCompany.id} />
     if (activeView === 'approval_inbox') return <ApprovalCenter />
     if (activeView === 'analytics_executive') return <AnalyticsDashboard />
+    if (activeView === 'developer_settings') return <DeveloperSettings companyId={currentCompany.id} />
     if (activeView === 'api_docs') return isConfigEligible ? <ApiDocs /> : <WorkspaceLayout companyId={currentCompany.id} isProvider={isProvider} companies={companies} />
     if (activeView === 'flowfy_bi') return <BiApp companyId={currentCompany.id} themeName={(currentCompany as any).primary_color} />
     if (activeView === 'workflow_builder') return isConfigEligible ? <WorkflowBuilder companyId={currentCompany.id} /> : <WorkspaceLayout companyId={currentCompany.id} isProvider={isProvider} companies={companies} />
