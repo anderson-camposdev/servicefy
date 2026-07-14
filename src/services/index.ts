@@ -18,6 +18,7 @@ export const mockCompanies: Company[] = [
     active: true,
     createdAt: '2024-01-10T00:00:00Z',
     concurrentLicenses: 50,
+    maxAnalystsLicenses: 20,
     licensePlan: 'enterprise' as const,
     branding: {
       primaryColor: '#1D4ED8',
@@ -44,6 +45,7 @@ export const mockCompanies: Company[] = [
     active: true,
     createdAt: '2024-03-15T00:00:00Z',
     concurrentLicenses: 25,
+    maxAnalystsLicenses: 10,
     licensePlan: 'professional' as const,
     branding: {
       primaryColor: '#059669',
@@ -69,6 +71,7 @@ export const mockCompanies: Company[] = [
     active: true,
     createdAt: '2024-06-01T00:00:00Z',
     concurrentLicenses: 10,
+    maxAnalystsLicenses: 3,
     licensePlan: 'starter' as const,
     branding: {
       primaryColor: '#B45309',

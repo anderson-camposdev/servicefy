@@ -1,9 +1,59 @@
 import { useState, useMemo, useEffect, useCallback } from 'react'
-import { Users, Plus, UserPlus, Settings, Edit2, X, Upload, Image as ImageIcon, LayoutTemplate, ExternalLink } from 'lucide-react'
+import { Users, Plus, UserPlus, Settings, Edit2, X, Upload, Image as ImageIcon, LayoutTemplate, ExternalLink, KeyRound } from 'lucide-react'
 import type { Company, Role } from '../types'
 import { useAppData } from '../hooks/useDbData'
 import { companiesService, profilesService, assignmentGroupsService } from '../lib/services'
 import type { ProfileRow, AssignmentGroupRow, CompanyRow } from '../lib/database.types'
+import { useToast } from '../context'
+
+// Fase 27: roles reais do enum user_role no banco — {sysadmin, company_admin,
+// agent, end_user}. As opções extras que existiam aqui antes (technician,
+// area_manager, it_manager, client_manager, cio) não existem no enum e
+// quebravam com um erro cru de cast do Postgres ao tentar salvar.
+const REAL_ROLE_OPTIONS: { value: Role; label: string }[] = [
+  { value: 'end_user', label: 'EndUser (Usuário Final)' },
+  { value: 'agent', label: 'Agent (Analista)' },
+  { value: 'company_admin', label: 'CompanyAdmin (Admin do Tenant)' },
+  { value: 'sysadmin', label: 'SysAdmin (Admin Global)' },
+]
+// Fase 27: roles que consomem uma licença de analista (seat) — mesma lista
+// usada pelo trigger tg_enforce_analyst_license_limit no banco.
+const LICENSE_CONSUMING_ROLES: Role[] = ['agent', 'company_admin']
+
+// Fase 27: indicador "Licenças Usadas: X / Y" — cálculo puramente
+// derivado dos dados já carregados (rawCompanies/rawProfiles), sem chamada
+// de rede extra. O banco (tg_enforce_analyst_license_limit) é sempre a
+// fonte de verdade real; este indicador é só uma prévia visual.
+function LicenseUsageBadge({ companyId, rawCompanies, rawProfiles }: {
+  companyId: string
+  rawCompanies: CompanyRow[]
+  rawProfiles: ProfileRow[]
+}) {
+  const limit = rawCompanies.find(c => c.id === companyId)?.max_analysts_licenses ?? 3
+  const used = rawProfiles.filter(p =>
+    p.company_id === companyId && p.active && LICENSE_CONSUMING_ROLES.includes(p.role as Role)
+  ).length
+  const pct = limit > 0 ? Math.min(100, Math.round((used / limit) * 100)) : 100
+  const atOrOverLimit = used >= limit
+  const barColor = atOrOverLimit ? 'bg-red-500' : pct >= 80 ? 'bg-amber-500' : 'bg-emerald-500'
+
+  return (
+    <div className="mb-4 rounded-xl border border-slate-100 bg-slate-50 p-3">
+      <div className="flex items-center justify-between mb-1.5">
+        <span className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+          <KeyRound className="w-3 h-3" /> Licenças de Analista
+        </span>
+        <span className={`text-xs font-black ${atOrOverLimit ? 'text-red-600' : 'text-slate-700'}`}>{used} / {limit}</span>
+      </div>
+      <div className="h-1.5 w-full rounded-full bg-slate-200 overflow-hidden">
+        <div className={`h-full rounded-full transition-all ${barColor}`} style={{ width: `${pct}%` }} />
+      </div>
+      {atOrOverLimit && (
+        <p className="mt-1.5 text-[10px] font-semibold text-red-600">Limite atingido — desative um usuário ou amplie o plano para adicionar mais analistas.</p>
+      )}
+    </div>
+  )
+}
 import { setTenantOverride } from '../tenant/resolveTenant'
 import CatalogManager from './CatalogManager'
 import DepartmentManager from './DepartmentManager'
@@ -309,6 +359,7 @@ interface AdminDashboardProps {
 }
 
 export default function AdminDashboard({ refetchAppData, currentCompany, activeTab, setManagedCompanyId, setActiveTab }: AdminDashboardProps) {
+  const { toast } = useToast()
   // States for tenant onboarding
   const [tenantName, setTenantName] = useState('')
   const [tenantDomain, setTenantDomain] = useState('')
@@ -414,14 +465,17 @@ export default function AdminDashboard({ refetchAppData, currentCompany, activeT
         manager_id: usrManagerId || null,
       }
       await profilesService.create(payload)
-      alert('Usuário cadastrado com sucesso!')
+      toast.success('Usuário cadastrado com sucesso!')
       setUsrName('')
       setUsrEmail('')
       setUsrDept('')
       setUsrManagerId('')
       if (refetchAppData) await refetchAppData()
-    } catch (err: any) {
-      alert('Erro ao cadastrar usuário: ' + err.message)
+    } catch (err) {
+      // O trigger tg_enforce_analyst_license_limit (Fase 27) já devolve uma
+      // mensagem amigável em português quando o limite de licenças é
+      // atingido — repassamos exatamente o que o banco disse, sem reescrever.
+      toast.error(err instanceof Error ? err.message : 'Erro ao cadastrar usuário.')
     } finally {
       setUsrSaving(false)
     }
@@ -566,6 +620,7 @@ export default function AdminDashboard({ refetchAppData, currentCompany, activeT
           </div>
           <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-6">
             <h3 className="text-slate-800 font-bold text-sm uppercase tracking-widest border-b border-slate-100 pb-3 mb-4">Adicionar Novo Colaborador</h3>
+            <LicenseUsageBadge companyId={usrCompanyId} rawCompanies={rawCompanies} rawProfiles={rawProfiles} />
             <form onSubmit={handleSaveUser} className="space-y-3">
               <div>
                 <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Nome Completo</label>
@@ -591,14 +646,11 @@ export default function AdminDashboard({ refetchAppData, currentCompany, activeT
               <div>
                 <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Papel de Acesso (RBAC)</label>
                 <select value={usrRole} onChange={e => setUsrRole(e.target.value as Role)} className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-700 bg-white">
-                  <option value="end_user">EndUser (Usuário Final)</option>
-                  <option value="technician">Technician (Analista)</option>
-                  <option value="area_manager">AreaManager (Gerente Torre)</option>
-                  <option value="it_manager">ITManager (Gerente Geral TI)</option>
-                  <option value="client_manager">ClientManager (Gestor Cliente)</option>
-                  <option value="cio">CIO (Executivo TI)</option>
-                  <option value="sysadmin">SysAdmin (Admin Global)</option>
+                  {REAL_ROLE_OPTIONS.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
                 </select>
+                {LICENSE_CONSUMING_ROLES.includes(usrRole) && (
+                  <p className="mt-1 text-[10px] text-slate-400">Este papel consome uma licença de analista.</p>
+                )}
               </div>
               <div>
                 <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Empresa / Tenant</label>

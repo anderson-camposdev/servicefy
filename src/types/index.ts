@@ -88,6 +88,10 @@ export interface Company {
   concurrentLicenses: number;
   licensePlan: 'starter' | 'professional' | 'enterprise';
   licenseExpiresAt?: string;
+  // Fase 27 — Controle de Licenças de Analistas: eixo distinto de
+  // concurrentLicenses (sessões simultâneas) — total de perfis ativos com
+  // role agent/company_admin (seat licensing).
+  maxAnalystsLicenses: number;
 }
 
 // ─── User ────────────────────────────────────────────────────

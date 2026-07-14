@@ -75,6 +75,7 @@ const mapCompany = (row: CompanyRow): Company => {
     concurrentLicenses: row.concurrent_licenses ?? 10,
     licensePlan: (row.license_plan ?? 'starter') as 'starter' | 'professional' | 'enterprise',
     licenseExpiresAt: row.license_expires_at ?? undefined,
+    maxAnalystsLicenses: row.max_analysts_licenses ?? 3,
     branding: {
       logoUrl: row.logo_url ?? undefined,
       primaryColor: row.primary_color,

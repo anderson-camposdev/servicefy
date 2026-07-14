@@ -57,6 +57,10 @@ export interface CompanyRow {
   license_plan: string
   license_expires_at: string | null
   license_alert_threshold: number
+  // Fase 27 — Controle de Licenças de Analistas (migration 124): eixo
+  // distinto de concurrent_licenses (sessões simultâneas) — total de
+  // perfis ativos com role agent/company_admin (seat licensing).
+  max_analysts_licenses: number
 }
 
 export interface ProfileRow {
