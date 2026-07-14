@@ -25,6 +25,15 @@ const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
   auth: { persistSession: false },
 })
 
+function escapeHtml(value: unknown): string {
+  return String(value ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#039;')
+}
+
 Deno.serve(async (req) => {
   const authorization = req.headers.get('authorization') ?? ''
   if (authorization !== `Bearer ${SERVICE_ROLE_KEY}`) {
@@ -67,10 +76,10 @@ Deno.serve(async (req) => {
     const subject = `[ServiceFY] Atualização no Chamado #${incident.number}`
     const html = `
       <div style="font-family:system-ui,sans-serif;color:#0f172a">
-        <p>Olá ${incident.caller_name ?? ''},</p>
-        <p>Há uma nova atualização no seu chamado <b>#${incident.number}</b> — "${incident.short_description}":</p>
+        <p>Olá ${escapeHtml(incident.caller_name)},</p>
+        <p>Há uma nova atualização no seu chamado <b>#${incident.number}</b> — "${escapeHtml(incident.short_description)}":</p>
         <blockquote style="border-left:3px solid #6366f1;margin:12px 0;padding:8px 12px;background:#f8fafc">
-          ${record.body}
+          ${escapeHtml(record.body)}
         </blockquote>
         <p style="color:#64748b;font-size:13px">Responda este e-mail para falar com o analista. Mantenha a tag <b>#${incident.number}</b> no assunto.</p>
       </div>`

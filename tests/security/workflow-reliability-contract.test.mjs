@@ -39,3 +39,13 @@ test('webhooks têm timeout e assinatura HMAC opcional', () => {
   assert.match(worker, /X-Flowfy-Signature/)
   assert.match(worker, /name: 'HMAC'/)
 })
+
+test('webhook de regra de automação passa pela guarda de SSRF compartilhada antes do fetch', () => {
+  assert.match(worker, /from '\.\.\/_shared\/ssrf-guard\.ts'/)
+  assert.match(worker, /if \(isBlockedTarget\(params\.url\)\)/)
+})
+
+test('lote da fila é processado em paralelo (Promise.allSettled) — um item lento não atrasa os demais', () => {
+  assert.match(worker, /Promise\.allSettled\(rows\.map\(processRow\)\)/)
+  assert.doesNotMatch(worker, /for \(const row of rows\)/)
+})

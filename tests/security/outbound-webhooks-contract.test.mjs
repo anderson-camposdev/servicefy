@@ -5,6 +5,7 @@ import test from 'node:test'
 const read = path => readFileSync(new URL('../../' + path, import.meta.url), 'utf8')
 const sql = read('supabase/migrations/20260715000000_122_outbound_webhooks.sql')
 const dispatcher = read('supabase/functions/webhook-dispatcher/index.ts')
+const ssrfGuard = read('supabase/functions/_shared/ssrf-guard.ts')
 const pkg = JSON.parse(read('package.json'))
 
 function fnBody(name, closer = '\n$$;') {
@@ -86,10 +87,11 @@ test('dispatcher assina o payload com HMAC-SHA256 e aplica timeout de 10s por re
   assert.match(dispatcher, /AbortSignal\.timeout\(10_000\)/)
 })
 
-test('dispatcher tem guarda de SSRF de linha de base contra alvos óbvios (loopback, redes privadas, metadados de nuvem)', () => {
-  assert.match(dispatcher, /BLOCKED_HOSTNAMES/)
-  assert.match(dispatcher, /169\.254\.169\.254/)
+test('dispatcher tem guarda de SSRF de linha de base contra alvos óbvios (loopback, redes privadas, metadados de nuvem) — guarda compartilhada com run-workflow-actions', () => {
   assert.match(dispatcher, /isBlockedTarget/)
+  assert.match(dispatcher, /from '\.\.\/_shared\/ssrf-guard\.ts'/)
+  assert.match(ssrfGuard, /BLOCKED_HOSTNAMES/)
+  assert.match(ssrfGuard, /169\.254\.169\.254/)
 })
 
 test('dispatcher exige Bearer service_role para ser acionado', () => {

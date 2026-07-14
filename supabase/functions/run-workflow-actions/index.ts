@@ -34,6 +34,7 @@
 // ============================================================
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { isBlockedTarget } from '../_shared/ssrf-guard.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
@@ -110,6 +111,7 @@ async function processEmail(row: QueueRow, incident: any): Promise<{ ok: boolean
 async function processWebhook(row: QueueRow, incident: any): Promise<{ ok: boolean; error?: string }> {
   const params = row.action.params ?? {}
   if (!params.url) return { ok: false, error: 'webhook sem url' }
+  if (isBlockedTarget(params.url)) return { ok: false, error: 'destino bloqueado (guarda de SSRF de linha de base)' }
 
   try {
     const body = JSON.stringify({ incident, rule_id: row.rule_id })
@@ -141,6 +143,77 @@ async function processWebhook(row: QueueRow, incident: any): Promise<{ ok: boole
   }
 }
 
+async function processRow(row: QueueRow): Promise<'done' | 'failed' | 'retried'> {
+  const { data: incident } = await admin
+    .from('incidents')
+    .select('id, number, short_description, caller_name, caller_id, company_id')
+    .eq('id', row.incident_id)
+    .maybeSingle()
+
+  let caller_email: string | null = null
+  if (incident?.caller_id) {
+    const { data: profile } = await admin.from('profiles').select('email').eq('id', incident.caller_id).maybeSingle()
+    caller_email = profile?.email ?? null
+  }
+  const incidentWithEmail = { ...incident, caller_email }
+
+  let result: { ok: boolean; error?: string }
+  if (!incident) {
+    result = { ok: false, error: 'incident not found' }
+  } else if (row.action.type === 'send_email') {
+    result = await processEmail(row, incidentWithEmail)
+  } else if (row.action.type === 'webhook') {
+    result = await processWebhook(row, incidentWithEmail)
+  } else if (SYNC_ACTIONS.has(row.action.type)) {
+    const { error } = await admin.rpc('workflow_run_queued_sync', { p_queue_id: row.id })
+    result = error ? { ok: false, error: error.message } : { ok: true }
+  } else if (row.action.type === 'delay') {
+    // Compatibilidade com itens criados pela migration 058. A migration
+    // 073 não enfileira mais o delay; ela agenda as ações subsequentes.
+    result = { ok: true }
+  } else {
+    result = { ok: false, error: `unknown action type: ${row.action.type}` }
+  }
+
+  const logStatus = result.ok ? 'success' : 'error'
+  const logSummary = result.ok ? `Ação ${row.action.type} executada.` : `Falha em ${row.action.type}: ${result.error}`
+
+  let outcome: 'done' | 'failed' | 'retried'
+  if (result.ok) {
+    await admin.from('workflow_action_queue').update({ status: 'done', processed_at: new Date().toISOString(), claimed_at: null }).eq('id', row.id)
+    outcome = 'done'
+  } else {
+    const attempts = row.attempts + 1
+    if (attempts >= row.max_attempts) {
+      await admin.from('workflow_action_queue').update({
+        status: 'failed', attempts, last_error: result.error, processed_at: new Date().toISOString(), claimed_at: null,
+      }).eq('id', row.id)
+      outcome = 'failed'
+    } else {
+      // Backoff linear: 2min * tentativas.
+      const runAfter = new Date(Date.now() + attempts * 2 * 60_000).toISOString()
+      await admin.from('workflow_action_queue').update({
+        status: 'pending', attempts, last_error: result.error, run_after: runAfter, claimed_at: null,
+      }).eq('id', row.id)
+      outcome = 'retried'
+    }
+  }
+
+  await admin.from('workflow_execution_log').insert({
+    company_id: row.company_id,
+    rule_id: row.rule_id,
+    rule_name: 'Ação assíncrona',
+    incident_id: row.incident_id,
+    incident_number: incident?.number ?? null,
+    trigger_event: 'async_action',
+    matched: true,
+    status: logStatus,
+    actions_summary: logSummary,
+  })
+
+  return outcome
+}
+
 Deno.serve(async (req) => {
   const authorization = req.headers.get('authorization') ?? ''
   if (authorization !== `Bearer ${SERVICE_ROLE_KEY}`) {
@@ -154,76 +227,19 @@ Deno.serve(async (req) => {
     }
 
     const rows = (batch ?? []) as QueueRow[]
+    // Despacho em paralelo — um webhook lento de uma regra não atrasa mais
+    // o processamento das demais ações do lote (antes era um loop `for`
+    // sequencial; mesmo padrão já usado em webhook-dispatcher).
+    const results = await Promise.allSettled(rows.map(processRow))
+
     let done = 0
     let failed = 0
     let retried = 0
-
-    for (const row of rows) {
-      const { data: incident } = await admin
-        .from('incidents')
-        .select('id, number, short_description, caller_name, caller_id, company_id')
-        .eq('id', row.incident_id)
-        .maybeSingle()
-
-      let caller_email: string | null = null
-      if (incident?.caller_id) {
-        const { data: profile } = await admin.from('profiles').select('email').eq('id', incident.caller_id).maybeSingle()
-        caller_email = profile?.email ?? null
-      }
-      const incidentWithEmail = { ...incident, caller_email }
-
-      let result: { ok: boolean; error?: string }
-      if (!incident) {
-        result = { ok: false, error: 'incident not found' }
-      } else if (row.action.type === 'send_email') {
-        result = await processEmail(row, incidentWithEmail)
-      } else if (row.action.type === 'webhook') {
-        result = await processWebhook(row, incidentWithEmail)
-      } else if (SYNC_ACTIONS.has(row.action.type)) {
-        const { error } = await admin.rpc('workflow_run_queued_sync', { p_queue_id: row.id })
-        result = error ? { ok: false, error: error.message } : { ok: true }
-      } else if (row.action.type === 'delay') {
-        // Compatibilidade com itens criados pela migration 058. A migration
-        // 073 não enfileira mais o delay; ela agenda as ações subsequentes.
-        result = { ok: true }
-      } else {
-        result = { ok: false, error: `unknown action type: ${row.action.type}` }
-      }
-
-      const logStatus = result.ok ? 'success' : 'error'
-      const logSummary = result.ok ? `Ação ${row.action.type} executada.` : `Falha em ${row.action.type}: ${result.error}`
-
-      if (result.ok) {
-        await admin.from('workflow_action_queue').update({ status: 'done', processed_at: new Date().toISOString(), claimed_at: null }).eq('id', row.id)
-        done++
-      } else {
-        const attempts = row.attempts + 1
-        if (attempts >= row.max_attempts) {
-          await admin.from('workflow_action_queue').update({
-            status: 'failed', attempts, last_error: result.error, processed_at: new Date().toISOString(), claimed_at: null,
-          }).eq('id', row.id)
-          failed++
-        } else {
-          // Backoff linear: 2min * tentativas.
-          const runAfter = new Date(Date.now() + attempts * 2 * 60_000).toISOString()
-          await admin.from('workflow_action_queue').update({
-            status: 'pending', attempts, last_error: result.error, run_after: runAfter, claimed_at: null,
-          }).eq('id', row.id)
-          retried++
-        }
-      }
-
-      await admin.from('workflow_execution_log').insert({
-        company_id: row.company_id,
-        rule_id: row.rule_id,
-        rule_name: 'Ação assíncrona',
-        incident_id: row.incident_id,
-        incident_number: incident?.number ?? null,
-        trigger_event: 'async_action',
-        matched: true,
-        status: logStatus,
-        actions_summary: logSummary,
-      })
+    for (const settled of results) {
+      const outcome = settled.status === 'fulfilled' ? settled.value : 'failed'
+      if (outcome === 'done') done++
+      else if (outcome === 'retried') retried++
+      else failed++
     }
 
     return new Response(JSON.stringify({ processed: rows.length, done, retried, failed }), { status: 200 })
