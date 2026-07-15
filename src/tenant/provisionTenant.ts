@@ -47,5 +47,5 @@ export async function provisionTenant(input: ProvisionTenantInput): Promise<Comp
   })
 
   if (error) throw error
-  return data as CompanyRow
+  return data as unknown as CompanyRow
 }

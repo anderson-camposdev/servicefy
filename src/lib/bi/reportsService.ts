@@ -6,6 +6,7 @@
 // ============================================================
 
 import { supabase } from '../supabase'
+import type { Json } from '../database.generated'
 import type { BiRecordType, BiFilter, BiDateField } from './types'
 
 export type BiPivotVisual = 'table' | 'bar' | 'donut' | 'line' | 'heatmap' | 'kpi'
@@ -202,7 +203,7 @@ export const reportsService = {
     const payload = {
       name: params.name,
       chart_type: params.config.visual,
-      query_config: params.config as unknown as Record<string, unknown>,
+      query_config: params.config as unknown as Json,
       is_public: params.isPublic,
       schema_version: 2,
       report_kind: 'pivot',
@@ -216,9 +217,11 @@ export const reportsService = {
       return params.id
     }
     const { data: userData } = await supabase.auth.getUser()
+    const createdBy = userData?.user?.id
+    if (!createdBy) throw new Error('Usuário não autenticado.')
     const { data, error } = await supabase
       .from('bi_saved_reports')
-      .insert({ ...payload, company_id: params.companyId, created_by: userData?.user?.id })
+      .insert({ ...payload, company_id: params.companyId, created_by: createdBy })
       .select('id')
       .single()
     if (error) throw error

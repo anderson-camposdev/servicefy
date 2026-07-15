@@ -29,7 +29,7 @@ export async function getAuthProfile(authUserId: string): Promise<AuthProfile | 
   if (error) throw error
   if (!data) return null
 
-  const { company, ...profile } = data as ProfileRow & { company: CompanyRow | null }
+  const { company, ...profile } = data as unknown as ProfileRow & { company: CompanyRow | null }
   return { profile: profile as ProfileRow, company: (company as CompanyRow) ?? null }
 }
 

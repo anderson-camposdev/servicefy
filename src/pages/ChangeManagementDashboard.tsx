@@ -112,12 +112,17 @@ export default function ChangeManagementDashboard({ companyId }: { companyId?: s
       .then(({ data }) => setProfiles((data || []) as Profile[]))
       
     // Incidentes do mesmo tenant
-    supabase.from('incidents').select('id, title, status').eq('company_id', companyId)
-      .then(({ data }) => setIncidents((data || []) as Incident[]))
+    // Bug pré-existente descoberto ao ligar a tipagem estrita do client
+    // (A1): 'title'/'status' não existem em incidents — as colunas reais
+    // são short_description/state. A query falhava (400) silenciosamente
+    // (sem tratamento de erro aqui), então o seletor de incidente vinculado
+    // nunca populava.
+    supabase.from('incidents').select('id, short_description, state').eq('company_id', companyId)
+      .then(({ data }) => setIncidents((data ?? []).map(row => ({ id: row.id!, title: row.short_description ?? '', status: row.state ?? '' }))))
 
-    // Problemas do mesmo tenant
-    supabase.from('problems').select('id, title, status').eq('company_id', companyId)
-      .then(({ data }) => setProblems((data || []) as Problem[]))
+    // Problemas do mesmo tenant (mesmo bug: short_description/state, não title/status)
+    supabase.from('problems').select('id, short_description, state').eq('company_id', companyId)
+      .then(({ data }) => setProblems((data ?? []).map(row => ({ id: row.id!, title: row.short_description ?? '', status: row.state ?? '' }))))
   }, [companyId])
 
   // KPIs calculados

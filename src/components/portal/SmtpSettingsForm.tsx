@@ -74,7 +74,9 @@ export function SmtpSettingsForm({ companyId, checkingAccess, hasCustomSmtpAcces
           smtpPassword: '',
           fromEmail: data.from_email ?? '',
           fromName: data.from_name ?? '',
-          encryptionType: SMTP_ENCRYPTION_TYPES.includes(data.encryption_type) ? data.encryption_type : 'tls',
+          encryptionType: (SMTP_ENCRYPTION_TYPES as readonly string[]).includes(data.encryption_type)
+            ? data.encryption_type as SmtpFormState['encryptionType']
+            : 'tls',
         })
       }
       setLoading(false)

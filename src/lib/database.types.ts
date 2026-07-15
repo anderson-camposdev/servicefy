@@ -962,7 +962,7 @@ export interface ModuleEntitlementRow {
   company_id: string
   module_key: string
   enabled: boolean
-  source: 'plan' | 'trial' | 'override'
+  source: string
   starts_at: string | null
   ends_at: string | null
   limits: Json

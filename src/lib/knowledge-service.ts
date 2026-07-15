@@ -6,6 +6,7 @@
 // ============================================================
 
 import { supabase } from './supabase'
+import type { Database } from './database.generated'
 import type {
   KnowledgeArticleRow, KnowledgeCategoryRow, KnowledgeArticleFeedbackRow,
   KnowledgeArticleVersionRow, KnowledgeArticleGrantRow, KnowledgeArticleCaseRow,
@@ -13,7 +14,7 @@ import type {
   KnowledgeGrantSubject, KnowledgeUsage,
 } from './database.types'
 
-function unwrap<T>(res: { data: T | null; error: unknown }): T {
+function unwrap<T>(res: { data: unknown; error: unknown }): T {
   if (res.error) throw res.error
   return res.data as T
 }
@@ -68,7 +69,7 @@ export const knowledgeService = {
   async updateCategory(id: string, patch: Partial<Pick<KnowledgeCategoryRow, 'name' | 'service_domain_id'>>): Promise<KnowledgeCategoryRow> {
     const next: Record<string, unknown> = { ...patch }
     if (patch.name) next.slug = slugify(patch.name)
-    return unwrap(await supabase.from('knowledge_categories').update(next).eq('id', id).select().single())
+    return unwrap(await supabase.from('knowledge_categories').update(next as Database['public']['Tables']['knowledge_categories']['Update']).eq('id', id).select().single())
   },
 
   async deleteCategory(id: string): Promise<void> {
@@ -151,7 +152,7 @@ export const knowledgeService = {
     if (input.serviceDomainId !== undefined) patch.service_domain_id = input.serviceDomainId
     if (input.visibility !== undefined) patch.visibility = input.visibility
     if (input.tags !== undefined) patch.tags = input.tags
-    return unwrap(await supabase.from('knowledge_articles').update(patch).eq('id', id).select().single())
+    return unwrap(await supabase.from('knowledge_articles').update(patch as Database['public']['Tables']['knowledge_articles']['Update']).eq('id', id).select().single())
   },
 
   // ─── Workflow (RPCs atômicas + auditadas) ───────────────────
@@ -200,9 +201,9 @@ export const knowledgeService = {
   async search(companyId: string, params: { query?: string; domainId?: string; categoryId?: string; limit?: number; offset?: number } = {}): Promise<{ rows: KnowledgeSearchResult[]; total: number }> {
     const rows = unwrap(await supabase.rpc('kb_search_articles', {
       p_company_id: companyId,
-      p_query: params.query ?? null,
-      p_domain_id: params.domainId ?? null,
-      p_category_id: params.categoryId ?? null,
+      p_query: params.query ?? undefined,
+      p_domain_id: params.domainId ?? undefined,
+      p_category_id: params.categoryId ?? undefined,
       p_limit: params.limit ?? 20,
       p_offset: params.offset ?? 0,
     })) as KnowledgeSearchResult[]

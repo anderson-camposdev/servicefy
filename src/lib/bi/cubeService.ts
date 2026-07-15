@@ -8,22 +8,29 @@
 
 import { supabase } from '../supabase'
 import { isProviderTenantId } from '../services'
+import type { Json } from '../database.generated'
 import type {
   BiCubeQuery, BiCubeRow, BiDrilldownRow, BiFilter,
   BiRecordType, BiDateField, BiBacklogTrendPoint,
 } from './types'
 
-/** MSP enxerga todos os tenants quando não há um tenant selecionado. */
-function toServerCompanyId(companyId: string): string | null {
-  return isProviderTenantId(companyId) ? null : companyId
+/**
+ * MSP enxerga todos os tenants quando não há um tenant selecionado.
+ * `p_company_id` não tem DEFAULT nas RPCs bi_* (migrations 063-065), então
+ * o gerador de tipos marca o Args como `string` obrigatório — mas as
+ * funções aceitam NULL explicitamente para o caso cross-tenant do MSP. O
+ * gerador não expõe nullability de parâmetro de RPC, só presença/DEFAULT.
+ */
+function toServerCompanyId(companyId: string): string {
+  return (isProviderTenantId(companyId) ? null : companyId) as unknown as string
 }
 
-function serializeFilters(filters?: BiFilter[]): unknown[] {
+function serializeFilters(filters?: BiFilter[]): Json {
   return (filters ?? []).map(f => ({
     dim: f.dim,
     op: f.op,
     value: Array.isArray(f.value) ? f.value : f.value ?? null,
-  }))
+  })) as unknown as Json
 }
 
 export const cubeService = {
@@ -78,7 +85,7 @@ export const cubeService = {
     const { data, error } = await supabase.rpc('bi_dimension_values', {
       p_company_id: toServerCompanyId(params.companyId),
       p_dimension: params.dimension,
-      p_search: params.search ?? null,
+      p_search: params.search ?? undefined,
       p_record_types: params.recordTypes ?? ['incident', 'request', 'problem', 'change'],
     })
     if (error) throw error

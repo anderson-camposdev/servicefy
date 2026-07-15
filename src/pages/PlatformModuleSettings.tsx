@@ -38,6 +38,30 @@ interface ModuleDef {
   payload: (form: Record<string, FormValue>, companyId: string) => Row
 }
 
+/**
+ * Este módulo é um editor CRUD genérico dirigido por config: `ModuleDef.table`
+ * é escolhido em runtime, não um literal estático — incompatível por
+ * natureza com os overloads de `.from()` do supabase-js tipado (exige um
+ * literal do union de tabelas conhecidas; resolver contra um `string`
+ * genérico dispara "instantiation excessively deep"). Os poucos pontos de
+ * acesso dinâmico deste arquivo usam esta view estrutural mínima da MESMA
+ * instância `supabase` (mesma sessão/auth), sem `any`.
+ */
+interface DynamicTableClient {
+  from(table: string): {
+    select(columns: string): {
+      eq(column: string, value: string): {
+        order(column: string): Promise<{ data: Row[] | null; error: { message: string } | null }>
+      }
+    }
+    insert(payload: Row): Promise<{ error: { message: string } | null }>
+    update(payload: Row): {
+      eq(column: string, value: string): Promise<{ error: { message: string } | null }>
+    }
+  }
+}
+const dynamicTable = supabase as unknown as DynamicTableClient
+
 const defs: Record<Exclude<OperationalModuleKey, 'compliance' | 'licensing' | 'branding' | 'iam' | 'smtp'>, ModuleDef> = {
   domains: {
     title: 'Domínios de serviço', description: 'Separe TI, RH, Jurídico e Facilities com privacidade e ciclo próprios.',
@@ -118,8 +142,8 @@ export default function PlatformModuleSettings({ moduleKey, companyId, activeRol
 
   // States for CMDB Relationships mapping
   const [activeCi, setActiveCi] = useState<Row | null>(null)
-  const [relationships, setRelationships] = useState<any[]>([])
-  const [relTypes, setRelTypes] = useState<any[]>([])
+  const [relationships, setRelationships] = useState<Row[]>([])
+  const [relTypes, setRelTypes] = useState<Row[]>([])
   const [allCis, setAllCis] = useState<Row[]>([])
   const [selectedRelTypeId, setSelectedRelTypeId] = useState('')
   const [selectedTargetCiId, setSelectedTargetCiId] = useState('')
@@ -162,11 +186,17 @@ export default function PlatformModuleSettings({ moduleKey, companyId, activeRol
         setSelectedRelTypeId(types[0].id)
       }
 
+      // configuration_items não tem coluna `active` — o estado é
+      // `lifecycle` (migration 079: planned/active/maintenance/retired/
+      // disposed). Bug pré-existente descoberto ao ligar a tipagem estrita
+      // do client (A1): .eq('active', true) falhava em runtime (coluna
+      // inexistente); a query nunca retornava CIs para o mapeamento de
+      // relacionamentos.
       const { data: cis, error: cisErr } = await supabase
         .from('configuration_items')
         .select('*')
         .eq('company_id', companyId)
-        .eq('active', true)
+        .eq('lifecycle', 'active')
         .order('name')
       if (cisErr) throw cisErr
       setAllCis(cis || [])
@@ -260,7 +290,7 @@ export default function PlatformModuleSettings({ moduleKey, companyId, activeRol
           .eq('id', companyId)
           .single()
         if (companyErr) throw companyErr
-        const companyRow = data as CompanyRow
+        const companyRow = data as unknown as CompanyRow
         setRows([companyRow as unknown as Row])
 
         const config = (companyRow.catalog_ui_config as unknown as CatalogUiConfig | null) ?? {
@@ -288,7 +318,7 @@ export default function PlatformModuleSettings({ moduleKey, companyId, activeRol
           requestEmoji: config.portal_buttons?.request_emoji || '',
         })
       } else {
-        const result = await supabase.from(def!.table).select('*').eq('company_id', companyId).order(def!.order)
+        const result = await dynamicTable.from(def!.table).select('*').eq('company_id', companyId).order(def!.order)
         if (result.error) throw result.error
         setRows(result.data ?? [])
         if (moduleKey === 'ci') {
@@ -324,7 +354,7 @@ export default function PlatformModuleSettings({ moduleKey, companyId, activeRol
     const missing = def.fields.find(field => field.required && !String(form[field.key] ?? '').trim())
     if (missing) { setError(`Informe: ${missing.label}.`); return }
     setSaving(true); setError('')
-    const { error: saveError } = await supabase.from(def.table).insert(def.payload(form, companyId))
+    const { error: saveError } = await dynamicTable.from(def.table).insert(def.payload(form, companyId))
     setSaving(false)
     if (saveError) { setError(saveError.message); return }
     setSuccess('Configuração salva e auditável.'); setForm(def.defaults); await load()
@@ -332,7 +362,7 @@ export default function PlatformModuleSettings({ moduleKey, companyId, activeRol
 
   const toggle = async (row: Row) => {
     if (!def?.activeField) return
-    const { error: updateError } = await supabase.from(def.table).update({ [def.activeField]: !bool(row, def.activeField) }).eq('id', text(row, 'id'))
+    const { error: updateError } = await dynamicTable.from(def.table).update({ [def.activeField]: !bool(row, def.activeField) }).eq('id', text(row, 'id'))
     if (updateError) setError(updateError.message); else await load()
   }
 
@@ -825,8 +855,8 @@ export default function PlatformModuleSettings({ moduleKey, companyId, activeRol
                   >
                     <option value="">Selecione…</option>
                     {relTypes.map(t => (
-                      <option key={t.id} value={t.id}>
-                        {relDirection === 'downstream' ? t.name : t.inverse_name}
+                      <option key={text(t, 'id')} value={text(t, 'id')}>
+                        {relDirection === 'downstream' ? text(t, 'name') : text(t, 'inverse_name')}
                       </option>
                     ))}
                   </select>
@@ -869,23 +899,23 @@ export default function PlatformModuleSettings({ moduleKey, companyId, activeRol
               ) : (
                 <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
                   {relationships.map(rel => {
-                    const isSource = rel.source_ci_id === text(activeCi, 'id')
-                    const relatedCiId = isSource ? rel.target_ci_id : rel.source_ci_id
+                    const isSource = text(rel, 'source_ci_id') === text(activeCi, 'id')
+                    const relatedCiId = isSource ? text(rel, 'target_ci_id') : text(rel, 'source_ci_id')
                     const relatedCi = allCis.find(c => text(c, 'id') === relatedCiId)
-                    const type = relTypes.find(t => t.id === rel.relationship_type_id)
+                    const type = relTypes.find(t => text(t, 'id') === text(rel, 'relationship_type_id'))
                     const relText = type
-                      ? (isSource ? type.name : type.inverse_name)
+                      ? (isSource ? text(type, 'name') : text(type, 'inverse_name'))
                       : 'Conectado a'
 
                     return (
-                      <div key={rel.id} className="flex items-center justify-between p-3 border rounded-xl bg-slate-50 hover:bg-slate-100 transition-colors">
+                      <div key={text(rel, 'id')} className="flex items-center justify-between p-3 border rounded-xl bg-slate-50 hover:bg-slate-100 transition-colors">
                         <div className="text-xs">
                           <span className="font-semibold text-slate-500">Este CI</span>{' '}
                           <span className="font-bold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-100 text-[10px] uppercase tracking-wide">{relText}</span>{' '}
                           <span className="font-bold text-slate-800">{relatedCi ? text(relatedCi, 'name') : 'CI Desconhecido'}</span>
                         </div>
                         <button
-                          onClick={() => void deleteRelationship(rel.id)}
+                          onClick={() => void deleteRelationship(text(rel, 'id'))}
                           className="text-red-500 hover:text-red-700 text-xs font-bold hover:underline transition-colors"
                         >
                           Excluir

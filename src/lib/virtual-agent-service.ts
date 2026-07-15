@@ -6,9 +6,10 @@
 // ============================================================
 
 import { supabase } from './supabase'
+import type { Json } from './database.generated'
 import type { VirtualAgentActionRow, VirtualAgentExecutionRow, VirtualAgentReply } from './database.types'
 
-function unwrap<T>(res: { data: T | null; error: unknown }): T {
+function unwrap<T>(res: { data: unknown; error: unknown }): T {
   if (res.error) throw res.error
   return res.data as T
 }
@@ -87,7 +88,7 @@ export const virtualAgentService = {
   async processMessage(text: string, conversationId?: string | null): Promise<VirtualAgentReply> {
     return unwrap(await supabase.rpc('virtual_agent_process_message', {
       p_text: text,
-      p_conversation_id: conversationId ?? null,
+      p_conversation_id: conversationId ?? undefined,
     }))
   },
 
@@ -108,8 +109,11 @@ export const virtualAgentService = {
     outbound?: string
   }): Promise<string> {
     return unwrap(await supabase.rpc('virtual_agent_triage_sync', {
-      p_conversation_id: input.conversationId ?? null,
-      p_state: input.state,
+      // p_conversation_id não tem DEFAULT (migration 085), mas a função
+      // aceita NULL para o caso "nova conversa" — o gerador de tipos não
+      // expõe nullability de parâmetro de RPC, só presença/DEFAULT.
+      p_conversation_id: (input.conversationId ?? null) as unknown as string,
+      p_state: input.state as unknown as Json,
       p_inbound: input.inbound ?? '',
       p_outbound: input.outbound ?? '',
     }))
@@ -120,7 +124,7 @@ export const virtualAgentService = {
     const { error } = await supabase.rpc('virtual_agent_triage_complete', {
       p_conversation_id: conversationId,
       p_incident_id: incidentId,
-      p_summary: summary,
+      p_summary: summary as unknown as Json,
     })
     if (error) throw error
   },

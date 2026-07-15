@@ -1,5 +1,6 @@
 import { supabase } from './supabase'
 import type { ModuleEntitlementRow } from './database.types'
+import type { Json } from './database.generated'
 import type { ChannelProvider } from './platform-foundation'
 
 export interface SafeConnectionHealth {
@@ -93,7 +94,7 @@ export const platformAdminService = {
     if (connectionsResult.error) throw connectionsResult.error
 
     return {
-      entitlements: entitlementsResult.data ?? [],
+      entitlements: (entitlementsResult.data ?? []) as unknown as ModuleEntitlementRow[],
       connections: (connectionsResult.data ?? []).map(row => ({
         id: row.id,
         provider: row.provider,
@@ -120,16 +121,20 @@ export const platformAdminService = {
     return data ?? []
   },
   async saveConnection(input: SaveConnectionInput) {
+    // p_connection_id/p_address não têm DEFAULT (migration de channel
+    // connections), mas a RPC aceita NULL explicitamente (conexão nova /
+    // provider sem endereço) — o gerador de tipos não expõe nullability de
+    // parâmetro de RPC, só presença/DEFAULT.
     const { data, error } = await supabase.rpc('save_channel_connection', {
       p_company_id: input.companyId,
-      p_connection_id: input.connectionId ?? null,
+      p_connection_id: (input.connectionId ?? null) as unknown as string,
       p_scope: input.scope,
       p_provider: input.provider,
       p_name: input.name,
-      p_address: input.address ?? null,
+      p_address: (input.address ?? null) as unknown as string,
       p_enabled: input.enabled,
-      p_config: input.config ?? {},
-      p_secret: input.secret ?? null,
+      p_config: (input.config ?? {}) as Json,
+      p_secret: input.secret ?? undefined,
     })
     if (error) throw error
     return data
@@ -203,7 +208,7 @@ export const platformAdminService = {
     const { error } = await supabase.rpc('resolve_channel_triage', {
       p_id: id,
       p_action: action,
-      p_target_company_id: targetCompanyId,
+      p_target_company_id: targetCompanyId ?? undefined,
     })
     if (error) throw error
   },
