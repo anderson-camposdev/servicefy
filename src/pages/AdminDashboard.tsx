@@ -370,7 +370,6 @@ export default function AdminDashboard({ refetchAppData, currentCompany, activeT
   const [tenantWelcomeTitle, _setTenantWelcomeTitle] = useState('Central de Serviços')
   const [tenantWelcomeSubtitle, _setTenantWelcomeSubtitle] = useState('Como podemos te ajudar hoje?')
   const [tenantLocalLogin, _setTenantLocalLogin] = useState(true)
-  const [tenantSchema, setTenantSchema] = useState('')
   const [tenantSaving, setTenantSaving] = useState(false)
   // States for tenant edition
   const [editingTenant, setEditingTenant] = useState<CompanyRow | null>(null)
@@ -403,13 +402,11 @@ export default function AdminDashboard({ refetchAppData, currentCompany, activeT
         welcome_subtitle: tenantWelcomeSubtitle,
         allow_local_login: tenantLocalLogin,
       }
-      if (tenantSchema) payload.schema_name = tenantSchema
       await companiesService.create(payload)
       alert('Empresa provisionada com sucesso!')
       setTenantName('')
       setTenantDomain('')
       setTenantLogo('')
-      setTenantSchema('')
       if (refetchAppData) await refetchAppData()
     } catch (err: any) {
       alert('Erro ao criar empresa: ' + err.message)
@@ -494,7 +491,7 @@ export default function AdminDashboard({ refetchAppData, currentCompany, activeT
                     <img src={c.logo_url || ''} className="w-8 h-8 rounded-lg" alt={c.name} />
                     <div>
                       <div className="text-xs font-bold text-slate-800">{c.name}</div>
-                      <div className="text-[10px] text-slate-400 font-mono">{c.domain} · Schema: {c.schema_name || 'public'}</div>
+                      <div className="text-[10px] text-slate-400 font-mono">{c.domain}</div>
                     </div>
                   </div>
                   <div className="flex items-center gap-4">
@@ -565,10 +562,6 @@ export default function AdminDashboard({ refetchAppData, currentCompany, activeT
                   <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Cor Secundária</label>
                   <input required type="text" value={tenantAccent} onChange={e => setTenantAccent(e.target.value)} className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-700 bg-white" />
                 </div>
-              </div>
-              <div>
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Instância DB Schema (Postgres)</label>
-                <input type="text" value={tenantSchema} onChange={e => setTenantSchema(e.target.value)} className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-700 bg-white" placeholder="ex: tenant_globex (deixe em branco para public)" />
               </div>
               <button type="submit" disabled={tenantSaving} className="w-full py-2.5 rounded-xl bg-slate-800 text-white font-bold text-xs mt-3 disabled:opacity-50">
                 {tenantSaving ? 'Salvando...' : 'Onboard Company'}
@@ -736,15 +729,6 @@ export default function AdminDashboard({ refetchAppData, currentCompany, activeT
                           required type="text" value={editingTenant.domain} 
                           onChange={e => setEditingTenant({ ...editingTenant, domain: e.target.value })} 
                           className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-700 bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all shadow-sm" 
-                        />
-                      </div>
-                      <div className="md:col-span-2">
-                        <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Esquema do Banco (Schema)</label>
-                        <input 
-                          type="text" value={editingTenant.schema_name || ''} 
-                          onChange={e => setEditingTenant({ ...editingTenant, schema_name: e.target.value || null })} 
-                          className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-700 bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all shadow-sm" 
-                          placeholder="public"
                         />
                       </div>
                     </div>

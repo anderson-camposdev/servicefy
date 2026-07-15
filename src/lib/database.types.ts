@@ -49,7 +49,6 @@ export interface CompanyRow {
   sso_providers: Json
   created_at: string
   updated_at: string
-  schema_name: string | null
   // Motor de SLA: calendário útil padrão do cliente (migration 032)
   default_sla_calendar_id: string | null
   // Licenças Concorrentes

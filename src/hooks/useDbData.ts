@@ -10,7 +10,6 @@ import {
   profilesService,
   problemsService,
   changesService,
-  setCompanySchemas,
   setProviderTenantIds,
   assignmentGroupsService,
   departmentsService,
@@ -60,15 +59,6 @@ export function useAppData() {
         setProfiles(profs)
         setGroups(grps)
         setDepartments(depts)
-
-        // Registry schemas
-        const mapping: Record<string, string> = {}
-        comps.forEach(c => {
-          if (c.schema_name) {
-            mapping[c.id] = c.schema_name
-          }
-        })
-        setCompanySchemas(mapping)
         setProviderTenantIds(comps.filter(c => c.is_provider_tenant).map(c => c.id))
       })
       .catch(err => {

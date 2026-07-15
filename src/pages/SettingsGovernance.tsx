@@ -111,7 +111,6 @@ export default function SettingsGovernance({ companyId, activeRole, startInDetai
           },
           createdAt: currentCompanyRow.created_at,
           active: currentCompanyRow.active,
-          schemaName: currentCompanyRow.schema_name ?? undefined,
           concurrentLicenses: 10,
           licensePlan: 'enterprise' as const,
         }

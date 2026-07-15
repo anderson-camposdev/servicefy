@@ -83,7 +83,6 @@ export interface Company {
   authConfig: AuthConfig;
   createdAt: string;
   active: boolean;
-  schemaName?: string;    // Isolamento multi-instance (ex: tenant_acme)
   // Licenças Concorrentes
   concurrentLicenses: number;
   licensePlan: 'starter' | 'professional' | 'enterprise';

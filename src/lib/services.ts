@@ -1,10 +1,9 @@
 // ============================================================
 // ServiceFY ITSM — Supabase Data Services
 // All CRUD + real-time subscriptions for ITIL modules
-// Supports PostgreSQL schema-based tenant isolation & views
+// Multi-tenant isolation is enforced by RLS (company_id-scoped policies).
 // ============================================================
 
-import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import { supabase } from './supabase'
 import type { Database, Json } from './database.generated'
 import type {
@@ -24,22 +23,6 @@ import type {
   TicketMacroRow,
 } from './database.types'
 
-const url  = import.meta.env.VITE_SUPABASE_URL  as string
-const key  = import.meta.env.VITE_SUPABASE_ANON_KEY as string
-
-// Dynamic schema clients cache to avoid recreating them constantly
-const schemaClientsCache: Record<string, SupabaseClient<Database>> = {}
-
-// Registro dinâmico companyId → schemaName do PostgreSQL.
-// Alimentado em runtime por setCompanySchemas() (ver useAppData).
-// Empresas ausentes do mapa usam o schema 'public' por padrão, de
-// modo que novos tenants provisionados funcionam automaticamente.
-let companySchemaMap: Record<string, string> = {}
-
-export const setCompanySchemas = (mapping: Record<string, string>) => {
-  companySchemaMap = { ...companySchemaMap, ...mapping }
-}
-
 // Conjunto dinâmico de company_id que são tenants provedores (MSP).
 // Alimentado em runtime por setProviderTenantIds() (ver useAppData) a
 // partir de companies.is_provider_tenant — mesma fonte de verdade já
@@ -54,38 +37,12 @@ export const setProviderTenantIds = (ids: Iterable<string>) => {
 
 export const isProviderTenantId = (companyId: string): boolean => providerTenantIds.has(companyId)
 
-// Schemas reservados do Supabase que nunca devem ser usados como schema de tenant.
-const RESERVED_SCHEMAS = new Set(['auth', 'storage', 'extensions', 'graphql', 'graphql_public', 'realtime', 'supabase_functions', 'vault'])
-const SCHEMA_NAME_RE = /^[a-z][a-z0-9_]{0,62}$/
-
-export function getSupabaseForSchema(schemaName?: string | null) {
-  if (!schemaName || schemaName === 'public') {
-    return supabase
-  }
-  if (!SCHEMA_NAME_RE.test(schemaName) || RESERVED_SCHEMAS.has(schemaName)) {
-    console.error(`[security] Schema inválido ou reservado ignorado: "${schemaName}"`)
-    return supabase
-  }
-  if (!schemaClientsCache[schemaName]) {
-    // O nome do schema só é conhecido em runtime (é o schema PostgreSQL do
-    // tenant, resolvido via companySchemaMap) — o generic SchemaName do
-    // supabase-js exige um literal estático, então este cast pontual é
-    // inerente ao padrão de isolamento por schema dinâmico, não tipagem
-    // frouxa: as linhas/colunas retornadas por .from() neste client ainda
-    // são checadas contra o shape do schema 'public' em Database (mesma
-    // estrutura de tabelas é replicada em cada schema de tenant).
-    schemaClientsCache[schemaName] = createClient<Database>(url, key, {
-      db: { schema: schemaName as 'public' },
-      auth: { persistSession: false, autoRefreshToken: false }
-    })
-  }
-  return schemaClientsCache[schemaName]
-}
-
-const getClientForCompany = (companyId: string) => {
-  const schema = companySchemaMap[companyId]
-  return getSupabaseForSchema(schema)
-}
+// Isolamento multi-tenant é feito inteiramente via RLS (company_id =
+// get_current_user_company_id() em toda policy) — nunca existiu um schema
+// Postgres por tenant (nenhuma migration jamais criou companies.schema_name).
+// getClientForCompany() existe só para manter os ~46 call sites abaixo
+// estáveis; sempre retorna o client único.
+const getClientForCompany = (_companyId: string) => supabase
 
 // ─── Generic error helper ─────────────────────────────────────
 
@@ -792,7 +749,7 @@ export const incidentsService = {
     onUpdate: (row: IncidentRow) => void,
     callerId?: string,
   ) {
-    const schema = companySchemaMap[companyId] || 'public'
+    const schema = 'public'
     const isMSP = isProviderTenantId(companyId)
     const channelName = callerId ? `incidents:caller:${callerId}` : isMSP ? 'incidents:msp' : `incidents:${companyId}`
     const callerFilter = callerId ? `caller_id=eq.${callerId}` : null
@@ -824,7 +781,7 @@ export const incidentsService = {
 
   /** Subscribe to history changes for an incident */
   subscribeToHistory(incidentId: string, companyId: string, onInsert: (row: IncidentHistoryRow) => void) {
-    const schema = companySchemaMap[companyId] || 'public'
+    const schema = 'public'
     return getClientForCompany(companyId)
       .channel(`incident_history:${incidentId}`)
       .on(
