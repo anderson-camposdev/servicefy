@@ -26,14 +26,28 @@ export default function MacroDropdown({ companyId, ticketId, onApplied, onError,
   const [applyingId, setApplyingId] = useState<string | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
 
+  const callbacksRef = useRef({ onApplied, onError, onSuccess })
   useEffect(() => {
+    callbacksRef.current = { onApplied, onError, onSuccess }
+  })
+
+  useEffect(() => {
+    if (!companyId || companyId.trim() === '') {
+      setLoading(false)
+      return
+    }
     let cancelled = false
+    setLoading(true)
     ticketMacrosService.list(companyId)
       .then(rows => { if (!cancelled) setMacros(rows) })
-      .catch(err => { if (!cancelled) onError(err instanceof Error ? err.message : 'Falha ao carregar macros.') })
+      .catch(err => { 
+        if (!cancelled) {
+          callbacksRef.current.onError(err instanceof Error ? err.message : 'Falha ao carregar macros.')
+        }
+      })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
-  }, [companyId, onError])
+  }, [companyId])
 
   useEffect(() => {
     if (!open) return
