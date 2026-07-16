@@ -1,12 +1,13 @@
 import { lazy, Suspense, useState, useMemo, useEffect } from 'react'
 import { Plus, Settings, ShieldAlert, ClipboardList, AlertOctagon, RefreshCw, Home, BarChart3, CircleCheckBig, TrendingUp, Code2 } from 'lucide-react'
-import { useToast } from './context'
+import { useBranding, useToast } from './context'
 import type { AppView, User, Company, Role } from './types'
 import { mockApiEndpoints } from './services/appMocks'
 import { useIncidents } from './hooks/useIncidents'
 import { useAppData, useProblems, useChanges } from './hooks/useDbData'
 import { useRealtimeNotifications } from './hooks/useRealtimeNotifications'
 import GlobalSearchSpotlight from './components/portal/GlobalSearchSpotlight'
+import Login from './pages/auth/Login'
 import { usePersistentState } from './hooks/usePersistentState'
 import type { ProblemRow, CompanyRow, ProfileRow, TicketPriority, IncidentCategory } from './lib/database.types'
 import { incidentsService, cioService, problemsService } from './lib/services'
@@ -15,7 +16,6 @@ import { useTenant } from './tenant'
 import { setTenantOverride } from './tenant/resolveTenant'
 import { useAuth } from './auth'
 const UserPortalLayout = lazy(() => import('./pages/UserPortalLayout'))
-const AdminPortalSettings = lazy(() => import('./pages/AdminPortalSettings'))
 const AnalystCockpit = lazy(() => import('./pages/AnalystCockpit'))
 const TicketManagementDashboard = lazy(() => import('./pages/TicketManagementDashboard'))
 const WorkspaceLayout = lazy(() => import('./pages/WorkspaceLayout'))
@@ -78,6 +78,7 @@ const mapCompany = (row: CompanyRow): Company => {
     maxAnalystsLicenses: row.max_analysts_licenses ?? 3,
     branding: {
       logoUrl: row.logo_url ?? undefined,
+      backgroundUrl: row.background_url ?? undefined,
       primaryColor: row.primary_color,
       secondaryColor: row.secondary_color ?? row.accent_color,
       brandName: row.brand_name ?? row.name,
@@ -264,7 +265,8 @@ function Modal({ title, subtitle, onClose, children, wide = false }: { title: st
 // ─── LOGIN SCREEN ─────────────────────────────────────────────
 
 function LoginScreen() {
-  const { branding, tenant, status: tenantStatus } = useTenant()
+  const { branding } = useBranding()
+  const { status: tenantStatus } = useTenant()
   const { signIn, status: authStatus, error: authError } = useAuth()
 
   const [email, setEmail] = useState('')
@@ -272,11 +274,11 @@ function LoginScreen() {
   const [localError, setLocalError] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
-  const brandColor = branding.primaryColor
+  const brandColor = 'var(--brand-primary)'
   const brandLogo =
     branding.logoUrl ||
     'https://ui-avatars.com/api/?name=ServiceFY&background=10b981&color=fff&size=64&bold=true'
-  const brandName = tenant?.name || branding.name
+  const brandName = branding.name
   const welcomeTitle = branding.welcomeTitle
   const welcomeSubtitle = branding.welcomeSubtitle
 
@@ -300,6 +302,9 @@ function LoginScreen() {
 
   const errorMessage = localError || authError
 
+  return <Login />
+
+  // Mantido abaixo apenas até o histórico desta tela ser removido em uma limpeza mecânica.
   return (
     <div 
       className="min-h-screen flex items-center justify-center p-6 relative" 
@@ -1016,7 +1021,6 @@ export default function App() {
   if (import.meta.env.DEV) {
     const previewMode = new URLSearchParams(window.location.search).get('preview')
     if (previewMode === 'portal')    return <LazyBoundary><UserPortalLayout companyId={currentCompany?.id} /></LazyBoundary>
-    if (previewMode === 'admin')     return <LazyBoundary><AdminPortalSettings /></LazyBoundary>
     if (previewMode === 'cockpit')   return <LazyBoundary><AnalystCockpit /></LazyBoundary>
     if (previewMode === 'tickets')   return <LazyBoundary><TicketManagementDashboard /></LazyBoundary>
     if (previewMode === 'workspace') return <LazyBoundary><div className="h-screen"><WorkspaceLayout /></div></LazyBoundary>
@@ -1188,7 +1192,7 @@ export default function App() {
     if (activeView === 'analytics_executive') return <AnalyticsDashboard />
     if (activeView === 'developer_settings') return <DeveloperSettings companyId={currentCompany.id} />
     if (activeView === 'api_docs') return isConfigEligible ? <ApiDocs /> : <WorkspaceLayout companyId={currentCompany.id} isProvider={isProvider} companies={companies} />
-    if (activeView === 'flowfy_bi') return <BiApp companyId={currentCompany.id} themeName={(currentCompany as any).primary_color} />
+    if (activeView === 'flowfy_bi') return <BiApp companyId={currentCompany.id} themeName={currentCompany.branding.primaryColor ?? undefined} />
     if (activeView === 'workflow_builder') return isConfigEligible ? <WorkflowBuilder companyId={currentCompany.id} /> : <WorkspaceLayout companyId={currentCompany.id} isProvider={isProvider} companies={companies} />
 
     return <WorkspaceLayout companyId={currentCompany.id} isProvider={isProvider} companies={companies} />
@@ -1200,10 +1204,14 @@ export default function App() {
       <header className="sticky top-0 z-40 shrink-0 bg-surface border-b border-outline-variant shadow-sm px-3 sm:px-4 lg:px-6 py-3 flex items-center gap-2 lg:gap-3 min-w-0">
         {/* Logo */}
         <div className="flex items-center gap-2.5 shrink-0">
-          <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-emerald-500 to-teal-400 flex items-center justify-center shadow-md shadow-emerald-500/25">
-            <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+          <div className="w-8 h-8 rounded-xl flex items-center justify-center shadow-md overflow-hidden" style={{ background: 'var(--brand-primary)' }}>
+            {currentCompany.branding.logoUrl ? (
+              <img src={currentCompany.branding.logoUrl} alt="" className="w-full h-full object-contain bg-white" />
+            ) : (
+              <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+            )}
           </div>
-          <span className="text-lg font-black tracking-tight text-on-surface hidden sm:block">ServiceFY</span>
+          <span className="text-lg font-black tracking-tight text-on-surface hidden sm:block">{currentCompany.branding.brandName || currentCompany.name}</span>
           <span className="text-[9px] text-on-surface-variant uppercase font-bold tracking-widest hidden sm:block">ITSM</span>
         </div>
 

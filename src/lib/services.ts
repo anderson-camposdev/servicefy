@@ -93,7 +93,7 @@ export const companiesService = {
    * same tenant always overwrite the previous file rather than accumulating
    * orphaned objects in storage.
    *
-   * Path format: `brands/{companyId}/{assetType}.{ext}`
+   * Path format: `brands/{companyId}/{assetType}`
    *
    * @param companyId - The tenant's UUID (used to scope the storage path).
    * @param file      - The File selected by the user.
@@ -121,7 +121,18 @@ export const companiesService = {
       .from('branding_assets')
       .getPublicUrl(path)
 
-    return data.publicUrl
+    return `${data.publicUrl}?v=${Date.now()}`
+  },
+
+  async removeBrandAsset(
+    companyId: string,
+    assetType: 'logo' | 'background',
+  ): Promise<void> {
+    const path = buildBrandAssetPath(companyId, assetType, '')
+    const { error } = await supabase.storage
+      .from('branding_assets')
+      .remove([path])
+    if (error) throw new Error(`Remoção falhou: ${error.message}`)
   },
 
   /**
@@ -164,21 +175,25 @@ export const companiesService = {
       },
     }
 
-    const payload: Partial<CompanyRow> = {
+    const payload = {
       primary_color:    settings.themeName,
       title_size:       settings.fontScale,
       logo_url:         settings.logoUrl,
       background_url:   settings.backgroundUrl,
       brand_name:       settings.brandName,
-      welcome_title:    settings.welcomeTitle ?? undefined,
-      welcome_subtitle: settings.welcomeSubtitle ?? undefined,
-      bg_color:         settings.loginBackground ?? '',
+      welcome_title:    settings.welcomeTitle,
+      welcome_subtitle: settings.welcomeSubtitle,
+      bg_color:         settings.loginBackground,
       greeting_prefix:  settings.greetingPrefix,
       greeting_color:   settings.greetingColor,
       catalog_ui_config: updatedConfig as unknown as import('./database.types').Json,
     }
 
-    return this.update(companyId, payload)
+    const { data, error } = await supabase.rpc('update_company_branding', {
+      p_company_id: companyId,
+      p_settings: payload,
+    })
+    return throwIfError<CompanyRow>(data, error)
   },
 }
 

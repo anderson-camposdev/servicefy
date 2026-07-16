@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { useTenant } from '../tenant'
 import { useAuth } from '../auth'
+import { useBranding } from '../theme/ThemeProvider'
 import { incidentsService, serviceCatalogService, departmentsService, csatService } from '../lib/services'
 import { priorityString } from '../lib/priority'
 import { STATE_LABELS_PT } from '../lib/statusLabels'
@@ -381,12 +382,14 @@ function HomeContent({ config, brand, brandWash: _brandWash, brandBorder: _brand
 // de um admin MSP). Sem ele, cai para a empresa do próprio perfil logado — o
 // comportamento padrão para um usuário final normal.
 const UserPortalLayout = ({ companyId }: { companyId?: string } = {}) => {
-  const { branding, tenant } = useTenant()
+  const { tenant } = useTenant()
+  const { branding, company: brandedCompany } = useBranding()
   const { profile } = useAuth()
-  const catalogCompanyId = companyId || profile?.company_id || tenant?.id
+  const effectiveCompany = brandedCompany ?? tenant
+  const catalogCompanyId = companyId || profile?.company_id || effectiveCompany?.id
 
-  const LOGO_KEY   = `servicefy-portal-logo-${tenant?.id || 'default'}`
-  const CONFIG_KEY = `servicefy-portal-config-${tenant?.id || 'default'}`
+  const LOGO_KEY   = `servicefy-portal-logo-${effectiveCompany?.id || 'default'}`
+  const CONFIG_KEY = `servicefy-portal-config-${effectiveCompany?.id || 'default'}`
 
   const [logoDataUrl, setLogoDataUrl] = useState<string | null>(null)
   const logoInputRef = useRef<HTMLInputElement>(null)
@@ -403,7 +406,7 @@ const UserPortalLayout = ({ companyId }: { companyId?: string } = {}) => {
     }
     return {
       ...DEFAULT_CONFIG,
-      companyName: tenant?.name || branding.name || DEFAULT_CONFIG.companyName,
+      companyName: branding.name || DEFAULT_CONFIG.companyName,
     }
   })
 
@@ -588,7 +591,7 @@ const UserPortalLayout = ({ companyId }: { companyId?: string } = {}) => {
   const navActiveBg = sb.navActiveBg
 
   // ── Card settings (Global Catalog Styles) ──────────────────────────────────
-  const cardSettings = (tenant?.catalog_ui_config as any)?.card_settings || {}
+  const cardSettings = (effectiveCompany?.catalog_ui_config as any)?.card_settings || {}
 
   const getIconSize = () => {
     switch (cardSettings.icon_size) {
@@ -1109,7 +1112,7 @@ const UserPortalLayout = ({ companyId }: { companyId?: string } = {}) => {
               departments={departments}
               onSelectDept={handleSelectDept}
               cardSettings={cardSettings}
-              portalButtons={(tenant?.catalog_ui_config as any)?.portal_buttons}
+              portalButtons={(effectiveCompany?.catalog_ui_config as any)?.portal_buttons}
               themeName={branding.themeName}
             />
           </div>
@@ -1442,7 +1445,7 @@ const UserPortalLayout = ({ companyId }: { companyId?: string } = {}) => {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                   {[
                     { label: 'Solicitante', value: selectedTicket.caller_name || 'Root Allied IT' },
-                    { label: 'Empresa', value: tenant?.name || 'Alpha Tech' },
+                    { label: 'Empresa', value: branding.name },
                     { label: 'Abertura', value: fmtDateTime(selectedTicket.created_at) },
                     { label: 'Tipo', value: selectedTicket.ticket_type === 'incident' ? 'Incidente' : 'Requisição' },
                     { label: 'Prioridade', value: selectedTicket.priority || '—' },

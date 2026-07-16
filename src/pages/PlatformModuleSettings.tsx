@@ -12,6 +12,8 @@ import { SmtpSettingsForm } from '../components/portal/SmtpSettingsForm'
 import { EmailDeliveryPolicyForm } from '../components/portal/EmailDeliveryPolicyForm'
 import { EmailDeliveryHistoryTable } from '../components/portal/EmailDeliveryHistoryTable'
 import { useTenantFeatureAccess } from '../hooks/useTenantFeatureAccess'
+import { useAuth } from '../auth'
+import { useTenant } from '../tenant'
 
 export type OperationalModuleKey = 'domains' | 'macros' | 'templates' | 'ci' | 'compliance' | 'licensing' | 'branding' | 'iam' | 'smtp'
 
@@ -115,6 +117,8 @@ const text = (row: Row, key: string) => typeof row[key] === 'string' ? row[key] 
 const bool = (row: Row, key: string) => row[key] === true
 
 export default function PlatformModuleSettings({ moduleKey, companyId, activeRole, onBack }: Props) {
+  const { company: authenticatedCompany, refreshCompany } = useAuth()
+  const { tenant: resolvedTenant, refreshTenant } = useTenant()
   const def = (moduleKey === 'compliance' || moduleKey === 'licensing' || moduleKey === 'branding' || moduleKey === 'iam' || moduleKey === 'smtp')
     ? null
     : defs[moduleKey as Exclude<OperationalModuleKey, 'compliance' | 'licensing' | 'branding' | 'iam' | 'smtp'>]
@@ -475,6 +479,12 @@ export default function PlatformModuleSettings({ moduleKey, companyId, activeRol
       }
 
       const updatedCompany = await companiesService.updateBrandingSettings(companyId, settings, existingConfig)
+      const removals: Promise<void>[] = []
+      if (companyRow?.logo_url && !settings.logoUrl) removals.push(companiesService.removeBrandAsset(companyId, 'logo'))
+      if (companyRow?.background_url && !settings.backgroundUrl) removals.push(companiesService.removeBrandAsset(companyId, 'background'))
+      await Promise.all(removals)
+      if (authenticatedCompany?.id === companyId) await refreshCompany()
+      if (resolvedTenant?.id === companyId) await refreshTenant()
       setRows([updatedCompany as unknown as Row])
       setSuccess('Identidade visual e configurações de marca atualizadas!')
     } catch (err: any) {
@@ -565,7 +575,7 @@ export default function PlatformModuleSettings({ moduleKey, companyId, activeRol
                       >
                         {logoUploading ? 'Enviando…' : 'Trocar logotipo'}
                       </button>
-                      <input ref={logoInputRef} type="file" accept="image/png,image/jpeg,image/jpg,image/svg+xml,image/webp" className="hidden" onChange={handleLogoChange} />
+                      <input ref={logoInputRef} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={handleLogoChange} />
                     </div>
                   ) : (
                     <div
@@ -581,17 +591,17 @@ export default function PlatformModuleSettings({ moduleKey, companyId, activeRol
                         <>
                           <Upload className="w-6 h-6 text-slate-400" />
                           <span className="text-sm font-semibold text-slate-600">Selecione o logotipo</span>
-                          <span className="text-xs text-slate-400">PNG, JPG, SVG, WebP · Máx 2 MB</span>
+                          <span className="text-xs text-slate-400">PNG, JPG ou WebP · Máx 2 MB</span>
                         </>
                       )}
-                      <input ref={logoInputRef} type="file" accept="image/png,image/jpeg,image/jpg,image/svg+xml,image/webp" className="hidden" onChange={handleLogoChange} />
+                      <input ref={logoInputRef} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={handleLogoChange} />
                     </div>
                   )}
                 </div>
 
                 {/* Upload Background */}
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Imagem de Fundo do Portal</label>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Imagem de Fundo do Login e Portal</label>
                   {form.backgroundUrl ? (
                     <div className="space-y-2">
                       <div className="relative rounded-xl overflow-hidden h-28 border border-slate-200">
@@ -615,7 +625,7 @@ export default function PlatformModuleSettings({ moduleKey, companyId, activeRol
                       >
                         {bgUploading ? 'Enviando…' : 'Trocar imagem de fundo'}
                       </button>
-                      <input ref={bgInputRef} type="file" accept="image/png,image/jpeg,image/jpg,image/svg+xml,image/webp" className="hidden" onChange={handleBgChange} />
+                      <input ref={bgInputRef} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={handleBgChange} />
                     </div>
                   ) : (
                     <div
@@ -631,10 +641,10 @@ export default function PlatformModuleSettings({ moduleKey, companyId, activeRol
                         <>
                           <Upload className="w-6 h-6 text-slate-400" />
                           <span className="text-sm font-semibold text-slate-600">Selecione imagem de fundo</span>
-                          <span className="text-xs text-slate-400">PNG, JPG, SVG, WebP · Máx 2 MB</span>
+                          <span className="text-xs text-slate-400">PNG, JPG ou WebP · Máx 2 MB</span>
                         </>
                       )}
-                      <input ref={bgInputRef} type="file" accept="image/png,image/jpeg,image/jpg,image/svg+xml,image/webp" className="hidden" onChange={handleBgChange} />
+                      <input ref={bgInputRef} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={handleBgChange} />
                     </div>
                   )}
                 </div>

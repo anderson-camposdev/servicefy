@@ -62,6 +62,16 @@ export interface CompanyRow {
   max_analysts_licenses: number
 }
 
+export interface CompanyLoginDomainRow {
+  id: string
+  company_id: string
+  domain: string
+  is_primary: boolean
+  verified_at: string | null
+  created_at: string
+  updated_at: string
+}
+
 export interface ProfileRow {
   id: string
   auth_id: string | null

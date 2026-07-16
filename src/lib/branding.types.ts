@@ -17,8 +17,6 @@ export const BRANDING_MAX_FILE_SIZE_BYTES = 2 * 1024 * 1024
 export const BRANDING_ALLOWED_MIME_TYPES = [
   'image/png',
   'image/jpeg',
-  'image/jpg',
-  'image/svg+xml',
   'image/webp',
 ] as const
 
@@ -148,7 +146,7 @@ export function validateBrandingFile(file: File): FileValidationResult {
   if (!isAllowedType) {
     return {
       valid: false,
-      error: `Formato inválido. Formatos aceitos: PNG, JPG, SVG, WebP. Recebido: "${file.type || 'desconhecido'}".`,
+      error: `Formato inválido. Formatos aceitos: PNG, JPG e WebP. Recebido: "${file.type || 'desconhecido'}".`,
     }
   }
 
@@ -161,24 +159,16 @@ export function validateBrandingFile(file: File): FileValidationResult {
  * Returns the deterministic Supabase Storage path for a brand asset,
  * ensuring idempotent uploads (upsert always replaces the previous file).
  *
- * Path format: `brands/{companyId}/{assetType}.{ext}`
+ * Path format: `brands/{companyId}/{assetType}`
  *
  * @param companyId  - The tenant's UUID.
  * @param assetType  - `'logo'` or `'background'`.
- * @param mimeType   - MIME type used to derive the file extension.
+ * @param mimeType   - Kept for source compatibility; the path is extensionless.
  */
 export function buildBrandAssetPath(
   companyId: string,
   assetType: 'logo' | 'background',
-  mimeType: string,
+  _mimeType: string,
 ): string {
-  const extMap: Record<string, string> = {
-    'image/png':     'png',
-    'image/jpeg':    'jpg',
-    'image/jpg':     'jpg',
-    'image/svg+xml': 'svg',
-    'image/webp':    'webp',
-  }
-  const ext = extMap[mimeType] ?? 'png'
-  return `brands/${companyId}/${assetType}.${ext}`
+  return `brands/${companyId}/${assetType}`
 }

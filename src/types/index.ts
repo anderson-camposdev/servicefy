@@ -50,6 +50,7 @@ export interface CompanyBranding {
   themeName?: string; // ex: 'Ocean', 'Midnight'
   fontScale?: string; // ex: 'compact', 'standard', 'large', 'display'
   logoUrl?: string;
+  backgroundUrl?: string;
   brandName?: string;     // nome de exibição customizado da marca
   welcomeTitle?: string;
   welcomeSubtitle?: string;

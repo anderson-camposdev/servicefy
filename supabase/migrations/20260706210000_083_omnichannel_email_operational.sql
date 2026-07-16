@@ -2,7 +2,7 @@
 -- e vínculo idempotente entre mensagens de canal e o histórico do chamado.
 
 ALTER TABLE public.channel_messages
-  ADD COLUMN IF NOT EXISTS ticket_message_id bigint
+  ADD COLUMN IF NOT EXISTS ticket_message_id uuid
   REFERENCES public.ticket_messages(id) ON DELETE SET NULL;
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_channel_messages_ticket_message

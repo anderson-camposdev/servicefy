@@ -8,17 +8,13 @@
 // imediato e atualiza quando o tenant carrega.
 // ============================================================
 
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { CompanyRow } from '../lib/database.types'
 import { resolveTenant } from './resolveTenant'
 import type { TenantSource } from './resolveTenant'
 import { getTenantBySlug } from './tenantService'
-import {
-  applyBranding,
-  brandingFromCompany,
-  DEFAULT_BRANDING,
-} from './applyBranding'
+import { brandingFromCompany, DEFAULT_BRANDING } from './applyBranding'
 import type { TenantBranding } from './applyBranding'
 
 /** Estado do carregamento do tenant. */
@@ -41,14 +37,18 @@ export interface TenantContextValue {
   branding: TenantBranding
   /** Mensagem de erro, quando status === 'error'. */
   error: string | null
+  /** Recarrega os dados visuais do tenant resolvido sem reload da SPA. */
+  refreshTenant: () => Promise<void>
 }
+
+type TenantState = Omit<TenantContextValue, 'refreshTenant'>
 
 const TenantContext = createContext<TenantContextValue | undefined>(undefined)
 
 export function TenantProvider({ children }: { children: ReactNode }) {
   // Resolução do slug é síncrona — inicializa o estado de forma lazy
   // (evita setState síncrono dentro do efeito / cascata de renders).
-  const [state, setState] = useState<TenantContextValue>(() => {
+  const [state, setState] = useState<TenantState>(() => {
     const { slug, source } = resolveTenant()
     return {
       status: slug ? 'loading' : 'no-tenant',
@@ -60,10 +60,23 @@ export function TenantProvider({ children }: { children: ReactNode }) {
     }
   })
 
-  useEffect(() => {
-    // Primeiro paint com o branding padrão (evita "flash" sem marca).
-    applyBranding(DEFAULT_BRANDING)
+  const refreshTenant = useCallback(async () => {
+    if (!state.slug) return
+    const row = await getTenantBySlug(state.slug)
+    if (!row) {
+      setState(prev => ({ ...prev, status: 'not-found', tenant: null, branding: DEFAULT_BRANDING }))
+      return
+    }
+    setState(prev => ({
+      ...prev,
+      status: 'ready',
+      tenant: row,
+      branding: brandingFromCompany(row),
+      error: null,
+    }))
+  }, [state.slug])
 
+  useEffect(() => {
     if (!state.slug) return
 
     let cancelled = false
@@ -75,7 +88,6 @@ export function TenantProvider({ children }: { children: ReactNode }) {
           return
         }
         const branding = brandingFromCompany(row)
-        applyBranding(branding)
         setState(prev => ({ ...prev, status: 'ready', tenant: row, branding }))
       })
       .catch((err: unknown) => {
@@ -92,7 +104,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
     }
   }, [state.slug])
 
-  return <TenantContext.Provider value={state}>{children}</TenantContext.Provider>
+  return <TenantContext.Provider value={{ ...state, refreshTenant }}>{children}</TenantContext.Provider>
 }
 
 /** Hook de acesso ao tenant atual. Lança se usado fora do provider. */

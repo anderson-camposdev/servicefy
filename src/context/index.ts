@@ -17,8 +17,6 @@ export {
 
 export {
   ThemeProvider,
-  useTheme,
-  THEME_PRESETS,
-  type ThemeColors,
-  type ThemePreset,
-} from './ThemeContext'
+  useBranding,
+  type BrandingContextValue,
+} from '../theme/ThemeProvider'

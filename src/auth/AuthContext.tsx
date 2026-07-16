@@ -16,8 +16,10 @@ import {
   getAuthProfile,
   isProviderUser,
   signInWithPassword,
+  signInWithOAuth,
   signOut as authSignOut,
 } from './authService'
+import type { SsoProvider } from '../lib/sso'
 
 export type AuthStatus =
   | 'loading' // verificando sessão / carregando profile
@@ -36,6 +38,7 @@ export interface AuthContextValue {
   role: string | null
   error: string | null
   signIn: (email: string, password: string) => Promise<void>
+  signInWithProvider: (provider: SsoProvider) => Promise<void>
   signOut: () => Promise<void>
   /** Recarrega profile + empresa da sessão atual (SPA, sem F5). */
   refreshCompany: () => Promise<void>
@@ -117,6 +120,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // onAuthStateChange limpa o estado.
   }, [])
 
+  const signInWithProvider = useCallback(async (provider: SsoProvider) => {
+    setStatus('loading')
+    setError(null)
+    try {
+      await signInWithOAuth(provider)
+    } catch (err: unknown) {
+      setStatus('unauthenticated')
+      setError(err instanceof Error ? err.message : 'Falha no login corporativo')
+      throw err
+    }
+  }, [])
+
   // Listen to profile updates in real-time to detect administrative deactivation — migration 071/IAM
   useEffect(() => {
     if (!profile?.id) return
@@ -162,6 +177,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     role: profile?.role ?? null,
     error,
     signIn,
+    signInWithProvider,
     signOut,
     refreshCompany,
   }

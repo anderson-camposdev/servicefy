@@ -62,11 +62,12 @@ SELECT i.id, 'paused',
        jsonb_build_object(
          'state', i.state,
          'reason_id', i.pending_reason_id,
-         'pending_reason', i.pending_reason,
+         'pending_reason', pr.name,
          'at', i.paused_at
        ),
        i.paused_at
   FROM public.incidents i
+  LEFT JOIN public.pending_reasons pr ON pr.id = i.pending_reason_id
  WHERE i.paused_at IS NOT NULL
    AND NOT EXISTS (
      SELECT 1 FROM public.sla_events e

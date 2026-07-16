@@ -2,6 +2,7 @@
  * ticket-table-customization.spec.ts
  *
  * Cobre a customização da tabela de incidentes (TicketDataTable):
+ *  0. Classificação tipada e reordenação persistente por drag-and-drop.
  *  1. Colunas customizáveis — abre "Colunas", desmarca uma coluna default
  *     e marca uma nova, salva, e confirma que a tabela reflete a mudança
  *     e persiste após reload (localStorage).
@@ -25,7 +26,7 @@ const MOCK_INCIDENTS = [
     assigned_group_id: null, assigned_group_name: 'Infraestrutura', sla_breached: false,
     sla_deadline: new Date(Date.now() + 3_600_000).toISOString(), ticket_type: 'incident',
     impact: 'High', urgency: 'High', tags: [], opened_via: 'portal', close_code: null,
-    created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+    created_at: '2026-06-10T18:33:37.000Z', updated_at: '2026-06-10T18:33:37.000Z',
     resolved_at: null, closed_at: null,
   },
   {
@@ -36,7 +37,7 @@ const MOCK_INCIDENTS = [
     assigned_group_id: null, assigned_group_name: 'Redes', sla_breached: false,
     sla_deadline: new Date(Date.now() + 3_600_000 * 2).toISOString(), ticket_type: 'incident',
     impact: 'High', urgency: 'Medium', tags: [], opened_via: 'portal', close_code: null,
-    created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+    created_at: '2026-06-06T16:19:37.000Z', updated_at: '2026-06-06T16:19:37.000Z',
     resolved_at: null, closed_at: null,
   },
   {
@@ -47,7 +48,7 @@ const MOCK_INCIDENTS = [
     assigned_group_id: null, assigned_group_name: 'Suporte N1', sla_breached: false,
     sla_deadline: new Date(Date.now() + 3_600_000 * 24).toISOString(), ticket_type: 'incident',
     impact: 'Low', urgency: 'Low', tags: [], opened_via: 'portal', close_code: null,
-    created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+    created_at: '2026-06-08T09:15:00.000Z', updated_at: '2026-06-08T09:15:00.000Z',
     resolved_at: null, closed_at: null,
   },
 ]
@@ -75,6 +76,41 @@ async function openIncidentQueue(page: Page) {
 }
 
 test.describe('Tabela de incidentes — colunas, filtro e agrupamento', () => {
+  test('classifica texto e data nas duas direcoes', async ({ page }) => {
+    await setupMocks(page)
+    await openIncidentQueue(page)
+
+    const ticketIds = () => page.locator('[data-testid="ticket-table-scroll"] tbody tr td:nth-child(2)')
+
+    await page.getByRole('button', { name: /Classificar por Ticket ID/i }).click()
+    await expect(ticketIds()).toHaveText([/INC-00101/, /INC-00102/, /INC-00103/])
+    await page.getByRole('button', { name: /Classificar por Ticket ID/i }).click()
+    await expect(ticketIds()).toHaveText([/INC-00103/, /INC-00102/, /INC-00101/])
+
+    await page.getByRole('button', { name: /Classificar por Abertura/i }).click()
+    await expect(ticketIds()).toHaveText([/INC-00102/, /INC-00103/, /INC-00101/])
+    await page.getByRole('button', { name: /Classificar por Abertura/i }).click()
+    await expect(ticketIds()).toHaveText([/INC-00101/, /INC-00103/, /INC-00102/])
+  })
+
+  test('reordena colunas por arrastar e persiste apos reload', async ({ page }) => {
+    await setupMocks(page)
+    await openIncidentQueue(page)
+
+    const company = page.getByRole('columnheader', { name: /Empresa/i })
+    const subject = page.getByRole('columnheader', { name: /Assunto/i })
+    await company.dragTo(subject)
+
+    const headers = page.locator('[data-testid="ticket-table-scroll"] thead th')
+    await expect(headers.nth(2)).toContainText('Empresa')
+    await expect(headers.nth(3)).toContainText('Assunto')
+
+    await page.reload()
+    await expect(page.getByText(/INC-00101/i).first()).toBeVisible({ timeout: 10_000 })
+    await expect(headers.nth(2)).toContainText('Empresa')
+    await expect(headers.nth(3)).toContainText('Assunto')
+  })
+
   test('customiza colunas e persiste após reload', async ({ page }) => {
     await setupMocks(page)
     await openIncidentQueue(page)

@@ -24,15 +24,27 @@ vi.mock('../../lib/supabase', () => ({
   },
 }))
 
-const { mockUploadBrandAsset, mockUpdateBrandingSettings } = vi.hoisted(() => ({
+const { mockUploadBrandAsset, mockUpdateBrandingSettings, mockRemoveBrandAsset, mockRefreshCompany, mockRefreshTenant } = vi.hoisted(() => ({
   mockUploadBrandAsset: vi.fn(),
   mockUpdateBrandingSettings: vi.fn(),
+  mockRemoveBrandAsset: vi.fn(),
+  mockRefreshCompany: vi.fn(),
+  mockRefreshTenant: vi.fn(),
+}))
+
+vi.mock('../../auth', () => ({
+  useAuth: () => ({ company: { id: 'company-123' }, refreshCompany: mockRefreshCompany }),
+}))
+
+vi.mock('../../tenant', () => ({
+  useTenant: () => ({ tenant: { id: 'company-123' }, refreshTenant: mockRefreshTenant }),
 }))
 
 vi.mock('../../lib/services', () => ({
   companiesService: {
     uploadBrandAsset: mockUploadBrandAsset,
     updateBrandingSettings: mockUpdateBrandingSettings,
+    removeBrandAsset: mockRemoveBrandAsset,
   },
 }))
 
@@ -74,6 +86,9 @@ describe('PlatformModuleSettings — Branding Panel', () => {
     // Default mock behavior
     mockSingle.mockResolvedValue({ data: MOCK_COMPANY, error: null })
     mockUploadBrandAsset.mockResolvedValue('https://supabase.com/new-asset.png')
+    mockRemoveBrandAsset.mockResolvedValue(undefined)
+    mockRefreshCompany.mockResolvedValue(undefined)
+    mockRefreshTenant.mockResolvedValue(undefined)
     mockUpdateBrandingSettings.mockResolvedValue({
       ...MOCK_COMPANY,
       brand_name: 'Acme Brand Updated',
@@ -170,6 +185,8 @@ describe('PlatformModuleSettings — Branding Panel', () => {
       }),
       MOCK_COMPANY.catalog_ui_config
     )
+    expect(mockRefreshCompany).toHaveBeenCalledOnce()
+    expect(mockRefreshTenant).toHaveBeenCalledOnce()
   })
 
   it('handles logo and background asset removal', async () => {
@@ -210,5 +227,6 @@ describe('PlatformModuleSettings — Branding Panel', () => {
       }),
       MOCK_COMPANY.catalog_ui_config
     )
+    expect(mockRemoveBrandAsset).toHaveBeenCalledWith(COMPANY_ID, 'logo')
   })
 })

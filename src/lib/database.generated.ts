@@ -2510,6 +2510,44 @@ export type Database = {
           },
         ]
       }
+      company_login_domains: {
+        Row: {
+          company_id: string
+          created_at: string
+          domain: string
+          id: string
+          is_primary: boolean
+          updated_at: string
+          verified_at: string | null
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          domain: string
+          id?: string
+          is_primary?: boolean
+          updated_at?: string
+          verified_at?: string | null
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          domain?: string
+          id?: string
+          is_primary?: boolean
+          updated_at?: string
+          verified_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_login_domains_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       company_module_entitlements: {
         Row: {
           company_id: string
@@ -8713,6 +8751,18 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      update_company_branding: {
+        Args: { p_company_id: string; p_settings: Json }
+        Returns: Database["public"]["Tables"]["companies"]["Row"]
+      }
+      update_company_login_policy: {
+        Args: {
+          p_allow_local_login: boolean
+          p_company_id: string
+          p_sso_providers: Json
+        }
+        Returns: Database["public"]["Tables"]["companies"]["Row"]
+      }
       update_profile_secure: {
         Args: { p_patch: Json; p_profile_id: string }
         Returns: {
@@ -9168,4 +9218,3 @@ export const Constants = {
     },
   },
 } as const
-

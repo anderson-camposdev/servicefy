@@ -30,7 +30,7 @@ export interface TenantBranding {
   subtitleSize: string | null
   /** ThemeName do motor de temas (mesmo valor que primaryColor para novos registros). */
   themeName: string
-  /** URL da imagem de fundo do portal do usuário (não afeta a tela de login). */
+  /** URL da imagem de fundo compartilhada pelo login e portal do usuário. */
   backgroundUrl: string | null
   /** Escala da fonte dos títulos: 'compact' | 'standard' | 'large' | 'display'. */
   fontScale: string
@@ -64,7 +64,7 @@ export const DEFAULT_BRANDING: TenantBranding = {
 /** Monta o branding a partir da linha de `companies`, com fallbacks seguros. */
 export function brandingFromCompany(row: CompanyRow): TenantBranding {
   return {
-    name: row.name || DEFAULT_BRANDING.name,
+    name: row.brand_name || row.name || DEFAULT_BRANDING.name,
     logoUrl: row.logo_url ?? null,
     faviconUrl: row.logo_url ?? null,
     primaryColor: row.primary_color || DEFAULT_BRANDING.primaryColor,
@@ -88,14 +88,14 @@ export function brandingFromCompany(row: CompanyRow): TenantBranding {
 
 /** Atualiza (ou cria) o <link rel="icon"> do documento. */
 function setFavicon(href: string | null): void {
-  if (typeof document === 'undefined' || !href) return
+  if (typeof document === 'undefined') return
   let link = document.querySelector<HTMLLinkElement>('link[rel="icon"]')
   if (!link) {
     link = document.createElement('link')
     link.rel = 'icon'
     document.head.appendChild(link)
   }
-  link.href = href
+  link.href = href || '/favicon.svg'
 }
 
 /**
@@ -110,6 +110,7 @@ export function applyBranding(branding: TenantBranding): void {
   const hexPrimary = THEME_HEX_COLORS[branding.primaryColor as ThemeName] || branding.primaryColor
 
   root.style.setProperty('--brand-primary', hexPrimary)
+  root.style.setProperty('--brand-secondary', branding.accentColor)
   root.style.setProperty('--brand-accent', branding.accentColor)
   root.style.setProperty('--brand-bg', branding.backgroundColor)
   root.style.setProperty('--color-bg-primary', branding.backgroundColor)

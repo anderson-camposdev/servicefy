@@ -5,6 +5,7 @@
 
 import { supabase } from '../lib/supabase'
 import type { CompanyRow, ProfileRow } from '../lib/database.types'
+import type { SsoProvider } from '../lib/sso'
 
 /** Perfil do usuário logado já com a empresa (tenant) resolvida. */
 export interface AuthProfile {
@@ -46,6 +47,19 @@ export function isProviderUser(authProfile: AuthProfile | null): boolean {
 /** Login com e-mail e senha. */
 export async function signInWithPassword(email: string, password: string) {
   const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+  if (error) throw error
+  return data
+}
+
+/** Inicia OAuth no Supabase preservando o host/subdomínio atual do tenant. */
+export async function signInWithOAuth(provider: SsoProvider) {
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider,
+    options: {
+      redirectTo: `${window.location.origin}/`,
+      ...(provider === 'azure' ? { scopes: 'email' } : {}),
+    },
+  })
   if (error) throw error
   return data
 }

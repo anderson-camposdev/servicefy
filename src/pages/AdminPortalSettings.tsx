@@ -19,7 +19,7 @@ const FONT_SCALE_LABELS: Record<FontScale, { label: string; size: string }> = {
   display:  { label: 'Display',   size: 'text-4xl' },
 }
 
-const ALLOWED_IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/jpg', 'image/svg+xml', 'image/webp']
+const ALLOWED_IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp']
 const MAX_MB = 2
 
 // ── Componente de upload de arquivo reutilizável ──────────────────────────────
@@ -131,6 +131,7 @@ const AdminPortalSettings = () => {
 
   const validateAndUpload = async (
     file: File,
+    assetType: 'logo' | 'background',
     setUploading: (v: boolean) => void,
     onSuccess: (url: string) => void,
   ) => {
@@ -144,7 +145,7 @@ const AdminPortalSettings = () => {
     setFeedback(null)
     setUploading(true)
     try {
-      const url = await companiesService.uploadBrandAsset(companyId, file)
+      const url = await companiesService.uploadBrandAsset(companyId, file, assetType)
       onSuccess(url)
     } catch (e) {
       setFeedback({ kind:'err', msg: e instanceof Error ? e.message : 'Falha no upload.' })
@@ -156,14 +157,14 @@ const AdminPortalSettings = () => {
   const handleLogoChange = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
-    validateAndUpload(file, setLogoUploading, setLogoUrl)
+    validateAndUpload(file, 'logo', setLogoUploading, setLogoUrl)
     e.target.value = ''
   }
 
   const handleBgChange = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
-    validateAndUpload(file, setBgUploading, setBackgroundUrl)
+    validateAndUpload(file, 'background', setBgUploading, setBackgroundUrl)
     e.target.value = ''
   }
 

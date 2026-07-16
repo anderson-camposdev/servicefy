@@ -7,6 +7,7 @@ export {
   getAuthProfile,
   isProviderUser,
   signInWithPassword,
+  signInWithOAuth,
   signOut,
 } from './authService'
 export type { AuthProfile } from './authService'

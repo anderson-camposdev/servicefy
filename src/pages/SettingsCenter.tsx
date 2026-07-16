@@ -13,6 +13,7 @@ import ChannelRoutingSettings from './ChannelRoutingSettings'
 import KnowledgeAdmin from './KnowledgeAdmin'
 import VirtualAgentAdmin from './VirtualAgentAdmin'
 import PlatformModuleSettings, { type OperationalModuleKey } from './PlatformModuleSettings'
+import LoginIntegrationSettings from './LoginIntegrationSettings'
 
 interface Props {
   companyId: string
@@ -48,7 +49,7 @@ const SECTIONS: SettingsSection[] = [
   section('departments', 'organization', 'Departamentos e localidades', 'Hierarquia, gestores e localidades.', ['Departamentos', 'Visibilidade por grupo', 'Estrutura ESM'], { legacyTab: 'departments' }),
   section('users', 'organization', 'Usuários e RBAC', 'Papéis e acesso do tenant.', ['Administrador do tenant', 'Papéis operacionais', 'Isolamento'], { legacyTab: 'users' }),
   section('groups', 'organization', 'Equipes solucionadoras', 'Grupos, membros e filas.', ['Filas', 'Membros', 'Roteamento'], { legacyTab: 'groups' }),
-  section('identity', 'organization', 'Identidade e provisionamento', 'Entra, Google, AD/LDAP e SCIM.', ['OIDC/SAML', 'SCIM', 'Agente AD outbound-only'], { status: 'locked', entitlementKey: 'identity_connectors' }),
+  section('login_integration', 'organization', 'Integração de Login', 'SSO Microsoft/Google, domínios e política de acesso.', ['Microsoft Entra ID', 'Google Workspace', 'JIT end_user', 'SSO obrigatório']),
   section('domains', 'service_management', 'Domínios de serviço', 'TI, RH, Jurídico e Facilities.', ['Caso unificado', 'Domínios privados', 'Tipos configuráveis'], { entitlementKey: 'esm' }),
   section('incident_catalog', 'service_management', 'Catálogo de incidentes', 'Categorias, serviços e sintomas.', ['Três níveis', 'SLA por item', 'Grupo solucionador'], { legacyTab: 'catalog_incidents', entitlementKey: 'itsm' }),
   section('request_catalog', 'service_management', 'Catálogo de requisições', 'Itens, aprovações e entrega.', ['Hierarquia', 'Formulários', 'Aprovações'], { legacyTab: 'catalog_requests', entitlementKey: 'itsm' }),
@@ -177,6 +178,13 @@ export default function SettingsCenter({ companyId, activeRole, onNavigate }: Pr
     <VirtualAgentAdmin
       companyId={targetCompanyId}
       activeRole={activeRole}
+      onBack={() => setSelected(null)}
+    />
+  )
+
+  if (selected?.key === 'login_integration') return (
+    <LoginIntegrationSettings
+      companyId={targetCompanyId}
       onBack={() => setSelected(null)}
     />
   )

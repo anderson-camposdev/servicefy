@@ -2,7 +2,7 @@
 // ServiceFY — Tabela de chamados customizável (genérica)
 //
 // Reusada pelas listas de Incidentes/Solicitações, Problemas e Mudanças:
-// escolha de colunas visíveis, filtro por coluna e agrupamento, com
+// escolha, reordenação e classificação de colunas, filtro por coluna e agrupamento, com
 // preferências persistidas por usuário em localStorage (mesmo padrão já
 // usado para os cartões de métrica em TicketManagementDashboard).
 //
@@ -11,9 +11,15 @@
 // ============================================================
 
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
-import { Settings, X, ChevronDown, ChevronRight, Plus } from 'lucide-react'
+import { Settings, X, ChevronDown, ChevronRight, Plus, ArrowDown, ArrowUp, ArrowUpDown, GripVertical } from 'lucide-react'
 import { useAuth } from '../auth'
 import type { TicketFieldDef } from '../lib/ticketTableFields'
+import {
+  compareTicketValues,
+  moveColumn,
+  sortTicketRows,
+  type TicketSortDirection,
+} from '../lib/ticketTableSorting'
 
 interface ActiveFilter {
   fieldKey: string
@@ -27,6 +33,7 @@ interface StoredPrefs {
   visibleKeys: string[]
   filters: ActiveFilter[]
   groupBy: string | null
+  sort: { fieldKey: string; direction: TicketSortDirection } | null
 }
 
 interface TicketDataTableProps<T> {
@@ -57,7 +64,10 @@ export default function TicketDataTable<T>({
   const [visibleKeys, setVisibleKeys] = useState<string[]>(defaultVisibleKeys)
   const [filters, setFilters] = useState<ActiveFilter[]>([])
   const [groupBy, setGroupBy] = useState<string | null>(null)
+  const [sort, setSort] = useState<StoredPrefs['sort']>(null)
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set())
+  const [draggedKey, setDraggedKey] = useState<string | null>(null)
+  const [dragOverKey, setDragOverKey] = useState<string | null>(null)
 
   const [isCustomizing, setIsCustomizing] = useState(false)
   const [draftVisibleKeys, setDraftVisibleKeys] = useState<string[]>(visibleKeys)
@@ -69,15 +79,29 @@ export default function TicketDataTable<T>({
     if (saved) {
       try {
         const parsed = JSON.parse(saved) as Partial<StoredPrefs>
-        setVisibleKeys(Array.isArray(parsed.visibleKeys) && parsed.visibleKeys.length ? parsed.visibleKeys : defaultVisibleKeys)
+        const savedVisibleKeys = Array.isArray(parsed.visibleKeys)
+          ? parsed.visibleKeys.filter(key => fields.some(field => field.key === key))
+          : []
+        const alwaysVisibleKeys = fields.filter(field => field.alwaysVisible).map(field => field.key)
+        setVisibleKeys(savedVisibleKeys.length
+          ? Array.from(new Set([...savedVisibleKeys, ...alwaysVisibleKeys]))
+          : defaultVisibleKeys)
         setFilters(Array.isArray(parsed.filters) ? parsed.filters : [])
         setGroupBy(typeof parsed.groupBy === 'string' ? parsed.groupBy : null)
+        setSort(
+          parsed.sort
+          && fields.some(field => field.key === parsed.sort?.fieldKey)
+          && (parsed.sort.direction === 'asc' || parsed.sort.direction === 'desc')
+            ? parsed.sort
+            : null,
+        )
         return
       } catch { /* preferências corrompidas — cai no default abaixo */ }
     }
     setVisibleKeys(defaultVisibleKeys)
     setFilters([])
     setGroupBy(null)
+    setSort(null)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [persistKey])
 
@@ -86,6 +110,7 @@ export default function TicketDataTable<T>({
       visibleKeys: next.visibleKeys ?? visibleKeys,
       filters: next.filters ?? filters,
       groupBy: next.groupBy !== undefined ? next.groupBy : groupBy,
+      sort: next.sort !== undefined ? next.sort : sort,
     }
     localStorage.setItem(persistKey, JSON.stringify(merged))
   }
@@ -115,17 +140,42 @@ export default function TicketDataTable<T>({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rows, filters])
 
+  const sortedRows = useMemo(() => {
+    if (!sort) return filteredRows
+    const field = fieldsByKey.get(sort.fieldKey)
+    if (!field) return filteredRows
+    return sortTicketRows(filteredRows, field.accessor, field.kind, sort.direction)
+  }, [filteredRows, fieldsByKey, sort])
+
   const groups = useMemo(() => {
     if (!groupField) return null
     const map = new Map<string, T[]>()
-    for (const row of filteredRows) {
+    for (const row of sortedRows) {
       const key = fmtValue(groupField.accessor(row))
       if (!map.has(key)) map.set(key, [])
       map.get(key)!.push(row)
     }
-    return Array.from(map.entries()).sort((a, b) => a[0].localeCompare(b[0], 'pt-BR'))
+    return Array.from(map.entries()).sort((a, b) => sort?.fieldKey === groupField.key
+      ? compareTicketValues(a[0], b[0], groupField.kind, sort.direction)
+      : a[0].localeCompare(b[0], 'pt-BR'))
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filteredRows, groupField])
+  }, [sortedRows, groupField, sort])
+
+  const reorderColumns = (sourceKey: string, targetKey: string) => {
+    const next = moveColumn(visibleKeys, sourceKey, targetKey)
+    if (next === visibleKeys) return
+    setVisibleKeys(next)
+    persist({ visibleKeys: next })
+  }
+
+  const toggleSort = (fieldKey: string) => {
+    const next: NonNullable<StoredPrefs['sort']> = {
+      fieldKey,
+      direction: sort?.fieldKey === fieldKey && sort.direction === 'asc' ? 'desc' : 'asc',
+    }
+    setSort(next)
+    persist({ sort: next })
+  }
 
   const toggleGroupCollapse = (key: string) => {
     setCollapsedGroups(prev => {
@@ -225,6 +275,10 @@ export default function TicketDataTable<T>({
             />
           )}
         </div>
+
+        <span className="ml-auto hidden text-[10px] font-semibold text-slate-400 lg:inline">
+          Arraste as colunas para mover · clique no título para ordenar
+        </span>
       </div>
 
       {/* Tabela */}
@@ -233,7 +287,64 @@ export default function TicketDataTable<T>({
           <thead className="bg-slate-50 sticky top-0 z-10 shadow-sm border-b border-slate-200">
             <tr className="text-slate-500 font-bold uppercase text-[10px] tracking-wider">
               {leadingCheckbox && <th className="p-3 w-10 text-center"><input type="checkbox" className="rounded border-slate-300" /></th>}
-              {visibleFields.map(field => <th key={field.key} className="p-3">{field.label}</th>)}
+              {visibleFields.map((field, index) => {
+                const direction = sort?.fieldKey === field.key ? sort.direction : null
+                const nextDirection = direction === 'asc' ? 'decrescente' : 'crescente'
+                return (
+                  <th
+                    key={field.key}
+                    draggable
+                    aria-sort={direction === 'asc' ? 'ascending' : direction === 'desc' ? 'descending' : 'none'}
+                    onDragStart={event => {
+                      setDraggedKey(field.key)
+                      event.dataTransfer.effectAllowed = 'move'
+                      event.dataTransfer.setData('text/plain', field.key)
+                    }}
+                    onDragEnter={() => setDragOverKey(field.key)}
+                    onDragOver={event => {
+                      event.preventDefault()
+                      event.dataTransfer.dropEffect = 'move'
+                    }}
+                    onDrop={event => {
+                      event.preventDefault()
+                      const sourceKey = draggedKey || event.dataTransfer.getData('text/plain')
+                      if (sourceKey) reorderColumns(sourceKey, field.key)
+                      setDraggedKey(null)
+                      setDragOverKey(null)
+                    }}
+                    onDragEnd={() => {
+                      setDraggedKey(null)
+                      setDragOverKey(null)
+                    }}
+                    className={`p-0 transition-colors ${
+                      dragOverKey === field.key && draggedKey !== field.key ? 'bg-indigo-100 ring-2 ring-inset ring-indigo-400' : ''
+                    } ${draggedKey === field.key ? 'opacity-50' : ''}`}
+                  >
+                    <button
+                      type="button"
+                      aria-label={`Classificar por ${field.label} em ordem ${nextDirection}`}
+                      title={`Classificar em ordem ${nextDirection}. Alt + setas move a coluna.`}
+                      onClick={() => toggleSort(field.key)}
+                      onKeyDown={event => {
+                        if (!event.altKey || (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight')) return
+                        event.preventDefault()
+                        const targetIndex = event.key === 'ArrowLeft' ? index - 1 : index + 1
+                        const target = visibleFields[targetIndex]
+                        if (target) reorderColumns(field.key, target.key)
+                      }}
+                      className="group/header flex w-full items-center gap-1.5 p-3 text-left hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-indigo-500"
+                    >
+                      <GripVertical className="h-3.5 w-3.5 shrink-0 cursor-grab text-slate-300 group-hover/header:text-slate-500" aria-hidden="true" />
+                      <span>{field.label}</span>
+                      {direction === 'asc'
+                        ? <ArrowUp className="h-3.5 w-3.5 shrink-0 text-indigo-600" aria-hidden="true" />
+                        : direction === 'desc'
+                          ? <ArrowDown className="h-3.5 w-3.5 shrink-0 text-indigo-600" aria-hidden="true" />
+                          : <ArrowUpDown className="h-3.5 w-3.5 shrink-0 text-slate-300 opacity-0 transition-opacity group-hover/header:opacity-100" aria-hidden="true" />}
+                    </button>
+                  </th>
+                )
+              })}
               {actions && <th className="p-3 text-right">Ações</th>}
             </tr>
           </thead>
@@ -247,7 +358,7 @@ export default function TicketDataTable<T>({
             {!loading && filteredRows.length === 0 && (
               <tr><td colSpan={totalCols} className="p-8 text-center text-slate-400 text-sm">{emptyLabel}</td></tr>
             )}
-            {!groupField && filteredRows.map(renderRow)}
+            {!groupField && sortedRows.map(renderRow)}
             {groupField && groups && groups.map(([key, groupRows]) => {
               const collapsed = collapsedGroups.has(key)
               return (

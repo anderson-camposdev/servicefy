@@ -1,0 +1,185 @@
+version: '3.8'
+
+services:
+  # Vector DB para Supabase (opcional, apenas se usar pgvector)
+  vector:
+    image: ankane/pgvector:latest
+    container_name: servicefy-vector
+    networks:
+      - servicefy
+    environment:
+      POSTGRES_PASSWORD: postgres
+    restart: unless-stopped
+
+  # PostgreSQL principal
+  postgres:
+    image: postgres:16-alpine
+    container_name: servicefy-postgres
+    environment:
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_DB: postgres
+    volumes:
+      - servicefy_postgres_data:/var/lib/postgresql/data
+      - ./supabase/migrations:/docker-entrypoint-initdb.d
+    networks:
+      - servicefy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Kong (API Gateway)
+  kong:
+    image: kong:3.4-alpine
+    container_name: servicefy-kong
+    depends_on:
+      - postgres
+    environment:
+      KONG_DATABASE: postgres
+      KONG_PG_HOST: postgres
+      KONG_PG_USER: postgres
+      KONG_PG_PASSWORD: postgres
+      KONG_PROXY_ACCESS_LOG: /dev/stdout
+      KONG_ADMIN_ACCESS_LOG: /dev/stdout
+      KONG_PROXY_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_LISTEN: 0.0.0.0:8001
+    ports:
+      - "8000:8000"
+      - "8001:8001"
+    networks:
+      - servicefy
+    restart: unless-stopped
+
+  # Supabase Auth
+  auth:
+    image: supabase/gotrue:v2.139.0
+    container_name: servicefy-auth
+    depends_on:
+      - postgres
+    environment:
+      GOTRUE_DB_DRIVER: postgres
+      GOTRUE_DB_DATABASE_URL: postgres://postgres:postgres@postgres:5432/postgres
+      GOTRUE_JWT_SECRET: your-super-secret-jwt-token-change-me
+      GOTRUE_JWT_EXP: 3600
+      GOTRUE_EXTERNAL_EMAIL_ENABLED: "true"
+      GOTRUE_MAILER_AUTOCONFIRM: "false"
+      GOTRUE_SMTP_HOST: mailpit
+      GOTRUE_SMTP_PORT: 1025
+      GOTRUE_SMTP_USER: ""
+      GOTRUE_SMTP_PASS: ""
+      GOTRUE_SMTP_ADMIN_EMAIL: admin@example.com
+      GOTRUE_SMTP_FROM_NAME: "Auth"
+      API_EXTERNAL_URL: http://localhost:54321
+      GOTRUE_SITE_URL: http://localhost:3000
+      GOTRUE_URI_ALLOW_LIST: "http://localhost:3000,http://localhost:5173"
+    ports:
+      - "9999:9999"
+    networks:
+      - servicefy
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Supabase REST API
+  rest:
+    image: postgrest/postgrest:v12.0.1
+    container_name: servicefy-rest
+    depends_on:
+      - postgres
+    environment:
+      PGRST_DB_URI: postgres://postgres:postgres@postgres:5432/postgres
+      PGRST_DB_ANON_ROLE: anon
+      PGRST_JWT_SECRET: your-super-secret-jwt-token-change-me
+      PGRST_DB_MAX_ROWS: 1000
+    ports:
+      - "3000:3000"
+    networks:
+      - servicefy
+    restart: unless-stopped
+
+  # Supabase Realtime
+  realtime:
+    image: supabase/realtime:v2.27.3
+    container_name: servicefy-realtime
+    depends_on:
+      - postgres
+    environment:
+      DB_HOST: postgres
+      DB_NAME: postgres
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_PORT: 5432
+      JWT_SECRET: your-super-secret-jwt-token-change-me
+      API_EXTERNAL_URL: http://localhost:54321
+      SECURE_CHANNELS: "true"
+    ports:
+      - "4000:4000"
+    networks:
+      - servicefy
+    restart: unless-stopped
+
+  # Supabase Edge Functions (worker)
+  functions:
+    image: supabase/functions-js:v1.41.0
+    container_name: servicefy-functions
+    depends_on:
+      - postgres
+    environment:
+      SUPABASE_URL: http://kong:8000
+      SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN1cGFiYXNlIiwicm9sZSI6ImFub24iLCJpYXQiOjE2MzA2NjI1MTEsImV4cCI6MzI4NzI2NjUxMX0.sNvHjgKEbvxGtW1GUxUwNGTnMFSHW0uCSHhxYngDhWA
+    volumes:
+      - ./supabase/functions:/home/deno/functions
+    ports:
+      - "9100:9100"
+    networks:
+      - servicefy
+    restart: unless-stopped
+
+  # Frontend React
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: servicefy-frontend
+    ports:
+      - "5173:5173"
+    environment:
+      VITE_SUPABASE_URL: http://kong:8000
+      VITE_SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN1cGFiYXNlIiwicm9sZSI6ImFub24iLCJpYXQiOjE2MzA2NjI1MTEsImV4cCI6MzI4NzI2NjUxMX0.sNvHjgKEbvxGtW1GUxUwNGTnMFSHW0uCSHhxYngDhWA
+    depends_on:
+      - rest
+      - auth
+      - realtime
+      - mailpit
+    networks:
+      - servicefy
+    restart: unless-stopped
+
+  # Mailpit (SMTP + UI)
+  mailpit:
+    image: axllent/mailpit:v1.27
+    container_name: servicefy-mailpit
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+    environment:
+      MP_MAX_MESSAGES: 500
+      MP_DATABASE: /data/mailpit.db
+    volumes:
+      - servicefy_mailpit_data:/data
+    networks:
+      - servicefy
+    restart: unless-stopped
+
+networks:
+  servicefy:
+    driver: bridge
+
+volumes:
+  servicefy_postgres_data:
+  servicefy_mailpit_data:

@@ -33,6 +33,7 @@ const TENANT_A = {
   license_plan: 'professional',
   license_expires_at: null,
   logo_url: null,
+  background_url: null,
   brand_name: 'Acme Corp',
   title_color: null, title_font: null, title_size: null,
   subtitle_color: null, subtitle_font: null, subtitle_size: null,

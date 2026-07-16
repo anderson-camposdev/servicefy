@@ -38,3 +38,15 @@ dist-lib/
 .claude/skills/*/shots/
 playwright-report/
 test-results/
+.env.*
+!.env.example
+
+# Hosting metadata and private keys
+.vercel/
+*.pem
+*.key
+*.p12
+*.pfx
+
+.vercel
+.env*

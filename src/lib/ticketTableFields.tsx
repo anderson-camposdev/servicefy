@@ -20,7 +20,7 @@ export interface TicketFieldDef<T> {
   /** Célula customizada (badges, ícones). Se ausente, usa texto simples do accessor. */
   render?: (row: T) => ReactNode
   /** Determina a UI do filtro: 'select' lista valores únicos presentes nas linhas; 'text' é "contém". */
-  kind: 'text' | 'select' | 'date' | 'boolean'
+  kind: 'text' | 'select' | 'date' | 'boolean' | 'number'
   defaultVisible?: boolean
   /** Não aparece no picker de colunas — sempre visível (ex.: número do chamado, assunto). */
   alwaysVisible?: boolean
@@ -94,7 +94,7 @@ export const INCIDENT_REQUEST_FIELDS: TicketFieldDef<TicketListRow>[] = [
     ),
   },
   { key: 'title', label: 'Assunto', accessor: r => r.title, kind: 'text', alwaysVisible: true },
-  { key: 'date', label: 'Abertura', accessor: r => r.date, kind: 'text', defaultVisible: true },
+  { key: 'date', label: 'Abertura', accessor: r => r.date, kind: 'date', defaultVisible: true },
   { key: 'client', label: 'Empresa', accessor: r => r.client, kind: 'select', defaultVisible: true },
   { key: 'requester', label: 'Solicitante', accessor: r => r.requester, kind: 'select', defaultVisible: true },
   {

@@ -26,19 +26,15 @@ import type { BrandingSettings } from '../branding.types'
 const {
   mockUpload,
   mockGetPublicUrl,
+  mockRemove,
   mockFrom,
-  mockUpdate,
-  mockEq,
-  mockSelect,
-  mockSingle,
+  mockRpc,
 } = vi.hoisted(() => ({
   mockUpload:       vi.fn(),
   mockGetPublicUrl: vi.fn(),
+  mockRemove:       vi.fn(),
   mockFrom:         vi.fn(),
-  mockUpdate:       vi.fn(),
-  mockEq:           vi.fn(),
-  mockSelect:       vi.fn(),
-  mockSingle:       vi.fn(),
+  mockRpc:          vi.fn(),
 }))
 
 vi.mock('../supabase', () => ({
@@ -47,9 +43,11 @@ vi.mock('../supabase', () => ({
       from: vi.fn((_bucket: string) => ({
         upload:       mockUpload,
         getPublicUrl: mockGetPublicUrl,
+        remove:       mockRemove,
       })),
     },
     from: mockFrom,
+    rpc: mockRpc,
   },
 }))
 
@@ -94,10 +92,10 @@ describe('validateBrandingFile', () => {
     expect(result.error).toBeNull()
   })
 
-  it('accepts a valid SVG file', () => {
+  it('rejects SVG files because public SVG is outside the hardened contract', () => {
     const result = validateBrandingFile(VALID_SVG)
-    expect(result.valid).toBe(true)
-    expect(result.error).toBeNull()
+    expect(result.valid).toBe(false)
+    expect(result.error).toMatch(/formato inválido/i)
   })
 
   it('accepts a valid WebP file', () => {
@@ -144,32 +142,32 @@ describe('validateBrandingFile', () => {
 describe('buildBrandAssetPath', () => {
   it('builds a deterministic logo path for PNG', () => {
     const path = buildBrandAssetPath(COMPANY_ID, 'logo', 'image/png')
-    expect(path).toBe(`brands/${COMPANY_ID}/logo.png`)
+    expect(path).toBe(`brands/${COMPANY_ID}/logo`)
   })
 
   it('builds a deterministic background path for JPEG', () => {
     const path = buildBrandAssetPath(COMPANY_ID, 'background', 'image/jpeg')
-    expect(path).toBe(`brands/${COMPANY_ID}/background.jpg`)
+    expect(path).toBe(`brands/${COMPANY_ID}/background`)
   })
 
   it('maps image/jpg MIME type to .jpg extension', () => {
     const path = buildBrandAssetPath(COMPANY_ID, 'logo', 'image/jpg')
-    expect(path).toBe(`brands/${COMPANY_ID}/logo.jpg`)
+    expect(path).toBe(`brands/${COMPANY_ID}/logo`)
   })
 
   it('maps image/svg+xml MIME type to .svg extension', () => {
     const path = buildBrandAssetPath(COMPANY_ID, 'logo', 'image/svg+xml')
-    expect(path).toBe(`brands/${COMPANY_ID}/logo.svg`)
+    expect(path).toBe(`brands/${COMPANY_ID}/logo`)
   })
 
   it('maps image/webp MIME type to .webp extension', () => {
     const path = buildBrandAssetPath(COMPANY_ID, 'background', 'image/webp')
-    expect(path).toBe(`brands/${COMPANY_ID}/background.webp`)
+    expect(path).toBe(`brands/${COMPANY_ID}/background`)
   })
 
   it('falls back to .png extension for unknown MIME types', () => {
     const path = buildBrandAssetPath(COMPANY_ID, 'logo', 'image/unknown')
-    expect(path).toBe(`brands/${COMPANY_ID}/logo.png`)
+    expect(path).toBe(`brands/${COMPANY_ID}/logo`)
   })
 
   it('produces the same path on repeated calls (idempotence)', () => {
@@ -198,11 +196,11 @@ describe('companiesService.uploadBrandAsset', () => {
 
     // Assert — path must be deterministic (not include timestamps/random tokens)
     expect(mockUpload).toHaveBeenCalledWith(
-      `brands/${COMPANY_ID}/logo.png`,
+      `brands/${COMPANY_ID}/logo`,
       VALID_PNG_1MB,
       expect.objectContaining({ upsert: true }),
     )
-    expect(url).toBe('https://cdn.example.com/brands/logo.png')
+    expect(url).toMatch(/^https:\/\/cdn\.example\.com\/brands\/logo\.png\?v=\d+$/)
   })
 
   it('defaults assetType to "logo" when not specified', async () => {
@@ -217,7 +215,7 @@ describe('companiesService.uploadBrandAsset', () => {
 
     // Assert
     expect(mockUpload).toHaveBeenCalledWith(
-      `brands/${COMPANY_ID}/logo.png`,
+      `brands/${COMPANY_ID}/logo`,
       expect.any(File),
       expect.anything(),
     )
@@ -235,7 +233,7 @@ describe('companiesService.uploadBrandAsset', () => {
 
     // Assert
     expect(mockUpload).toHaveBeenCalledWith(
-      `brands/${COMPANY_ID}/background.jpg`,
+      `brands/${COMPANY_ID}/background`,
       VALID_JPG_1MB,
       expect.objectContaining({ upsert: true }),
     )
@@ -300,11 +298,7 @@ describe('companiesService.updateBrandingSettings', () => {
     vi.clearAllMocks()
 
     // Chain mock: supabase.from(...).update(...).eq(...).select(...).single()
-    mockSingle.mockResolvedValue({ data: MOCK_COMPANY_ROW, error: null })
-    mockSelect.mockReturnValue({ single: mockSingle })
-    mockEq.mockReturnValue({ select: mockSelect })
-    mockUpdate.mockReturnValue({ eq: mockEq })
-    mockFrom.mockReturnValue({ update: mockUpdate })
+    mockRpc.mockResolvedValue({ data: MOCK_COMPANY_ROW, error: null })
   })
 
   const baseSettings: BrandingSettings = {
@@ -323,13 +317,16 @@ describe('companiesService.updateBrandingSettings', () => {
     requestButton:    null,
   }
 
-  it('calls supabase update with correctly mapped column payload', async () => {
+  it('calls the hardened RPC with the tenant and branding payload', async () => {
     // Act
     await companiesService.updateBrandingSettings(COMPANY_ID, baseSettings)
 
     // Assert — update called with expected column mapping
-    expect(mockUpdate).toHaveBeenCalledWith(
-      expect.objectContaining({
+    expect(mockRpc).toHaveBeenCalledWith(
+      'update_company_branding',
+      {
+        p_company_id: COMPANY_ID,
+        p_settings: expect.objectContaining({
         primary_color:    'Ocean',
         title_size:       'standard',
         logo_url:         'https://cdn.example.com/logo.png',
@@ -338,16 +335,17 @@ describe('companiesService.updateBrandingSettings', () => {
         welcome_title:    'Bem-vindo ao Portal',
         greeting_prefix:  'Bom dia',
         greeting_color:   '#94a3b8',
-      }),
+        }),
+      },
     )
   })
 
-  it('scopes the update to the correct tenant via .eq("id", companyId)', async () => {
+  it('scopes the RPC to the requested company id', async () => {
     // Act
     await companiesService.updateBrandingSettings(COMPANY_ID, baseSettings)
 
     // Assert — RLS is enforced at the application layer via the eq filter
-    expect(mockEq).toHaveBeenCalledWith('id', COMPANY_ID)
+    expect(mockRpc).toHaveBeenCalledWith('update_company_branding', expect.objectContaining({ p_company_id: COMPANY_ID }))
   })
 
   it('merges card_layout into existing catalog_ui_config without clobbering other keys', async () => {
@@ -362,7 +360,7 @@ describe('companiesService.updateBrandingSettings', () => {
     await companiesService.updateBrandingSettings(COMPANY_ID, settings, existingConfig)
 
     // Assert — card_settings.layout updated, icon_size preserved
-    const payload = (mockUpdate as Mock).mock.calls[0][0]
+    const payload = (mockRpc as Mock).mock.calls[0][1].p_settings
     const config = payload.catalog_ui_config as typeof existingConfig
     expect(config.card_settings.layout).toBe('grid')
     expect((config.card_settings as { icon_size?: string }).icon_size).toBe('large')
@@ -382,7 +380,7 @@ describe('companiesService.updateBrandingSettings', () => {
     await companiesService.updateBrandingSettings(COMPANY_ID, settings)
 
     // Assert
-    const payload = (mockUpdate as Mock).mock.calls[0][0]
+    const payload = (mockRpc as Mock).mock.calls[0][1].p_settings
     const buttons = (payload.catalog_ui_config as { portal_buttons: Record<string, string> }).portal_buttons
     expect(buttons.incident_label).toBe('Reportar Falha')
     expect(buttons.incident_desc).toBe('Algo parou')
@@ -397,7 +395,7 @@ describe('companiesService.updateBrandingSettings', () => {
     await companiesService.updateBrandingSettings(COMPANY_ID, baseSettings)
 
     // Assert — still produces a valid CatalogUiConfig shape
-    const payload = (mockUpdate as Mock).mock.calls[0][0]
+    const payload = (mockRpc as Mock).mock.calls[0][1].p_settings
     expect(payload.catalog_ui_config).toMatchObject({
       card_settings: { layout: 'grid' },
     })
@@ -405,7 +403,7 @@ describe('companiesService.updateBrandingSettings', () => {
 
   it('throws when Supabase returns an error on update', async () => {
     // Arrange
-    mockSingle.mockResolvedValueOnce({ data: null, error: { message: 'RLS violation' } })
+    mockRpc.mockResolvedValueOnce({ data: null, error: { message: 'RLS violation' } })
 
     // Act & Assert
     await expect(
@@ -419,5 +417,20 @@ describe('companiesService.updateBrandingSettings', () => {
 
     // Assert
     expect(result).toMatchObject({ id: COMPANY_ID, name: 'Acme Corp' })
+  })
+})
+
+describe('companiesService.removeBrandAsset', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('removes only the deterministic object for the requested tenant asset', async () => {
+    mockRemove.mockResolvedValueOnce({ error: null })
+    await companiesService.removeBrandAsset(COMPANY_ID, 'background')
+    expect(mockRemove).toHaveBeenCalledWith([`brands/${COMPANY_ID}/background`])
+  })
+
+  it('surfaces storage deletion errors', async () => {
+    mockRemove.mockResolvedValueOnce({ error: { message: 'not allowed' } })
+    await expect(companiesService.removeBrandAsset(COMPANY_ID, 'logo')).rejects.toThrow('not allowed')
   })
 })
