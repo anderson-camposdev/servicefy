@@ -1078,37 +1078,41 @@ export default function App() {
     return (
       <div>
         <div className="fixed top-4 right-4 z-50 flex gap-2">
-          {import.meta.env.DEV && currentUser.role !== 'end_user' && (
+          {currentUser.role !== 'end_user' && (
             <>
-              {/* Role Sim Selector — apenas em desenvolvimento (import.meta.env.DEV) */}
-              <div className="flex items-center gap-1 border border-slate-200 bg-white rounded-xl px-2 py-1 shadow-sm shrink-0">
-                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Simular Papel:</span>
-                <select
-                  value={activeRole}
-                  onChange={e => {
-                    const r = e.target.value as Role
-                    setSimulatedRole(r)
-                    if (r === 'end_user') {
-                      setActiveView('user_portal')
-                    } else if (r === 'sysadmin' || r === 'company_admin') {
-                      setActiveView('settings_governance')
-                    } else {
-                      setActiveView('dashboard_incidents')
-                    }
-                  }}
-                  className="text-xs font-semibold text-slate-700 bg-white border-none outline-none cursor-pointer focus:ring-0"
-                >
-                  <option value="sysadmin">SysAdmin (Admin Global)</option>
-                  <option value="company_admin">CompanyAdmin (Admin Tenant)</option>
-                  <option value="technician">Technician (Analista)</option>
-                  <option value="area_manager">AreaManager (Gerente Torre)</option>
-                  <option value="it_manager">ITManager (Gerente Geral TI)</option>
-                  <option value="client_manager">ClientManager (Gestor Cliente)</option>
-                  <option value="cio">CIO (Executivo TI)</option>
-                  <option value="end_user">EndUser (Usuário Final)</option>
-                </select>
-              </div>
-              <button onClick={() => { setSimulatedRole('sysadmin'); setActiveView('settings_governance') }} className="px-3 py-1.5 rounded-xl bg-white border border-slate-200 text-slate-600 text-xs font-semibold hover:bg-slate-50 hover:border-slate-300 transition-all cursor-pointer shadow-sm">
+              {import.meta.env.DEV && (
+                <div className="flex items-center gap-1 border border-slate-200 bg-white rounded-xl px-2 py-1 shadow-sm shrink-0">
+                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Simular Papel:</span>
+                  <select
+                    value={activeRole}
+                    onChange={e => {
+                      const r = e.target.value as Role
+                      setSimulatedRole(r)
+                      if (r === 'end_user') {
+                        setActiveView('user_portal')
+                      } else if (r === 'sysadmin' || r === 'company_admin') {
+                        setActiveView('settings_governance')
+                      } else {
+                        setActiveView('dashboard_incidents')
+                      }
+                    }}
+                    className="text-xs font-semibold text-slate-700 bg-white border-none outline-none cursor-pointer focus:ring-0"
+                  >
+                    <option value="sysadmin">SysAdmin (Admin Global)</option>
+                    <option value="company_admin">CompanyAdmin (Admin Tenant)</option>
+                    <option value="technician">Technician (Analista)</option>
+                    <option value="area_manager">AreaManager (Gerente Torre)</option>
+                    <option value="it_manager">ITManager (Gerente Geral TI)</option>
+                    <option value="client_manager">ClientManager (Gestor Cliente)</option>
+                    <option value="cio">CIO (Executivo TI)</option>
+                    <option value="end_user">EndUser (Usuário Final)</option>
+                  </select>
+                </div>
+              )}
+              <button 
+                onClick={() => setActiveView(currentUser.role === 'sysadmin' || currentUser.role === 'company_admin' ? 'settings_governance' : 'dashboard_incidents')} 
+                className="px-3 py-1.5 rounded-xl bg-white border border-slate-200 text-slate-600 text-xs font-semibold hover:bg-slate-50 hover:border-slate-300 transition-all cursor-pointer shadow-sm"
+              >
                 ← Painel do Agente
               </button>
             </>
