@@ -173,6 +173,8 @@ export default function TriageChat({ companyId }: { companyId: string }) {
       const reply = parts.join(' ')
       pushBot(reply)
       setEnded(true)
+      
+      window.dispatchEvent(new CustomEvent('ticket-created', { detail: { id: incidentId, number } }))
 
       const activeConversationId = await sync({ ...state, step: 'done' }, '', reply)
       if (activeConversationId) {

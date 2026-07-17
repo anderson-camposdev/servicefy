@@ -475,6 +475,16 @@ const UserPortalLayout = ({ companyId }: { companyId?: string } = {}) => {
       .catch(console.error)
   }
 
+  useEffect(() => {
+    const handleTicketCreated = () => {
+      reloadTickets()
+    }
+    window.addEventListener('ticket-created', handleTicketCreated)
+    return () => {
+      window.removeEventListener('ticket-created', handleTicketCreated)
+    }
+  }, [profile?.id, profile?.company_id])
+
   // ── Derived ticket values ─────────────────────────────────────────────────
   const activeTickets  = userTickets.filter(t => !CLOSED_STATES.has(t.state))
   const closedTickets  = userTickets.filter(t => CLOSED_STATES.has(t.state))
