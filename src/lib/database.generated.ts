@@ -7890,6 +7890,10 @@ export type Database = {
         }
       }
       auto_close_resolved_incidents: { Args: never; Returns: undefined }
+      batch_invite_users: {
+        Args: { p_payload: Json }
+        Returns: Json
+      }
       bi_aging_bucket: {
         Args: { p_closed: string; p_created: string; p_resolved: string }
         Returns: string

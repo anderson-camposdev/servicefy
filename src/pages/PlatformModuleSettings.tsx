@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useState, useRef } from 'react'
-import { ArrowLeft, CheckCircle2, Loader2, Plus, RefreshCw, Save, ShieldCheck, Upload, X, Palette, Image as ImageIcon, LayoutGrid, Type } from 'lucide-react'
+import { ArrowLeft, CheckCircle2, Loader2, Moon, Plus, RefreshCw, Save, ShieldCheck, Sun, Upload, X, Palette, Image as ImageIcon, LayoutGrid, Type } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { companiesService } from '../lib/services'
 import { validateBrandingFile } from '../lib/branding.types'
 import type { BrandingSettings, CatalogUiConfig } from '../lib/branding.types'
 import type { ThemeName, FontScale } from '../lib/theme-engine'
-import { THEME_HEX_COLORS, getPortalSidebar } from '../lib/theme-engine'
+import { THEME_HEX_COLORS, getPortalSidebar, LIGHT_THEMES, DARK_THEMES } from '../lib/theme-engine'
 import type { CompanyRow } from '../lib/database.types'
 import { UserImportZone } from '../components/portal/UserImportZone'
 import { SmtpSettingsForm } from '../components/portal/SmtpSettingsForm'
@@ -657,37 +657,53 @@ export default function PlatformModuleSettings({ moduleKey, companyId, activeRol
                 Cores e Temas
               </h2>
               
-              {/* Tema Swatches */}
-              <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Selecione o Tema Corporativo</label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                  {(['CorporateBlue', 'Ocean', 'Midnight', 'Emerald', 'Graphite'] as ThemeName[]).map(t => {
-                    const hex = THEME_HEX_COLORS[t]
-                    const sbg = getPortalSidebar(t).bg
-                    const active = form.themeName === t
-                    const labelMap: Record<string, string> = {
-                      CorporateBlue: 'Corporate Blue',
-                      Ocean: 'Ocean Blue',
-                      Midnight: 'Midnight Indigo',
-                      Emerald: 'Emerald Green',
-                      Graphite: 'Slate Graphite'
-                    }
-                    return (
-                      <button
-                        key={t}
-                        type="button"
-                        onClick={() => setForm(f => ({ ...f, themeName: t }))}
-                        className={`p-3 rounded-xl border-2 text-left transition-all hover:bg-slate-50 ${active ? 'border-indigo-600 bg-indigo-50/20 shadow-sm scale-102 font-bold' : 'border-slate-200'}`}
-                      >
-                        <div className="flex items-center gap-1.5 mb-2">
-                          <div style={{ background: hex }} className="w-4 h-4 rounded-full flex-shrink-0 shadow-sm" title="Cor Primária" />
-                          <div style={{ background: sbg }} className="w-4 h-4 rounded flex-shrink-0 shadow-sm border border-slate-200" title="Sidebar" />
-                        </div>
-                        <div className="text-xs font-bold text-slate-800 leading-tight">{labelMap[t] || t}</div>
-                      </button>
-                    )
-                  })}
-                </div>
+              {/* Tema Swatches — mini-previews agrupados em Claros/Escuros */}
+              <div className="space-y-5">
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider -mb-1">Selecione o Tema Corporativo</label>
+                {([
+                  { title: 'Temas Claros', Icon: Sun, list: LIGHT_THEMES },
+                  { title: 'Temas Escuros', Icon: Moon, list: DARK_THEMES },
+                ] as { title: string; Icon: typeof Sun; list: ThemeName[] }[]).map(group => (
+                  <div key={group.title}>
+                    <div className="flex items-center gap-1.5 mb-2">
+                      <group.Icon className="w-3.5 h-3.5 text-slate-400" />
+                      <span className="text-[11px] font-black text-slate-400 uppercase tracking-wider">{group.title}</span>
+                    </div>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                      {group.list.map(t => {
+                        const hex = THEME_HEX_COLORS[t]
+                        const sb = getPortalSidebar(t)
+                        const active = form.themeName === t
+                        return (
+                          <button
+                            key={t}
+                            type="button"
+                            onClick={() => setForm(f => ({ ...f, themeName: t }))}
+                            className={`rounded-xl border-2 overflow-hidden text-left transition-all ${active ? 'border-indigo-600 shadow-md ring-1 ring-indigo-200' : 'border-slate-200 hover:border-slate-300 hover:shadow-sm'}`}
+                          >
+                            {/* Mini-preview do portal: sidebar + conteúdo + botão primário */}
+                            <div className="flex h-14 pointer-events-none">
+                              <div style={{ background: sb.bg }} className="w-8 shrink-0 flex flex-col gap-1 p-1.5 border-r border-black/5">
+                                <div style={{ background: hex }} className="w-2 h-2 rounded" />
+                                <div style={{ background: sb.navActiveBg }} className="h-1 rounded-full" />
+                                <div style={{ background: sb.itemBg }} className="h-1 rounded-full" />
+                              </div>
+                              <div className="flex-1 bg-white p-2 flex flex-col gap-1.5">
+                                <div className="h-1.5 w-3/4 rounded-full bg-slate-200" />
+                                <div className="h-1.5 w-1/2 rounded-full bg-slate-100" />
+                                <div style={{ background: hex }} className="h-2.5 w-10 rounded mt-auto" />
+                              </div>
+                            </div>
+                            <div className="flex items-center justify-between gap-1 px-2.5 py-1.5 border-t border-slate-100 bg-white">
+                              <span className="text-[11px] font-bold text-slate-700 truncate">{THEME_LABELS[t]}</span>
+                              {active && <CheckCircle2 className="w-3.5 h-3.5 text-indigo-600 shrink-0" />}
+                            </div>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                ))}
               </div>
 
               {/* Escala da Fonte */}
@@ -732,23 +748,32 @@ export default function PlatformModuleSettings({ moduleKey, companyId, activeRol
               <TextInput label="Título de Boas-vindas" value={String(form.welcomeTitle ?? '')} onChange={v => setForm(f => ({ ...f, welcomeTitle: v }))} />
               <TextInput label="Subtítulo de Boas-vindas" value={String(form.welcomeSubtitle ?? '')} onChange={v => setForm(f => ({ ...f, welcomeSubtitle: v }))} />
               
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <TextInput label="Saudação (Prefixo)" value={String(form.greetingPrefix ?? '')} onChange={v => setForm(f => ({ ...f, greetingPrefix: v }))} />
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Cor da Saudação</label>
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="color"
-                      value={String(form.greetingColor).startsWith('#') && String(form.greetingColor).length === 7 ? String(form.greetingColor) : '#94a3b8'}
-                      onChange={e => setForm(f => ({ ...f, greetingColor: e.target.value }))}
-                      className="w-12 h-10 border border-slate-200 rounded-lg cursor-pointer p-0.5 bg-white shrink-0"
-                    />
-                    <span className="text-xs font-mono text-slate-500">{String(form.greetingColor || '#94a3b8')}</span>
-                  </div>
-                </div>
-              </div>
+              <TextInput label="Saudação (Prefixo)" value={String(form.greetingPrefix ?? '')} onChange={v => setForm(f => ({ ...f, greetingPrefix: v }))} />
+              <ColorSwatchField
+                label="Cor da Saudação"
+                value={String(form.greetingColor ?? '')}
+                onChange={v => setForm(f => ({ ...f, greetingColor: v }))}
+                presets={GREETING_COLOR_PRESETS}
+              />
 
-              <TextInput label="Fundo da Tela de Login (Hex ou URL)" value={String(form.loginBackground ?? '')} onChange={v => setForm(f => ({ ...f, loginBackground: v }))} />
+              <div>
+                <ColorSwatchField
+                  label="Fundo da Tela de Login"
+                  value={String(form.loginBackground ?? '')}
+                  onChange={v => setForm(f => ({ ...f, loginBackground: v }))}
+                  presets={LOGIN_BG_PRESETS}
+                />
+                <details className="mt-2" open={/^https?:\/\//i.test(String(form.loginBackground ?? ''))}>
+                  <summary className="text-xs font-semibold text-slate-400 cursor-pointer hover:text-slate-600 select-none">Avançado — usar imagem por URL</summary>
+                  <input
+                    type="url"
+                    value={String(form.loginBackground ?? '')}
+                    onChange={e => setForm(f => ({ ...f, loginBackground: e.target.value }))}
+                    placeholder="https://exemplo.com/fundo.jpg"
+                    className="mt-2 w-full rounded-xl border px-3 py-2.5 text-sm"
+                  />
+                </details>
+              </div>
             </section>
 
             <section className="rounded-2xl border bg-white p-6 shadow-sm space-y-4">
@@ -955,6 +980,71 @@ function FormField({ field, value, classes, groups, onChange }: { field: FieldDe
 
 function TextInput({ label, value, type = 'text', onChange }: { label: string; value: string; type?: string; onChange: (value: string) => void }) {
   return <label className="block text-xs font-bold">{label}<input type={type} value={value} onChange={e => onChange(e.target.value)} className="mt-1 w-full rounded-xl border px-3 py-2.5 text-sm" /></label>
+}
+
+const THEME_LABELS: Record<ThemeName, string> = {
+  // Claros
+  Pearl: 'Pearl Light', Breeze: 'Sky Breeze', Meadow: 'Meadow Green', Blush: 'Blush Rose', Stone: 'Warm Stone',
+  // Escuros
+  CorporateBlue: 'Corporate Blue', Ocean: 'Ocean Blue', Midnight: 'Midnight Indigo', Emerald: 'Emerald Green', Graphite: 'Slate Graphite',
+  Ruby: 'Ruby Rose', Amethyst: 'Amethyst Purple', Sunset: 'Sunset Orange', Crimson: 'Crimson Red', Forest: 'Forest Teal',
+}
+
+const GREETING_COLOR_PRESETS = [
+  { name: 'Branco', hex: '#ffffff' },
+  { name: 'Cinza claro', hex: '#94a3b8' },
+  { name: 'Grafite', hex: '#0f172a' },
+  { name: 'Azul céu', hex: '#38bdf8' },
+  { name: 'Esmeralda', hex: '#34d399' },
+  { name: 'Âmbar', hex: '#fbbf24' },
+  { name: 'Rosa', hex: '#f472b6' },
+  { name: 'Violeta', hex: '#a78bfa' },
+]
+
+const LOGIN_BG_PRESETS = [
+  { name: 'Claro neutro', hex: '#f8fafc' },
+  { name: 'Índigo suave', hex: '#eef2ff' },
+  { name: 'Céu suave', hex: '#f0f9ff' },
+  { name: 'Verde suave', hex: '#ecfdf5' },
+  { name: 'Grafite escuro', hex: '#0f172a' },
+  { name: 'Índigo profundo', hex: '#1e1b4b' },
+]
+
+/** Paleta de swatches clicáveis + picker personalizado — substitui inputs crus de hex. */
+function ColorSwatchField({ label, value, onChange, presets }: { label: string; value: string; onChange: (v: string) => void; presets: { name: string; hex: string }[] }) {
+  const normalized = /^#[0-9a-fA-F]{6}$/.test(value.trim()) ? value.trim().toLowerCase() : ''
+  const isPreset = presets.some(p => p.hex === normalized)
+  const customActive = Boolean(normalized) && !isPreset
+  return (
+    <div>
+      <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">{label}</label>
+      <div className="flex flex-wrap items-center gap-2">
+        {presets.map(p => (
+          <button
+            key={p.hex}
+            type="button"
+            title={p.name}
+            aria-label={p.name}
+            onClick={() => onChange(p.hex)}
+            style={{ background: p.hex }}
+            className={`w-8 h-8 rounded-full border transition-transform hover:scale-110 ${normalized === p.hex ? 'ring-2 ring-indigo-500 ring-offset-2 border-slate-200' : 'border-slate-200 shadow-sm'}`}
+          />
+        ))}
+        <label
+          title="Cor personalizada"
+          style={customActive ? { background: normalized } : { background: 'conic-gradient(from 0deg, #f43f5e, #fbbf24, #22c55e, #06b6d4, #6366f1, #d946ef, #f43f5e)' }}
+          className={`relative w-8 h-8 rounded-full border cursor-pointer transition-transform hover:scale-110 ${customActive ? 'ring-2 ring-indigo-500 ring-offset-2 border-slate-200' : 'border-slate-200 shadow-sm'}`}
+        >
+          <input
+            type="color"
+            value={normalized || '#6366f1'}
+            onChange={e => onChange(e.target.value)}
+            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+          />
+        </label>
+      </div>
+    </div>
+  )
 }
 
 function RowList({ rows, empty, activeField, groups, onToggle, onManageRelations }: { rows: Row[]; empty: string; activeField?: 'active' | 'enabled'; groups?: Row[]; onToggle?: (row: Row) => void; onManageRelations?: (row: Row) => void }) {
