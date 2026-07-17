@@ -1,0 +1,27 @@
+-- ============================================================
+-- ServiceFY — Migration 137
+-- Achado crítico durante o smoke test da privacidade de tickets
+-- (migration 134): a view public.incidents estava sem
+-- security_invoker=on. A migration 107 já tinha corrigido isso
+-- uma vez ("achado crítico da auditoria" — sem esse ajuste, o
+-- dono da view, postgres, tem BYPASSRLS=true e todo SELECT via
+-- incidents roda com esse privilégio, ignorando por completo a
+-- RLS de tickets/incident_attributes/service_request_attributes).
+-- Uma migration posterior (115, CREATE OR REPLACE VIEW) reset o
+-- reloption silenciosamente — confirmado ao vivo via
+-- SELECT reloptions FROM pg_class WHERE relname='incidents'
+-- retornando NULL, e via teste real: um agent sem vínculo com um
+-- grupo privado conseguia ler um ticket restrito através de
+-- "incidents" (mas não através de "tickets" diretamente, onde a
+-- RLS de fato se aplica) — ou seja, a proteção de privacidade por
+-- grupo (134) não tinha nenhum efeito real via o caminho que o
+-- app de fato usa (services.ts consulta .from('incidents'), não
+-- .from('tickets')).
+--
+-- Não é causado por este trabalho, mas é pré-requisito direto
+-- para a privacidade de tickets (134) funcionar de verdade — sem
+-- isso, TODA restrição de RLS em tickets (não só a nova) fica sem
+-- efeito para qualquer consulta feita via a view.
+-- ============================================================
+
+ALTER VIEW public.incidents SET (security_invoker = on);

@@ -4,6 +4,7 @@ import { test } from 'node:test'
 
 const read = path => readFileSync(new URL('../../' + path, import.meta.url), 'utf8')
 const sql = read('supabase/migrations/20260718000300_134_ticket_group_privacy.sql')
+const invokerFix = read('supabase/migrations/20260718000600_137_incidents_view_security_invoker_regression_fix.sql')
 const packageJson = read('package.json')
 
 const fnBody = (name) => {
@@ -45,6 +46,10 @@ test('select_incident_policy (migration 071, nunca removida por 096) é derrubad
 test('select_ticket_policy usa can_read_ticket como única fonte de verdade para SELECT', () => {
   assert.match(sql, /DROP POLICY IF EXISTS select_ticket_policy ON public\.tickets/)
   assert.match(sql, /CREATE POLICY select_ticket_policy ON public\.tickets\s*\n?\s*FOR SELECT TO authenticated\s*\n?\s*USING \(public\.can_read_ticket\(id\)\)/)
+})
+
+test('view incidents tem security_invoker=on (achado crítico: sem isso, a RLS de tickets é ignorada por completo via o caminho que o app realmente usa — services.ts consulta .from(\'incidents\'), não .from(\'tickets\'))', () => {
+  assert.match(invokerFix, /ALTER VIEW public\.incidents SET \(security_invoker = on\)/)
 })
 
 test('Contrato de privacidade de tickets participa da suíte de segurança padrão', () => {
