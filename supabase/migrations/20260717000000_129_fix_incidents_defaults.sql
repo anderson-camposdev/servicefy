@@ -91,7 +91,7 @@ BEGIN
     COALESCE(NEW.ticket_type, 'incident')::ticket_type_enum, NEW.short_description, NEW.description,
     COALESCE(NEW.priority, 'P3 - Moderate'::ticket_priority), COALESCE(NEW.state, 'New'::incident_state), NEW.caller_id, NEW.caller_name, NEW.assigned_to_id, NEW.assigned_to_name,
     COALESCE(NEW.assigned_group_id, v_group_id), COALESCE(NEW.assigned_group_name, v_group_name),
-    COALESCE(NEW.assignment_group_id, v_group_id), NEW.sla_breached,
+    COALESCE(NEW.assignment_group_id, v_group_id), COALESCE(NEW.sla_breached, false),
     NEW.sla_response_deadline, NEW.sla_resolution_deadline, NEW.responded_at, NEW.resolved_at, NEW.closed_at,
     NEW.close_code, NEW.close_notes, NEW.resolution_code, NEW.resolution_notes, COALESCE(NEW.kb_candidate, false),
     COALESCE(NEW.created_at, NOW()), COALESCE(NEW.updated_at, NOW()), v_approval_status, v_approval_paused_at,
@@ -115,3 +115,19 @@ BEGIN
   RETURN NEW;
 END;
 $$;
+
+DROP TRIGGER IF EXISTS tg_incidents_view_insert ON public.incidents;
+CREATE TRIGGER tg_incidents_view_insert
+  INSTEAD OF INSERT ON public.incidents
+  FOR EACH ROW EXECUTE FUNCTION public.tg_incidents_view_insert();
+
+DROP TRIGGER IF EXISTS tg_incidents_view_update ON public.incidents;
+CREATE TRIGGER tg_incidents_view_update
+  INSTEAD OF UPDATE ON public.incidents
+  FOR EACH ROW EXECUTE FUNCTION public.tg_incidents_view_update();
+
+DROP TRIGGER IF EXISTS tg_incidents_view_delete ON public.incidents;
+CREATE TRIGGER tg_incidents_view_delete
+  INSTEAD OF DELETE ON public.incidents
+  FOR EACH ROW EXECUTE FUNCTION public.tg_incidents_view_delete();
+
