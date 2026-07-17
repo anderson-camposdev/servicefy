@@ -10,6 +10,15 @@ DECLARE
   setting_row record;
   secret_id uuid;
 BEGIN
+  -- Only migrate if the legacy column exists
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+     WHERE table_schema = 'public' AND table_name = 'tenant_smtp_settings'
+       AND column_name = 'smtp_password_encrypted'
+  ) THEN
+    RETURN;
+  END IF;
+
   IF to_regprocedure('vault.create_secret(text,text,text,uuid)') IS NULL THEN
     RAISE EXCEPTION 'Vault nao esta disponivel para migrar credenciais SMTP';
   END IF;
@@ -36,6 +45,7 @@ END $$;
 ALTER TABLE public.tenant_smtp_settings
   DROP COLUMN IF EXISTS smtp_password_encrypted;
 
+DROP POLICY IF EXISTS tenant_smtp_settings_admin_read ON public.tenant_smtp_settings;
 DROP POLICY IF EXISTS tenant_smtp_settings_tenant_isolation ON public.tenant_smtp_settings;
 CREATE POLICY tenant_smtp_settings_admin_read
   ON public.tenant_smtp_settings

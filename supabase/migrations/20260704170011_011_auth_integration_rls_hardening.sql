@@ -99,7 +99,12 @@ BEGIN
     'changes','change_history',
     'catalog_items','sla_policies','notifications'
   ] LOOP
-    IF to_regclass('public.' || t) IS NOT NULL THEN
+    -- Only enable RLS on real tables (relkind 'r'), skip views ('v')
+    IF EXISTS (
+      SELECT 1 FROM pg_class c
+        JOIN pg_namespace n ON n.oid = c.relnamespace
+       WHERE n.nspname = 'public' AND c.relname = t AND c.relkind = 'r'
+    ) THEN
       EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY;', t);
     END IF;
   END LOOP;
