@@ -45,6 +45,12 @@ jobs:
     name: 'Job 2 — Testes Automatizados'
     needs: [lint-and-build]
     runs-on: ubuntu-latest
+    env:
+      # src/lib/supabase.ts lança erro na importação se essas variáveis não
+      # existirem — valores fictícios bastam para os testes unitários (Vitest),
+      # que mockam as chamadas de serviço em vez de bater num Supabase real.
+      VITE_SUPABASE_URL: 'https://ci-placeholder.supabase.co'
+      VITE_SUPABASE_ANON_KEY: 'ci-placeholder-anon-key'
     steps:
       - uses: actions/checkout@v4
 

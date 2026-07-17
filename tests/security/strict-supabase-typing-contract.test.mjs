@@ -14,8 +14,8 @@ test('o client raiz do Supabase usa o Database gerado, não createClient<any>', 
   assert.doesNotMatch(supabaseTs, /createClient<any>/)
 })
 
-test('o client por-schema de services.ts (multi-tenant) também usa Database, não <any>', () => {
-  assert.match(servicesTs, /createClient<Database>/)
+test('services.ts usa os tipos Database/Json gerados em vez de any — sem client próprio (schema-per-tenant foi removido; getClientForCompany() só retorna o client único)', () => {
+  assert.match(servicesTs, /import type \{ Database, Json \} from '\.\/database\.generated'/)
   assert.doesNotMatch(servicesTs, /createClient<any>/)
 })
 

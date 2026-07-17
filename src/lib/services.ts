@@ -243,13 +243,8 @@ export const profilesService = {
     return throwIfError(data, error)
   },
 
-  // TODO(bug pré-existente, não introduzido por esta task de tipagem): a RPC
-  // 'batch_invite_users' não existe em NENHUMA migration do projeto — chamar
-  // este método falha em runtime com "function does not exist". Descoberto
-  // ao ligar createClient<Database> (A1); corrigir separadamente (criar a
-  // RPC ou remover o fluxo de UserImportZone.tsx que a invoca).
   async batchInvite(payload: import('./iam.types').BatchInvitePayload): Promise<void> {
-    const { error } = await supabase.rpc('batch_invite_users' as unknown as never, { p_payload: payload } as never)
+    const { error } = await supabase.rpc('batch_invite_users', { p_payload: payload as unknown as Json })
     if (error) throw error
   },
 }
