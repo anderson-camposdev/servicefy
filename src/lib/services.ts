@@ -858,13 +858,14 @@ export const assignmentGroupsService = {
   },
 
   /** Create a new group */
-  async create(payload: { companyId: string; name: string; description?: string }): Promise<AssignmentGroupRow> {
+  async create(payload: { companyId: string; name: string; description?: string; isPrivate?: boolean }): Promise<AssignmentGroupRow> {
     const { data, error } = await supabase
       .from('assignment_groups')
       .insert({
         company_id: payload.companyId,
         name: payload.name,
         description: payload.description ?? null,
+        is_private: payload.isPrivate ?? false,
       })
       .select()
       .single()
@@ -873,7 +874,7 @@ export const assignmentGroupsService = {
   },
 
   /** Update group */
-  async update(id: string, payload: Partial<Pick<AssignmentGroupRow, 'name' | 'description' | 'is_active'>>): Promise<AssignmentGroupRow> {
+  async update(id: string, payload: Partial<Pick<AssignmentGroupRow, 'name' | 'description' | 'is_active' | 'is_private'>>): Promise<AssignmentGroupRow> {
     const { data, error } = await supabase
       .from('assignment_groups')
       .update(payload)

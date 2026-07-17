@@ -252,6 +252,7 @@ export type Database = {
           id: string
           is_active: boolean
           is_default_triage: boolean
+          is_private: boolean
           name: string
         }
         Insert: {
@@ -261,6 +262,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           is_default_triage?: boolean
+          is_private?: boolean
           name: string
         }
         Update: {
@@ -270,6 +272,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           is_default_triage?: boolean
+          is_private?: boolean
           name?: string
         }
         Relationships: [
@@ -9009,7 +9012,7 @@ export type Database = {
         | "P4 - Low"
         | "P5 - Planning"
       ticket_type_enum: "incident" | "request"
-      user_role: "sysadmin" | "company_admin" | "agent" | "end_user"
+      user_role: "sysadmin" | "company_admin" | "agent" | "end_user" | "ops_manager" | "governance_manager"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -9218,7 +9221,7 @@ export const Constants = {
         "P5 - Planning",
       ],
       ticket_type_enum: ["incident", "request"],
-      user_role: ["sysadmin", "company_admin", "agent", "end_user"],
+      user_role: ["sysadmin", "company_admin", "agent", "end_user", "ops_manager", "governance_manager"],
     },
   },
 } as const

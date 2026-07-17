@@ -3,10 +3,23 @@ import { readFileSync } from 'node:fs'
 import { test } from 'node:test'
 
 const read = path => readFileSync(new URL('../../' + path, import.meta.url), 'utf8')
-const sql = read('supabase/migrations/20260705203012_082_knowledge_completion.sql')
+// Concatenados na ordem de aplicação: 082 define a base; 131 expande o
+// enum; 132/133 reescrevem helpers/RPCs/triggers via CREATE OR REPLACE.
+// fnBody() sempre pega a ÚLTIMA ocorrência de cada função, então a versão
+// vigente (132/133) vence sobre a original (082).
+const sql = [
+  '20260705203012_082_knowledge_completion.sql',
+  '20260718000000_131_kb_role_enum_expansion.sql',
+  '20260718000100_132_kb_role_governance.sql',
+  '20260718000200_133_kb_workflow_state_machine.sql',
+].map(f => read('supabase/migrations/' + f)).join('\n')
 const service = read('src/lib/knowledge-service.ts')
 const markdown = read('src/lib/markdown.ts')
+const kbAccess = read('src/lib/kb-access.ts')
 const center = read('src/pages/SettingsCenter.tsx')
+const knowledgeCenter = read('src/pages/KnowledgeCenter.tsx')
+const admin = read('src/pages/KnowledgeAdmin.tsx')
+const app = read('src/App.tsx')
 const portal = read('src/pages/UserPortalLayout.tsx')
 const portalQuickView = read('src/components/portal/KnowledgeQuickView.tsx')
 const cockpit = read('src/pages/AnalystCockpit.tsx')
@@ -15,7 +28,8 @@ const packageJson = read('package.json')
 const fnBody = (name) => {
   const parts = sql.split('CREATE OR REPLACE FUNCTION public.' + name)
   assert.ok(parts.length > 1, `função ${name} deve existir`)
-  return parts[1].split('$$;')[0]
+  // Última ocorrência = definição vigente após todas as migrations aplicadas.
+  return parts[parts.length - 1].split('$$;')[0]
 }
 
 test('Leitura de artigo é centralizada e respeita status, visibilidade e tenant', () => {
@@ -29,6 +43,12 @@ test('Leitura de artigo é centralizada e respeita status, visibilidade e tenant
   assert.match(body, /visibility = 'internal'[\s\S]*get_current_user_role\(\) <> 'end_user'/)
   // A política de SELECT usa o helper
   assert.match(sql, /CREATE POLICY knowledge_tenant_read ON public\.knowledge_articles FOR SELECT TO authenticated\s*\n?\s*USING \(public\.can_read_knowledge_article\(id\)\)/)
+})
+
+test('Leitura de artigo abrange autoria própria e fila de revisão (agent/ops_manager/governance_manager)', () => {
+  const body = fnBody('can_read_knowledge_article')
+  assert.match(body, /a\.author_id = public\.get_current_profile_id\(\)/)
+  assert.match(body, /status IN \('draft','review','archived'\) AND public\.is_kb_reviewer\(a\.company_id\)/)
 })
 
 test('Artigo restrito exige concessão explícita a perfil ou grupo', () => {
@@ -47,12 +67,80 @@ test('Feedback só é aceito para artigo acessível e com identidade do servidor
   assert.match(policy, /public\.can_read_knowledge_article\(article_id\)/)
 })
 
-test('RPCs de escrita exigem admin do tenant e auditam a ação', () => {
-  for (const fn of ['kb_set_article_status', 'kb_duplicate_article']) {
+test('Enum user_role foi expandido com ops_manager e governance_manager', () => {
+  assert.match(sql, /ALTER TYPE public\.user_role ADD VALUE IF NOT EXISTS 'ops_manager'/)
+  assert.match(sql, /ALTER TYPE public\.user_role ADD VALUE IF NOT EXISTS 'governance_manager'/)
+})
+
+test('Helpers de capacidade de KB existem, compõem sobre is_settings_admin e são revogados de anon', () => {
+  for (const fn of ['is_kb_contributor', 'is_kb_reviewer', 'is_kb_governance']) {
     const body = fnBody(fn)
-    assert.match(body, /public\.is_settings_admin\(p_company_id\)/, `${fn} deve exigir admin`)
-    assert.match(body, /public\.write_admin_audit/, `${fn} deve auditar`)
+    assert.match(body, /public\.is_settings_admin\(p_company_id\)/, `${fn} deve compor sobre is_settings_admin`)
+    assert.match(sql, new RegExp('REVOKE ALL ON FUNCTION public\\.' + fn + '\\(uuid\\) FROM public, anon'))
+    assert.match(sql, new RegExp('GRANT EXECUTE ON FUNCTION public\\.' + fn + '\\(uuid\\) TO authenticated'))
   }
+  assert.match(fnBody('is_kb_contributor'), /'agent', 'ops_manager', 'governance_manager'/)
+  assert.match(fnBody('is_kb_reviewer'), /'ops_manager', 'governance_manager'/)
+  assert.match(fnBody('is_kb_governance'), /role\(\) = 'governance_manager'/)
+})
+
+test('write_kb_audit_event não reexige is_settings_admin e é revogada até de authenticated', () => {
+  const body = fnBody('write_kb_audit_event')
+  assert.doesNotMatch(body, /is_settings_admin/)
+  assert.match(body, /INSERT INTO public\.admin_audit_events/)
+  assert.match(sql, /REVOKE ALL ON FUNCTION public\.write_kb_audit_event\([^)]*\) FROM public, anon, authenticated/)
+})
+
+test('RPCs de escrita de KB usam checagem de capacidade (não mais is_settings_admin isolado) e auditam via write_kb_audit_event', () => {
+  const setStatus = fnBody('kb_set_article_status')
+  assert.match(setStatus, /public\.is_kb_reviewer\(p_company_id\)/)
+  assert.match(setStatus, /public\.write_kb_audit_event/)
+  // Regra dos quatro olhos: aprovar review->published exige revisor E não-autor.
+  assert.match(setStatus, /v_is_reviewer AND NOT v_is_own/)
+  // Reinstaurar arquivado é exclusivo de governança.
+  assert.match(setStatus, /v_old_status = 'archived' AND p_status = 'draft'[\s\S]{0,20}v_allowed := v_is_governance/)
+
+  const duplicate = fnBody('kb_duplicate_article')
+  assert.match(duplicate, /public\.is_kb_contributor\(p_company_id\)/)
+  assert.match(duplicate, /public\.write_kb_audit_event/)
+  assert.match(duplicate, /public\.can_read_knowledge_article\(v_src\.id\)/)
+})
+
+test('tg_kb_article_guard trava mudança de status fora de kb_set_article_status', () => {
+  const body = fnBody('tg_kb_article_guard')
+  assert.match(body, /NEW\.status IS DISTINCT FROM OLD\.status/)
+  assert.match(body, /servicefy\.kb_status_rpc/)
+  assert.match(body, /Alteração de status deve usar kb_set_article_status\(\)/)
+  // kb_set_article_status é quem seta a flag que autoriza a própria mudança.
+  assert.match(fnBody('kb_set_article_status'), /set_config\('servicefy\.kb_status_rpc', 'true', true\)/)
+})
+
+test('RLS de escrita em knowledge_articles é granular por papel (não mais um único FOR ALL admin)', () => {
+  // knowledge_admin_write (FOR ALL, criada na 079 — não concatenada aqui) é
+  // derrubada pela 132; nenhuma migration concatenada volta a recriá-la.
+  assert.match(sql, /DROP POLICY IF EXISTS knowledge_admin_write ON public\.knowledge_articles/)
+  assert.doesNotMatch(sql, /CREATE POLICY knowledge_admin_write /)
+  assert.match(sql, /CREATE POLICY knowledge_author_insert ON public\.knowledge_articles FOR INSERT TO authenticated\s*\n?\s*WITH CHECK \(public\.is_kb_contributor\(company_id\) AND status = 'draft'\)/)
+  assert.match(sql, /CREATE POLICY knowledge_author_update ON public\.knowledge_articles FOR UPDATE/)
+  const updatePolicy = sql.split('CREATE POLICY knowledge_author_update')[1].split(';')[0]
+  assert.match(updatePolicy, /public\.is_kb_reviewer\(company_id\)/)
+  assert.match(updatePolicy, /author_id = public\.get_current_profile_id\(\) AND status IN \('draft','review'\)/)
+  assert.match(sql, /CREATE POLICY knowledge_admin_delete ON public\.knowledge_articles FOR DELETE TO authenticated\s*\n?\s*USING \(public\.is_settings_admin\(company_id\)\)/)
+})
+
+test('Concessões de acesso restrito passam a ser gerenciadas por governança (não mais admin-only)', () => {
+  assert.match(sql, /CREATE POLICY kb_grants_governance_write ON public\.knowledge_article_grants FOR ALL TO authenticated\s*\n?\s*USING \(public\.is_kb_governance\(company_id\)\)/)
+})
+
+test('Versões ficam visíveis a quem pode ler o artigo vivo (não mais admin-only)', () => {
+  assert.match(sql, /CREATE POLICY kb_versions_reader ON public\.knowledge_article_versions FOR SELECT TO authenticated\s*\n?\s*USING \(public\.can_read_knowledge_article\(article_id\)\)/)
+})
+
+test('Governança lê a trilha de auditoria da própria KB', () => {
+  assert.match(sql, /CREATE POLICY audit_kb_governance_select ON public\.admin_audit_events FOR SELECT TO authenticated/)
+  const policy = sql.split('CREATE POLICY audit_kb_governance_select')[1].split(';')[0]
+  assert.match(policy, /public\.is_kb_governance\(company_id\)/)
+  assert.match(policy, /resource_type IN/)
 })
 
 test('Todas as RPCs de KB são revogadas de anon/public e concedidas a authenticated', () => {
@@ -98,9 +186,24 @@ test('Serviço não usa any e chama as RPCs tipadas', () => {
   }
 })
 
-test('UI foi conectada em admin, portal e cockpit (sem placeholders)', () => {
+test('kb-access.ts define o mapa de capacidades de UI espelhando a máquina de estados', () => {
+  assert.match(kbAccess, /export const KB_CAPABLE_ROLES/)
+  assert.match(kbAccess, /'sysadmin'.*'company_admin'.*'agent'.*'ops_manager'.*'governance_manager'/s)
+  assert.match(kbAccess, /export const kbCapabilitiesFor/)
+  assert.match(kbAccess, /export const hasKbCapability/)
+})
+
+test('UI foi conectada em admin, Central de Conhecimento, portal e cockpit (sem placeholders)', () => {
   assert.match(center, /selected\?\.key === 'knowledge'/)
   assert.match(center, /<KnowledgeAdmin/)
+  // Central de Conhecimento: entrada fora de Configurações para
+  // agent/ops_manager/governance_manager, checagem real de capacidade.
+  assert.match(knowledgeCenter, /isKbCapableRole/)
+  assert.match(knowledgeCenter, /<KnowledgeAdmin/)
+  assert.match(app, /KnowledgeCenter/)
+  assert.match(app, /'knowledge_center'/)
+  // KnowledgeAdmin não ignora mais a prop activeRole (bug original corrigido).
+  assert.match(admin, /hasKbCapability\(activeRole/)
   assert.match(portal, /setScreen\('knowledge'\)/)
   // A tela 'knowledge' renderiza <KnowledgeQuickView>, um wrapper fino que por
   // sua vez renderiza <KnowledgePortal> (a UI de busca/leitura/feedback) — ver
@@ -130,12 +233,14 @@ test('Guards impedem referências cross-tenant e carimbam autoria no servidor', 
   assert.ok(sql.includes('NEW.granted_by := public.get_current_profile_id()'))
 })
 
-test('CRUD administrativo da KB é auditado sem armazenar o corpo do artigo', () => {
+test('CRUD administrativo da KB é auditado (via write_kb_audit_event) sem armazenar o corpo do artigo', () => {
   assert.match(sql, /CREATE TRIGGER trg_kb_article_audit/)
   assert.match(sql, /CREATE TRIGGER trg_kb_category_audit/)
   assert.match(sql, /CREATE TRIGGER trg_kb_grant_audit/)
-  assert.match(sql, /public.write_admin_audit/)
-  assert.ok(sql.includes("to_jsonb(OLD) - ARRAY['body','search_vector']"))
+  const auditBody = fnBody('tg_kb_admin_audit')
+  assert.match(auditBody, /public\.is_kb_contributor\(v_company\)/)
+  assert.match(auditBody, /public\.write_kb_audit_event/)
+  assert.ok(auditBody.includes("to_jsonb(OLD) - ARRAY['body','search_vector']"))
 })
 
 test('Contrato da KB participa da suíte de segurança padrão', () => {

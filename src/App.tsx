@@ -1,5 +1,5 @@
 import { lazy, Suspense, useState, useMemo, useEffect } from 'react'
-import { Plus, Settings, ShieldAlert, ClipboardList, AlertOctagon, RefreshCw, Home, BarChart3, CircleCheckBig, TrendingUp, Code2 } from 'lucide-react'
+import { Plus, Settings, ShieldAlert, ClipboardList, AlertOctagon, RefreshCw, Home, BarChart3, CircleCheckBig, TrendingUp, Code2, BookOpen } from 'lucide-react'
 import { useBranding, useToast } from './context'
 import type { AppView, User, Company, Role } from './types'
 import { mockApiEndpoints } from './services/appMocks'
@@ -15,6 +15,7 @@ import { translateState } from './lib/statusLabels'
 import { useTenant } from './tenant'
 import { setTenantOverride } from './tenant/resolveTenant'
 import { useAuth } from './auth'
+import { isKbCapableRole } from './lib/kb-access'
 const UserPortalLayout = lazy(() => import('./pages/UserPortalLayout'))
 const AnalystCockpit = lazy(() => import('./pages/AnalystCockpit'))
 const TicketManagementDashboard = lazy(() => import('./pages/TicketManagementDashboard'))
@@ -23,6 +24,7 @@ const SettingsCenter = lazy(() => import('./pages/SettingsCenter'))
 const WorkflowBuilder = lazy(() => import('./pages/WorkflowBuilder'))
 const ChangeManagementDashboard = lazy(() => import('./pages/ChangeManagementDashboard'))
 const ApprovalCenter = lazy(() => import('./pages/ApprovalCenter'))
+const KnowledgeCenter = lazy(() => import('./pages/KnowledgeCenter'))
 const AnalyticsDashboard = lazy(() => import('./pages/admin/AnalyticsDashboard'))
 const DeveloperSettings = lazy(() => import('./pages/admin/DeveloperSettings'))
 const BiApp = lazy(() => import('./features/bi/BiApp'))
@@ -42,6 +44,7 @@ const PERSISTED_APP_VIEWS: readonly AppView[] = [
   'dashboard_problems',
   'dashboard_changes',
   'approval_inbox',
+  'knowledge_center',
   'user_portal',
   'api_docs',
   'settings_governance',
@@ -1100,6 +1103,9 @@ export default function App() {
                   >
                     <option value="sysadmin">SysAdmin (Admin Global)</option>
                     <option value="company_admin">CompanyAdmin (Admin Tenant)</option>
+                    <option value="agent">Agent (Analista)</option>
+                    <option value="ops_manager">OpsManager (Gestor de Operação)</option>
+                    <option value="governance_manager">GovernanceManager (Gestor de Governança)</option>
                     <option value="technician">Technician (Analista)</option>
                     <option value="area_manager">AreaManager (Gerente Torre)</option>
                     <option value="it_manager">ITManager (Gerente Geral TI)</option>
@@ -1132,6 +1138,13 @@ export default function App() {
     { view: 'approval_inbox', label: 'Minhas Aprovações', icon: <CircleCheckBig className="w-5 h-5" /> },
     { view: 'user_portal', label: 'Portal do Usuário', icon: <Home className="w-5 h-5" /> },
   ]
+
+  // Central de Conhecimento: analista/gestor de operação/gestor de governança
+  // + admins (a RLS/RPC de KB, migrations 131-133, já governa quem pode fazer
+  // o quê dentro da tela; este filtro é só conveniência de navegação).
+  if (isKbCapableRole(activeRole)) {
+    navItems.push({ view: 'knowledge_center', label: 'Base de Conhecimento', icon: <BookOpen className="w-5 h-5" /> })
+  }
 
   // O ServiceFY BI fica disponível para todos os perfis gerenciais/técnicos que alcançam esta tela
   navItems.push({ view: 'flowfy_bi', label: 'ServiceFY BI Analytics', icon: <BarChart3 className="w-5 h-5" /> })
@@ -1193,6 +1206,7 @@ export default function App() {
     if (activeView === 'dashboard_problems') return <ProblemDashboard companyId={currentCompany.id} />
     if (activeView === 'dashboard_changes') return <ChangeManagementDashboard companyId={currentCompany.id} />
     if (activeView === 'approval_inbox') return <ApprovalCenter />
+    if (activeView === 'knowledge_center') return <KnowledgeCenter onNavigateHome={() => setActiveView('dashboard_incidents')} />
     if (activeView === 'analytics_executive') return <AnalyticsDashboard />
     if (activeView === 'developer_settings') return <DeveloperSettings companyId={currentCompany.id} />
     if (activeView === 'api_docs') return isConfigEligible ? <ApiDocs /> : <WorkspaceLayout companyId={currentCompany.id} isProvider={isProvider} companies={companies} />

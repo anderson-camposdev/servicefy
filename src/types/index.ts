@@ -6,15 +6,17 @@
 // ─── RBAC & Access Control ───────────────────────────────────
 
 export type Role =
-  | 'sysadmin'       // Administrador Global do Sistema
-  | 'company_admin'  // Admin do Tenant/Empresa
-  | 'agent'          // Agente / Técnico operacional
-  | 'technician'     // Analista operacional
-  | 'area_manager'   // Gerente de Torre Técnica (ex: Sistemas, Infra)
-  | 'it_manager'     // Gerente Geral de TI / Operações
-  | 'client_manager' // Gestor de Contrato no Cliente
-  | 'cio'            // Executivo de TI
-  | 'end_user';      // Usuário Final (abre chamados e vê catálogo)
+  | 'sysadmin'           // Administrador Global do Sistema
+  | 'company_admin'      // Admin do Tenant/Empresa
+  | 'agent'              // Agente / Técnico operacional
+  | 'ops_manager'        // Gestor de Operação (KB: revisão/publicação; tickets: vê tudo)
+  | 'governance_manager' // Gestor de Governança (KB: aprovação/concessões; tickets: vê tudo)
+  | 'technician'         // Analista operacional
+  | 'area_manager'       // Gerente de Torre Técnica (ex: Sistemas, Infra)
+  | 'it_manager'         // Gerente Geral de TI / Operações
+  | 'client_manager'     // Gestor de Contrato no Cliente
+  | 'cio'                // Executivo de TI
+  | 'end_user';          // Usuário Final (abre chamados e vê catálogo)
 
 export interface Group {
   id: string;
@@ -358,6 +360,7 @@ export type AppView =
   | 'dashboard_problems'
   | 'dashboard_changes'
   | 'approval_inbox'
+  | 'knowledge_center'
   | 'user_portal'
   | 'api_docs'
   | 'admin_dashboard'

@@ -1,26 +1,32 @@
 // ============================================================
 // ServiceFY — Administração da Base de Conhecimento
-// Aberto pela Central de Configurações (seção 'knowledge'). CRUD de
-// categorias e artigos, editor Markdown + preview, workflow
-// (rascunho/revisão/publicado/arquivado), concessões para restrito,
-// versões e auditoria. A segurança real é a RLS/RPC; a UI é o gate
-// de conveniência (apenas company_admin/sysadmin chegam aqui).
+// Alcançável tanto pela Central de Configurações (seção 'knowledge',
+// admin-only) quanto pela Central de Conhecimento (KnowledgeCenter,
+// aberta a agent/ops_manager/governance_manager). CRUD de categorias
+// e artigos, editor Markdown + preview, workflow (rascunho/revisão/
+// publicado/arquivado) com máquina de estados por papel, concessões
+// para restrito, versões e auditoria. A segurança real é a RLS/RPC
+// (migrations 131-133); a UI só espelha as capacidades de cada papel
+// via src/lib/kb-access.ts.
 // ============================================================
 
 import { useCallback, useEffect, useState } from 'react'
 import {
   ArrowLeft, Plus, Search, Eye, EyeOff, Archive, Copy, Trash2, Save, Lock,
-  BookOpen, History, FolderTree, X, CheckCircle2, AlertTriangle, Sparkles,
+  BookOpen, History, FolderTree, X, CheckCircle2, AlertTriangle, Sparkles, RotateCcw,
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
+import { useAuth } from '../auth/AuthContext'
 import { knowledgeService, type ArticleInput } from '../lib/knowledge-service'
 import { renderMarkdown } from '../lib/markdown'
+import { isAdminRole } from '../lib/admin-access'
+import { hasKbCapability } from '../lib/kb-access'
 import type {
   KnowledgeArticleRow, KnowledgeCategoryRow, KnowledgeVisibility, KnowledgeStatus,
   KnowledgeArticleVersionRow, KnowledgeArticleGrantRow, KnowledgeGrantSubject,
 } from '../lib/database.types'
 
-interface Props { companyId: string; activeRole: string; onBack: () => void }
+interface Props { companyId: string; activeRole: string; onBack: () => void; backLabel?: string }
 interface Domain { id: string; name: string }
 interface Group { id: string; name: string }
 interface Person { id: string; name: string }
@@ -39,7 +45,10 @@ const VIS_META: Record<KnowledgeVisibility, { label: string }> = {
 }
 const PAGE = 12
 
-export default function KnowledgeAdmin({ companyId, onBack }: Props) {
+export default function KnowledgeAdmin({ companyId, activeRole, onBack, backLabel = 'Central de Configurações' }: Props) {
+  const { profile } = useAuth()
+  const isAdmin = isAdminRole(activeRole)
+  const canEditAny = hasKbCapability(activeRole, 'kb.edit_any')
   const [domains, setDomains] = useState<Domain[]>([])
   const [categories, setCategories] = useState<KnowledgeCategoryRow[]>([])
   const [rows, setRows] = useState<KnowledgeArticleRow[]>([])
@@ -114,6 +123,85 @@ export default function KnowledgeAdmin({ companyId, onBack }: Props) {
     catch (e) { setError((e as Error).message) }
   }
 
+  // Ações por linha seguem a máquina de estados de kb_set_article_status
+  // (migration 133): quem escreve nunca aprova o próprio artigo, revisão
+  // continua reservada a ops_manager/governance_manager/admin, e reinstaurar
+  // um arquivado é privilégio de governança.
+  const renderStatusActions = (a: KnowledgeArticleRow) => {
+    const isOwn = a.author_id === profile?.id
+    const actions: React.ReactNode[] = []
+
+    if (a.status === 'draft') {
+      if (isOwn || canEditAny) {
+        actions.push(
+          <IconBtn key="submit" title="Enviar para revisão" onClick={() => doAction(() => knowledgeService.submitReview(a.id, companyId), 'Artigo enviado para revisão.')}>
+            <Eye className="w-4 h-4 text-indigo-600" />
+          </IconBtn>,
+        )
+      }
+      if (isAdmin) {
+        actions.push(
+          <IconBtn key="publish" title="Publicar diretamente (pula revisão)" onClick={() => doAction(() => knowledgeService.publish(a.id, companyId), 'Artigo publicado.')}>
+            <Eye className="w-4 h-4 text-emerald-600" />
+          </IconBtn>,
+        )
+      }
+      if (isOwn || hasKbCapability(activeRole, 'kb.archive')) {
+        actions.push(
+          <ConfirmBtn key="archive" title="Arquivar" confirm={`Arquivar "${a.title}"? Ele deixará de aparecer no portal.`} onConfirm={() => doAction(() => knowledgeService.archive(a.id, companyId), 'Artigo arquivado.')}>
+            <Archive className="w-4 h-4 text-amber-600" />
+          </ConfirmBtn>,
+        )
+      }
+    } else if (a.status === 'review') {
+      if (hasKbCapability(activeRole, 'kb.approve_publish') && (isAdmin || !isOwn)) {
+        actions.push(
+          <IconBtn key="approve" title="Aprovar e publicar" onClick={() => doAction(() => knowledgeService.publish(a.id, companyId), 'Artigo publicado.')}>
+            <Eye className="w-4 h-4 text-emerald-600" />
+          </IconBtn>,
+        )
+      }
+      if (isOwn || hasKbCapability(activeRole, 'kb.reject_to_draft')) {
+        actions.push(
+          <IconBtn key="reject" title="Devolver para rascunho" onClick={() => doAction(() => knowledgeService.unpublish(a.id, companyId), 'Artigo devolvido para rascunho.')}>
+            <EyeOff className="w-4 h-4 text-slate-500" />
+          </IconBtn>,
+        )
+      }
+    } else if (a.status === 'published') {
+      if (hasKbCapability(activeRole, 'kb.unpublish')) {
+        actions.push(
+          <IconBtn key="unpublish" title="Despublicar" onClick={() => doAction(() => knowledgeService.unpublish(a.id, companyId), 'Artigo despublicado.')}>
+            <EyeOff className="w-4 h-4 text-slate-500" />
+          </IconBtn>,
+        )
+      }
+      if (hasKbCapability(activeRole, 'kb.archive')) {
+        actions.push(
+          <ConfirmBtn key="archive" title="Arquivar" confirm={`Arquivar "${a.title}"? Ele deixará de aparecer no portal.`} onConfirm={() => doAction(() => knowledgeService.archive(a.id, companyId), 'Artigo arquivado.')}>
+            <Archive className="w-4 h-4 text-amber-600" />
+          </ConfirmBtn>,
+        )
+      }
+    } else if (a.status === 'archived' && hasKbCapability(activeRole, 'kb.reinstate_archived')) {
+      actions.push(
+        <IconBtn key="reinstate" title="Reinstaurar como rascunho" onClick={() => doAction(() => knowledgeService.unpublish(a.id, companyId), 'Artigo reinstaurado como rascunho.')}>
+          <RotateCcw className="w-4 h-4 text-indigo-600" />
+        </IconBtn>,
+      )
+    }
+
+    if (hasKbCapability(activeRole, 'kb.create_draft')) {
+      actions.push(
+        <IconBtn key="dup" title="Duplicar" onClick={() => doAction(() => knowledgeService.duplicate(a.id, companyId), 'Artigo duplicado.')}>
+          <Copy className="w-4 h-4 text-slate-500" />
+        </IconBtn>,
+      )
+    }
+
+    return actions
+  }
+
   if (editing || creating) {
     return (
       <ArticleEditor
@@ -121,6 +209,8 @@ export default function KnowledgeAdmin({ companyId, onBack }: Props) {
         article={editing}
         categories={categories}
         domains={domains}
+        activeRole={activeRole}
+        currentProfileId={profile?.id}
         onClose={() => { setEditing(null); setCreating(false) }}
         onSaved={(msg) => { setEditing(null); setCreating(false); flash(msg); loadArticles() }}
       />
@@ -131,7 +221,7 @@ export default function KnowledgeAdmin({ companyId, onBack }: Props) {
     <div className="min-h-full bg-slate-50">
       <div className="mx-auto max-w-7xl p-5 lg:p-8">
         <button onClick={onBack} className="mb-5 inline-flex items-center gap-2 text-sm font-bold text-slate-600">
-          <ArrowLeft className="w-4 h-4" /> Central de Configurações
+          <ArrowLeft className="w-4 h-4" /> {backLabel}
         </button>
 
         <header className="flex flex-wrap items-start justify-between gap-4">
@@ -155,12 +245,16 @@ export default function KnowledgeAdmin({ companyId, onBack }: Props) {
                 {pendingDrafts} Rascunho{pendingDrafts === 1 ? '' : 's'} Pendente{pendingDrafts === 1 ? '' : 's'}
               </button>
             )}
-            <button onClick={() => setShowCats(true)} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700">
-              <FolderTree className="w-4 h-4" /> Categorias
-            </button>
-            <button onClick={() => setCreating(true)} className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-bold text-white">
-              <Plus className="w-4 h-4" /> Novo artigo
-            </button>
+            {hasKbCapability(activeRole, 'kb.manage_categories') && (
+              <button onClick={() => setShowCats(true)} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700">
+                <FolderTree className="w-4 h-4" /> Categorias
+              </button>
+            )}
+            {hasKbCapability(activeRole, 'kb.create_draft') && (
+              <button onClick={() => setCreating(true)} className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-bold text-white">
+                <Plus className="w-4 h-4" /> Novo artigo
+              </button>
+            )}
           </div>
         </header>
 
@@ -219,13 +313,7 @@ export default function KnowledgeAdmin({ companyId, onBack }: Props) {
                     </p>
                   </button>
                   <div className="flex shrink-0 flex-wrap items-center gap-1">
-                    {a.status !== 'published'
-                      ? <IconBtn title="Publicar" onClick={() => doAction(() => knowledgeService.publish(a.id, companyId), 'Artigo publicado.')}><Eye className="w-4 h-4 text-emerald-600" /></IconBtn>
-                      : <IconBtn title="Despublicar" onClick={() => doAction(() => knowledgeService.unpublish(a.id, companyId), 'Artigo despublicado.')}><EyeOff className="w-4 h-4 text-slate-500" /></IconBtn>}
-                    <IconBtn title="Duplicar" onClick={() => doAction(() => knowledgeService.duplicate(a.id, companyId), 'Artigo duplicado.')}><Copy className="w-4 h-4 text-slate-500" /></IconBtn>
-                    <ConfirmBtn title="Arquivar" confirm={`Arquivar "${a.title}"? Ele deixará de aparecer no portal.`} onConfirm={() => doAction(() => knowledgeService.archive(a.id, companyId), 'Artigo arquivado.')}>
-                      <Archive className="w-4 h-4 text-amber-600" />
-                    </ConfirmBtn>
+                    {renderStatusActions(a)}
                   </div>
                 </div>
               ))}
@@ -252,9 +340,10 @@ export default function KnowledgeAdmin({ companyId, onBack }: Props) {
 }
 
 // ─── Editor de artigo ──────────────────────────────────────────
-function ArticleEditor({ companyId, article, categories, domains, onClose, onSaved }: {
+function ArticleEditor({ companyId, article, categories, domains, activeRole, currentProfileId, onClose, onSaved }: {
   companyId: string; article: KnowledgeArticleRow | null
   categories: KnowledgeCategoryRow[]; domains: Domain[]
+  activeRole: string; currentProfileId: string | null | undefined
   onClose: () => void; onSaved: (msg: string) => void
 }) {
   const [title, setTitle] = useState(article?.title ?? '')
@@ -290,14 +379,39 @@ function ArticleEditor({ companyId, article, categories, domains, onClose, onSav
   }
 
   const saveAndClose = async () => { const id = await save(); if (id) onSaved('Artigo salvo.') }
-  const saveAndPublish = async () => {
+
+  // Botão de ação primária segue a máquina de estados: um artigo novo/em
+  // rascunho vai para revisão (exceto admin, que pode pular direto para
+  // publicado); um artigo em revisão só ganha o botão de aprovar se quem
+  // está editando não for o próprio autor (regra dos quatro olhos).
+  const status = article?.status ?? 'draft'
+  const isOwn = !article || article.author_id === currentProfileId
+  const isAdmin = isAdminRole(activeRole)
+  const canApprove = hasKbCapability(activeRole, 'kb.approve_publish') && (isAdmin || !isOwn)
+  const showAdvanceButton = status === 'draft' || (status === 'review' && canApprove)
+  const advanceLabel = status === 'draft' ? (isAdmin ? 'Salvar e publicar' : 'Salvar e enviar para revisão') : 'Salvar e aprovar'
+
+  const saveAndAdvance = async () => {
     const id = await save()
     if (!id) return
-    try { await knowledgeService.publish(id, companyId); onSaved('Artigo publicado.') }
-    catch (e) { setError((e as Error).message) }
+    try {
+      if (status === 'draft') {
+        if (isAdmin) await knowledgeService.publish(id, companyId)
+        else await knowledgeService.submitReview(id, companyId)
+      } else {
+        await knowledgeService.publish(id, companyId)
+      }
+      onSaved(status === 'draft' && !isAdmin ? 'Artigo enviado para revisão.' : 'Artigo publicado.')
+    } catch (e) { setError((e as Error).message) }
   }
 
   const inputCls = 'w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-200'
+
+  const tabs: Array<[typeof tab, string]> = [
+    ['edit', 'Conteúdo'],
+    ...(hasKbCapability(activeRole, 'kb.manage_grants') ? ([['grants', 'Concessões']] as Array<[typeof tab, string]>) : []),
+    ['versions', 'Versões'],
+  ]
 
   return (
     <div className="min-h-full bg-slate-50">
@@ -312,15 +426,17 @@ function ArticleEditor({ companyId, article, categories, domains, onClose, onSav
             <button disabled={saving} onClick={saveAndClose} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 disabled:opacity-50">
               <Save className="w-4 h-4" /> {saving ? 'Salvando…' : 'Salvar'}
             </button>
-            <button disabled={saving} onClick={saveAndPublish} className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50">
-              <Eye className="w-4 h-4" /> Salvar e publicar
-            </button>
+            {showAdvanceButton && (
+              <button disabled={saving} onClick={saveAndAdvance} className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50">
+                <Eye className="w-4 h-4" /> {advanceLabel}
+              </button>
+            )}
           </div>
         </div>
 
         {currentId && (
           <div className="mt-5 flex gap-1 border-b border-slate-200">
-            {([['edit', 'Conteúdo'], ['grants', 'Concessões'], ['versions', 'Versões']] as const).map(([k, l]) => (
+            {tabs.map(([k, l]) => (
               <button key={k} onClick={() => setTab(k)} className={`rounded-t-lg px-4 py-2 text-sm font-bold ${tab === k ? 'border-b-2 border-indigo-600 text-indigo-700' : 'text-slate-500'}`}>
                 {k === 'grants' && <Lock className="mr-1 inline w-3.5 h-3.5" />}
                 {k === 'versions' && <History className="mr-1 inline w-3.5 h-3.5" />}

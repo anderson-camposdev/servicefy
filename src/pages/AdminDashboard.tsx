@@ -10,15 +10,19 @@ import { useToast } from '../context'
 // agent, end_user}. As opções extras que existiam aqui antes (technician,
 // area_manager, it_manager, client_manager, cio) não existem no enum e
 // quebravam com um erro cru de cast do Postgres ao tentar salvar.
+// Migration 131 adicionou ops_manager/governance_manager ao enum real —
+// diferente dos papéis acima, esses dois são de fato persistíveis.
 const REAL_ROLE_OPTIONS: { value: Role; label: string }[] = [
   { value: 'end_user', label: 'EndUser (Usuário Final)' },
   { value: 'agent', label: 'Agent (Analista)' },
+  { value: 'ops_manager', label: 'OpsManager (Gestor de Operação)' },
+  { value: 'governance_manager', label: 'GovernanceManager (Gestor de Governança)' },
   { value: 'company_admin', label: 'CompanyAdmin (Admin do Tenant)' },
   { value: 'sysadmin', label: 'SysAdmin (Admin Global)' },
 ]
 // Fase 27: roles que consomem uma licença de analista (seat) — mesma lista
 // usada pelo trigger tg_enforce_analyst_license_limit no banco.
-const LICENSE_CONSUMING_ROLES: Role[] = ['agent', 'company_admin']
+const LICENSE_CONSUMING_ROLES: Role[] = ['agent', 'company_admin', 'ops_manager', 'governance_manager']
 
 // Fase 27: indicador "Licenças Usadas: X / Y" — cálculo puramente
 // derivado dos dados já carregados (rawCompanies/rawProfiles), sem chamada
@@ -73,6 +77,7 @@ function AssignmentGroupsAdmin({ currentCompany, rawProfiles }: AssignmentGroups
   // Form for new group
   const [newGroupName, setNewGroupName] = useState('')
   const [newGroupDesc, setNewGroupDesc] = useState('')
+  const [newGroupPrivate, setNewGroupPrivate] = useState(false)
   const [savingGroup, setSavingGroup] = useState(false)
 
   // Select analyst to add
@@ -130,10 +135,12 @@ function AssignmentGroupsAdmin({ currentCompany, rawProfiles }: AssignmentGroups
       const newGrp = await assignmentGroupsService.create({
         companyId: currentCompany.id,
         name: newGroupName.trim(),
-        description: newGroupDesc.trim() || undefined
+        description: newGroupDesc.trim() || undefined,
+        isPrivate: newGroupPrivate,
       })
       setNewGroupName('')
       setNewGroupDesc('')
+      setNewGroupPrivate(false)
       alert('Equipe solucionadora criada com sucesso!')
 
       const data = await assignmentGroupsService.list(currentCompany.id)
@@ -157,6 +164,21 @@ function AssignmentGroupsAdmin({ currentCompany, rawProfiles }: AssignmentGroups
       }
     } catch (err: any) {
       alert('Erro ao atualizar status do grupo: ' + err.message)
+    }
+  }
+
+  // Grupo privado: tickets atribuídos só ficam visíveis para membros do
+  // grupo + ops_manager/governance_manager/admin (RLS can_read_ticket,
+  // migration 134). Analistas de fora deixam de ver esses tickets.
+  const handleTogglePrivate = async (group: AssignmentGroupRow) => {
+    try {
+      const updated = await assignmentGroupsService.update(group.id, { is_private: !group.is_private })
+      setGroups(prev => prev.map(g => g.id === group.id ? updated : g))
+      if (selectedGroup?.id === group.id) {
+        setSelectedGroup(updated)
+      }
+    } catch (err: any) {
+      alert('Erro ao atualizar privacidade do grupo: ' + err.message)
     }
   }
 
@@ -222,10 +244,20 @@ function AssignmentGroupsAdmin({ currentCompany, rawProfiles }: AssignmentGroups
                       {!g.is_active && (
                         <span className="bg-red-50 text-red-600 border border-red-200 text-[9px] font-bold px-1.5 py-0.5 rounded">Inativo</span>
                       )}
+                      {g.is_private && (
+                        <span title="Tickets deste grupo só ficam visíveis para membros + gestores" className="bg-amber-50 text-amber-700 border border-amber-200 text-[9px] font-bold px-1.5 py-0.5 rounded">Privado</span>
+                      )}
                     </div>
                     {g.description && <div className="text-[10px] text-slate-400 mt-1 truncate">{g.description}</div>}
                   </div>
                   <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
+                    <button
+                      onClick={() => handleTogglePrivate(g)}
+                      title="Tickets deste grupo só ficam visíveis para membros + gestores"
+                      className={`text-[10px] px-2.5 py-1 rounded-md font-bold transition-all border shadow-xs cursor-pointer ${g.is_private ? 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100' : 'bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100'}`}
+                    >
+                      {g.is_private ? 'Privado' : 'Público'}
+                    </button>
                     <button
                       onClick={() => handleToggleActive(g)}
                       className={`text-[10px] px-2.5 py-1 rounded-md font-bold transition-all border shadow-xs cursor-pointer ${g.is_active ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100' : 'bg-red-50 text-red-700 border-red-200 hover:bg-red-100'}`}
@@ -265,6 +297,19 @@ function AssignmentGroupsAdmin({ currentCompany, rawProfiles }: AssignmentGroups
                 placeholder="Descrição resumida das responsabilidades do grupo..."
               />
             </div>
+            <label className="flex items-start gap-2.5 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={newGroupPrivate}
+                onChange={e => setNewGroupPrivate(e.target.checked)}
+                className="mt-0.5"
+              />
+              <span className="text-xs text-slate-600">
+                <span className="font-bold text-slate-700">Grupo privado</span>
+                <br />
+                <span className="text-[10px] text-slate-400">Tickets atribuídos a este grupo só ficam visíveis para membros dele, além de gestores de operação, gestores de governança e administradores. Use para equipes como RH ou Financeiro.</span>
+              </span>
+            </label>
             <button
               type="submit"
               disabled={savingGroup || !newGroupName.trim()}
