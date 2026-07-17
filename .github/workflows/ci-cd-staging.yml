@@ -118,7 +118,7 @@ jobs:
       # flag --dry-run própria — esta é a forma correta de pré-visualizar antes
       # dela.
       - name: Dry-run — diff de migrations local vs. staging
-        run: supabase migration list --linked
+        run: supabase migration list --linked --debug
 
       # Aplica estritamente as migrations PENDENTES (009→107 incluídas) contra
       # staging. `migration up` só soma migrations novas ao histórico — nunca
