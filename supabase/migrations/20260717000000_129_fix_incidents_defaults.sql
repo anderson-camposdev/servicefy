@@ -96,7 +96,7 @@ BEGIN
     NEW.close_code, NEW.close_notes, NEW.resolution_code, NEW.resolution_notes, COALESCE(NEW.kb_candidate, false),
     COALESCE(NEW.created_at, NOW()), COALESCE(NEW.updated_at, NOW()), v_approval_status, v_approval_paused_at,
     NEW.catalog_symptom_id, NEW.catalog_item_id, NEW.catalog_subitem_id, NEW.catalog_service_id, NEW.symptom_id
-  ) RETURNING id INTO NEW.id;
+  ) RETURNING id, number, state, created_at, updated_at INTO NEW.id, NEW.number, NEW.state, NEW.created_at, NEW.updated_at;
 
   IF COALESCE(NEW.ticket_type, 'incident') = 'incident' THEN
     INSERT INTO public.incident_attributes (
