@@ -7,6 +7,7 @@ export {
   resolveTenant,
   getTenantSlug,
   extractSlugFromHostname,
+  isCustomDomain,
   setTenantOverride,
   clearTenantOverride,
   BASE_DOMAIN,
@@ -16,7 +17,7 @@ export {
 } from './resolveTenant'
 export type { ResolvedTenant, TenantSource } from './resolveTenant'
 
-export { getTenantBySlug, getTenantByDomain } from './tenantService'
+export { getTenantBySlug, getTenantByDomain, getTenantByHostname } from './tenantService'
 
 export { provisionTenant } from './provisionTenant'
 export type { ProvisionTenantInput } from './provisionTenant'

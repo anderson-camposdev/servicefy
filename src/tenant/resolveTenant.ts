@@ -39,7 +39,7 @@ export const RESERVED_SUBDOMAINS = new Set([
 ])
 
 /** De onde o slug do tenant foi resolvido (útil para debug/telemetria). */
-export type TenantSource = 'subdomain' | 'query' | 'storage' | 'none'
+export type TenantSource = 'subdomain' | 'query' | 'storage' | 'domain' | 'none'
 
 export interface ResolvedTenant {
   /** Slug normalizado do tenant (ex.: "acme") ou null se não resolvido. */
@@ -157,3 +157,23 @@ export function clearTenantOverride(): void {
     /* ignora */
   }
 }
+
+/**
+ * Verifica se o hostname atual é um domínio customizado (não pertence a servicefy.app, flowfy.app, localhost ou Vercel system domains).
+ */
+export function isCustomDomain(hostname: string): boolean {
+  const host = hostname.toLowerCase().replace(/:\d+$/, '') // remove porta
+  
+  // IPs diretos não são domínios customizados
+  if (/^\d{1,3}(\.\d{1,3}){3}$/.test(host)) return false
+  if (host === 'localhost' || host === '127.0.0.1') return false
+  if (host.endsWith('.vercel.app')) return false
+
+  return (
+    host !== 'servicefy.app' &&
+    host !== 'www.servicefy.app' &&
+    host !== 'flowfy.app' &&
+    host !== 'www.flowfy.app'
+  )
+}
+

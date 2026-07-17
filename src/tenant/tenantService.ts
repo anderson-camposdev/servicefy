@@ -45,3 +45,90 @@ export async function getTenantByDomain(domain: string): Promise<CompanyRow | nu
   if (error) throw error
   return (data as CompanyRow) ?? null
 }
+
+/**
+ * Busca um tenant ativo pelo hostname do navegador.
+ * Tenta encontrar por correspondência direta do domínio da empresa,
+ * ou via tabela de domínios de login verificados, com fallback para o parent domain.
+ */
+export async function getTenantByHostname(hostname: string): Promise<CompanyRow | null> {
+  const host = hostname.toLowerCase().replace(/:\d+$/, '') // remove porta
+
+  // 1. Busca direta pelo campo `domain` na tabela `companies`
+  const { data: directCompany, error: directError } = await supabase
+    .from('companies')
+    .select(TENANT_COLUMNS)
+    .eq('domain', host)
+    .eq('active', true)
+    .maybeSingle()
+
+  if (directError) throw directError
+  if (directCompany) return directCompany as CompanyRow
+
+  // 2. Busca pela tabela `company_login_domains`
+  const { data: domainRecord, error: domainError } = await supabase
+    .from('company_login_domains')
+    .select('company_id')
+    .eq('domain', host)
+    .maybeSingle()
+
+  if (domainError) throw domainError
+  if (domainRecord) {
+    const { data: company, error: companyError } = await supabase
+      .from('companies')
+      .select(TENANT_COLUMNS)
+      .eq('id', domainRecord.company_id)
+      .eq('active', true)
+      .maybeSingle()
+
+    if (companyError) throw companyError
+    if (company) return company as CompanyRow
+  }
+
+  // 3. Fallback: se o hostname tiver mais de 2 partes (ex: suporte.alliedit.com.br),
+  // tenta buscar pelo domínio pai (alliedit.com.br)
+  const parts = host.split('.')
+  if (parts.length > 2) {
+    // Para domínios de dois níveis (ex: alliedit.com.br), o parent domain é parts.slice(1).join('.')
+    // Se o domínio for de 3 níveis (ex: suporte.alliedit.com.br), parts.slice(1).join('.') dará alliedit.com.br.
+    // Se for suporte.alliedit.com, parts.slice(1).join('.') dará alliedit.com.
+    const parentDomain = parts.slice(1).join('.')
+
+    // Evitamos buscar coisas genéricas como ".com" ou ".com.br"
+    if (parentDomain.includes('.')) {
+      // Tenta busca direta pelo parent domain
+      const { data: parentCompany, error: parentError } = await supabase
+        .from('companies')
+        .select(TENANT_COLUMNS)
+        .eq('domain', parentDomain)
+        .eq('active', true)
+        .maybeSingle()
+
+      if (parentError) throw parentError
+      if (parentCompany) return parentCompany as CompanyRow
+
+      // Tenta busca na company_login_domains pelo parent domain
+      const { data: parentDomainRecord, error: parentDomainError } = await supabase
+        .from('company_login_domains')
+        .select('company_id')
+        .eq('domain', parentDomain)
+        .maybeSingle()
+
+      if (parentDomainError) throw parentDomainError
+      if (parentDomainRecord) {
+        const { data: company, error: companyError } = await supabase
+          .from('companies')
+          .select(TENANT_COLUMNS)
+          .eq('id', parentDomainRecord.company_id)
+          .eq('active', true)
+          .maybeSingle()
+
+        if (companyError) throw companyError
+        if (company) return company as CompanyRow
+      }
+    }
+  }
+
+  return null
+}
+

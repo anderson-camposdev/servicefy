@@ -11,9 +11,9 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { CompanyRow } from '../lib/database.types'
-import { resolveTenant } from './resolveTenant'
+import { resolveTenant, isCustomDomain } from './resolveTenant'
 import type { TenantSource } from './resolveTenant'
-import { getTenantBySlug } from './tenantService'
+import { getTenantBySlug, getTenantByHostname } from './tenantService'
 import { brandingFromCompany, DEFAULT_BRANDING } from './applyBranding'
 import type { TenantBranding } from './applyBranding'
 
@@ -50,10 +50,13 @@ export function TenantProvider({ children }: { children: ReactNode }) {
   // (evita setState síncrono dentro do efeito / cascata de renders).
   const [state, setState] = useState<TenantState>(() => {
     const { slug, source } = resolveTenant()
+    const hostname = typeof window !== 'undefined' ? window.location.hostname : ''
+    const hasCustomDomain = hostname ? isCustomDomain(hostname) : false
+
     return {
-      status: slug ? 'loading' : 'no-tenant',
+      status: (slug || hasCustomDomain) ? 'loading' : 'no-tenant',
       slug,
-      source,
+      source: hasCustomDomain && !slug ? 'domain' : source,
       tenant: null,
       branding: DEFAULT_BRANDING,
       error: null,
@@ -61,8 +64,18 @@ export function TenantProvider({ children }: { children: ReactNode }) {
   })
 
   const refreshTenant = useCallback(async () => {
-    if (!state.slug) return
-    const row = await getTenantBySlug(state.slug)
+    const hostname = typeof window !== 'undefined' ? window.location.hostname : ''
+    const hasCustomDomain = hostname ? isCustomDomain(hostname) : false
+
+    if (!state.slug && !hasCustomDomain) return
+
+    let row: CompanyRow | null = null
+    if (state.slug) {
+      row = await getTenantBySlug(state.slug)
+    } else if (hasCustomDomain) {
+      row = await getTenantByHostname(hostname)
+    }
+
     if (!row) {
       setState(prev => ({ ...prev, status: 'not-found', tenant: null, branding: DEFAULT_BRANDING }))
       return
@@ -72,32 +85,55 @@ export function TenantProvider({ children }: { children: ReactNode }) {
       status: 'ready',
       tenant: row,
       branding: brandingFromCompany(row),
+      slug: row.slug,
       error: null,
     }))
   }, [state.slug])
 
   useEffect(() => {
-    if (!state.slug) return
+    const hostname = typeof window !== 'undefined' ? window.location.hostname : ''
+    const hasCustomDomain = hostname ? isCustomDomain(hostname) : false
+
+    if (!state.slug && !hasCustomDomain) return
+    if (state.tenant) return // evita busca duplicada se já carregado
 
     let cancelled = false
-    getTenantBySlug(state.slug)
-      .then(row => {
+
+    const fetchTenant = async () => {
+      try {
+        let row: CompanyRow | null = null
+        if (state.slug) {
+          row = await getTenantBySlug(state.slug)
+        } else if (hasCustomDomain) {
+          row = await getTenantByHostname(hostname)
+        }
+
         if (cancelled) return
+
         if (!row) {
           setState(prev => ({ ...prev, status: 'not-found' }))
           return
         }
+
         const branding = brandingFromCompany(row)
-        setState(prev => ({ ...prev, status: 'ready', tenant: row, branding }))
-      })
-      .catch((err: unknown) => {
+        setState(prev => ({
+          ...prev,
+          status: 'ready',
+          tenant: row,
+          branding,
+          slug: row.slug,
+        }))
+      } catch (err: unknown) {
         if (cancelled) return
         setState(prev => ({
           ...prev,
           status: 'error',
           error: err instanceof Error ? err.message : 'Falha ao carregar o tenant',
         }))
-      })
+      }
+    }
+
+    void fetchTenant()
 
     return () => {
       cancelled = true
