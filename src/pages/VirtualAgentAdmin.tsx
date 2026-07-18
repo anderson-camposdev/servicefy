@@ -19,9 +19,26 @@ interface Props { companyId: string; activeRole: string; onBack: () => void }
 const RESULT_LABEL: Record<string, { label: string; cls: string }> = {
   success:     { label: 'Sucesso',       cls: 'bg-emerald-100 text-emerald-700' },
   failed:      { label: 'Falhou',        cls: 'bg-red-100 text-red-700' },
-  transferred: { label: 'Transferido',   cls: 'bg-indigo-100 text-indigo-700' },
+  transferred: { label: 'Transferido',   cls: 'bg-primary-container text-on-primary-container' },
   blocked:     { label: 'Bloqueado',     cls: 'bg-slate-200 text-slate-600' },
   pending:     { label: 'Aguardando…',   cls: 'bg-amber-100 text-amber-700' },
+}
+
+export function normalizeVirtualAgentList<T>(value: T[] | null | undefined): T[] {
+  return Array.isArray(value) ? value : []
+}
+
+export function normalizeReadiness(
+  value: (Partial<ItsmReadiness> & Pick<ItsmReadiness, 'ready' | 'companyName'>) | null | undefined,
+): ItsmReadiness | null {
+  if (!value) return null
+  return {
+    companyId: value.companyId ?? '',
+    companyName: value.companyName,
+    ready: value.ready,
+    checks: normalizeVirtualAgentList(value.checks),
+    checkedAt: value.checkedAt ?? '',
+  }
 }
 
 export default function VirtualAgentAdmin({ companyId, onBack }: Props) {
@@ -43,7 +60,9 @@ export default function VirtualAgentAdmin({ companyId, onBack }: Props) {
         virtualAgentService.listExecutions(companyId),
         virtualAgentService.getReadiness(companyId),
       ])
-      setActions(a); setExecutions(e); setReadiness(r)
+      setActions(normalizeVirtualAgentList(a))
+      setExecutions(normalizeVirtualAgentList(e))
+      setReadiness(normalizeReadiness(r))
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'Falha ao carregar.') }
     finally { setLoading(false) }
   }, [companyId])
@@ -55,7 +74,7 @@ export default function VirtualAgentAdmin({ companyId, onBack }: Props) {
       <button onClick={onBack} className="mb-5 inline-flex items-center gap-2 text-sm font-bold text-slate-600"><ArrowLeft className="h-4 w-4" /> Central de Configurações</button>
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div className="flex items-center gap-3">
-          <span className="rounded-2xl bg-indigo-50 p-3 text-indigo-600"><Bot className="h-6 w-6" /></span>
+          <span className="rounded-xl bg-primary-container p-3 text-on-primary-container"><Bot className="h-6 w-6" /></span>
           <div>
             <h1 className="text-2xl font-black text-slate-900">Agente Virtual</h1>
             <p className="text-sm text-slate-500">Ações controladas, confirmação e transferência para humano.</p>
@@ -65,9 +84,9 @@ export default function VirtualAgentAdmin({ companyId, onBack }: Props) {
       </header>
 
       <div className="mt-5 flex gap-1 border-b border-slate-200">
-        <button onClick={() => setTab('actions')} className={`flex items-center gap-1.5 rounded-t-lg px-4 py-2 text-sm font-bold ${tab === 'actions' ? 'border-b-2 border-indigo-600 text-indigo-700' : 'text-slate-500'}`}><ListChecks className="h-4 w-4" /> Ações</button>
-        <button onClick={() => setTab('test')} className={`flex items-center gap-1.5 rounded-t-lg px-4 py-2 text-sm font-bold ${tab === 'test' ? 'border-b-2 border-indigo-600 text-indigo-700' : 'text-slate-500'}`}><MessageSquareText className="h-4 w-4" /> Testar conversa</button>
-        <button onClick={() => setTab('history')} className={`flex items-center gap-1.5 rounded-t-lg px-4 py-2 text-sm font-bold ${tab === 'history' ? 'border-b-2 border-indigo-600 text-indigo-700' : 'text-slate-500'}`}><History className="h-4 w-4" /> Histórico</button>
+        <button onClick={() => setTab('actions')} className={`flex items-center gap-1.5 px-4 py-2 text-sm font-bold ${tab === 'actions' ? 'border-b-2 border-primary text-primary' : 'text-slate-500'}`}><ListChecks className="h-4 w-4" /> Ações</button>
+        <button onClick={() => setTab('test')} className={`flex items-center gap-1.5 px-4 py-2 text-sm font-bold ${tab === 'test' ? 'border-b-2 border-primary text-primary' : 'text-slate-500'}`}><MessageSquareText className="h-4 w-4" /> Testar conversa</button>
+        <button onClick={() => setTab('history')} className={`flex items-center gap-1.5 px-4 py-2 text-sm font-bold ${tab === 'history' ? 'border-b-2 border-primary text-primary' : 'text-slate-500'}`}><History className="h-4 w-4" /> Histórico</button>
       </div>
 
       {error && <div className="mt-5 flex gap-2 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700"><AlertTriangle className="h-4 w-4" />{error}</div>}
@@ -76,7 +95,9 @@ export default function VirtualAgentAdmin({ companyId, onBack }: Props) {
         <section className={`mt-5 rounded-2xl border p-5 ${readiness.ready ? 'border-emerald-200 bg-emerald-50' : 'border-amber-200 bg-amber-50'}`}>
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
-              <h2 className={`font-extrabold ${readiness.ready ? 'text-emerald-900' : 'text-amber-900'}`}>Prontidão do Service Desk · {readiness.companyName}</h2>
+              <h2 className={`font-extrabold ${readiness.ready ? 'text-emerald-900' : 'text-amber-900'}`}>
+                Prontidão do Service Desk{readiness.companyName ? ` · ${readiness.companyName}` : ''}
+              </h2>
               <p className={`mt-1 text-xs ${readiness.ready ? 'text-emerald-700' : 'text-amber-700'}`}>{readiness.ready ? 'Configuração apta para abrir e consultar chamados.' : 'Existem configurações obrigatórias pendentes.'}</p>
             </div>
             <span className={`rounded-full px-3 py-1 text-xs font-black ${readiness.ready ? 'bg-emerald-600 text-white' : 'bg-amber-500 text-white'}`}>{readiness.ready ? 'PRONTO' : 'ATENÇÃO'}</span>
@@ -158,12 +179,12 @@ function ActionsPanel({ companyId, actions, loading, onChanged, onError, onFlash
           <label className="block text-xs font-bold">Confiança mínima (0–1)<input type="number" step="0.01" min="0" max="1" value={form.minConfidence} onChange={e => setForm(f => ({ ...f, minConfidence: Number(e.target.value) }))} className="mt-1 w-full rounded-xl border px-3 py-2.5 text-sm" /></label>
           <label className="flex items-center gap-2 text-sm font-semibold"><input type="checkbox" checked={form.requiresConfirmation} onChange={e => setForm(f => ({ ...f, requiresConfirmation: e.target.checked }))} /> Exige confirmação (Sim/Não)</label>
           <label className="flex items-center gap-2 text-sm font-semibold"><input type="checkbox" checked={form.enabled} onChange={e => setForm(f => ({ ...f, enabled: e.target.checked }))} /> Ativa</label>
-          <button onClick={() => void add()} className="flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-3 text-sm font-bold text-white"><Plus className="h-4 w-4" /> Adicionar ação</button>
+          <button onClick={() => void add()} className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-bold text-on-primary hover:opacity-90"><Plus className="h-4 w-4" /> Adicionar ação</button>
         </div>
       </section>
 
       <section className="rounded-2xl border bg-white p-5 shadow-sm">
-        <h2 className="flex items-center gap-2 font-extrabold"><ListChecks className="h-4 w-4 text-indigo-600" /> Ações configuradas</h2>
+        <h2 className="flex items-center gap-2 font-extrabold"><ListChecks className="h-4 w-4 text-primary" /> Ações configuradas</h2>
         {loading ? <div className="py-12 text-center text-sm text-slate-500"><Loader2 className="mx-auto h-5 w-5 animate-spin" /></div> :
           actions.length === 0 ? <div className="mt-4 rounded-xl border border-dashed p-8 text-center text-sm text-slate-500">Nenhuma ação configurada.</div> :
           <div className="mt-4 space-y-2">{actions.map(a => (
@@ -203,7 +224,7 @@ function HistoryPanel({ executions, loading, actions }: { executions: VirtualAge
   const actionName = (id: string | null) => actions.find(a => a.id === id)?.name ?? id ?? '—'
   return (
     <section className="mt-6 rounded-2xl border bg-white p-5 shadow-sm">
-      <h2 className="flex items-center gap-2 font-extrabold"><History className="h-4 w-4 text-indigo-600" /> Execuções recentes</h2>
+      <h2 className="flex items-center gap-2 font-extrabold"><History className="h-4 w-4 text-primary" /> Execuções recentes</h2>
       {loading ? <div className="py-12 text-center text-sm text-slate-500"><Loader2 className="mx-auto h-5 w-5 animate-spin" /></div> :
         executions.length === 0 ? <div className="mt-4 rounded-xl border border-dashed p-8 text-center text-sm text-slate-500">Nenhuma execução registrada ainda.</div> :
         <div className="mt-4 space-y-2">{executions.map(e => (

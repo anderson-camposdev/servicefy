@@ -93,11 +93,23 @@ const themeClasses: Record<ThemeName, {
   Graphite: { headerBg: 'bg-zinc-950', headerBorder: 'border-zinc-800/40', headerText: 'text-white', accentBg: 'bg-zinc-100', accentText: 'text-zinc-600' },
   Crimson: { headerBg: 'bg-red-950', headerBorder: 'border-red-900/40', headerText: 'text-white', accentBg: 'bg-red-50', accentText: 'text-red-700' },
   Forest: { headerBg: 'bg-teal-950', headerBorder: 'border-teal-900/40', headerText: 'text-white', accentBg: 'bg-teal-50', accentText: 'text-teal-700' },
-  Pearl: { headerBg: 'bg-slate-50', headerBorder: 'border-slate-200', headerText: 'text-slate-900', accentBg: 'bg-indigo-50', accentText: 'text-indigo-600' },
+  Pearl: {
+    headerBg: 'bg-slate-50',
+    headerBorder: 'border-slate-200',
+    headerText: 'text-slate-900',
+    accentBg: 'bg-indigo-50',
+    accentText: 'text-indigo-600',
+  },
   Breeze: { headerBg: 'bg-sky-50', headerBorder: 'border-sky-200', headerText: 'text-sky-900', accentBg: 'bg-sky-50', accentText: 'text-sky-600' },
   Meadow: { headerBg: 'bg-green-50', headerBorder: 'border-green-200', headerText: 'text-green-900', accentBg: 'bg-green-50', accentText: 'text-green-700' },
   Blush: { headerBg: 'bg-rose-50', headerBorder: 'border-rose-200', headerText: 'text-rose-900', accentBg: 'bg-rose-50', accentText: 'text-rose-600' },
-  Stone: { headerBg: 'bg-stone-50', headerBorder: 'border-stone-200', headerText: 'text-stone-900', accentBg: 'bg-amber-50', accentText: 'text-amber-700' },
+  Stone: {
+    headerBg: 'bg-stone-50',
+    headerBorder: 'border-stone-200',
+    headerText: 'text-stone-900',
+    accentBg: 'bg-amber-50',
+    accentText: 'text-amber-700',
+  },
 }
 
 // Maps portal incident category IDs to DB IncidentCategory values
@@ -966,13 +978,13 @@ const UserPortalLayout = ({ companyId }: { companyId?: string } = {}) => {
 
   return (
     <>
-    <div style={{ width:'100%', height:'100vh', display:'flex', overflow:'hidden', fontFamily:'system-ui,sans-serif' }}>
+    <div className="servicefy-portal-shell" style={{ width:'100%', height:'100vh', display:'flex', overflow:'hidden' }}>
 
       {/* ═══ SIDEBAR ═══ */}
-      <div style={{ width:268, flexShrink:0, background:sb.bg, display:'flex', flexDirection:'column', overflow:'hidden' }}>
+      <div className="servicefy-portal-sidebar" style={{ width:268, flexShrink:0, background:sb.bg, display:'flex', flexDirection:'column', overflow:'hidden' }}>
 
         {/* Logo + company */}
-        <div style={{ padding:'18px 20px 14px', borderBottom:`1px solid ${sb.border}`, textAlign:'center' }}>
+        <div className="servicefy-portal-brand" style={{ padding:'18px 20px 14px', borderBottom:`1px solid ${sb.border}`, textAlign:'center' }}>
           <div style={{ display:'flex', justifyContent:'center', width:'100%', marginBottom:12 }}>
             {branding.logoUrl ? (
               <div style={{ width:'100%', height:56, borderRadius:8, overflow:'hidden' }}>
@@ -1001,7 +1013,7 @@ const UserPortalLayout = ({ companyId }: { companyId?: string } = {}) => {
         </div>
 
         {/* Nav */}
-        <nav style={{ padding:'12px 12px 0', flexShrink:0 }}>
+        <nav className="servicefy-portal-nav" aria-label="Navegação do portal" style={{ padding:'12px 12px 0', flexShrink:0 }}>
           {navItems.map(item => (
             <a key={item.key} href="#"
               onClick={e => { e.preventDefault(); item.onClick() }}
@@ -1018,7 +1030,7 @@ const UserPortalLayout = ({ companyId }: { companyId?: string } = {}) => {
         </nav>
 
         {/* Chamados Ativos */}
-        <div style={{ margin:'12px 16px 0', borderTop:`1px solid ${sb.border}`, paddingTop:12, flexShrink:0 }}>
+        <div className="servicefy-portal-active-tickets" style={{ margin:'12px 16px 0', borderTop:`1px solid ${sb.border}`, paddingTop:12, flexShrink:0 }}>
           <div style={{ font:'700 9px monospace', color:sb.muted, textTransform:'uppercase', letterSpacing:'.1em', marginBottom:10, padding:'0 4px' }}>
             Chamados Ativos
           </div>
@@ -1041,7 +1053,7 @@ const UserPortalLayout = ({ companyId }: { companyId?: string } = {}) => {
         </div>
 
         {/* Mini stats */}
-        <div style={{ margin:'12px 16px 0', flexShrink:0 }}>
+        <div className="servicefy-portal-stats" style={{ margin:'12px 16px 0', flexShrink:0 }}>
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
             <div style={{ padding:10, background:'rgba(220,38,38,.1)', border:'1px solid rgba(220,38,38,.18)', borderRadius:9, textAlign:'center' }}>
               <div style={{ font:'800 22px/1 sans-serif', color:'#ef4444' }}>{p1Count}</div>
@@ -1055,7 +1067,7 @@ const UserPortalLayout = ({ companyId }: { companyId?: string } = {}) => {
         </div>
 
         {/* User footer */}
-        <div style={{ marginTop:'auto', padding:'14px 16px', borderTop:`1px solid ${sb.border}`, display:'flex', alignItems:'center', gap:10 }}>
+        <div className="servicefy-portal-user" style={{ marginTop:'auto', padding:'14px 16px', borderTop:`1px solid ${sb.border}`, display:'flex', alignItems:'center', gap:10 }}>
           <div style={{ width:36, height:36, borderRadius:'50%', background:brand, display:'flex', alignItems:'center', justifyContent:'center', font:'700 13px sans-serif', color:'#fff', flexShrink:0 }}>
             {getInitials(userName)}
           </div>
@@ -1067,7 +1079,7 @@ const UserPortalLayout = ({ companyId }: { companyId?: string } = {}) => {
       </div>
 
       {/* ═══ MAIN ═══ */}
-      <div style={{
+      <div className="servicefy-portal-main" style={{
         flex:1, minWidth:0, display:'flex', flexDirection:'column', overflow:'hidden',
         background: branding.backgroundUrl
           ? `linear-gradient(rgba(248,250,252,0.92),rgba(248,250,252,0.92)),url("${branding.backgroundUrl}") center/cover`
@@ -1078,7 +1090,7 @@ const UserPortalLayout = ({ companyId }: { companyId?: string } = {}) => {
         {(() => {
           const currentTheme = themeClasses[branding.themeName as ThemeName] || themeClasses.CorporateBlue
           return (
-            <div className={`flex-shrink-0 border-b px-7 py-4 ${currentTheme.headerBg} ${currentTheme.headerBorder}`}>
+            <div className={`servicefy-portal-header flex-shrink-0 border-b px-7 py-4 ${currentTheme.headerBg} ${currentTheme.headerBorder}`}>
               <div className={`text-xs font-semibold ${currentTheme.headerText === 'text-white' ? 'text-slate-300' : 'text-slate-500'} mb-0.5`} style={{ color: branding.greetingColor || undefined }}>
                 {branding.greetingPrefix ? `${branding.greetingPrefix}, ${profile?.name?.split(' ')[0] || 'você'}` : getGreeting()}
               </div>
@@ -1108,7 +1120,7 @@ const UserPortalLayout = ({ companyId }: { companyId?: string } = {}) => {
 
         {/* HOME */}
         {isHome && (
-          <div style={{ flex:1, overflowY:'auto', padding:'22px 28px' }}>
+          <div className="servicefy-portal-content" style={{ flex:1, overflowY:'auto', padding:'22px 28px' }}>
             <HomeContent
               config={config}
               brand={brand}
@@ -1130,7 +1142,7 @@ const UserPortalLayout = ({ companyId }: { companyId?: string } = {}) => {
 
         {/* MEUS CHAMADOS */}
         {isTickets && (
-          <div style={{ flex:1, overflowY:'auto', padding:'22px 28px' }}>
+          <div className="servicefy-portal-content" style={{ flex:1, overflowY:'auto', padding:'22px 28px' }}>
             <UserTicketList
               ticketsLoading={ticketsLoading}
               tickets={activeTickets}
@@ -1144,7 +1156,7 @@ const UserPortalLayout = ({ companyId }: { companyId?: string } = {}) => {
 
         {/* HISTÓRICO */}
         {isHistory && (
-          <div style={{ flex:1, overflowY:'auto', padding:'22px 28px' }}>
+          <div className="servicefy-portal-content" style={{ flex:1, overflowY:'auto', padding:'22px 28px' }}>
             <UserTicketList
               ticketsLoading={ticketsLoading}
               tickets={closedTickets}
@@ -1158,7 +1170,7 @@ const UserPortalLayout = ({ companyId }: { companyId?: string } = {}) => {
 
         {/* TICKET DETAIL */}
         {isTicketDetail && selectedTicket && (
-          <div style={{ flex:1, overflowY:'auto', padding:'22px 28px' }}>
+          <div className="servicefy-portal-content" style={{ flex:1, overflowY:'auto', padding:'22px 28px' }}>
             {/* Botão Voltar */}
             <button onClick={goBack}
               style={{ display:'inline-flex', alignItems:'center', gap:6, padding:'7px 13px', border:'1.5px solid #e2e8f0', borderRadius:9, font:'600 13px sans-serif', color:'#475569', background:'#fff', cursor:'pointer', marginBottom:20 }}>
@@ -1492,10 +1504,10 @@ const UserPortalLayout = ({ companyId }: { companyId?: string } = {}) => {
 
         {/* FLOW screens */}
         {isFlow && (
-          <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
+          <div className="servicefy-portal-flow" style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
 
             {/* Back bar + progress dots */}
-            <div style={{ flexShrink:0, padding:'12px 28px', background:'#fff', borderBottom:'1px solid #e2e8f0', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+            <div className="servicefy-portal-flowbar" style={{ flexShrink:0, padding:'12px 28px', background:'#fff', borderBottom:'1px solid #e2e8f0', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
               <div style={{ display:'flex', alignItems:'center', gap:14 }}>
                 <button onClick={goBack}
                   style={{ display:'flex', alignItems:'center', gap:6, padding:'7px 13px', border:'1.5px solid #e2e8f0', borderRadius:9, font:'600 13px sans-serif', color:'#475569', background:'#fff', cursor:'pointer' }}>
@@ -1513,7 +1525,7 @@ const UserPortalLayout = ({ companyId }: { companyId?: string } = {}) => {
               </div>
             </div>
 
-            <div style={{ flex:1, overflowY:'auto', padding:'26px 28px' }}>
+            <div className="servicefy-portal-flow-content" style={{ flex:1, overflowY:'auto', padding:'26px 28px' }}>
 
               {/* DEPT: Hub do departamento (RH, Financeiro…) — mesma escolha da home, mas escopada */}
               {screen === 'dept-cats' && (
@@ -1521,7 +1533,7 @@ const UserPortalLayout = ({ companyId }: { companyId?: string } = {}) => {
                   <h2 style={{ font:'700 20px sans-serif', color:'#0f172a', marginBottom:6 }}>{selDept?.name || 'Departamento'}</h2>
                   <p style={{ font:'400 14px sans-serif', color:'#94a3b8', marginBottom:20 }}>O que você precisa em {selDept?.name || 'departamento'}?</p>
 
-                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+                  <div className="servicefy-portal-choice-grid" style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
                     <button onClick={() => setScreen('inc-cats')}
                       style={{ display:'flex', flexDirection:'column', gap:11, padding:20, background:'#fff', border:'2px solid #fecaca', borderRadius:14, textAlign:'left', boxShadow:'0 1px 3px rgba(220,38,38,.07)', cursor:'pointer', transition:'transform .15s,box-shadow .15s' }}>
                       <div style={{ display:'flex', alignItems:'center', gap:11 }}>
@@ -1612,7 +1624,7 @@ const UserPortalLayout = ({ companyId }: { companyId?: string } = {}) => {
                     </div>
                   </div>
 
-                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14, marginBottom:18 }}>
+                  <div className="servicefy-portal-form-grid" style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14, marginBottom:18 }}>
                     <div>
                       <label style={{ display:'block', font:'700 11px sans-serif', textTransform:'uppercase', letterSpacing:'.05em', color:'#64748b', marginBottom:7 }}>Impacto</label>
                       <select value={impact} onChange={e => setImpact(e.target.value as typeof impact)}

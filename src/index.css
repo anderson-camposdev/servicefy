@@ -196,3 +196,244 @@ html, body, #root {
 }
 
 body { min-width: 320px; }
+
+body,
+button,
+input,
+select,
+textarea {
+  font-family: var(--font-family-sans);
+}
+
+::placeholder {
+  color: #64748b;
+  opacity: 1;
+}
+
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--brand-primary);
+  outline-offset: 2px;
+}
+
+@media (max-width: 1023px) {
+  .servicefy-workflow-shell {
+    flex-direction: column;
+  }
+
+  .servicefy-workflow-sidebar {
+    width: 100% !important;
+    max-height: 15rem;
+    border-right: 0 !important;
+    border-bottom: 1px solid var(--color-outline-variant);
+  }
+
+  .servicefy-workflow-header {
+    align-items: flex-start !important;
+    flex-wrap: wrap;
+    padding: 0.875rem 1rem !important;
+  }
+
+  .servicefy-workflow-actions {
+    width: 100%;
+    overflow-x: auto;
+    padding-bottom: 0.125rem;
+    scrollbar-width: none;
+  }
+
+  .servicefy-workflow-actions > * {
+    flex-shrink: 0;
+  }
+
+  .servicefy-workflow-tabs {
+    padding-inline: 1rem !important;
+    scrollbar-width: none;
+  }
+
+  .servicefy-portal-shell {
+    height: 100dvh !important;
+    flex-direction: column !important;
+    font-family: var(--font-family-sans) !important;
+  }
+
+  .servicefy-portal-main {
+    padding-bottom: calc(4.5rem + env(safe-area-inset-bottom)) !important;
+  }
+
+  .servicefy-portal-sidebar {
+    position: fixed !important;
+    inset: auto 0 0 !important;
+    z-index: 40;
+    width: 100% !important;
+    height: auto !important;
+    border-top: 1px solid var(--color-outline-variant);
+    overflow: visible !important;
+  }
+
+  .servicefy-portal-brand,
+  .servicefy-portal-active-tickets,
+  .servicefy-portal-stats,
+  .servicefy-portal-user {
+    display: none !important;
+  }
+
+  .servicefy-portal-nav {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.25rem;
+    padding: 0.5rem 0.5rem max(0.5rem, env(safe-area-inset-bottom)) !important;
+  }
+
+  .servicefy-portal-nav > a {
+    min-height: 3.25rem;
+    flex-direction: column;
+    justify-content: center;
+    gap: 0.2rem !important;
+    margin: 0 !important;
+    padding: 0.35rem !important;
+    font-size: 0.6875rem !important;
+    line-height: 1rem;
+    text-align: center;
+  }
+
+  .servicefy-portal-header {
+    padding: 1rem 1.25rem !important;
+  }
+
+  .servicefy-portal-header > div:nth-child(2) {
+    max-width: calc(100vw - 2.5rem);
+    font-size: 1.25rem !important;
+    line-height: 1.55rem;
+  }
+
+  .servicefy-portal-content,
+  .servicefy-portal-flow-content {
+    padding: 1rem !important;
+  }
+
+  .servicefy-portal-flowbar {
+    align-items: flex-start !important;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem !important;
+  }
+
+  .servicefy-portal-flowbar > div:first-child {
+    min-width: 0;
+    flex: 1;
+  }
+
+  .servicefy-portal-flowbar > div:first-child > span {
+    display: none;
+  }
+
+  .servicefy-portal-choice-grid,
+  .servicefy-portal-form-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .servicefy-portal-agent-actions {
+    inset: auto 0.75rem calc(4.75rem + env(safe-area-inset-bottom)) auto !important;
+  }
+
+  .servicefy-portal-agent-actions > div {
+    display: none;
+  }
+
+  .servicefy-ticket-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .servicefy-ticket-actions {
+    width: 100%;
+    border-left: 0;
+    padding-left: 0;
+  }
+
+  .servicefy-ticket-actions > div:first-child {
+    flex: 1;
+  }
+
+  .servicefy-ticket-search {
+    width: 100% !important;
+  }
+
+  .servicefy-ticket-metrics {
+    max-height: 5.5rem;
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .servicefy-ticket-metrics > div:first-child {
+    display: flex;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+  }
+
+  .servicefy-ticket-metrics > div:first-child > button {
+    min-width: 9rem;
+  }
+
+  .servicefy-ticket-content {
+    overflow: hidden !important;
+    padding-inline: 0.75rem !important;
+  }
+
+  .servicefy-ticket-dashboard .servicefy-data-table th:nth-child(n + 4),
+  .servicefy-ticket-dashboard .servicefy-data-table td:nth-child(n + 4) {
+    display: none;
+  }
+
+  .servicefy-ticket-dashboard .servicefy-data-table th,
+  .servicefy-ticket-dashboard .servicefy-data-table td {
+    max-width: none;
+  }
+
+  .servicefy-ticket-dashboard .servicefy-data-table th:nth-child(2),
+  .servicefy-ticket-dashboard .servicefy-data-table td:nth-child(2) {
+    width: 8.5rem;
+  }
+
+  .servicefy-ticket-dashboard .servicefy-data-table table,
+  .servicefy-change-table .servicefy-data-table table {
+    table-layout: fixed;
+  }
+
+  .servicefy-change-table .servicefy-data-table th:nth-child(n + 3),
+  .servicefy-change-table .servicefy-data-table td:nth-child(n + 3) {
+    display: none;
+  }
+
+  .servicefy-change-table .servicefy-data-table th:first-child,
+  .servicefy-change-table .servicefy-data-table td:first-child {
+    width: 8rem;
+  }
+}
+
+@media (max-width: 639px) {
+  .servicefy-workflow-sidebar {
+    max-height: 12.5rem;
+  }
+
+  button,
+  [role="button"],
+  input:not([type="checkbox"]):not([type="radio"]),
+  select {
+    min-height: 44px;
+  }
+
+  .servicefy-portal-header > div:first-child {
+    font-size: 0.75rem !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

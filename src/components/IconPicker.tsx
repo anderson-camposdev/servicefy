@@ -117,7 +117,7 @@ export default function IconPicker({ value, onChange, companyId, label = "Ícone
                           key={iconName}
                           onClick={() => { onChange(`lucide:${iconName}`); setOpen(false); }}
                           title={iconName}
-                          className={`p-2 rounded-xl flex items-center justify-center transition-colors ${isSelected ? 'bg-indigo-100 text-indigo-700' : 'text-slate-600 hover:bg-slate-100'}`}
+                          className={`p-2 rounded-xl flex items-center justify-center transition-colors ${isSelected ? 'bg-primary-container text-on-primary-container' : 'text-slate-600 hover:bg-slate-100'}`}
                         >
                           <Cmp className="w-6 h-6" />
                         </button>

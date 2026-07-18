@@ -12,6 +12,7 @@ const sql = [
   '20260718000000_131_kb_role_enum_expansion.sql',
   '20260718000100_132_kb_role_governance.sql',
   '20260718000200_133_kb_workflow_state_machine.sql',
+  '20260718000800_139_knowledge_review_due.sql',
 ].map(f => read('supabase/migrations/' + f)).join('\n')
 const service = read('src/lib/knowledge-service.ts')
 const markdown = read('src/lib/markdown.ts')
@@ -241,6 +242,13 @@ test('CRUD administrativo da KB é auditado (via write_kb_audit_event) sem armaz
   assert.match(auditBody, /public\.is_kb_contributor\(v_company\)/)
   assert.match(auditBody, /public\.write_kb_audit_event/)
   assert.ok(auditBody.includes("to_jsonb(OLD) - ARRAY['body','search_vector']"))
+})
+
+test('Revisão programada (review_due_at) é aditiva e coberta pelas policies existentes — sem policy nova de escrita', () => {
+  assert.match(sql, /ADD COLUMN IF NOT EXISTS review_due_at date/)
+  // A migration 139 não pode reabrir escrita fora de knowledge_author_insert/update.
+  const reviewMigration = read('supabase/migrations/20260718000800_139_knowledge_review_due.sql')
+  assert.doesNotMatch(reviewMigration, /CREATE POLICY|GRANT (INSERT|UPDATE|DELETE)/)
 })
 
 test('Contrato da KB participa da suíte de segurança padrão', () => {

@@ -137,10 +137,10 @@ const mockRows: Row[] = [
 ]
 
 const KANBAN_COLUMNS = [
-  { id: 'open', title: 'Abertos', color: 'border-slate-300' },
-  { id: 'progress', title: 'Em Atendimento', color: 'border-indigo-400' },
-  { id: 'waiting', title: 'Aguardando', color: 'border-amber-400' },
-  { id: 'resolved', title: 'Resolvidos', color: 'border-green-400' },
+  { id: 'open', title: 'Abertos', color: 'bg-slate-400' },
+  { id: 'progress', title: 'Em Atendimento', color: 'bg-blue-500' },
+  { id: 'waiting', title: 'Aguardando', color: 'bg-amber-500' },
+  { id: 'resolved', title: 'Resolvidos', color: 'bg-emerald-500' },
 ]
 
 // ─── Helpers de mapeamento (estado/prioridade → UI) ───────────
@@ -409,7 +409,7 @@ const TicketManagementDashboard = ({ onOpenTicket, companyId, isProvider, compan
   const canOpenNew = realMode && Boolean(profile) && Boolean(newTicketCompanyId)
 
   return (
-    <div data-testid="ticket-dashboard" className="flex flex-col h-full min-h-0 min-w-0 w-full max-w-full bg-slate-50 overflow-hidden font-sans text-slate-900">
+    <div data-testid="ticket-dashboard" className="servicefy-ticket-dashboard flex flex-col h-full min-h-0 min-w-0 w-full max-w-full bg-background overflow-hidden font-sans text-on-surface">
 
       {canOpenNew && profile && (
         <NewTicketModal
@@ -422,7 +422,7 @@ const TicketManagementDashboard = ({ onOpenTicket, companyId, isProvider, compan
       )}
 
       {/* 1. BARRA SUPERIOR: Filtros e Controle de Visão */}
-      <div className="bg-white border-b border-slate-200 px-3 sm:px-4 xl:px-6 py-3 flex items-center justify-between shrink-0 gap-2 xl:gap-4 min-w-0">
+      <div className="servicefy-ticket-toolbar bg-surface border-b border-outline-variant px-3 sm:px-4 xl:px-6 py-3 flex items-center justify-between shrink-0 gap-2 xl:gap-4 min-w-0">
         {showClientChips ? (
           <div className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto pb-1 hide-scrollbar">
             <span className="text-sm font-bold text-slate-400 uppercase tracking-wider mr-2 flex items-center gap-1 shrink-0">
@@ -446,7 +446,7 @@ const TicketManagementDashboard = ({ onOpenTicket, companyId, isProvider, compan
           <div className="text-sm font-bold text-slate-700">Fila de Atendimento</div>
         )}
 
-        <div className="flex min-w-0 items-center gap-2 xl:gap-4 pl-2 xl:pl-4 border-l border-slate-200 shrink-0">
+        <div className="servicefy-ticket-actions flex min-w-0 items-center gap-2 xl:gap-4 pl-2 xl:pl-4 border-l border-outline-variant shrink-0">
           <div className="relative min-w-0">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <input
@@ -454,14 +454,14 @@ const TicketManagementDashboard = ({ onOpenTicket, companyId, isProvider, compan
               value={realMode ? undefined : localSearch}
               onChange={(e) => handleSearchChange(e.target.value)}
               placeholder="Buscar ID ou assunto..."
-              className="pl-9 pr-4 py-1.5 bg-slate-100 border-transparent rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:bg-white outline-none transition-all w-36 sm:w-44 xl:w-56 2xl:w-64"
+              className="servicefy-ticket-search pl-9 pr-4 py-2 bg-surface-container border-transparent rounded-lg text-sm focus:ring-2 focus:ring-primary focus:bg-surface outline-none transition-all w-36 sm:w-44 xl:w-56 2xl:w-64"
             />
           </div>
 
           {canOpenNew && (
             <button
               onClick={() => setShowNewTicket(true)}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-lg shadow-sm transition-all shrink-0"
+              className="flex min-h-10 items-center gap-1.5 px-3.5 py-2 bg-primary hover:brightness-95 text-on-primary text-sm font-bold rounded-lg transition-all shrink-0"
             >
               <Plus className="w-4 h-4" /><span className="hidden 2xl:inline">{newTicketLabel}</span><span className="2xl:hidden">Novo</span>
             </button>
@@ -488,7 +488,7 @@ const TicketManagementDashboard = ({ onOpenTicket, companyId, isProvider, compan
       </div>
 
       {/* 2. ÁREA SELF-SERVICE: Contadores (compactos — a tabela abaixo é a prioridade de espaço) */}
-      <div className="px-3 sm:px-4 xl:px-6 py-2 grid grid-cols-[minmax(0,1fr)_auto] items-stretch gap-2 shrink-0 min-w-0">
+      <div className="servicefy-ticket-metrics px-3 sm:px-4 xl:px-6 py-2 grid grid-cols-[minmax(0,1fr)_auto] items-stretch gap-2 shrink-0 min-w-0">
         <div className="grid min-w-0 gap-2" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 150px), 1fr))' }}>
           {selectedMetricKeys.map(key => {
             const metric = AVAILABLE_METRICS.find(m => m.key === key)
@@ -527,7 +527,7 @@ const TicketManagementDashboard = ({ onOpenTicket, companyId, isProvider, compan
       </div>
 
       {/* 3. ÁREA PRINCIPAL: Tabela ou Kanban */}
-      <div className="flex-1 min-h-0 min-w-0 overflow-hidden px-3 sm:px-4 xl:px-6 pb-3 xl:pb-6">
+      <div className="servicefy-ticket-content flex-1 min-h-0 min-w-0 overflow-hidden px-3 sm:px-4 xl:px-6 pb-3 xl:pb-6">
 
         {viewMode === 'table' ? (
           <TicketDataTable
@@ -571,8 +571,8 @@ const TicketManagementDashboard = ({ onOpenTicket, companyId, isProvider, compan
                   data-testid="ticket-kanban-column"
                   className="min-h-[280px] min-w-0 overflow-hidden flex flex-col bg-slate-100/50 rounded-2xl border border-slate-200"
                 >
-                  <div className={`p-4 border-t-4 rounded-t-2xl flex justify-between items-center bg-slate-100 ${col.color}`}>
-                    <h3 className="font-bold text-slate-800 uppercase tracking-wide text-sm">{col.title}</h3>
+                  <div className="p-4 rounded-t-xl flex justify-between items-center bg-slate-100">
+                    <h3 className="flex items-center gap-2 font-bold text-slate-800 uppercase tracking-wide text-sm"><span className={`h-2 w-2 rounded-full ${col.color}`} />{col.title}</h3>
                     <span className="bg-white px-2.5 py-0.5 rounded-full text-xs font-bold text-slate-500 shadow-sm">{colRows.length}</span>
                   </div>
                   <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3 space-y-3">
@@ -651,7 +651,7 @@ const TicketManagementDashboard = ({ onOpenTicket, companyId, isProvider, compan
                         }}
                         className="w-4.5 h-4.5 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500"
                       />
-                      <div className={`p-1.5 rounded-lg ${isChecked ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-600'}`}>
+                      <div className={`p-1.5 rounded-lg ${isChecked ? 'bg-primary-container text-on-primary-container' : 'bg-slate-100 text-slate-600'}`}>
                         <Icon className="w-4 h-4" />
                       </div>
                       <div className="flex-1">

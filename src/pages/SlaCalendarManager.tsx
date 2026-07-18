@@ -197,7 +197,7 @@ export default function SlaCalendarManager({
                     return (
                     <button key={c.id} onClick={() => setSelectedId(c.id)}
                       className={`w-full text-left px-4 py-3 rounded-xl text-sm transition-all flex items-center justify-between group
-                        ${selectedId === c.id ? 'bg-indigo-50 text-indigo-700 font-bold border border-indigo-200' : 'text-slate-600 hover:bg-slate-50 border border-transparent'}`}>
+                        ${selectedId === c.id ? 'bg-primary-container text-on-primary-container font-bold border border-primary/30' : 'text-slate-600 hover:bg-slate-50 border border-transparent'}`}>
                       <div>
                         <span className="block">{c.name}</span>
                         {isDefault && <span className="text-[10px] uppercase font-bold text-emerald-600 mt-0.5 block">Padrão</span>}
@@ -323,7 +323,7 @@ export default function SlaCalendarManager({
                                 <Clock className="w-4 h-4 text-slate-400 shrink-0" />
                                 <span className="font-semibold text-slate-700 w-24">{WEEKDAYS[s.weekday]}</span>
                                 <span className="text-slate-600">{s.start_time?.slice(0, 5)} — {s.end_time?.slice(0, 5)}</span>
-                                <button onClick={() => handleRemoveShift(s.id)} className="ml-auto p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Remover">
+                                <button onClick={() => handleRemoveShift(s.id)} className="ml-auto p-1.5 text-red-600/70 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors" title="Remover">
                                   <Trash2 className="w-4 h-4" />
                                 </button>
                               </div>
@@ -362,7 +362,7 @@ export default function SlaCalendarManager({
                             <CalendarDays className="w-4 h-4 text-slate-400 shrink-0" />
                             <span className="font-semibold text-slate-700 w-28">{h.holiday}</span>
                             <span className="text-slate-500">{h.name ?? '—'}</span>
-                            <button onClick={() => handleRemoveHoliday(h.id)} className="ml-auto p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Remover">
+                            <button onClick={() => handleRemoveHoliday(h.id)} className="ml-auto p-1.5 text-red-600/70 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors" title="Remover">
                               <Trash2 className="w-4 h-4" />
                             </button>
                           </div>

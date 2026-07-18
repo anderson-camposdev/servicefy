@@ -208,47 +208,47 @@ export default function SettingsCenter({ companyId, activeRole, onNavigate }: Pr
   )
 
   if (selected) return (
-    <div className="max-w-5xl mx-auto p-6">
-      <button onClick={() => setSelected(null)} className="mb-5 inline-flex items-center gap-2 text-sm font-bold text-slate-600"><ChevronLeft className="w-4 h-4" /> Central de Configurações</button>
-      <div className="rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
-        <div className="flex items-start justify-between gap-5">
-          <div><p className="text-xs font-bold uppercase tracking-widest text-indigo-600">{CATEGORY_META[selected.category].title}</p><h1 className="mt-2 text-3xl font-black">{selected.title}</h1><p className="mt-3 text-slate-500">{selected.description}</p></div>
+    <div className="mx-auto max-w-5xl p-4 sm:p-6">
+      <button onClick={() => setSelected(null)} className="mb-5 inline-flex min-h-11 items-center gap-2 rounded-lg px-2 text-sm font-semibold text-on-surface-variant hover:bg-surface-container"><ChevronLeft className="w-4 h-4" /> Central de Configurações</button>
+      <div className="rounded-xl border border-outline-variant bg-surface p-5 sm:p-8">
+        <div className="flex flex-col items-start justify-between gap-5 sm:flex-row">
+          <div><p className="text-sm font-semibold text-primary">{CATEGORY_META[selected.category].title}</p><h1 className="mt-1 text-2xl font-bold text-on-surface">{selected.title}</h1><p className="mt-2 max-w-2xl text-sm text-on-surface-variant">{selected.description}</p></div>
           {selected.status === 'locked' && <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-3 py-1 text-xs font-bold text-amber-700"><Lock className="w-3.5 h-3.5" /> Módulo não contratado</span>}
         </div>
-        <div className="mt-8 grid gap-3 md:grid-cols-2">{selected.capabilities.map(item =>
-          <div key={item} className="flex items-center gap-3 rounded-xl border p-4 text-sm font-semibold"><FileCheck2 className="w-4 h-4 text-emerald-500" />{item}</div>,
+        <div className="mt-7 divide-y divide-outline-variant border-y border-outline-variant">{selected.capabilities.map(item =>
+          <div key={item} className="flex min-h-12 items-center gap-3 py-3 text-sm font-semibold text-on-surface"><FileCheck2 className="w-4 h-4 text-resolved" />{item}</div>,
         )}</div>
         {selected.status === 'locked'
-          ? <button className="mt-8 rounded-xl bg-slate-900 px-5 py-3 text-sm font-bold text-white">Solicitar habilitação</button>
-          : <div className="mt-8 rounded-xl bg-emerald-50 p-4 text-sm font-semibold text-emerald-800">Fundação do módulo habilitada para este tenant.</div>}
+          ? <button className="mt-7 rounded-lg bg-on-surface px-5 py-3 text-sm font-bold text-surface">Solicitar habilitação</button>
+          : <div className="mt-7 rounded-lg bg-resolved-bg p-4 text-sm font-semibold text-resolved-fg">Módulo disponível para este tenant.</div>}
       </div>
     </div>
   )
 
   return (
-    <div className="h-full overflow-y-auto bg-slate-50 p-6 lg:p-8"><div className="max-w-7xl mx-auto">
-      <header className="flex flex-wrap items-start justify-between gap-5">
-        <div><p className="text-xs font-black uppercase tracking-[0.2em] text-indigo-600">Administração do tenant</p><h1 className="mt-2 text-4xl font-black">Central de Configurações</h1><p className="mt-2 text-slate-500">Configurações pesquisáveis, seguras e organizadas por capacidade.</p></div>
-        {isSysAdmin && <select value={targetCompanyId} onChange={event => setTargetCompanyId(event.target.value)} className="rounded-xl border bg-white px-4 py-2.5 text-sm font-bold">{companies.filter(company => company.active).map(company => <option key={company.id} value={company.id}>{company.name}</option>)}</select>}
+    <div className="h-full overflow-y-auto bg-background p-4 sm:p-6 lg:p-8"><div className="mx-auto max-w-6xl">
+      <header className="flex flex-wrap items-start justify-between gap-5 border-b border-outline-variant pb-6">
+        <div><h1 className="text-2xl font-bold text-on-surface">Central de Configurações</h1><p className="mt-1 max-w-2xl text-sm text-on-surface-variant">Encontre uma capacidade, revise o estado do tenant e continue de onde parou.</p></div>
+        {isSysAdmin && <label className="text-xs font-semibold text-on-surface-variant">Tenant<select value={targetCompanyId} onChange={event => setTargetCompanyId(event.target.value)} className="mt-1 block rounded-lg border border-outline-variant bg-surface px-3 py-2 text-sm font-semibold text-on-surface">{companies.filter(company => company.active).map(company => <option key={company.id} value={company.id}>{company.name}</option>)}</select></label>}
       </header>
-      <div className="relative mt-7"><Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" /><input value={query} onChange={event => setQuery(event.target.value)} placeholder="Buscar usuários, SLA, WhatsApp, CMDB, LGPD…" className="w-full rounded-2xl border bg-white py-4 pl-12 pr-4 text-sm shadow-sm outline-none focus:ring-2 focus:ring-indigo-200" /></div>
+      <div className="relative mt-6"><Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-on-surface-variant" /><input value={query} onChange={event => setQuery(event.target.value)} placeholder="Buscar usuários, SLA, WhatsApp, CMDB ou LGPD" className="w-full rounded-xl border border-outline-variant bg-surface py-3 pl-12 pr-4 text-sm text-on-surface outline-none focus:border-primary focus:ring-2 focus:ring-primary/20" /></div>
       {connections.length > 0 && <div className="mt-3 flex flex-wrap gap-2 text-xs font-bold"><span className="rounded-full bg-emerald-50 px-3 py-1.5 text-emerald-700">{connections.filter(item => item.status === 'healthy').length} canais saudáveis</span>{connections.some(item => item.rotationRequired) && <span className="rounded-full bg-amber-50 px-3 py-1.5 text-amber-700">Credenciais aguardando rotação</span>}</div>}
-      {recent.length > 0 && !query && <div className="mt-4 flex flex-wrap items-center gap-2 text-xs text-slate-500"><Activity className="w-4 h-4" /><b>Recentes:</b>{recent.map(key => { const item = SECTIONS.find(candidate => candidate.key === key); return item && <button key={key} onClick={() => openSection(item)} className="rounded-full border bg-white px-3 py-1.5 font-semibold">{item.title}</button> })}</div>}
-      <div className="mt-8 space-y-9">
+      {recent.length > 0 && !query && <div className="mt-4 flex flex-wrap items-center gap-2 text-xs text-on-surface-variant"><Activity className="w-4 h-4" /><b>Recentes:</b>{recent.map(key => { const item = SECTIONS.find(candidate => candidate.key === key); return item && <button key={key} onClick={() => openSection(item)} className="rounded-full bg-surface-container px-3 py-2 font-semibold hover:bg-surface-container-high">{item.title}</button> })}</div>}
+      <div className="mt-7 space-y-6">
         {(Object.keys(CATEGORY_META) as SettingsCategoryKey[]).map(categoryKey => {
           const items = visibleSections.filter(item => item.category === categoryKey)
           if (!items.length) return null
           const meta = CATEGORY_META[categoryKey]
           const Icon = meta.icon
-          return <section key={categoryKey}>
-            <div className="mb-3 flex items-center gap-3"><span className="rounded-xl bg-indigo-50 p-2 text-indigo-600"><Icon className="w-5 h-5" /></span><div><h2 className="font-black">{meta.title}</h2><p className="text-xs text-slate-500">{meta.description}</p></div></div>
-            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{items.map(item =>
-              <article key={item.key} className="relative rounded-2xl border bg-white p-5 shadow-sm hover:border-indigo-200 hover:shadow-md">
-                <button onClick={() => toggleFavorite(item.key)} aria-label="Favoritar" className="absolute right-3 top-3 p-1 text-slate-300"><Star className={'w-4 h-4 ' + (favorites.includes(item.key) ? 'fill-amber-400 text-amber-400' : '')} /></button>
-                <button onClick={() => openSection(item)} className="w-full text-left pr-7">
-                  <div className="flex items-center gap-2">{item.status === 'locked' ? <Lock className="w-4 h-4 text-amber-500" /> : item.status === 'attention' ? <HeartPulse className="w-4 h-4 text-red-500" /> : <Wrench className="w-4 h-4 text-emerald-500" />}<h3 className="font-extrabold">{item.title}</h3></div>
-                  <p className="mt-2 text-sm text-slate-500">{item.description}</p>
+          return <section key={categoryKey} className="overflow-hidden rounded-xl border border-outline-variant bg-surface">
+            <div className="flex items-center gap-3 bg-surface-container px-4 py-3 sm:px-5"><span className="text-primary"><Icon className="w-5 h-5" /></span><div><h2 className="text-sm font-bold text-on-surface">{meta.title}</h2><p className="text-xs text-on-surface-variant">{meta.description}</p></div></div>
+            <div className="divide-y divide-outline-variant">{items.map(item =>
+              <article key={item.key} className="group flex min-h-16 items-center gap-2 px-3 transition-colors hover:bg-surface-container-low sm:px-4">
+                <button onClick={() => openSection(item)} className="flex min-w-0 flex-1 items-center gap-3 py-3 text-left">
+                  <span className="shrink-0">{item.status === 'locked' ? <Lock className="w-4 h-4 text-amber-600" /> : item.status === 'attention' ? <HeartPulse className="w-4 h-4 text-error" /> : <Wrench className="w-4 h-4 text-on-surface-variant" />}</span>
+                  <span className="min-w-0"><span className="block text-sm font-semibold text-on-surface">{item.title}</span><span className="mt-0.5 block text-xs text-on-surface-variant">{item.description}</span></span>
                 </button>
+                <button onClick={() => toggleFavorite(item.key)} aria-label={`${favorites.includes(item.key) ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}: ${item.title}`} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-on-surface-variant hover:bg-surface-container-high"><Star className={'w-4 h-4 ' + (favorites.includes(item.key) ? 'fill-amber-400 text-amber-500' : '')} /></button>
               </article>,
             )}</div>
           </section>

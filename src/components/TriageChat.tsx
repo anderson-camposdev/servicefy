@@ -258,7 +258,7 @@ export default function TriageChat({ companyId }: { companyId: string }) {
     <div className="flex h-full flex-col">
       <div className="flex flex-1 flex-col gap-3 overflow-y-auto p-4">
         {messages.map((m, i) => (
-          <div key={i} className={`max-w-[85%] whitespace-pre-line rounded-2xl px-3.5 py-2 text-sm ${m.from === 'user' ? 'ml-auto bg-indigo-600 text-white' : 'bg-slate-100 text-slate-800'}`}>
+          <div key={i} className={`max-w-[85%] whitespace-pre-line rounded-2xl px-3.5 py-2 text-sm ${m.from === 'user' ? 'ml-auto bg-primary text-on-primary' : 'bg-slate-100 text-slate-800'}`}>
             {m.text}
           </div>
         ))}
@@ -270,7 +270,7 @@ export default function TriageChat({ companyId }: { companyId: string }) {
                 key={o.id}
                 disabled={busy}
                 onClick={() => void submit(o.label)}
-                className="rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-sm font-semibold text-indigo-700 hover:bg-indigo-100 disabled:opacity-50"
+                className="rounded-xl border border-primary/30 bg-primary-container px-3 py-1.5 text-sm font-semibold text-on-primary-container hover:opacity-90 disabled:opacity-50"
               >{o.label}</button>
             ))}
             {turn?.inputType === 'multi' && (
@@ -296,7 +296,7 @@ export default function TriageChat({ companyId }: { companyId: string }) {
             placeholder={showText ? 'Digite sua resposta…' : 'Ou escreva aqui…'}
             className="flex-1 rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-200 disabled:opacity-50"
           />
-          <button onClick={() => void submit(text)} disabled={busy || !text.trim()} className="inline-flex items-center justify-center rounded-xl bg-indigo-600 px-3 py-2 text-white disabled:opacity-50">
+          <button onClick={() => void submit(text)} disabled={busy || !text.trim()} className="inline-flex items-center justify-center rounded-xl bg-primary px-3 py-2 text-on-primary disabled:opacity-50">
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
           </button>
         </div>

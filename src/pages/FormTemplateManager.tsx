@@ -69,7 +69,7 @@ export default function FormTemplateManager({ companyId, templates, onChange }: 
                 <span className="block truncate text-sm font-bold text-slate-800">{template.name}</span>
                 <span className="text-xs text-slate-400">Clique para editar os campos reutilizáveis</span>
               </button>
-              <button type="button" onClick={() => remove(template)} className="rounded-lg p-2 text-slate-400 hover:bg-red-50 hover:text-red-600">
+              <button type="button" onClick={() => remove(template)} className="rounded-lg p-2 text-red-600/70 hover:bg-red-50 hover:text-red-700">
                 <Trash2 className="h-4 w-4" />
               </button>
             </div>

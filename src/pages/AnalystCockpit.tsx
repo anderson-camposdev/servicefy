@@ -2,10 +2,12 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   User, Building2, AlertTriangle, Send,
   BookOpen, CheckCircle, History, FileText, ListTree, Link2, Lock, Pause, Edit3,
-  ShieldAlert, PlayCircle, ArrowRightLeft, X, ChevronDown, ChevronUp,
+  ShieldAlert, PlayCircle, ArrowRightLeft, X, ChevronDown, ChevronUp, Timer,
 } from 'lucide-react'
 import { incidentsService, messagesService, assignmentGroupsService, pendingReasonsService, responseMacrosService, cmdbService } from '../lib/services'
 import type { CmdbImpactRow } from '../lib/services'
+import { knowledgeService, type CaseLinkedArticle } from '../lib/knowledge-service'
+import { filterRequesterHistory, summarizeRequesterHistory } from '../lib/ticket-insights'
 import { translateState } from '../lib/statusLabels'
 import { useAuth } from '../auth'
 import { useToast } from '../context'
@@ -40,7 +42,10 @@ type IncidentDetail = IncidentRow & { history: IncidentHistoryRow[] }
 type ContextTab = 'detalhes' | 'historico' | 'subchamados' | 'relacionamentos'
 
 const fmt = (iso: string) => {
-  try { return new Date(iso).toLocaleString('pt-BR') } catch { return iso }
+  const date = new Date(iso)
+  // new Date('') não lança — vira Invalid Date e renderizava "Invalid Date" na UI.
+  if (Number.isNaN(date.getTime())) return '—'
+  return date.toLocaleString('pt-BR')
 }
 
 // Extrai a mensagem REAL de erros do Supabase (PostgrestError não é instanceof Error).
@@ -164,11 +169,11 @@ const PRIORITY_STYLES: Record<number, { badge: string; dot: string; label: strin
   5: { badge: 'bg-p5-bg border-p5/20 text-p5-fg font-semibold',            dot: 'bg-p5',             label: 'P5 · Planejada' },
 }
 
-const CONTEXT_TABS: { id: ContextTab; label: string; icon: React.ReactNode }[] = [
-  { id: 'detalhes', label: 'Detalhes', icon: <FileText className="w-4 h-4" /> },
-  { id: 'historico', label: 'Histórico de Chamados', icon: <History className="w-4 h-4" /> },
-  { id: 'subchamados', label: 'Sub Chamados', icon: <ListTree className="w-4 h-4" /> },
-  { id: 'relacionamentos', label: 'Relacionamentos', icon: <Link2 className="w-4 h-4" /> },
+const CONTEXT_TABS: { id: ContextTab; label: string; compactLabel: string; icon: React.ReactNode }[] = [
+  { id: 'detalhes', label: 'Detalhes', compactLabel: 'Detalhes', icon: <FileText className="w-4 h-4" /> },
+  { id: 'historico', label: 'Histórico de Chamados', compactLabel: 'Histórico', icon: <History className="w-4 h-4" /> },
+  { id: 'subchamados', label: 'Sub Chamados', compactLabel: 'Tarefas', icon: <ListTree className="w-4 h-4" /> },
+  { id: 'relacionamentos', label: 'Relacionamentos', compactLabel: 'Artigos', icon: <Link2 className="w-4 h-4" /> },
 ]
 
 const MOCK_MESSAGES: TicketMessageRow[] = [
@@ -194,9 +199,6 @@ function EmptyContext({ icon, title, desc }: { icon: React.ReactNode; title: str
         <div className="w-14 h-14 flex items-center justify-center mb-4 rounded-xl bg-surface-container text-on-surface-variant">{icon}</div>
         <h3 className="text-lg font-bold text-text-main">{title}</h3>
         <p className="text-sm mt-1 max-w-sm text-on-surface-variant">{desc}</p>
-        <span className="mt-4 text-[10px] font-bold uppercase tracking-wider px-3 py-1 border bg-primary/10 text-primary border-primary/20 rounded-full">
-          Em desenvolvimento
-        </span>
       </div>
     </div>
   )
@@ -216,8 +218,6 @@ const translateUrgency = (val: string | null | undefined) => {
 const AnalystCockpit = ({ ticket = FALLBACK_TICKET }: { ticket?: WorkspaceTicket }) => {
   const { profile } = useAuth()
   const { toast } = useToast()
-  const isAlpha = false
-  const isBeta = false
 
   // Classes limpas e independentes de tenant baseadas no tema dinâmico
   const cardClass = 'bg-surface border border-outline-variant rounded-xl shadow-sm'
@@ -237,6 +237,13 @@ const AnalystCockpit = ({ ticket = FALLBACK_TICKET }: { ticket?: WorkspaceTicket
   const [impactCis, setImpactCis] = useState<CmdbImpactRow[]>([])
   const [loadingImpact, setLoadingImpact] = useState(false)
   const [impactExpanded, setImpactExpanded] = useState(true)
+
+  // Aba "Histórico de Chamados": outros tickets do mesmo solicitante.
+  const [requesterHistory, setRequesterHistory] = useState<IncidentRow[] | null>(null)
+  const [requesterHistoryError, setRequesterHistoryError] = useState<string | null>(null)
+  // Aba "Relacionamentos": artigos de conhecimento vinculados ao caso.
+  const [linkedArticles, setLinkedArticles] = useState<CaseLinkedArticle[] | null>(null)
+  const [linkedArticlesError, setLinkedArticlesError] = useState<string | null>(null)
 
   // Helper to render Priority badges (P1–P5, dinâmico via priority_level das triggers)
   const renderPriorityBadge = (prio: string | null | undefined, level?: number | null) => {
@@ -501,6 +508,35 @@ const AnalystCockpit = ({ ticket = FALLBACK_TICKET }: { ticket?: WorkspaceTicket
     }
   }, [detail?.case_id, ticket.caseId, detail?.company_id, ticket.companyId])
 
+
+  // Aba Histórico: outros chamados do solicitante (carrega ao abrir a aba).
+  const loadRequesterHistory = useCallback(() => {
+    const callerId = detail?.caller_id
+    const companyId = detail?.company_id || ticket.companyId
+    if (!callerId || !companyId) return
+    setRequesterHistoryError(null)
+    incidentsService.list({ companyId, callerId, limit: 25 })
+      .then(rows => setRequesterHistory(rows))
+      .catch(err => setRequesterHistoryError(dbErrMsg(err, 'Falha ao carregar o histórico do solicitante.')))
+  }, [detail?.caller_id, detail?.company_id, ticket.companyId])
+
+  useEffect(() => {
+    if (activeContext === 'historico') loadRequesterHistory()
+  }, [activeContext, loadRequesterHistory])
+
+  // Aba Relacionamentos: artigos de conhecimento usados/vinculados neste caso.
+  const loadLinkedArticles = useCallback(() => {
+    const caseId = detail?.case_id ?? ticket.caseId ?? null
+    if (!caseId) return
+    setLinkedArticlesError(null)
+    knowledgeService.listCaseLinkedArticles(caseId)
+      .then(rows => setLinkedArticles(rows))
+      .catch(err => setLinkedArticlesError(dbErrMsg(err, 'Falha ao carregar os artigos vinculados.')))
+  }, [detail?.case_id, ticket.caseId])
+
+  useEffect(() => {
+    if (activeContext === 'relacionamentos') loadLinkedArticles()
+  }, [activeContext, loadLinkedArticles])
 
   // Load active assignment groups for this company
   useEffect(() => {
@@ -947,6 +983,37 @@ const AnalystCockpit = ({ ticket = FALLBACK_TICKET }: { ticket?: WorkspaceTicket
               {loading && <span className="text-xs text-on-surface-variant animate-pulse">carregando…</span>}
             </div>
             <p className="text-xs text-on-surface-variant truncate">{title}</p>
+            {/* Contexto de decisão sempre à vista: prioridade, SLA ativo, quem pediu e quem atende. */}
+            {detail && (
+              <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-on-surface-variant">
+                {renderPriorityBadge(priority, detail.priority_level)}
+                {(() => {
+                  const awaitingResponse = !detail.responded_at
+                  const sla = calculateSlaState(
+                    awaitingResponse ? detail.sla_response_deadline : detail.sla_resolution_deadline,
+                    awaitingResponse ? detail.responded_at : detail.resolved_at,
+                    awaitingResponse ? detail.is_response_breached : detail.is_resolution_breached,
+                    now, detail.created_at, detail.paused_at,
+                  )
+                  if (sla.status === 'none') return null
+                  const chip = {
+                    fulfilled: 'text-emerald-600',
+                    breached: 'text-rose-600',
+                    warning: 'text-amber-600',
+                    normal: 'text-on-surface-variant',
+                    paused: 'text-sky-600',
+                  }[sla.status]
+                  return (
+                    <span className={`inline-flex items-center gap-1 font-semibold ${chip}`}>
+                      <Timer className="w-3.5 h-3.5" />
+                      {awaitingResponse ? 'Resposta' : 'Solução'}: {sla.text}
+                    </span>
+                  )
+                })()}
+                <span className="hidden sm:inline min-w-0 truncate max-w-48"><User className="mr-1 inline w-3.5 h-3.5" />{requester}</span>
+                <span className="hidden md:inline min-w-0 truncate max-w-48"><Building2 className="mr-1 inline w-3.5 h-3.5" />{group}</span>
+              </div>
+            )}
           </div>
 
           <div className="flex items-center gap-2 shrink-0 pb-2">
@@ -1017,7 +1084,7 @@ const AnalystCockpit = ({ ticket = FALLBACK_TICKET }: { ticket?: WorkspaceTicket
           </div>
         </div>
 
-        <div className="px-4 pt-2 flex items-center gap-1 overflow-x-auto hide-scrollbar border-t border-outline-variant">
+        <div className="grid grid-cols-4 items-stretch border-t border-outline-variant px-1 pt-2 sm:flex sm:items-center sm:gap-1 sm:px-4">
           {CONTEXT_TABS.map(tab => {
             const active = tab.id === activeContext
             
@@ -1032,16 +1099,108 @@ const AnalystCockpit = ({ ticket = FALLBACK_TICKET }: { ticket?: WorkspaceTicket
               <button
                 key={tab.id}
                 onClick={() => setActiveContext(tab.id)}
-                className={`flex items-center gap-2 px-4 py-2 text-sm font-semibold border-b-2 whitespace-nowrap transition-colors ${tabBtnStyle}`}
+                className={`flex min-w-0 items-center justify-center gap-1 border-b-2 px-1 py-2 text-xs font-semibold transition-colors sm:gap-2 sm:px-4 sm:text-sm ${tabBtnStyle}`}
               >
-                {tab.icon}{tab.label}
+                {tab.icon}
+                <span className="sm:hidden">{tab.compactLabel}</span>
+                <span className="hidden sm:inline">{tab.label}</span>
               </button>
             )
           })}
         </div>
       </div>
 
-      {activeContext === 'historico' && <EmptyContext icon={<History className="w-7 h-7" />} title="Histórico de Chamados" desc="Outros chamados deste solicitante e empresa aparecerão aqui." />}
+      {activeContext === 'historico' && (() => {
+        if (!detail?.caller_id) {
+          return <EmptyContext icon={<History className="w-7 h-7" />} title="Histórico indisponível" desc="Este chamado não tem um solicitante identificado — não há como consultar atendimentos anteriores." />
+        }
+        if (requesterHistoryError) {
+          return (
+            <div className="max-w-6xl mx-auto p-6">
+              <div className="p-8 text-center border bg-error/5 border-error/20 rounded-xl">
+                <p className="text-sm font-bold text-error">{requesterHistoryError}</p>
+                <button onClick={loadRequesterHistory} className="mt-3 px-4 py-2 text-sm font-semibold border border-outline-variant rounded-lg text-text-main hover:bg-surface-container">
+                  Tentar novamente
+                </button>
+              </div>
+            </div>
+          )
+        }
+        if (requesterHistory === null) {
+          return (
+            <div className="max-w-6xl mx-auto p-6 space-y-2 animate-pulse" aria-label="Carregando histórico">
+              <div className="h-10 rounded-lg bg-surface-container" />
+              <div className="h-10 rounded-lg bg-surface-container w-5/6" />
+              <div className="h-10 rounded-lg bg-surface-container w-4/6" />
+            </div>
+          )
+        }
+        const others = filterRequesterHistory(requesterHistory, detail.id, requesterHistory.length)
+        const summary = summarizeRequesterHistory(others)
+        const rows = others.slice(0, 10)
+        if (rows.length === 0) {
+          return (
+            <div className="max-w-6xl mx-auto p-6">
+              <div className="p-10 text-center border border-dashed bg-surface border-outline-variant rounded-xl">
+                <History className="w-8 h-8 mx-auto text-on-surface-variant" />
+                <h3 className="mt-3 text-base font-bold text-text-main">Primeiro chamado de {requester}</h3>
+                <p className="mt-1 text-sm text-on-surface-variant max-w-md mx-auto">
+                  Não há outros atendimentos registrados para este solicitante. Sem reincidência conhecida — trate como ocorrência nova.
+                </p>
+              </div>
+            </div>
+          )
+        }
+        return (
+          <div className="max-w-6xl mx-auto p-6 space-y-4">
+            <p className="text-sm text-on-surface-variant">
+              <b className="text-text-main">{summary.total}</b> chamado(s) anteriores deste solicitante
+              {summary.open > 0 && <> · <b className="text-amber-600">{summary.open} em aberto</b></>}
+              {summary.breached > 0 && <> · <b className="text-rose-600">{summary.breached} com SLA estourado</b></>}
+            </p>
+            <div className={`${cardClass} overflow-hidden`}>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                  <thead className="bg-surface-container border-b border-outline-variant">
+                    <tr className="font-bold uppercase text-[11px] tracking-wider text-on-surface-variant">
+                      <th className="px-4 py-3">Número</th>
+                      <th className="px-4 py-3">Assunto</th>
+                      <th className="px-4 py-3">Estado</th>
+                      <th className="px-4 py-3">Prioridade</th>
+                      <th className="px-4 py-3">Abertura</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-outline-variant">
+                    {rows.map(item => (
+                      <tr key={item.id} className="text-on-surface hover:bg-surface-container/30">
+                        <td className="px-4 py-2.5 font-semibold whitespace-nowrap">{item.number}</td>
+                        <td className="px-4 py-2.5 max-w-96 truncate">{item.short_description}</td>
+                        <td className="px-4 py-2.5 whitespace-nowrap">
+                          <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${{
+                            'New':         'bg-new-bg text-new-fg',
+                            'In Progress': 'bg-progress-bg text-progress-fg',
+                            'On Hold':     'bg-hold-bg text-hold-fg',
+                            'Pending User':'bg-hold-bg text-hold-fg',
+                            'Resolved':    'bg-resolved-bg text-resolved-fg',
+                            'Closed':      'bg-closed-bg text-closed-fg',
+                          }[item.state] ?? 'bg-surface-container text-on-surface-variant'}`}>{translateState(item.state)}</span>
+                        </td>
+                        <td className="px-4 py-2.5 whitespace-nowrap text-xs font-semibold">{item.priority ?? '—'}</td>
+                        <td className="px-4 py-2.5 whitespace-nowrap text-xs text-on-surface-variant">{fmt(item.created_at)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {others.length > rows.length && (
+                <p className="px-4 py-2.5 text-xs text-on-surface-variant border-t border-outline-variant">
+                  Mostrando os {rows.length} mais recentes de {others.length}. Use a Fila de Atendimento para a lista completa.
+                </p>
+              )}
+            </div>
+          </div>
+        )
+      })()}
       {activeContext === 'subchamados' && (
         <div className="max-w-7xl mx-auto p-6">
           <TicketTasksPanel 
@@ -1052,7 +1211,81 @@ const AnalystCockpit = ({ ticket = FALLBACK_TICKET }: { ticket?: WorkspaceTicket
           />
         </div>
       )}
-      {activeContext === 'relacionamentos' && <EmptyContext icon={<Link2 className="w-7 h-7" />} title="Relacionamentos" desc="Incidentes, problemas e mudanças relacionados serão exibidos aqui." />}
+      {activeContext === 'relacionamentos' && (() => {
+        const caseId = detail?.case_id ?? ticket.caseId ?? null
+        if (!caseId) {
+          return <EmptyContext icon={<Link2 className="w-7 h-7" />} title="Sem caso vinculado" desc="Este chamado ainda não possui um caso associado — os relacionamentos de conhecimento aparecem aqui assim que houver um." />
+        }
+        if (linkedArticlesError) {
+          return (
+            <div className="max-w-6xl mx-auto p-6">
+              <div className="p-8 text-center border bg-error/5 border-error/20 rounded-xl">
+                <p className="text-sm font-bold text-error">{linkedArticlesError}</p>
+                <button onClick={loadLinkedArticles} className="mt-3 px-4 py-2 text-sm font-semibold border border-outline-variant rounded-lg text-text-main hover:bg-surface-container">
+                  Tentar novamente
+                </button>
+              </div>
+            </div>
+          )
+        }
+        if (linkedArticles === null) {
+          return (
+            <div className="max-w-6xl mx-auto p-6 space-y-2 animate-pulse" aria-label="Carregando relacionamentos">
+              <div className="h-14 rounded-lg bg-surface-container" />
+              <div className="h-14 rounded-lg bg-surface-container w-5/6" />
+            </div>
+          )
+        }
+        const usageLabel: Record<string, string> = {
+          suggested: 'Sugerido pelo sistema',
+          linked: 'Vinculado pelo analista',
+          sent_to_user: 'Enviado ao solicitante',
+        }
+        return (
+          <div className="max-w-6xl mx-auto p-6 space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h3 className="text-base font-bold text-text-main">Conhecimento aplicado neste chamado</h3>
+                <p className="text-sm text-on-surface-variant">{linkedArticles.length} artigo(s) da base relacionados a este atendimento.</p>
+              </div>
+              <button onClick={() => setKbOpen(true)} className="flex items-center gap-1.5 px-3 py-2 text-sm font-semibold border border-outline-variant text-text-main hover:bg-surface-container rounded-lg">
+                <BookOpen className="w-4 h-4" /> Consultar Base de Conhecimento
+              </button>
+            </div>
+            {linkedArticles.length === 0 ? (
+              <div className="p-10 text-center border border-dashed bg-surface border-outline-variant rounded-xl">
+                <Link2 className="w-8 h-8 mx-auto text-on-surface-variant" />
+                <h4 className="mt-3 text-base font-bold text-text-main">Nenhum artigo usado ainda</h4>
+                <p className="mt-1 text-sm text-on-surface-variant max-w-md mx-auto">
+                  Quando você consultar a Base de Conhecimento e aplicar um artigo na resposta, o vínculo aparece aqui — criando rastreabilidade entre o conhecimento e a resolução.
+                </p>
+              </div>
+            ) : (
+              <div className={`${cardClass} divide-y divide-outline-variant overflow-hidden`}>
+                {linkedArticles.map(({ link, article }) => (
+                  <div key={link.id} className="flex flex-wrap items-center justify-between gap-3 p-4">
+                    <div className="min-w-0">
+                      <p className="text-sm font-bold text-text-main truncate">
+                        {article?.title ?? 'Artigo sem acesso para o seu papel'}
+                      </p>
+                      <p className="mt-0.5 text-xs text-on-surface-variant">
+                        {usageLabel[link.usage] ?? link.usage} · {fmt(link.created_at)}
+                      </p>
+                    </div>
+                    {article && (
+                      <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full shrink-0 ${
+                        article.status === 'published' ? 'bg-resolved-bg text-resolved-fg' : 'bg-surface-container text-on-surface-variant'
+                      }`}>
+                        {article.status === 'published' ? 'Publicado' : article.status === 'draft' ? 'Rascunho' : article.status === 'review' ? 'Em revisão' : 'Arquivado'}
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )
+      })()}
 
       {activeContext === 'detalhes' && (
         <>
@@ -1267,18 +1500,16 @@ const AnalystCockpit = ({ ticket = FALLBACK_TICKET }: { ticket?: WorkspaceTicket
                     <div className="p-5 space-y-4">
                       <Field label="Código de Encerramento" value={detail?.close_code ?? closeCode ?? '—'} accent="text-emerald-500 font-bold" />
                       <div>
-                        <p className={`text-[11px] font-bold uppercase tracking-wider ${
-                          isAlpha ? 'text-zinc-500 font-mono' : 'text-on-surface-variant'
-                        }`}>Notas de Resolução</p>
-                        <p className={`text-sm whitespace-pre-wrap mt-0.5 ${isAlpha ? 'text-zinc-300 font-mono' : 'text-on-surface'}`}>{detail?.close_notes ?? closeNotes ?? '—'}</p>
+                        <p className="text-[11px] font-bold uppercase tracking-wider text-on-surface-variant">Notas de Resolução</p>
+                        <p className="text-sm whitespace-pre-wrap mt-0.5 text-on-surface">{detail?.close_notes ?? closeNotes ?? '—'}</p>
                       </div>
                       {detail?.resolved_at && <Field label="Resolvido em" value={fmt(detail.resolved_at)} />}
                     </div>
                   ) : (
-                    <div className={`p-6 text-center text-sm ${isAlpha ? 'font-mono text-zinc-400' : 'text-on-surface-variant'}`}>
-                      <AlertTriangle className={`w-8 h-8 text-amber-500 mx-auto mb-2 ${isAlpha ? 'animate-pulse' : ''}`} />
+                    <div className="p-6 text-center text-sm text-on-surface-variant">
+                      <AlertTriangle className="w-8 h-8 text-amber-500 mx-auto mb-2" />
                       O chamado ainda não foi resolvido.
-                      <p className={`text-xs mt-1 ${isAlpha ? 'text-zinc-500' : 'text-on-surface-variant'}`}>
+                      <p className="text-xs mt-1 text-on-surface-variant">
                         Para resolvê-lo, use o botão <b>Resolver chamado</b> na barra superior.
                       </p>
                     </div>
@@ -1292,89 +1523,49 @@ const AnalystCockpit = ({ ticket = FALLBACK_TICKET }: { ticket?: WorkspaceTicket
 
                 {/* TABELA DE HISTÓRICO LEGADA (OPCIONAL/AUDITORIA GERAL) */}
                 <section className={`${cardClass} overflow-hidden`}>
-                  <div className={`px-5 py-3 border-b flex items-center gap-2 ${
-                    isAlpha 
-                      ? 'border-zinc-800 bg-zinc-900/50' 
-                      : isBeta 
-                        ? 'border-zinc-200 bg-slate-50/80' 
-                        : 'border-outline-variant bg-surface-container/30'
-                  }`}>
-                    <History className={`w-4 h-4 ${isBeta ? 'text-medical-blue' : 'text-primary'}`} />
-                    <h2 className={`text-xs font-bold uppercase tracking-wider ${isAlpha ? 'text-zinc-300 font-mono' : 'text-on-surface'}`}>
+                  <div className="px-5 py-3 border-b flex items-center gap-2 border-outline-variant bg-surface-container/30">
+                    <History className="w-4 h-4 text-primary" />
+                    <h2 className="text-xs font-bold uppercase tracking-wider text-on-surface">
                       Histórico de Alterações (Campos)
                     </h2>
                   </div>
                   <div className="overflow-x-auto">
                     <table className="w-full text-left text-sm">
-                      <thead className={`${
-                        isAlpha 
-                          ? 'bg-zinc-950 border-b border-zinc-800' 
-                          : isBeta 
-                            ? 'bg-slate-50/50 border-b border-zinc-200' 
-                            : 'bg-surface-container border-b border-outline-variant'
-                      }`}>
-                        <tr className={`font-bold uppercase text-[10px] tracking-wider ${isAlpha ? 'text-zinc-500 font-mono' : 'text-on-surface-variant'}`}>
+                      <thead className="bg-surface-container border-b border-outline-variant">
+                        <tr className="font-bold uppercase text-[10px] tracking-wider text-on-surface-variant">
                           <th className="px-4 py-3">Usuário</th>
                           <th className="px-4 py-3">Data</th>
                           <th className="px-4 py-3">Tipo</th>
                           <th className="px-4 py-3">Ação Detalhada</th>
                         </tr>
                       </thead>
-                      <tbody className={`divide-y ${
-                        isAlpha 
-                          ? 'divide-zinc-900' 
-                          : isBeta 
-                            ? 'divide-zinc-100' 
-                            : 'divide-outline-variant'
-                      }`}>
+                      <tbody className="divide-y divide-outline-variant">
                         {!realMode && (
-                          <tr className={isAlpha ? 'text-zinc-300 font-mono' : 'text-on-surface-variant'}>
+                          <tr className="text-on-surface-variant">
                             <td className="px-4 py-2.5 font-medium">{requester}</td>
                             <td className="px-4 py-2.5 text-xs whitespace-nowrap">{fmt(new Date().toISOString())}</td>
                             <td className="px-4 py-2.5">
-                              <span className={`text-[10px] font-bold uppercase px-2 py-0.5 ${
-                                isAlpha 
-                                  ? 'bg-emerald-950/20 text-emerald-400 border border-emerald-800/30 rounded-lg' 
-                                  : isBeta 
-                                    ? 'bg-emerald-50 text-emerald-800 border border-emerald-100 rounded-sm' 
-                                    : 'bg-surface-container-high text-on-surface rounded'
-                              }`}>Abertura</span>
+                              <span className="text-[10px] font-bold uppercase px-2 py-0.5 bg-surface-container-high text-on-surface rounded">Abertura</span>
                             </td>
                             <td className="px-4 py-2.5">Chamado registrado pelo portal.</td>
                           </tr>
                         )}
                         {realMode && visibleAuditRows.length === 0 && (
-                          <tr><td colSpan={4} className={`px-4 py-6 text-center text-sm italic ${isAlpha ? 'text-zinc-500 font-mono' : 'text-on-surface-variant'}`}>Sem registros de auditoria.</td></tr>
+                          <tr><td colSpan={4} className="px-4 py-6 text-center text-sm italic text-on-surface-variant">Sem registros de auditoria.</td></tr>
                         )}
                         {visibleAuditRows.map(h => (
-                          <tr key={h.id} className={`text-sm ${
-                            isAlpha 
-                              ? 'text-zinc-300 hover:bg-zinc-800/30 border-b border-zinc-900' 
-                              : isBeta 
-                                ? 'text-zinc-700 hover:bg-zinc-50 border-b border-zinc-100' 
-                                : 'text-on-surface hover:bg-surface-container/30 border-b border-outline-variant'
-                          }`}>
+                          <tr key={h.id} className="text-sm text-on-surface hover:bg-surface-container/30 border-b border-outline-variant">
                             <td className="px-4 py-2.5 font-medium">{h.changed_by_name}</td>
-                            <td className={`px-4 py-2.5 text-xs whitespace-nowrap ${isAlpha ? 'text-zinc-500 font-mono' : 'text-on-surface-variant'}`}>{fmt(h.created_at)}</td>
+                            <td className="px-4 py-2.5 text-xs whitespace-nowrap text-on-surface-variant">{fmt(h.created_at)}</td>
                             <td className="px-4 py-2.5">
-                              <span className={`text-[10px] font-bold uppercase px-2 py-0.5 ${
-                                isAlpha ? 'font-mono rounded-lg' : isBeta ? 'rounded-sm' : 'rounded'
-                              } ${
+                              <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded ${
                                 isOpeningHistory(h.field_name)
-                                  ? isAlpha
-                                    ? 'bg-emerald-950/20 text-emerald-400 border border-emerald-800/30'
-                                    : 'bg-emerald-50 text-emerald-800 border border-emerald-100'
+                                  ? 'bg-emerald-50 text-emerald-800 border border-emerald-100'
                                   : h.field_name === 'comment'
-                                    ? isAlpha
-                                      ? 'bg-cyan-950/20 text-cyan-400 border border-cyan-800/30'
-                                      : 'bg-blue-50 text-medical-blue border border-blue-100'
+                                    ? 'bg-blue-50 text-medical-blue border border-blue-100'
                                     : h.field_name === 'Início de Atendimento'
-                                      ? isAlpha
-                                        ? 'bg-sky-950/20 text-sky-400 border border-sky-800/30'
-                                        : 'bg-sky-50 text-sky-700 border border-sky-100'
-                                      : isAlpha
-                                        ? 'bg-zinc-900 text-zinc-400 border border-zinc-800'
-                                        : 'bg-zinc-50 text-zinc-600 border border-zinc-200'
+                                      ? 'bg-sky-50 text-sky-700 border border-sky-100'
+                                      : 'bg-zinc-50 text-zinc-600 border border-zinc-200'
                               }`}>
                                 {historyTypeLabel(h.field_name)}
                               </span>

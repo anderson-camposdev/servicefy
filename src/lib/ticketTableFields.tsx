@@ -151,7 +151,9 @@ export const PROBLEM_FIELDS: TicketFieldDef<ProblemRow>[] = [
   { key: 'root_cause', label: 'Causa Raiz', accessor: r => r.root_cause, kind: 'text', defaultVisible: true },
   {
     key: 'known_error', label: 'KEDB', accessor: r => (r.known_error ? 'Sim' : 'Não'), kind: 'select', defaultVisible: true,
-    render: r => r.known_error ? badge('KEDB', 'bg-amber-50 text-amber-700 border-amber-200') : <span className="text-slate-300">—</span>,
+    render: r => r.known_error
+      ? badge('KEDB', 'bg-amber-50 text-amber-700 border-amber-200')
+      : <span className="text-slate-300">—</span>,
   },
   { key: 'workaround', label: 'Contorno (Workaround)', accessor: r => r.workaround, kind: 'text', groupable: false },
   { key: 'assigned_to_name', label: 'Responsável', accessor: r => r.assigned_to_name, kind: 'select' },

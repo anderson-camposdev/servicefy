@@ -3826,6 +3826,99 @@ export type Database = {
           },
         ]
       }
+      knowledge_article_relations: {
+        Row: {
+          article_id: string
+          change_id: string | null
+          company_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          incident_catalog_symptom_id: string | null
+          problem_id: string | null
+          relationship: string
+          request_catalog_subitem_id: string | null
+          target_id: string
+          target_type: string
+        }
+        Insert: {
+          article_id: string
+          change_id?: string | null
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          incident_catalog_symptom_id?: string | null
+          problem_id?: string | null
+          relationship?: string
+          request_catalog_subitem_id?: string | null
+          target_type: string
+        }
+        Update: {
+          article_id?: string
+          change_id?: string | null
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          incident_catalog_symptom_id?: string | null
+          problem_id?: string | null
+          relationship?: string
+          request_catalog_subitem_id?: string | null
+          target_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "knowledge_article_relations_article_id_fkey"
+            columns: ["article_id"]
+            isOneToOne: false
+            referencedRelation: "knowledge_articles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "knowledge_article_relations_change_id_fkey"
+            columns: ["change_id"]
+            isOneToOne: false
+            referencedRelation: "changes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "knowledge_article_relations_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "knowledge_article_relations_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "knowledge_article_relations_incident_catalog_symptom_id_fkey"
+            columns: ["incident_catalog_symptom_id"]
+            isOneToOne: false
+            referencedRelation: "incident_catalog_symptoms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "knowledge_article_relations_problem_id_fkey"
+            columns: ["problem_id"]
+            isOneToOne: false
+            referencedRelation: "problems"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "knowledge_article_relations_request_catalog_subitem_id_fkey"
+            columns: ["request_catalog_subitem_id"]
+            isOneToOne: false
+            referencedRelation: "request_catalog_subitems"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       knowledge_article_versions: {
         Row: {
           article_id: string
@@ -3907,6 +4000,7 @@ export type Database = {
           deflection_count: number
           id: string
           published_at: string | null
+          review_due_at: string | null
           reviewer_id: string | null
           scheduled_at: string | null
           search_vector: unknown
@@ -3932,6 +4026,7 @@ export type Database = {
           deflection_count?: number
           id?: string
           published_at?: string | null
+          review_due_at?: string | null
           reviewer_id?: string | null
           scheduled_at?: string | null
           search_vector?: unknown
@@ -3957,6 +4052,7 @@ export type Database = {
           deflection_count?: number
           id?: string
           published_at?: string | null
+          review_due_at?: string | null
           reviewer_id?: string | null
           scheduled_at?: string | null
           search_vector?: unknown
@@ -8298,6 +8394,27 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      kb_replace_article_relations: {
+        Args: {
+          p_article_id: string
+          p_company_id: string
+          p_relations?: Json
+        }
+        Returns: {
+          article_id: string
+          change_id: string | null
+          company_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          incident_catalog_symptom_id: string | null
+          problem_id: string | null
+          relationship: string
+          request_catalog_subitem_id: string | null
+          target_id: string
+          target_type: string
+        }[]
       }
       kb_search_articles: {
         Args: {

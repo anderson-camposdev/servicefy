@@ -298,7 +298,7 @@ function FlowConnector({ label, onAdd }: { label: string; onAdd: () => void }) {
     <div className="flex flex-col items-center select-none">
       <div className="w-px h-6 bg-slate-200" />
       <button onClick={onAdd}
-        className="group flex items-center gap-2 px-4 py-1.5 rounded-full border-2 border-dashed border-slate-200 hover:border-indigo-400 hover:bg-indigo-50 transition-all text-xs font-semibold text-slate-400 hover:text-indigo-600">
+        className="group flex items-center gap-2 px-4 py-1.5 rounded-full border border-dashed border-slate-300 hover:border-primary hover:bg-primary-container transition-all text-xs font-semibold text-slate-500 hover:text-primary">
         <Plus className="w-3.5 h-3.5 group-hover:rotate-90 transition-transform" />
         {label}
       </button>
@@ -316,8 +316,8 @@ function TemplateGallery({ onSelect, onClose }: { onSelect: (t: Template) => voi
       <div className="bg-white rounded-2xl border border-slate-200 w-full max-w-2xl shadow-2xl overflow-hidden">
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-100 to-indigo-200 flex items-center justify-center">
-              <Layers className="w-4 h-4 text-indigo-600" />
+            <div className="w-9 h-9 rounded-lg bg-primary-container flex items-center justify-center">
+              <Layers className="w-4 h-4 text-on-primary-container" />
             </div>
             <div>
               <h2 className="font-extrabold text-slate-800 text-base">Nova Automação</h2>
@@ -328,7 +328,7 @@ function TemplateGallery({ onSelect, onClose }: { onSelect: (t: Template) => voi
             <X className="w-4 h-4" />
           </button>
         </div>
-        <div className="p-6 grid grid-cols-2 gap-3">
+        <div className="p-6 grid grid-cols-1 sm:grid-cols-2 gap-3">
           <button
             onClick={() => onSelect({ id: 'blank', name: 'Nova Automação', description: 'Configure do zero', emoji: '⚡', triggerEvent: 'incident_created', triggerSource: 'any', conditions: [], actions: [] })}
             className="flex items-center gap-3 p-4 rounded-xl border-2 border-dashed border-slate-200 hover:border-indigo-400 hover:bg-indigo-50 transition-all text-left group">
@@ -441,7 +441,7 @@ function TestModal({ wf, onClose }: { wf: Workflow; onClose: () => void }) {
         <div className="p-6 space-y-5 overflow-y-auto">
           <div>
             <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Dados do Chamado de Teste</div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Número</label>
                 <input value={mockTicket.number} onChange={e => setMockTicket(t => ({ ...t, number: e.target.value }))}
@@ -555,7 +555,7 @@ function ExecutionHistory({ logs, loading }: { logs: ExecutionLog[]; loading?: b
 
   return (
     <div className="max-w-[700px] mx-auto px-4 py-8">
-      <div className="grid grid-cols-4 gap-3 mb-6">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
         {[
           { label: 'Total', value: logs.length, cls: 'border-slate-200 text-slate-800' },
           { label: 'Sucesso', value: logs.filter(l => l.status === 'success').length, cls: 'border-emerald-200 text-emerald-700 bg-emerald-50' },
@@ -843,20 +843,20 @@ export default function WorkflowBuilder({ companyId }: { companyId: string }) {
   }
 
   return (
-    <div className="flex h-full bg-slate-50 overflow-hidden">
+    <div className="servicefy-workflow-shell flex h-full bg-slate-50 overflow-hidden">
 
       {/* ─── SIDEBAR ──────────────────────────────────────── */}
-      <aside className="w-72 shrink-0 border-r border-slate-200 bg-white flex flex-col overflow-hidden">
+      <aside className="servicefy-workflow-sidebar w-72 shrink-0 border-r border-slate-200 bg-white flex flex-col overflow-hidden">
         <div className="px-4 pt-5 pb-3 border-b border-slate-100">
           <div className="flex items-center justify-between mb-4">
             <div>
               <h2 className="text-base font-extrabold text-slate-800 flex items-center gap-2">
-                <Settings2 className="w-4 h-4 text-indigo-500" /> Automações
+                <Settings2 className="w-4 h-4 text-primary" /> Automações
               </h2>
               <p className="text-[11px] text-slate-400 mt-0.5">{workflows.length} regras configuradas</p>
             </div>
             <button onClick={() => setShowTemplates(true)}
-              className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white text-xs font-bold px-3 py-1.5 rounded-lg transition-all shadow-sm">
+              className="flex items-center gap-1.5 bg-primary hover:opacity-90 active:scale-95 text-on-primary text-xs font-bold px-3 py-1.5 rounded-lg transition-all">
               <Plus className="w-3.5 h-3.5" /> Nova
             </button>
           </div>
@@ -875,11 +875,11 @@ export default function WorkflowBuilder({ companyId }: { companyId: string }) {
             return (
               <button key={w.id} onClick={() => { setSelectedId(w.id); setActiveTab('config') }}
                 className={`w-full text-left px-4 py-3.5 border-l-2 transition-all ${
-                  w.id === selectedId ? 'border-l-indigo-500 bg-indigo-50/70' : 'border-l-transparent hover:bg-slate-50'
+                  w.id === selectedId ? 'border-l-primary bg-primary-container' : 'border-l-transparent hover:bg-slate-50'
                 }`}>
                 <div className="flex items-center gap-2 mb-1">
                   <span className={`w-2 h-2 rounded-full shrink-0 ${w.enabled ? 'bg-emerald-500' : 'bg-slate-300'}`} />
-                  <span className={`text-sm font-bold truncate ${w.id === selectedId ? 'text-indigo-700' : 'text-slate-700'}`}>{w.name}</span>
+                  <span className={`text-sm font-bold truncate ${w.id === selectedId ? 'text-on-primary-container' : 'text-slate-700'}`}>{w.name}</span>
                 </div>
                 <div className="flex items-center gap-1.5 pl-4 mb-1">
                   <span className="text-[10px] text-slate-400">{wTrig.emoji} {wTrig.label}</span>
@@ -918,13 +918,13 @@ export default function WorkflowBuilder({ companyId }: { companyId: string }) {
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
 
         {/* Top bar */}
-        <header className="bg-white border-b border-slate-200 px-6 py-3 flex items-center gap-4 shrink-0">
+        <header className="servicefy-workflow-header bg-white border-b border-slate-200 px-6 py-3 flex items-center gap-4 shrink-0">
           <div className="flex-1 min-w-0">
             {editingName ? (
               <input autoFocus value={tempName} onChange={e => setTempName(e.target.value)}
                 onBlur={() => { patch({ name: tempName || wf.name }); setEditingName(false) }}
                 onKeyDown={e => { if (e.key === 'Enter') { patch({ name: tempName || wf.name }); setEditingName(false) } if (e.key === 'Escape') setEditingName(false) }}
-                className="text-lg font-extrabold text-slate-800 border-b-2 border-indigo-500 outline-none bg-transparent w-full max-w-sm" />
+                className="text-lg font-extrabold text-slate-800 border-b-2 border-primary outline-none bg-transparent w-full max-w-sm" />
             ) : (
               <button onClick={() => { setTempName(wf.name); setEditingName(true) }} className="group flex items-center gap-2">
                 <h1 className="text-lg font-extrabold text-slate-800">{wf.name}</h1>
@@ -938,18 +938,24 @@ export default function WorkflowBuilder({ companyId }: { companyId: string }) {
               <span className="text-slate-200">·</span>
               <div className="flex items-center rounded-full border border-slate-200 overflow-hidden shrink-0">
                 <button onClick={() => patch({ ticketType: 'incident' })}
-                  className={`flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold transition-colors ${wf.ticketType === 'incident' ? 'bg-red-50 text-red-600' : 'text-slate-400 hover:bg-slate-50'}`}>
+                  className={`flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold transition-colors ${
+                    wf.ticketType === 'incident'
+                      ? 'bg-red-50 text-red-700'
+                      : 'text-slate-500 hover:bg-slate-50'
+                  }`}>
                   <AlertTriangle className="w-2.5 h-2.5" /> Incidente
                 </button>
                 <button onClick={() => patch({ ticketType: 'request' })}
-                  className={`flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold transition-colors border-l border-slate-200 ${wf.ticketType === 'request' ? 'bg-indigo-50 text-indigo-600' : 'text-slate-400 hover:bg-slate-50'}`}>
+                  className={`flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold transition-colors border-l border-slate-200 ${
+                    wf.ticketType === 'request' ? 'bg-primary-container text-on-primary-container' : 'text-slate-500 hover:bg-slate-50'
+                  }`}>
                   <Ticket className="w-2.5 h-2.5" /> Requisição
                 </button>
               </div>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="servicefy-workflow-actions flex items-center gap-2">
             {(validIssues.conditions || validIssues.actions) && (
               <span className="flex items-center gap-1.5 text-[10px] font-bold text-amber-600 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-full">
                 <AlertCircle className="w-3 h-3" /> Configuração incompleta
@@ -957,9 +963,11 @@ export default function WorkflowBuilder({ companyId }: { companyId: string }) {
             )}
             <button onClick={toggleEnabled}
               className={`flex items-center gap-2 text-xs font-bold px-3 py-1.5 rounded-full border transition-all ${
-                wf.enabled ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-slate-50 border-slate-200 text-slate-400 hover:border-slate-300'
+                wf.enabled
+                  ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                  : 'bg-slate-50 border-slate-200 text-slate-500 hover:border-slate-300'
               }`}>
-              <span className={`w-2 h-2 rounded-full ${wf.enabled ? 'bg-emerald-500 shadow-[0_0_6px_#10b981]' : 'bg-slate-300'}`} />
+              <span className={`w-2 h-2 rounded-full ${wf.enabled ? 'bg-emerald-500' : 'bg-slate-300'}`} />
               {wf.enabled ? 'Ativo' : 'Pausado'}
             </button>
             <button onClick={duplicateWorkflow} title="Duplicar"
@@ -967,7 +975,7 @@ export default function WorkflowBuilder({ companyId }: { companyId: string }) {
               <Copy className="w-4 h-4" />
             </button>
             <button onClick={deleteWorkflow} title="Excluir"
-              className="w-8 h-8 flex items-center justify-center rounded-lg border border-slate-200 text-slate-400 hover:text-red-500 hover:bg-red-50 hover:border-red-200 transition-colors">
+              className="w-8 h-8 flex items-center justify-center rounded-lg border border-slate-200 text-red-600/70 hover:text-red-700 hover:bg-red-50 hover:border-red-200 transition-colors">
               <Trash2 className="w-4 h-4" />
             </button>
             <button onClick={() => setShowTest(true)}
@@ -976,7 +984,7 @@ export default function WorkflowBuilder({ companyId }: { companyId: string }) {
             </button>
             <button onClick={handleSave} disabled={saving}
               className={`flex items-center gap-1.5 text-xs font-bold px-4 py-1.5 rounded-lg transition-all active:scale-95 shadow-sm disabled:opacity-60 ${
-                savedFeedback ? 'bg-emerald-500 text-white' : 'bg-indigo-600 hover:bg-indigo-700 text-white'
+                savedFeedback ? 'bg-emerald-600 text-white' : 'bg-primary hover:opacity-90 text-on-primary'
               }`}>
               {saving
                 ? <><Loader2 className="w-4 h-4 animate-spin" /> Salvando…</>
@@ -992,7 +1000,7 @@ export default function WorkflowBuilder({ companyId }: { companyId: string }) {
         )}
 
         {/* Tabs */}
-        <div className="bg-white border-b border-slate-200 px-6 flex items-center gap-1 shrink-0">
+        <div className="servicefy-workflow-tabs bg-white border-b border-slate-200 px-6 flex items-center gap-1 shrink-0 overflow-x-auto">
           {([
             { key: 'config',    label: 'Configuração', Icon: Settings2 },
             { key: 'history',   label: `Histórico (${logs.length})`, Icon: History },
@@ -1001,7 +1009,7 @@ export default function WorkflowBuilder({ companyId }: { companyId: string }) {
             <button key={tab.key} onClick={() => setActiveTab(tab.key)}
               className={`flex items-center gap-1.5 px-4 py-2.5 text-xs font-bold border-b-2 -mb-px transition-all ${
                 activeTab === tab.key
-                  ? 'border-indigo-500 text-indigo-700'
+                  ? 'border-primary text-primary'
                   : 'border-transparent text-slate-500 hover:text-slate-700'
               }`}>
               <tab.Icon className="w-3.5 h-3.5" />
@@ -1021,13 +1029,13 @@ export default function WorkflowBuilder({ companyId }: { companyId: string }) {
 
           {/* ── CONFIG TAB ──────────────────────────────── */}
           {activeTab === 'config' && (
-            <div className="max-w-[680px] mx-auto px-4 py-10">
+            <div className="max-w-[720px] mx-auto px-4 py-8 sm:py-10">
 
               {/* ── TRIGGER CARD ──────────────────────── */}
               <div className={`rounded-2xl border-2 bg-white shadow-sm overflow-hidden ${validIssues.conditions ? 'border-amber-200' : 'border-amber-200'}`}>
                 <button className="w-full flex items-center gap-4 px-5 py-4 hover:bg-amber-50/50 transition-colors text-left"
                   onClick={() => setOpenTrigger(v => !v)}>
-                  <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-amber-100 to-amber-200 flex items-center justify-center shrink-0 shadow-sm">
+                  <div className="w-11 h-11 rounded-lg border border-amber-200 bg-amber-50 flex items-center justify-center shrink-0">
                     <Zap className="w-5 h-5 text-amber-600" />
                   </div>
                   <div className="flex-1 min-w-0">
@@ -1051,7 +1059,7 @@ export default function WorkflowBuilder({ companyId }: { companyId: string }) {
                     {/* Event grid */}
                     <div>
                       <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-2">Evento</p>
-                      <div className="grid grid-cols-2 gap-2">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                         {TRIGGER_EVENTS.map(t => (
                           <button key={t.value}
                             onClick={() => patch({ triggerEvent: t.value, triggerSource: t.hasSource ? wf.triggerSource : 'any' })}
@@ -1071,7 +1079,7 @@ export default function WorkflowBuilder({ companyId }: { companyId: string }) {
                     {trig.hasSource && (
                       <div>
                         <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-2">Origem do Chamado</p>
-                        <div className="grid grid-cols-2 gap-2">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                           {TICKET_SOURCES.map(src => {
                             const Icon = src.Icon
                             const sel = wf.triggerSource === src.value
@@ -1100,7 +1108,7 @@ export default function WorkflowBuilder({ companyId }: { companyId: string }) {
                         <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
                           <Calendar className="w-3.5 h-3.5" /> Agendamento
                         </p>
-                        <div className="grid grid-cols-2 gap-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           <div>
                             <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Frequência</label>
                             <select value={wf.scheduleConfig?.frequency ?? 'daily'}
@@ -1129,34 +1137,34 @@ export default function WorkflowBuilder({ companyId }: { companyId: string }) {
               <FlowConnector label="Adicionar condição" onAdd={() => { addCondition(); setOpenConditions(true) }} />
 
               {/* ── CONDITIONS CARD ────────────────────── */}
-              <div className={`rounded-2xl border-2 bg-white shadow-sm overflow-hidden ${validIssues.conditions ? 'border-amber-300' : 'border-indigo-200'}`}>
-                <button className="w-full flex items-center gap-4 px-5 py-4 hover:bg-indigo-50/50 transition-colors text-left"
+              <div className={`rounded-2xl border bg-white shadow-sm overflow-hidden ${validIssues.conditions ? 'border-amber-300' : 'border-slate-200'}`}>
+                <button className="w-full flex items-center gap-4 px-5 py-4 hover:bg-surface-container-low transition-colors text-left"
                   onClick={() => setOpenConditions(v => !v)}>
-                  <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-indigo-100 to-indigo-200 flex items-center justify-center shrink-0 shadow-sm">
-                    <GitBranch className="w-5 h-5 text-indigo-600" />
+                  <div className="w-11 h-11 rounded-lg bg-primary-container flex items-center justify-center shrink-0">
+                    <GitBranch className="w-5 h-5 text-on-primary-container" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="text-[10px] font-black text-indigo-500 uppercase tracking-[0.15em] mb-0.5 flex items-center gap-2">
+                    <div className="text-xs font-bold text-primary uppercase tracking-wider mb-0.5 flex items-center gap-2">
                       Condições — Filtros
                       {validIssues.conditions && <AlertCircle className="w-3 h-3 text-amber-500" />}
                     </div>
                     <div className="text-base font-bold text-slate-800">
                       {wf.conditions.length === 0
                         ? 'Sem filtros — executa sempre'
-                        : <>Se <span className="text-indigo-700">{wf.conditions.length} {wf.conditions.length === 1 ? 'condição for' : 'condições forem'} atendida{wf.conditions.length > 1 ? 's' : ''}</span></>}
+                        : <>Se <span className="text-on-surface">{wf.conditions.length} {wf.conditions.length === 1 ? 'condição for' : 'condições forem'} atendida{wf.conditions.length > 1 ? 's' : ''}</span></>}
                     </div>
                   </div>
-                  <span className="text-[10px] font-black text-indigo-500 bg-indigo-50 border border-indigo-200 px-2.5 py-1 rounded-full tracking-wider shrink-0">
+                  <span className="text-xs font-bold text-on-primary-container bg-primary-container px-2.5 py-1 rounded-md tracking-wide shrink-0">
                     {wf.conditions.length === 0 ? 'SEMPRE' : `${wf.conditions.length} REGRA${wf.conditions.length !== 1 ? 'S' : ''}`}
                   </span>
                   {openConditions ? <ChevronUp className="w-4 h-4 text-slate-400 shrink-0" /> : <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />}
                 </button>
 
                 {openConditions && (
-                  <div className="border-t border-indigo-100 px-5 py-4">
+                  <div className="border-t border-slate-200 px-5 py-4">
                     {wf.conditions.length === 0 ? (
-                      <div className="flex flex-col items-center py-6 border-2 border-dashed border-indigo-100 rounded-xl text-center">
-                        <GitBranch className="w-8 h-8 text-indigo-200 mb-2" />
+                      <div className="flex flex-col items-center py-6 border border-dashed border-slate-300 rounded-xl text-center">
+                        <GitBranch className="w-8 h-8 text-slate-300 mb-2" />
                         <p className="text-sm font-semibold text-slate-500">Nenhuma condição definida</p>
                         <p className="text-xs text-slate-400 mt-0.5 max-w-[220px]">A automação executará para todos os eventos do gatilho</p>
                       </div>
@@ -1169,7 +1177,7 @@ export default function WorkflowBuilder({ companyId }: { companyId: string }) {
                                 <button onClick={() => updateCondition(cond.id, { logicOp: cond.logicOp === 'AND' ? 'OR' : 'AND' })}
                                   className={`text-[10px] font-black tracking-widest px-2.5 py-1 rounded-md border transition-colors ${
                                     cond.logicOp === 'AND'
-                                      ? 'border-indigo-200 bg-indigo-50 text-indigo-600 hover:bg-indigo-100'
+                                      ? 'border-primary/30 bg-primary-container text-on-primary-container hover:opacity-90'
                                       : 'border-orange-200 bg-orange-50 text-orange-600 hover:bg-orange-100'
                                   }`}>{cond.logicOp}</button>
                                 <div className="flex-1 h-px bg-slate-100" />
@@ -1189,7 +1197,7 @@ export default function WorkflowBuilder({ companyId }: { companyId: string }) {
                                 placeholder={valuePlaceholder(cond.field)}
                                 className={`min-w-0 flex-1 text-sm border rounded-lg px-3 py-2 bg-white outline-none focus:ring-2 focus:ring-indigo-300 text-slate-700 placeholder:text-slate-300 ${!cond.value.trim() ? 'border-amber-300' : 'border-slate-200'}`} />
                               <button onClick={() => removeCondition(cond.id)}
-                                className="w-8 h-8 shrink-0 flex items-center justify-center rounded-lg text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors opacity-0 group-hover:opacity-100">
+                                className="w-8 h-8 shrink-0 flex items-center justify-center rounded-lg text-red-600/70 hover:text-red-700 hover:bg-red-50 transition-colors opacity-0 group-hover:opacity-100">
                                 <X className="w-4 h-4" />
                               </button>
                             </div>
@@ -1198,7 +1206,7 @@ export default function WorkflowBuilder({ companyId }: { companyId: string }) {
                       </div>
                     )}
                     <button onClick={addCondition}
-                      className="mt-3 flex items-center gap-2 text-sm font-semibold text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 px-3 py-2 rounded-xl transition-colors w-full">
+                      className="mt-3 flex items-center gap-2 text-sm font-semibold text-primary hover:bg-primary-container px-3 py-2 rounded-xl transition-colors w-full">
                       <Plus className="w-4 h-4" /> Adicionar condição
                     </button>
                   </div>
@@ -1212,7 +1220,7 @@ export default function WorkflowBuilder({ companyId }: { companyId: string }) {
               <div className={`rounded-2xl border-2 bg-white shadow-sm overflow-hidden ${validIssues.actions ? 'border-red-200' : 'border-emerald-200'}`}>
                 <button className="w-full flex items-center gap-4 px-5 py-4 hover:bg-emerald-50/50 transition-colors text-left"
                   onClick={() => setOpenActions(v => !v)}>
-                  <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-emerald-100 to-emerald-200 flex items-center justify-center shrink-0 shadow-sm">
+                  <div className="w-11 h-11 rounded-lg border border-emerald-200 bg-emerald-50 flex items-center justify-center shrink-0">
                     <PlayCircle className="w-5 h-5 text-emerald-600" />
                   </div>
                   <div className="flex-1 min-w-0">
@@ -1260,7 +1268,7 @@ export default function WorkflowBuilder({ companyId }: { companyId: string }) {
                                   {ACTION_TYPES.map(a => <option key={a.value} value={a.value}>{a.label}</option>)}
                                 </select>
                                 <button onClick={() => removeAction(action.id)}
-                                  className="w-8 h-8 shrink-0 flex items-center justify-center rounded-lg text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors opacity-0 group-hover:opacity-100">
+                                  className="w-8 h-8 shrink-0 flex items-center justify-center rounded-lg text-red-600/70 hover:text-red-700 hover:bg-red-50 transition-colors opacity-0 group-hover:opacity-100">
                                   <X className="w-4 h-4" />
                                 </button>
                               </div>
@@ -1276,7 +1284,7 @@ export default function WorkflowBuilder({ companyId }: { companyId: string }) {
                                   </div>
                                 )}
                                 {action.type === 'set_field' && (
-                                  <div className="grid grid-cols-2 gap-2">
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                     <div>
                                       <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Campo</label>
                                       <select value={action.params.field ?? ''} onChange={e => updateAction(action.id, { params: { ...action.params, field: e.target.value } })}
@@ -1299,7 +1307,7 @@ export default function WorkflowBuilder({ companyId }: { companyId: string }) {
                                   </div>
                                 )}
                                 {action.type === 'send_email' && (
-                                  <div className="grid grid-cols-2 gap-2">
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                     <div>
                                       <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Destinatários</label>
                                       <input value={action.params.recipients ?? ''} onChange={e => updateAction(action.id, { params: { ...action.params, recipients: e.target.value } })}
@@ -1370,7 +1378,7 @@ export default function WorkflowBuilder({ companyId }: { companyId: string }) {
                                   </div>
                                 )}
                                 {action.type === 'delay' && (
-                                  <div className="grid grid-cols-2 gap-2">
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                     <div>
                                       <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Aguardar</label>
                                       <input type="number" min="1" value={action.params.amount ?? '1'}
@@ -1390,8 +1398,8 @@ export default function WorkflowBuilder({ companyId }: { companyId: string }) {
                                 )}
                                 {action.type === 'webhook' && (
                                   <div className="space-y-2">
-                                    <div className="grid grid-cols-3 gap-2">
-                                      <div className="col-span-2">
+                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                                      <div className="sm:col-span-2">
                                         <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">URL</label>
                                         <input value={action.params.url ?? ''} onChange={e => updateAction(action.id, { params: { ...action.params, url: e.target.value } })}
                                           placeholder="https://hooks.empresa.com/endpoint"

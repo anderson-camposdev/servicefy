@@ -91,7 +91,7 @@ export default function FormFieldsBuilder({
   }
 
   return (
-    <section className="mt-3 rounded-xl border border-indigo-100 bg-indigo-50/40 p-4">
+    <section className="mt-3 rounded-xl border border-slate-200 bg-surface-container-low p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h4 className="text-sm font-bold text-slate-800">{title}</h4>
@@ -100,7 +100,7 @@ export default function FormFieldsBuilder({
         <button
           type="button"
           onClick={addField}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-white px-3 py-2 text-xs font-bold text-indigo-700 shadow-sm hover:bg-indigo-50"
+          className="inline-flex items-center gap-1.5 rounded-lg border border-primary/30 bg-white px-3 py-2 text-xs font-bold text-primary hover:bg-primary-container"
         >
           <Plus className="h-3.5 w-3.5" /> {addLabel}
         </button>
@@ -112,7 +112,7 @@ export default function FormFieldsBuilder({
             <div className="mb-2 text-[10px] font-bold uppercase tracking-wider text-indigo-600">Campos herdados do template</div>
             <div className="space-y-2">
               {inheritedFields.map(field => (
-                <div key={field.id} className="flex flex-wrap items-center gap-2 rounded-lg bg-indigo-50 px-3 py-2 text-xs text-slate-600">
+                <div key={field.id} className="flex flex-wrap items-center gap-2 rounded-lg bg-primary-container px-3 py-2 text-xs text-on-primary-container">
                   <span className="font-semibold text-slate-800">{field.label}</span>
                   <span className="rounded bg-white px-2 py-0.5">{typeLabels[field.type]}</span>
                   {field.required && <span className="font-semibold text-rose-600">Obrigatório</span>}
@@ -166,7 +166,7 @@ export default function FormFieldsBuilder({
                 type="button"
                 onClick={() => setFields(current => current.filter(candidate => candidate.id !== field.id))}
                 title="Remover campo"
-                className="flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 text-slate-400 hover:border-red-200 hover:bg-red-50 hover:text-red-600"
+                className="flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 text-red-600/70 hover:border-red-200 hover:bg-red-50 hover:text-red-700"
               >
                 <Trash2 className="h-4 w-4" />
               </button>

@@ -220,10 +220,18 @@ export default function NewTicketModal({ open, onClose, companyId, analyst, onCr
               <div>
                 <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Tipo de Esteira</label>
                 <div className="grid grid-cols-2 gap-2">
-                  <button onClick={() => { setTicketType('incident'); setReqCategoryId(''); setReqItemId(''); setAnswers({}); setFieldErrors({}) }} className={`flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border text-sm font-semibold transition-all ${ticketType === 'incident' ? 'bg-rose-600 text-white border-rose-600 shadow-sm' : 'bg-white text-slate-600 border-slate-200 hover:border-rose-200'}`}>
+                  <button onClick={() => { setTicketType('incident'); setReqCategoryId(''); setReqItemId(''); setAnswers({}); setFieldErrors({}) }} className={`flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border text-sm font-semibold transition-all ${
+                    ticketType === 'incident'
+                      ? 'bg-rose-600 text-white border-rose-600'
+                      : 'bg-white text-slate-600 border-slate-200 hover:border-rose-200'
+                  }`}>
                     <AlertTriangle className="w-4 h-4" /> Incidente
                   </button>
-                  <button onClick={() => { setTicketType('request'); setCategoryId(''); setServiceId(''); setSymptomId(''); setAnswers({}); setFieldErrors({}) }} className={`flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border text-sm font-semibold transition-all ${ticketType === 'request' ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm' : 'bg-white text-slate-600 border-slate-200 hover:border-indigo-200'}`}>
+                  <button onClick={() => { setTicketType('request'); setCategoryId(''); setServiceId(''); setSymptomId(''); setAnswers({}); setFieldErrors({}) }} className={`flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border text-sm font-semibold transition-all ${
+                    ticketType === 'request'
+                      ? 'bg-primary text-on-primary border-primary'
+                      : 'bg-white text-slate-600 border-slate-200 hover:border-primary/30'
+                  }`}>
                     <ShoppingCart className="w-4 h-4" /> Requisição
                   </button>
                 </div>

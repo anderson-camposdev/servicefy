@@ -55,7 +55,7 @@ export default function DeveloperSettings({ companyId }: DeveloperSettingsProps)
     <div className="mx-auto w-full max-w-4xl p-5 lg:p-8 space-y-6">
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div className="flex items-center gap-3">
-          <span className="rounded-2xl bg-indigo-50 p-3 text-indigo-600"><Code2 className="w-6 h-6" /></span>
+          <span className="rounded-xl bg-primary-container p-3 text-on-primary-container"><Code2 className="w-6 h-6" /></span>
           <div>
             <h1 className="text-2xl font-black text-slate-900">Configurações de Desenvolvedor</h1>
             <p className="text-sm text-slate-500 mt-1">Webhooks outbound para integrações corporativas.</p>
@@ -89,7 +89,11 @@ export default function DeveloperSettings({ companyId }: DeveloperSettingsProps)
                 <button onClick={() => setEditing(webhook)} className="min-w-0 flex-1 text-left">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="truncate font-mono text-sm font-bold text-slate-800">{webhook.target_url}</span>
-                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${webhook.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-500'}`}>
+                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                      webhook.is_active
+                        ? 'bg-emerald-100 text-emerald-700'
+                        : 'bg-slate-200 text-slate-500'
+                    }`}>
                       {webhook.is_active ? 'Ativo' : 'Inativo'}
                     </span>
                     {webhook.consecutive_failures > 0 && (
@@ -100,7 +104,7 @@ export default function DeveloperSettings({ companyId }: DeveloperSettingsProps)
                   </div>
                   <p className="mt-1 text-xs text-slate-400">{webhook.events_subscribed.join(', ') || 'Nenhum evento selecionado'}</p>
                 </button>
-                <button onClick={() => handleDelete(webhook.id)} className="shrink-0 rounded-lg border border-slate-200 bg-white p-2 hover:bg-red-50 hover:border-red-200 text-slate-500 hover:text-red-600 transition-colors" title="Remover">
+                <button onClick={() => handleDelete(webhook.id)} className="shrink-0 rounded-lg border border-slate-200 bg-white p-2 text-red-600/70 hover:bg-red-50 hover:border-red-200 hover:text-red-700 transition-colors" title="Remover">
                   <Trash2 className="w-4 h-4" />
                 </button>
               </div>

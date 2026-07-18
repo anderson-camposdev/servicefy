@@ -110,16 +110,16 @@ export default function ChannelRoutingSettings({ companyId, onBack }: Props) {
       <button onClick={onBack} className="mb-5 inline-flex items-center gap-2 text-sm font-bold text-slate-600"><ArrowLeft className="h-4 w-4" /> Central de Configurações</button>
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <p className="text-xs font-black uppercase tracking-widest text-indigo-600">Canais e Comunicação</p>
-          <h1 className="mt-2 text-3xl font-black">Rotas e filas</h1>
+          <p className="text-xs font-bold uppercase tracking-wider text-primary">Canais e comunicação</p>
+          <h1 className="mt-2 text-2xl font-black sm:text-3xl">Rotas e filas</h1>
           <p className="mt-2 text-sm text-slate-500">Identificação de destinatário, prioridade e triagem de eventos ambíguos.</p>
         </div>
         <button onClick={() => void load()} className="rounded-xl border bg-white p-2.5"><RefreshCw className="h-4 w-4" /></button>
       </header>
 
       <div className="mt-5 flex gap-1 border-b border-slate-200">
-        <button onClick={() => setTab('routes')} className={`flex items-center gap-1.5 rounded-t-lg px-4 py-2 text-sm font-bold ${tab === 'routes' ? 'border-b-2 border-indigo-600 text-indigo-700' : 'text-slate-500'}`}><Network className="h-4 w-4" /> Rotas</button>
-        <button onClick={() => setTab('triage')} className={`flex items-center gap-1.5 rounded-t-lg px-4 py-2 text-sm font-bold ${tab === 'triage' ? 'border-b-2 border-indigo-600 text-indigo-700' : 'text-slate-500'}`}>
+        <button onClick={() => setTab('routes')} className={`flex items-center gap-1.5 px-4 py-2 text-sm font-bold ${tab === 'routes' ? 'border-b-2 border-primary text-primary' : 'text-slate-500'}`}><Network className="h-4 w-4" /> Rotas</button>
+        <button onClick={() => setTab('triage')} className={`flex items-center gap-1.5 px-4 py-2 text-sm font-bold ${tab === 'triage' ? 'border-b-2 border-primary text-primary' : 'text-slate-500'}`}>
           <Inbox className="h-4 w-4" /> Triagem {triage.length > 0 && <span className="rounded-full bg-amber-100 px-2 text-xs text-amber-700">{triage.length}</span>}
         </button>
       </div>
@@ -144,13 +144,13 @@ export default function ChannelRoutingSettings({ companyId, onBack }: Props) {
                   <label className="block text-xs font-bold">Grupo<select value={form.assignmentGroupId} onChange={e => setForm(f => ({ ...f, assignmentGroupId: e.target.value }))} className="mt-1 w-full rounded-xl border bg-white px-3 py-2.5 text-sm"><option value="">— Nenhum —</option>{groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}</select></label>
                 </div>
                 <label className="flex items-center gap-2 text-sm font-semibold"><input type="checkbox" checked={form.enabled} onChange={e => setForm(f => ({ ...f, enabled: e.target.checked }))} /> Ativa</label>
-                <button onClick={() => void addRoute()} className="flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-3 text-sm font-bold text-white"><Plus className="h-4 w-4" /> Adicionar rota</button>
+                <button onClick={() => void addRoute()} className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-bold text-on-primary hover:opacity-90"><Plus className="h-4 w-4" /> Adicionar rota</button>
               </div>
             )}
           </section>
 
           <section className="rounded-2xl border bg-white p-5 shadow-sm">
-            <h2 className="flex items-center gap-2 font-extrabold"><Network className="h-4 w-4 text-indigo-600" /> Rotas configuradas</h2>
+            <h2 className="flex items-center gap-2 font-extrabold"><Network className="h-4 w-4 text-primary" /> Rotas configuradas</h2>
             {loading ? <div className="py-12 text-center text-sm text-slate-500"><Loader2 className="mx-auto h-5 w-5 animate-spin" /></div> :
               routes.length === 0 ? <div className="mt-4 rounded-xl border border-dashed p-8 text-center text-sm text-slate-500">Nenhuma rota configurada.</div> :
               <div className="mt-4 space-y-2">{routes.map(r => (
@@ -169,7 +169,7 @@ export default function ChannelRoutingSettings({ companyId, onBack }: Props) {
 
       {tab === 'triage' && (
         <section className="mt-6 rounded-2xl border bg-white p-5 shadow-sm">
-          <h2 className="flex items-center gap-2 font-extrabold"><Inbox className="h-4 w-4 text-indigo-600" /> Eventos aguardando triagem</h2>
+          <h2 className="flex items-center gap-2 font-extrabold"><Inbox className="h-4 w-4 text-primary" /> Eventos aguardando triagem</h2>
           {loading ? <div className="py-12 text-center text-sm text-slate-500"><Loader2 className="mx-auto h-5 w-5 animate-spin" /></div> :
             triage.length === 0 ? <div className="mt-4 rounded-xl border border-dashed p-8 text-center text-sm text-slate-500">Nenhum evento pendente. Rotas ambíguas ou sem correspondência aparecem aqui.</div> :
             <div className="mt-4 space-y-2">{triage.map(ev => (
@@ -182,8 +182,8 @@ export default function ChannelRoutingSettings({ companyId, onBack }: Props) {
                   <div className="mt-1 truncate text-xs text-slate-500">de {ev.sender || 'desconhecido'} · {new Date(ev.created_at).toLocaleString('pt-BR')}</div>
                 </div>
                 <div className="flex shrink-0 gap-2">
-                  <button onClick={() => void resolve(ev, 'assigned')} className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-bold text-white"><CheckCircle2 className="h-3.5 w-3.5" /> Atribuir a este tenant</button>
-                  <button onClick={() => void resolve(ev, 'reprocessed')} title="Reprocessar" className="rounded-lg border p-2 text-slate-500 hover:text-indigo-600"><RotateCcw className="h-4 w-4" /></button>
+                  <button onClick={() => void resolve(ev, 'assigned')} className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-on-primary hover:opacity-90"><CheckCircle2 className="h-3.5 w-3.5" /> Atribuir a este tenant</button>
+                  <button onClick={() => void resolve(ev, 'reprocessed')} title="Reprocessar" className="rounded-lg border p-2 text-slate-500 hover:text-primary"><RotateCcw className="h-4 w-4" /></button>
                   <button onClick={() => void resolve(ev, 'discarded')} title="Descartar" className="rounded-lg border p-2 text-slate-500 hover:text-red-600"><XCircle className="h-4 w-4" /></button>
                 </div>
               </article>

@@ -49,12 +49,12 @@ export default function AnalyticsDashboard() {
 
   const compliance = metrics?.sla_compliance_pct ?? null
   const complianceTone = compliance === null
-    ? 'bg-slate-50 border-slate-200 text-slate-500'
+    ? 'text-on-surface-variant'
     : compliance >= 90
-      ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+      ? 'text-resolved-fg'
       : compliance >= 70
-        ? 'bg-amber-50 border-amber-200 text-amber-700'
-        : 'bg-rose-50 border-rose-200 text-rose-700'
+        ? 'text-amber-700'
+        : 'text-error'
 
   const statusEntries = metrics
     ? Object.entries(metrics.by_status).sort((a, b) => {
@@ -65,11 +65,11 @@ export default function AnalyticsDashboard() {
     : []
 
   return (
-    <div className="mx-auto w-full max-w-6xl p-5 lg:p-8 space-y-6">
-      <header className="flex flex-wrap items-start justify-between gap-4">
+    <div className="mx-auto w-full max-w-6xl space-y-6 p-4 sm:p-6 lg:p-8">
+      <header className="flex flex-wrap items-start justify-between gap-4 border-b border-outline-variant pb-5">
         <div>
-          <h1 className="text-2xl font-black text-slate-900">Analytics Executivo</h1>
-          <p className="text-sm text-slate-500 mt-1">Visão consolidada de ITSM para a camada gerencial.</p>
+          <h1 className="text-2xl font-bold text-on-surface">Visão executiva</h1>
+          <p className="mt-1 text-sm text-on-surface-variant">Desempenho operacional e riscos que precisam de decisão.</p>
         </div>
         <div className="flex flex-wrap items-end gap-2">
           <label className="text-xs font-bold text-slate-600">
@@ -105,18 +105,18 @@ export default function AnalyticsDashboard() {
         </div>
       ) : metrics ? (
         <>
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="grid overflow-hidden rounded-xl border border-outline-variant bg-surface sm:grid-cols-2 xl:grid-cols-4">
             <MetricCard
               icon={<TrendingUp className="w-5 h-5" />}
               label="Tickets Abertos"
               value={metrics.total_opened.toLocaleString('pt-BR')}
-              tone="bg-indigo-50 border-indigo-200 text-indigo-700"
+              tone="text-primary"
             />
             <MetricCard
               icon={<CheckCircle2 className="w-5 h-5" />}
               label="Tickets Resolvidos"
               value={metrics.total_resolved.toLocaleString('pt-BR')}
-              tone="bg-slate-50 border-slate-200 text-slate-700"
+              tone="text-on-surface"
             />
             <MetricCard
               icon={compliance !== null && compliance < 70 ? <AlertTriangle className="w-5 h-5" /> : <CheckCircle2 className="w-5 h-5" />}
@@ -130,7 +130,7 @@ export default function AnalyticsDashboard() {
               label="MTTR (tempo útil médio)"
               value={metrics.mttr_hours === null ? '—' : `${metrics.mttr_hours.toFixed(1)}h`}
               subValue={metrics.mttr_minutes === null ? undefined : `${metrics.mttr_minutes.toFixed(0)} min`}
-              tone="bg-sky-50 border-sky-200 text-sky-700"
+              tone="text-sky-700"
             />
           </div>
 
@@ -166,13 +166,13 @@ interface MetricCardProps {
 
 function MetricCard({ icon, label, value, subValue, tone, emphasized }: MetricCardProps) {
   return (
-    <div className={`rounded-2xl border p-5 shadow-sm ${tone} ${emphasized ? 'ring-2 ring-offset-2 ring-current/20' : ''}`}>
-      <div className="flex items-center gap-2 opacity-80">
+    <div className={`border-b border-outline-variant p-4 last:border-b-0 sm:[&:nth-child(odd)]:border-r xl:border-b-0 xl:border-r xl:last:border-r-0 ${tone} ${emphasized ? 'bg-surface-container' : ''}`}>
+      <div className="flex items-center gap-2">
         {icon}
-        <span className="text-xs font-bold uppercase tracking-wide">{label}</span>
+        <span className="text-xs font-semibold">{label}</span>
       </div>
-      <p className="mt-3 text-3xl font-black tracking-tight">{value}</p>
-      {subValue && <p className="mt-0.5 text-xs font-semibold opacity-70">{subValue}</p>}
+      <p className="mt-2 text-2xl font-bold tracking-tight">{value}</p>
+      {subValue && <p className="mt-0.5 text-xs font-semibold opacity-75">{subValue}</p>}
     </div>
   )
 }

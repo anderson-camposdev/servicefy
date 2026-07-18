@@ -203,7 +203,7 @@ export default function TicketTasksPanel({ companyId, ticketId, ticketType, grou
                     <option value="Closed">Concluída</option>
                     <option value="Canceled">Cancelada</option>
                   </select>
-                  <button onClick={() => handleDelete(t.id)} className="text-slate-400 hover:text-rose-500 p-1 rounded hover:bg-rose-50 transition-colors">
+                  <button onClick={() => handleDelete(t.id)} className="text-rose-600/70 hover:text-rose-700 p-1 rounded hover:bg-rose-50 transition-colors">
                     <Trash2 className="w-4 h-4" />
                   </button>
                 </div>

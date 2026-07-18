@@ -255,6 +255,8 @@ export type KnowledgeStatus = 'draft' | 'review' | 'published' | 'archived'
 export type KnowledgeVisibility = 'public' | 'tenant' | 'internal' | 'restricted'
 export type KnowledgeUsage = 'suggested' | 'linked' | 'sent_to_user'
 export type KnowledgeGrantSubject = 'profile' | 'group'
+export type KnowledgeRelationTargetType = 'incident' | 'request' | 'problem' | 'change'
+export type KnowledgeRelationKind = 'applies_to' | 'resolves' | 'workaround' | 'reference'
 
 export interface KnowledgeCategoryRow {
   id: string
@@ -287,6 +289,8 @@ export interface KnowledgeArticleRow {
   updated_at: string
   // Fase 20 — Automação de KEDB (migration 117)
   source_ticket_id: string | null
+  // Revisão programada de conteúdo (migration 139)
+  review_due_at: string | null
 }
 
 export interface KnowledgeArticleFeedbackRow {
@@ -321,6 +325,21 @@ export interface KnowledgeArticleGrantRow {
   subject_id: string
   granted_by: string | null
   expires_at: string | null
+  created_at: string
+}
+
+export interface KnowledgeArticleRelationRow {
+  id: string
+  company_id: string
+  article_id: string
+  target_type: KnowledgeRelationTargetType
+  target_id: string
+  incident_catalog_symptom_id: string | null
+  request_catalog_subitem_id: string | null
+  problem_id: string | null
+  change_id: string | null
+  relationship: KnowledgeRelationKind
+  created_by: string | null
   created_at: string
 }
 

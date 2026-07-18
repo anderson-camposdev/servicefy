@@ -465,7 +465,7 @@ export default function CatalogManager({ companyId, section = 'incident' }: { co
             <div className="flex border-b border-slate-100 px-5 gap-1 pt-2">
               {(['ti', 'rh'] as const).map(tab => (
                 <button key={tab} onClick={() => setIncidentLibTab(tab)}
-                  className={`px-4 py-2 text-sm font-semibold rounded-t-lg border-b-2 transition-colors ${incidentLibTab === tab ? 'border-indigo-600 text-indigo-700 bg-indigo-50' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>
+                  className={`px-4 py-2 text-sm font-semibold border-b-2 transition-colors ${incidentLibTab === tab ? 'border-primary text-primary' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>
                   {tab === 'ti' ? '💻 TI / Infraestrutura' : '👥 Recursos Humanos'}
                 </button>
               ))}
@@ -940,7 +940,7 @@ function RequestCatalogManager({ companyId, groups, templates, departments, cale
           <div className="flex border-b border-slate-100 px-5 gap-1 pt-2">
             {(['ti', 'rh'] as const).map(tab => (
               <button key={tab} onClick={() => setRequestLibTab(tab)}
-                className={`px-4 py-2 text-sm font-semibold rounded-t-lg border-b-2 transition-colors ${requestLibTab === tab ? 'border-indigo-600 text-indigo-700 bg-indigo-50' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>
+                className={`px-4 py-2 text-sm font-semibold border-b-2 transition-colors ${requestLibTab === tab ? 'border-primary text-primary' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>
                 {tab === 'ti' ? '💻 TI / Infraestrutura' : '👥 Recursos Humanos'}
               </button>
             ))}

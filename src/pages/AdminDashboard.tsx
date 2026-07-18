@@ -254,7 +254,11 @@ function AssignmentGroupsAdmin({ currentCompany, rawProfiles }: AssignmentGroups
                     <button
                       onClick={() => handleTogglePrivate(g)}
                       title="Tickets deste grupo só ficam visíveis para membros + gestores"
-                      className={`text-[10px] px-2.5 py-1 rounded-md font-bold transition-all border shadow-xs cursor-pointer ${g.is_private ? 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100' : 'bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100'}`}
+                      className={`text-[10px] px-2.5 py-1 rounded-md font-bold transition-all border shadow-xs cursor-pointer ${
+                        g.is_private
+                          ? 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100'
+                          : 'bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100'
+                      }`}
                     >
                       {g.is_private ? 'Privado' : 'Público'}
                     </button>
@@ -552,7 +556,7 @@ export default function AdminDashboard({ refetchAppData, currentCompany, activeT
                           alert('Empresa sem identificador cadastrado.');
                         }
                       }}
-                      className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors cursor-pointer"
+                      className="p-1.5 text-emerald-600/70 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg transition-colors cursor-pointer"
                       title="Testar Portal do Usuário"
                     >
                       <ExternalLink className="w-4 h-4" />
@@ -565,7 +569,7 @@ export default function AdminDashboard({ refetchAppData, currentCompany, activeT
                           setActiveTab('appearance')
                         }
                       }}
-                      className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors cursor-pointer"
+                      className="p-1.5 text-primary/70 hover:text-primary hover:bg-primary-container rounded-lg transition-colors cursor-pointer"
                       title="Configurar Aparência, SLAs e Motivos"
                     >
                       <Settings className="w-4 h-4" />
@@ -573,7 +577,7 @@ export default function AdminDashboard({ refetchAppData, currentCompany, activeT
 
                     <button 
                       onClick={() => setEditingTenant(c)}
-                      className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors cursor-pointer"
+                      className="p-1.5 text-primary/70 hover:text-primary hover:bg-primary-container rounded-lg transition-colors cursor-pointer"
                       title="Editar Empresa"
                     >
                       <Edit2 className="w-4 h-4" />

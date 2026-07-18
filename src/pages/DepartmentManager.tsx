@@ -180,7 +180,7 @@ export default function DepartmentManager({ companyId, cardClass, primaryColor }
       )}
 
       {isCreating && (
-        <div className={`${cardClass} p-4 border-l-4`} style={{ borderLeftColor: primaryColor }}>
+        <div className={`${cardClass} p-4`} style={{ borderColor: primaryColor }}>
           <h3 className="font-medium mb-4">Adicionar Departamento</h3>
           <form onSubmit={handleCreate} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

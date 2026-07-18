@@ -7,6 +7,7 @@ import { useIncidents } from './hooks/useIncidents'
 import { useAppData, useProblems, useChanges } from './hooks/useDbData'
 import { useRealtimeNotifications } from './hooks/useRealtimeNotifications'
 import GlobalSearchSpotlight from './components/portal/GlobalSearchSpotlight'
+import AppNavigation, { type AppNavigationItem } from './components/AppNavigation'
 import Login from './pages/auth/Login'
 import { usePersistentState } from './hooks/usePersistentState'
 import type { ProblemRow, CompanyRow, ProfileRow, TicketPriority, IncidentCategory } from './lib/database.types'
@@ -1080,7 +1081,7 @@ export default function App() {
   if (activeView === 'user_portal' || activeRole === 'end_user') {
     return (
       <div>
-        <div className="fixed top-4 right-4 z-50 flex gap-2">
+        <div className="servicefy-portal-agent-actions fixed right-4 top-4 z-50 flex gap-2">
           {currentUser.role !== 'end_user' && (
             <>
               {import.meta.env.DEV && (
@@ -1130,30 +1131,30 @@ export default function App() {
     )
   }
 
-  const navItems: { view: AppView; label: string; icon: React.ReactNode }[] = [
-    { view: 'dashboard_incidents', label: 'Incidentes', icon: <ShieldAlert className="w-5 h-5" /> },
-    { view: 'dashboard_requests', label: 'Requisições', icon: <ClipboardList className="w-5 h-5" /> },
-    { view: 'dashboard_problems', label: 'Problemas', icon: <AlertOctagon className="w-5 h-5" /> },
-    { view: 'dashboard_changes', label: 'Mudanças', icon: <RefreshCw className="w-5 h-5" /> },
-    { view: 'approval_inbox', label: 'Minhas Aprovações', icon: <CircleCheckBig className="w-5 h-5" /> },
-    { view: 'user_portal', label: 'Portal do Usuário', icon: <Home className="w-5 h-5" /> },
+  const navItems: AppNavigationItem[] = [
+    { view: 'dashboard_incidents', label: 'Incidentes', icon: <ShieldAlert className="w-5 h-5" />, group: 'operation' },
+    { view: 'dashboard_requests', label: 'Requisições', icon: <ClipboardList className="w-5 h-5" />, group: 'operation' },
+    { view: 'dashboard_problems', label: 'Problemas', icon: <AlertOctagon className="w-5 h-5" />, group: 'operation' },
+    { view: 'dashboard_changes', label: 'Mudanças', icon: <RefreshCw className="w-5 h-5" />, group: 'operation' },
+    { view: 'approval_inbox', label: 'Minhas Aprovações', icon: <CircleCheckBig className="w-5 h-5" />, group: 'access' },
+    { view: 'user_portal', label: 'Portal do Usuário', icon: <Home className="w-5 h-5" />, group: 'access' },
   ]
 
   // Central de Conhecimento: analista/gestor de operação/gestor de governança
   // + admins (a RLS/RPC de KB, migrations 131-133, já governa quem pode fazer
   // o quê dentro da tela; este filtro é só conveniência de navegação).
   if (isKbCapableRole(activeRole)) {
-    navItems.push({ view: 'knowledge_center', label: 'Base de Conhecimento', icon: <BookOpen className="w-5 h-5" /> })
+    navItems.push({ view: 'knowledge_center', label: 'Base de Conhecimento', icon: <BookOpen className="w-5 h-5" />, group: 'access' })
   }
 
   // O ServiceFY BI fica disponível para todos os perfis gerenciais/técnicos que alcançam esta tela
-  navItems.push({ view: 'flowfy_bi', label: 'ServiceFY BI Analytics', icon: <BarChart3 className="w-5 h-5" /> })
+  navItems.push({ view: 'flowfy_bi', label: 'Analytics', icon: <BarChart3 className="w-5 h-5" />, group: 'access' })
 
   // Fase 23 — Analytics Executivo: camada gerencial (a RPC get_executive_metrics
   // já bloqueia end_user no banco; este filtro é só conveniência de navegação).
   const managerialRoles: Role[] = ['sysadmin', 'company_admin', 'cio', 'client_manager', 'it_manager', 'area_manager']
   if (managerialRoles.includes(activeRole)) {
-    navItems.push({ view: 'analytics_executive', label: 'Analytics Executivo', icon: <TrendingUp className="w-5 h-5" /> })
+    navItems.push({ view: 'analytics_executive', label: 'Visão Executiva', icon: <TrendingUp className="w-5 h-5" />, group: 'access' })
   }
 
   // Configurações, integrações e automações são exclusivas dos administradores.
@@ -1162,7 +1163,8 @@ export default function App() {
     navItems.push({
       view: 'settings_governance',
       label: 'Configurações',
-      icon: <Settings className="w-5 h-5" />
+      icon: <Settings className="w-5 h-5" />,
+      group: 'access',
     })
   }
 
@@ -1170,7 +1172,7 @@ export default function App() {
   // save_outbound_webhook já valida is_settings_admin no banco; este filtro
   // de navegação é só conveniência de UI).
   if (activeRole === 'company_admin') {
-    navItems.push({ view: 'developer_settings', label: 'Desenvolvedor', icon: <Code2 className="w-5 h-5" /> })
+    navItems.push({ view: 'developer_settings', label: 'Desenvolvedor', icon: <Code2 className="w-5 h-5" />, group: 'access' })
   }
 
   const customDashRoles: Role[] = ['cio', 'client_manager', 'it_manager', 'area_manager', 'technician']
@@ -1219,7 +1221,7 @@ export default function App() {
   return (
     <div className="h-screen max-h-screen w-full max-w-full overflow-hidden text-on-surface flex flex-col" style={{ background: currentCompany.branding.backgroundColor || 'var(--color-bg-primary)', backgroundSize: 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat', backgroundAttachment: 'fixed' }}>
       {/* Top Header */}
-      <header className="sticky top-0 z-40 shrink-0 bg-surface border-b border-outline-variant shadow-sm px-3 sm:px-4 lg:px-6 py-3 flex items-center gap-2 lg:gap-3 min-w-0">
+      <header className="sticky top-0 z-40 flex min-h-16 min-w-0 shrink-0 items-center gap-2 border-b border-outline-variant bg-surface px-3 py-3 sm:px-4 lg:gap-3 lg:px-6">
         {/* Logo */}
         <div className="flex items-center gap-2.5 shrink-0">
           <div className="w-8 h-8 rounded-xl flex items-center justify-center shadow-md overflow-hidden" style={{ background: 'var(--brand-primary)' }}>
@@ -1230,13 +1232,13 @@ export default function App() {
             )}
           </div>
           <span className="text-lg font-black tracking-tight text-on-surface hidden sm:block">{currentCompany.branding.brandName || currentCompany.name}</span>
-          <span className="text-[9px] text-on-surface-variant uppercase font-bold tracking-widest hidden sm:block">ITSM</span>
+          <span className="hidden text-xs font-semibold text-on-surface-variant sm:block">ITSM</span>
         </div>
 
         <div className="w-px h-6 bg-outline-variant mx-1 hidden sm:block" />
 
         {/* Tenant Indicator (+ selo de Provedor MSP) */}
-        <div className="flex min-w-0 max-w-[13rem] xl:max-w-[18rem] items-center gap-2 px-2.5 py-1.5 rounded-xl border border-outline-variant bg-surface text-xs font-semibold text-on-surface shadow-sm shrink">
+        <div className="hidden min-w-0 max-w-[13rem] shrink items-center gap-2 rounded-lg bg-surface-container px-2.5 py-2 text-xs font-semibold text-on-surface sm:flex xl:max-w-[18rem]">
           {currentCompany.branding.logoUrl && (
             <img src={currentCompany.branding.logoUrl} alt={currentCompany.name} className="w-5 h-5 rounded-md" />
           )}
@@ -1309,7 +1311,7 @@ export default function App() {
             <img src={currentUser.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(currentUser.name)}&size=48`} alt={currentUser.name} className="w-6 h-6 rounded-full" />
             <div className="hidden sm:block text-left">
               <div className="text-xs font-bold text-on-surface">{currentUser.name.split(' ')[0]}</div>
-              <div className="text-[9px] text-on-surface-variant font-bold uppercase tracking-wider">{currentUser.role.replace('_', ' ')}</div>
+              <div className="text-[11px] text-on-surface-variant">{currentUser.role.replace('_', ' ')}</div>
             </div>
             <svg className={`w-3.5 h-3.5 text-on-surface-variant transition-transform ${isUserMenuOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
           </button>
@@ -1319,9 +1321,9 @@ export default function App() {
                 <div className="text-sm font-bold text-on-surface truncate">{currentUser.name}</div>
                 <div className="text-[11px] text-on-surface-variant truncate">{currentUser.email}</div>
                 <div className="mt-1.5 flex items-center gap-1.5 flex-wrap">
-                  <span className="px-1.5 py-0.5 rounded bg-surface-container-high text-on-surface-variant text-[9px] uppercase tracking-wider font-bold">{currentUser.role.replace('_', ' ')}</span>
-                  <span className="px-1.5 py-0.5 rounded bg-surface-container-high text-on-surface-variant text-[9px] font-semibold">{currentCompany.name}</span>
-                  {isProvider && <span className="px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-400 border border-sky-500/20 text-[9px] uppercase tracking-wider font-bold">Provedor MSP</span>}
+                  <span className="rounded bg-surface-container-high px-2 py-1 text-xs font-semibold text-on-surface-variant">{currentUser.role.replace('_', ' ')}</span>
+                  <span className="rounded bg-surface-container-high px-2 py-1 text-xs font-semibold text-on-surface-variant">{currentCompany.name}</span>
+                  {isProvider && <span className="rounded bg-sky-50 px-2 py-1 text-xs font-semibold text-sky-700">Provedor MSP</span>}
                 </div>
               </div>
               <div className="p-2">
@@ -1338,7 +1340,7 @@ export default function App() {
         />
 
         {/* Notification Bell */}
-        <button className="relative p-2 rounded-xl text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all cursor-pointer">
+        <button aria-label="Abrir notificações" className="relative flex h-11 w-11 items-center justify-center rounded-lg text-on-surface-variant transition-colors hover:bg-surface-container-high hover:text-on-surface">
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
           {unreadNotifs > 0 && <span className="absolute top-1.5 right-1.5 flex h-2 w-2"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" /><span className="relative inline-flex rounded-full h-2 w-2 bg-red-500" /></span>}
         </button>
@@ -1346,62 +1348,19 @@ export default function App() {
 
       {/* Layout */}
       <div className="flex flex-1 min-h-0 min-w-0 overflow-hidden">
-        {/* Sidebar */}
-        <aside className="w-56 bg-surface border-r border-outline-variant shrink-0 hidden lg:flex flex-col py-4">
-          <div className="px-3 space-y-0.5">
-            {navItems.slice(0, 4).map(item => (
-              <button key={item.view} onClick={() => handleViewChange(item.view)}
-                className={`w-full text-left flex items-center gap-2.5 px-3 py-2.5 rounded-r-none rounded-l-xl text-sm font-semibold transition-all cursor-pointer border-r-2 ${activeView === item.view ? 'bg-surface-container-high text-primary border-primary' : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container border-transparent'}`}>
-                <span className={activeView === item.view ? 'text-primary' : 'text-on-surface-variant'}>{item.icon}</span>
-                {item.label}
-              </button>
-            ))}
-          </div>
-          <div className="px-3 space-y-0.5 mt-4 pt-4 border-t border-outline-variant">
-            <div className="text-[9px] text-on-surface-variant font-bold uppercase tracking-widest px-3 py-2">Acesso</div>
-            {navItems.slice(4).map(item => (
-              <button key={item.view} onClick={() => handleViewChange(item.view)}
-                className={`w-full text-left flex items-center gap-2.5 px-3 py-2.5 rounded-r-none rounded-l-xl text-sm font-semibold transition-all cursor-pointer border-r-2 ${activeView === item.view ? 'bg-surface-container-high text-primary border-primary' : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container border-transparent'}`}>
-                <span className={activeView === item.view ? 'text-primary' : 'text-on-surface-variant'}>{item.icon}</span>
-                {item.label}
-              </button>
-            ))}
-          </div>
-          {/* Active Company Card */}
-          <div className="mt-auto px-3 pb-3">
-            <div className="bg-surface-container/80 border border-outline-variant rounded-xl p-2.5 shadow-sm">
-              <div className="flex items-center justify-between mb-2">
-                <div className="text-[9px] text-on-surface-variant uppercase tracking-[0.16em] font-bold">Tenant</div>
-                <span className="inline-flex items-center gap-1 text-[9px] font-semibold text-emerald-600">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                  Ativo
-                </span>
-              </div>
-              <div className="flex items-center gap-3 min-w-0">
-                <div className="w-14 h-12 shrink-0 rounded-lg border border-outline-variant bg-white overflow-hidden flex items-center justify-center">
-                  {currentCompany.branding.logoUrl ? (
-                    <img
-                      src={currentCompany.branding.logoUrl}
-                      alt={currentCompany.name}
-                      className="w-full h-full object-contain"
-                    />
-                  ) : (
-                    <span className="text-sm font-black text-primary">
-                      {currentCompany.name.slice(0, 2).toUpperCase()}
-                    </span>
-                  )}
-                </div>
-                <div className="min-w-0 text-left">
-                  <div className="text-xs text-on-surface font-bold truncate">{currentCompany.name}</div>
-                  <div className="text-[10px] text-on-surface-variant mt-0.5 truncate">{currentCompany.domain}</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </aside>
+        <AppNavigation
+          items={navItems}
+          activeView={activeView}
+          company={{
+            name: currentCompany.name,
+            domain: currentCompany.domain,
+            logoUrl: currentCompany.branding.logoUrl,
+          }}
+          onNavigate={view => handleViewChange(view as AppView)}
+        />
 
         {/* Main Content */}
-        <main className={`flex-1 min-h-0 min-w-0 w-0 bg-background ${showWorkspace ? 'overflow-hidden' : 'overflow-y-auto'}`} onClick={() => setIsUserMenuOpen(false)}>
+        <main className={`flex-1 min-h-0 min-w-0 w-0 bg-background pb-16 lg:pb-0 ${showWorkspace ? 'overflow-hidden' : 'overflow-y-auto'}`} onClick={() => setIsUserMenuOpen(false)}>
           {showWorkspace ? (
             <LazyBoundary>{renderActiveDashboard()}</LazyBoundary>
           ) : (
@@ -1413,11 +1372,11 @@ export default function App() {
       </div>
 
       {/* Footer */}
-      <footer className="shrink-0 bg-surface border-t border-outline-variant py-3 px-6 flex items-center justify-between">
-        <span className="text-[10px] text-on-surface-variant">© {new Date().getFullYear()} ServiceFY ITSM · ITIL v4 · Multi-Tenant</span>
-        <span className="flex items-center gap-1.5 text-[10px] text-on-surface-variant">
-          <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
-          Todos os sistemas operacionais
+      <footer className="hidden shrink-0 items-center justify-between border-t border-outline-variant bg-surface px-6 py-2.5 lg:flex">
+        <span className="text-xs text-on-surface-variant">© {new Date().getFullYear()} ServiceFY</span>
+        <span className="flex items-center gap-1.5 text-xs text-on-surface-variant">
+          <span className="h-1.5 w-1.5 rounded-full bg-resolved" />
+          Operação disponível
         </span>
       </footer>
     </div>

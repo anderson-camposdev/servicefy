@@ -86,7 +86,7 @@ export default function TicketChat({
           const mine = m.actor_type === actorType
           return (
             <div key={m.id} className={`flex gap-2.5 ${mine ? 'flex-row-reverse' : ''}`}>
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs flex-shrink-0 ${mine ? 'bg-slate-800 text-white' : m.actor_type === 'system' ? 'bg-slate-300 text-slate-600' : 'bg-indigo-100 text-indigo-600'}`}>
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs flex-shrink-0 ${mine ? 'bg-slate-800 text-white' : m.actor_type === 'system' ? 'bg-slate-300 text-slate-600' : 'bg-primary-container text-on-primary-container'}`}>
                 {(m.sender_name || '?').charAt(0)}
               </div>
               <div className={`border p-3 rounded-2xl shadow-sm max-w-[80%] ${mine ? 'bg-white border-slate-200 rounded-tr-none' : 'bg-white border-slate-200 rounded-tl-none'}`}>

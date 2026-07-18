@@ -60,7 +60,7 @@ const WorkspaceLayout = ({ companyId, isProvider, companies, ticketType }: Works
           
           let tabStyle = ''
           if (active) {
-            tabStyle = 'bg-surface text-primary border-t-2 border-t-primary border-x border-x-outline-variant font-bold rounded-t-lg shadow-sm'
+            tabStyle = 'bg-surface text-primary border-b-2 border-b-primary font-bold'
           } else {
             tabStyle = 'bg-transparent text-on-surface-variant border-transparent hover:text-on-surface hover:bg-surface-container rounded-t-lg'
           }

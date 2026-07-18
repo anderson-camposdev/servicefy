@@ -66,7 +66,7 @@ export default function ChannelConnectionsSettings({ companyId, activeRole, onBa
     <div className="h-full overflow-y-auto bg-slate-50 p-6"><div className="max-w-6xl mx-auto">
       <button onClick={onBack} className="mb-5 inline-flex items-center gap-2 text-sm font-bold text-slate-600"><ArrowLeft className="w-4 h-4" /> Central de Configurações</button>
       <header className="flex flex-wrap items-start justify-between gap-4">
-        <div><p className="text-xs font-black uppercase tracking-widest text-indigo-600">Canais e Comunicação</p><h1 className="mt-2 text-3xl font-black">Conexões omnichannel</h1><p className="mt-2 text-sm text-slate-500">Credenciais são write-only e nunca podem ser recuperadas.</p></div>
+        <div><p className="text-xs font-bold uppercase tracking-wider text-primary">Canais e comunicação</p><h1 className="mt-2 text-2xl font-black sm:text-3xl">Conexões omnichannel</h1><p className="mt-2 text-sm text-slate-500">Cadastre os provedores usados no atendimento. As credenciais são protegidas e nunca voltam a ser exibidas.</p></div>
         <button onClick={() => void load()} className="rounded-xl border bg-white p-2.5"><RefreshCw className="w-4 h-4" /></button>
       </header>
       {error && <div className="mt-5 flex gap-2 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700"><AlertTriangle className="w-4 h-4" />{error}</div>}
@@ -80,11 +80,11 @@ export default function ChannelConnectionsSettings({ companyId, activeRole, onBa
             <label className="block text-xs font-bold">Endereço/identificador<input value={form.address} onChange={event => setForm(v => ({ ...v, address: event.target.value }))} className="mt-1 w-full rounded-xl border px-3 py-2.5 text-sm" placeholder="suporte@empresa.com" /></label>
             <label className="block text-xs font-bold">Credencial<input type="password" value={form.secret} onChange={event => setForm(v => ({ ...v, secret: event.target.value }))} autoComplete="new-password" className="mt-1 w-full rounded-xl border px-3 py-2.5 text-sm" placeholder="Enviada diretamente ao Vault" /></label>
             <label className="flex items-center gap-2 text-sm font-semibold"><input type="checkbox" checked={form.enabled} onChange={event => setForm(v => ({ ...v, enabled: event.target.checked }))} /> Ativar após salvar</label>
-            <button onClick={() => void save()} disabled={saving || !form.name.trim()} className="flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-3 text-sm font-bold text-white disabled:opacity-50">{saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <KeyRound className="w-4 h-4" />} Salvar</button>
+            <button onClick={() => void save()} disabled={saving || !form.name.trim()} className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-bold text-on-primary hover:opacity-90 disabled:opacity-50">{saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <KeyRound className="w-4 h-4" />} Salvar conexão</button>
           </div>
         </section>
         <section className="rounded-2xl border bg-white p-5 shadow-sm">
-          <h2 className="flex items-center gap-2 font-extrabold"><Network className="w-4 h-4 text-indigo-600" /> Conexões configuradas</h2>
+          <h2 className="flex items-center gap-2 font-extrabold"><Network className="w-4 h-4 text-primary" /> Conexões configuradas</h2>
           {loading ? <div className="py-12 text-center text-sm text-slate-500">Carregando…</div> :
             connections.length === 0 ? <div className="mt-4 rounded-xl border border-dashed p-8 text-center text-sm text-slate-500">Nenhuma conexão configurada.</div> :
             <div className="mt-4 space-y-3">{connections.map(item => <article key={item.id} className="flex items-center gap-3 rounded-xl border p-4">

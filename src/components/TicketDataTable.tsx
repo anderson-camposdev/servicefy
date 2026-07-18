@@ -210,7 +210,7 @@ export default function TicketDataTable<T>({
   )
 
   return (
-    <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden flex flex-col h-full">
+    <div className="servicefy-data-table bg-surface border border-outline-variant rounded-xl overflow-hidden flex flex-col h-full">
       {/* Barra de ferramentas: colunas, agrupar por, filtros ativos */}
       <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-slate-50/60 px-3 py-2.5">
         <button

@@ -6,12 +6,15 @@
 // ============================================================
 
 import { supabase } from './supabase'
-import type { Database } from './database.generated'
+import type { Database, Json } from './database.generated'
 import type {
   KnowledgeArticleRow, KnowledgeCategoryRow, KnowledgeArticleFeedbackRow,
   KnowledgeArticleVersionRow, KnowledgeArticleGrantRow, KnowledgeArticleCaseRow,
   KnowledgeSearchResult, KnowledgeSuggestion, KnowledgeStatus, KnowledgeVisibility,
-  KnowledgeGrantSubject, KnowledgeUsage,
+  KnowledgeGrantSubject, KnowledgeUsage, KnowledgeArticleRelationRow,
+  KnowledgeRelationKind, KnowledgeRelationTargetType, IncidentCatalogItemRow,
+  IncidentCatalogSubitemRow, IncidentCatalogSymptomRow, RequestCatalogItemRow,
+  RequestCatalogSubitemRow, ProblemRow, ChangeRow,
 } from './database.types'
 
 function unwrap<T>(res: { data: unknown; error: unknown }): T {
@@ -49,6 +52,36 @@ export interface ArticleInput {
   serviceDomainId: string | null
   visibility: KnowledgeVisibility
   tags: string[]
+  /** Data-limite de validade editorial (migration 139); null = sem revisão programada. */
+  reviewDueAt: string | null
+}
+
+export interface KnowledgeRelationSelection {
+  targetType: KnowledgeRelationTargetType
+  targetId: string
+  relationship: KnowledgeRelationKind
+}
+
+export interface KnowledgeRelationOption extends KnowledgeRelationSelection {
+  title: string
+  subtitle: string
+  description: string | null
+  meta: string
+  searchText: string
+}
+
+type IncidentCascadeRow = IncidentCatalogItemRow & {
+  subitems: Array<IncidentCatalogSubitemRow & { symptoms: IncidentCatalogSymptomRow[] }>
+}
+
+type RequestCascadeRow = RequestCatalogItemRow & {
+  subitems: RequestCatalogSubitemRow[]
+}
+
+function minutesLabel(minutes: number): string {
+  if (minutes < 60) return `${minutes} min`
+  if (minutes % 60 === 0) return `${minutes / 60} h`
+  return `${Math.floor(minutes / 60)} h ${minutes % 60} min`
 }
 
 export const knowledgeService = {
@@ -78,6 +111,130 @@ export const knowledgeService = {
   },
 
   // ─── Artigos (admin) ────────────────────────────────────────
+  async listRelationOptions(companyId: string): Promise<KnowledgeRelationOption[]> {
+    const [incidentRes, requestRes, problemRes, changeRes] = await Promise.all([
+      supabase
+        .from('incident_catalog_items')
+        .select(`
+          *,
+          subitems:incident_catalog_subitems(
+            *,
+            symptoms:incident_catalog_symptoms(*)
+          )
+        `)
+        .eq('company_id', companyId)
+        .eq('active', true)
+        .eq('incident_catalog_subitems.active', true)
+        .eq('incident_catalog_subitems.incident_catalog_symptoms.active', true)
+        .order('sort_order'),
+      supabase
+        .from('request_catalog_items')
+        .select('*, subitems:request_catalog_subitems(*)')
+        .eq('company_id', companyId)
+        .eq('active', true)
+        .eq('request_catalog_subitems.active', true)
+        .order('sort_order'),
+      supabase
+        .from('problems')
+        .select('*')
+        .eq('company_id', companyId)
+        .order('updated_at', { ascending: false })
+        .limit(100),
+      supabase
+        .from('changes')
+        .select('*')
+        .eq('company_id', companyId)
+        .order('updated_at', { ascending: false })
+        .limit(100),
+    ])
+
+    if (incidentRes.error) throw incidentRes.error
+    if (requestRes.error) throw requestRes.error
+    if (problemRes.error) throw problemRes.error
+    if (changeRes.error) throw changeRes.error
+
+    const options: KnowledgeRelationOption[] = []
+    for (const item of (incidentRes.data ?? []) as unknown as IncidentCascadeRow[]) {
+      for (const subitem of item.subitems ?? []) {
+        for (const symptom of subitem.symptoms ?? []) {
+          options.push({
+            targetType: 'incident',
+            targetId: symptom.id,
+            relationship: 'applies_to',
+            title: symptom.name,
+            subtitle: `${item.name} › ${subitem.name}`,
+            description: symptom.description,
+            meta: `${symptom.default_priority} · SLA ${minutesLabel(symptom.sla_resolution_mins)}`,
+            searchText: `${item.name} ${subitem.name} ${symptom.name} ${symptom.description ?? ''}`.toLocaleLowerCase('pt-BR'),
+          })
+        }
+      }
+    }
+    for (const item of (requestRes.data ?? []) as unknown as RequestCascadeRow[]) {
+      for (const subitem of item.subitems ?? []) {
+        options.push({
+          targetType: 'request',
+          targetId: subitem.id,
+          relationship: 'applies_to',
+          title: subitem.name,
+          subtitle: item.name,
+          description: subitem.description,
+          meta: `${subitem.estimated_delivery_days} dia(s)${subitem.requires_manager_approval ? ' · requer aprovação' : ''}`,
+          searchText: `${item.name} ${subitem.name} ${subitem.description ?? ''}`.toLocaleLowerCase('pt-BR'),
+        })
+      }
+    }
+    for (const problem of (problemRes.data ?? []) as ProblemRow[]) {
+      options.push({
+        targetType: 'problem',
+        targetId: problem.id,
+        relationship: problem.workaround ? 'workaround' : 'reference',
+        title: problem.short_description,
+        subtitle: problem.number,
+        description: problem.root_cause ?? problem.description,
+        meta: `${problem.state} · ${problem.priority}${problem.known_error ? ' · erro conhecido' : ''}`,
+        searchText: `${problem.number} ${problem.short_description} ${problem.root_cause ?? ''} ${problem.workaround ?? ''}`.toLocaleLowerCase('pt-BR'),
+      })
+    }
+    for (const change of (changeRes.data ?? []) as ChangeRow[]) {
+      options.push({
+        targetType: 'change',
+        targetId: change.id,
+        relationship: 'reference',
+        title: change.short_description,
+        subtitle: change.number,
+        description: change.description,
+        meta: `${change.state} · risco ${change.risk} · ${change.type}`,
+        searchText: `${change.number} ${change.short_description} ${change.description ?? ''}`.toLocaleLowerCase('pt-BR'),
+      })
+    }
+    return options
+  },
+
+  async listRelations(articleId: string): Promise<KnowledgeArticleRelationRow[]> {
+    const rows = unwrap<Database['public']['Tables']['knowledge_article_relations']['Row'][]>(
+      await supabase
+        .from('knowledge_article_relations')
+        .select('*')
+        .eq('article_id', articleId)
+        .order('created_at'),
+    )
+    return rows as KnowledgeArticleRelationRow[]
+  },
+
+  async replaceRelations(
+    articleId: string,
+    companyId: string,
+    relations: KnowledgeRelationSelection[],
+  ): Promise<KnowledgeArticleRelationRow[]> {
+    const rows = unwrap(await supabase.rpc('kb_replace_article_relations', {
+      p_article_id: articleId,
+      p_company_id: companyId,
+      p_relations: relations as unknown as Json,
+    }))
+    return rows as KnowledgeArticleRelationRow[]
+  },
+
   async listArticles(companyId: string, filters: ArticleListFilters = {}): Promise<{ rows: KnowledgeArticleRow[]; total: number }> {
     const limit = filters.limit ?? 20
     const offset = filters.offset ?? 0
@@ -140,6 +297,7 @@ export const knowledgeService = {
       title: input.title, slug, summary: input.summary, body: input.body,
       category_id: input.categoryId, service_domain_id: input.serviceDomainId,
       visibility: input.visibility, tags: input.tags, status: 'draft',
+      review_due_at: input.reviewDueAt,
     }).select().single())
   },
 
@@ -152,6 +310,7 @@ export const knowledgeService = {
     if (input.serviceDomainId !== undefined) patch.service_domain_id = input.serviceDomainId
     if (input.visibility !== undefined) patch.visibility = input.visibility
     if (input.tags !== undefined) patch.tags = input.tags
+    if (input.reviewDueAt !== undefined) patch.review_due_at = input.reviewDueAt
     return unwrap(await supabase.from('knowledge_articles').update(patch as Database['public']['Tables']['knowledge_articles']['Update']).eq('id', id).select().single())
   },
 
@@ -239,4 +398,30 @@ export const knowledgeService = {
       .from('knowledge_article_cases').select('*')
       .eq('case_id', caseId).order('created_at', { ascending: false }))
   },
+
+  /**
+   * Vínculos artigo↔caso com o contexto do artigo resolvido — alimenta a aba
+   * "Relacionamentos" do cockpit. `article` vem null quando a RLS esconde o
+   * artigo do papel atual (ex.: restrito sem concessão).
+   */
+  async listCaseLinkedArticles(caseId: string): Promise<CaseLinkedArticle[]> {
+    const links = await this.listCaseLinks(caseId)
+    if (links.length === 0) return []
+    const ids = [...new Set(links.map(link => link.article_id))]
+    const articles = unwrap<CaseLinkedArticleSummary[]>(await supabase
+      .from('knowledge_articles')
+      .select('id,title,slug,status,visibility')
+      .in('id', ids))
+    return links.map(link => ({
+      link,
+      article: articles.find(article => article.id === link.article_id) ?? null,
+    }))
+  },
+}
+
+export type CaseLinkedArticleSummary = Pick<KnowledgeArticleRow, 'id' | 'title' | 'slug' | 'status' | 'visibility'>
+
+export interface CaseLinkedArticle {
+  link: KnowledgeArticleCaseRow
+  article: CaseLinkedArticleSummary | null
 }

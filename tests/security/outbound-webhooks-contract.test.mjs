@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import test from 'node:test'
 
 const read = path => readFileSync(new URL('../../' + path, import.meta.url), 'utf8')
-const sql = read('supabase/migrations/20260715000000_122_outbound_webhooks.sql')
+const sql = read('supabase/migrations/20260715000000_122_outbound_webhooks.sql').replace(/\r\n/g, '\n')
 const dispatcher = read('supabase/functions/webhook-dispatcher/index.ts')
 const ssrfGuard = read('supabase/functions/_shared/ssrf-guard.ts')
 const pkg = JSON.parse(read('package.json'))

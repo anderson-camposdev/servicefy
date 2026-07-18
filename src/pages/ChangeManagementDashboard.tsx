@@ -332,72 +332,72 @@ export default function ChangeManagementDashboard({ companyId }: { companyId?: s
   const prevMonth = () => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1))
 
   return (
-    <div className="p-5 space-y-3 h-full overflow-y-auto max-w-7xl mx-auto">
+    <div className="mx-auto h-full max-w-7xl space-y-4 overflow-y-auto p-4 sm:p-5">
       {/* Top Banner */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 pb-3">
         <div>
-          <h2 className="text-xl font-black text-slate-800 flex items-center gap-3">
-            <Shuffle className="w-6 h-6 text-indigo-600 animate-spin-slow" />
-            Gestão de Mudanças (ITIL)
+          <h2 className="flex items-center gap-3 text-xl font-bold text-on-surface">
+            <Shuffle className="w-5 h-5 text-primary" />
+            Gestão de mudanças
           </h2>
-          <p className="text-slate-500 text-xs mt-1">
-            Planejamento, calendário de janelas e controle de aprovações do CAB estilo ServiceNow.
+          <p className="mt-1 text-sm text-on-surface-variant">
+            Planeje janelas, avalie riscos e conduza aprovações do CAB.
           </p>
         </div>
         <button
           onClick={() => openForm()}
-          className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 px-5 rounded-xl shadow-lg hover:shadow-xl active:scale-[0.98] transition-all flex items-center gap-2 self-start md:self-auto shrink-0 cursor-pointer"
+          className="flex min-h-11 shrink-0 cursor-pointer items-center gap-2 self-start rounded-lg bg-primary px-5 py-2.5 font-bold text-on-primary transition-colors hover:brightness-95 md:self-auto"
         >
           <Plus className="w-5 h-5" /> Nova Mudança
         </button>
       </div>
 
       {/* KPI Stats (compactos — a tabela abaixo é a prioridade de espaço) */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
-        <div className="bg-white px-3 py-2 rounded-lg border border-slate-200 shadow-sm flex items-center justify-between">
-          <span className="text-[10px] font-bold text-slate-400 uppercase">Total de Mudanças</span>
-          <span className="text-lg font-black text-slate-700">{kpis.total}</span>
+      <div className="grid grid-cols-2 overflow-hidden rounded-xl border border-outline-variant bg-surface md:grid-cols-5">
+        <div className="flex items-center justify-between border-b border-r border-outline-variant px-3 py-3 md:border-b-0">
+          <span className="text-xs font-semibold text-on-surface-variant">Total</span>
+          <span className="text-lg font-bold text-on-surface">{kpis.total}</span>
         </div>
-        <div className="bg-white px-3 py-2 rounded-lg border border-slate-200 shadow-sm flex items-center justify-between">
-          <span className="text-[10px] font-bold text-slate-400 uppercase">Aguardando CAB</span>
-          <span className="text-lg font-black text-amber-600">{kpis.awaitingCAB}</span>
+        <div className="flex items-center justify-between border-b border-outline-variant px-3 py-3 md:border-b-0 md:border-r">
+          <span className="text-xs font-semibold text-on-surface-variant">Aguardando CAB</span>
+          <span className="text-lg font-bold text-amber-700">{kpis.awaitingCAB}</span>
         </div>
-        <div className="bg-white px-3 py-2 rounded-lg border border-slate-200 shadow-sm flex items-center justify-between">
-          <span className="text-[10px] font-bold text-slate-400 uppercase">Emergenciais</span>
-          <span className="text-lg font-black text-rose-600">{kpis.emergency}</span>
+        <div className="flex items-center justify-between border-b border-r border-outline-variant px-3 py-3 md:border-b-0">
+          <span className="text-xs font-semibold text-on-surface-variant">Emergenciais</span>
+          <span className="text-lg font-bold text-error">{kpis.emergency}</span>
         </div>
-        <div className="bg-white px-3 py-2 rounded-lg border border-slate-200 shadow-sm flex items-center justify-between">
-          <span className="text-[10px] font-bold text-slate-400 uppercase">Alto Risco</span>
-          <span className="text-lg font-black text-orange-600">{kpis.highRisk}</span>
+        <div className="flex items-center justify-between border-b border-outline-variant px-3 py-3 md:border-b-0 md:border-r">
+          <span className="text-xs font-semibold text-on-surface-variant">Alto risco</span>
+          <span className="text-lg font-bold text-orange-700">{kpis.highRisk}</span>
         </div>
-        <div className="bg-white px-3 py-2 rounded-lg border border-slate-200 shadow-sm flex items-center justify-between">
-          <span className="text-[10px] font-bold text-slate-400 uppercase">Agendadas</span>
-          <span className="text-lg font-black text-blue-600">{kpis.scheduled}</span>
+        <div className="col-span-2 flex items-center justify-between px-3 py-3 md:col-span-1">
+          <span className="text-xs font-semibold text-on-surface-variant">Agendadas</span>
+          <span className="text-lg font-bold text-primary">{kpis.scheduled}</span>
         </div>
       </div>
 
       {/* Navigation Subtabs */}
-      <div className="flex border-b border-slate-200 gap-1">
+      <div className="flex gap-1 overflow-x-auto border-b border-outline-variant">
         <button
           onClick={() => setActiveSubTab('list')}
-          className={`flex items-center gap-2 px-5 py-2.5 text-sm font-bold border-b-2 -mb-px transition-colors cursor-pointer ${
-            activeSubTab === 'list' ? 'border-indigo-600 text-indigo-600 font-extrabold' : 'border-transparent text-slate-500 hover:text-slate-800'
+          className={`-mb-px flex min-h-11 shrink-0 cursor-pointer items-center gap-2 border-b-2 px-4 py-2.5 text-sm font-semibold transition-colors ${
+            activeSubTab === 'list' ? 'border-primary text-primary' : 'border-transparent text-on-surface-variant hover:text-on-surface'
           }`}
         >
           <ClipboardList className="w-4 h-4" /> Lista de Mudanças
         </button>
         <button
           onClick={() => setActiveSubTab('calendar')}
-          className={`flex items-center gap-2 px-5 py-2.5 text-sm font-bold border-b-2 -mb-px transition-colors cursor-pointer ${
-            activeSubTab === 'calendar' ? 'border-indigo-600 text-indigo-600 font-extrabold' : 'border-transparent text-slate-500 hover:text-slate-800'
+          className={`-mb-px flex min-h-11 shrink-0 cursor-pointer items-center gap-2 border-b-2 px-4 py-2.5 text-sm font-semibold transition-colors ${
+            activeSubTab === 'calendar' ? 'border-primary text-primary' : 'border-transparent text-on-surface-variant hover:text-on-surface'
           }`}
         >
           <CalendarRange className="w-4 h-4" /> Calendário de Janelas
         </button>
         <button
           onClick={() => setActiveSubTab('cab')}
-          className={`flex items-center gap-2 px-5 py-2.5 text-sm font-bold border-b-2 -mb-px transition-colors cursor-pointer relative ${
-            activeSubTab === 'cab' ? 'border-indigo-600 text-indigo-600 font-extrabold' : 'border-transparent text-slate-500 hover:text-slate-800'
+          className={`relative -mb-px flex min-h-11 shrink-0 cursor-pointer items-center gap-2 border-b-2 px-4 py-2.5 text-sm font-semibold transition-colors ${
+            activeSubTab === 'cab' ? 'border-primary text-primary' : 'border-transparent text-on-surface-variant hover:text-on-surface'
           }`}
         >
           <Users className="w-4 h-4" /> Painel de Aprovadores do CAB
@@ -410,7 +410,7 @@ export default function ChangeManagementDashboard({ companyId }: { companyId?: s
       </div>
 
       {/* Content Area */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden p-6">
+      <div className="overflow-hidden rounded-xl border border-outline-variant bg-surface p-4 sm:p-6">
         {loading ? (
           <div className="flex flex-col items-center justify-center py-20 gap-3">
             <div className="w-10 h-10 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
@@ -431,14 +431,14 @@ export default function ChangeManagementDashboard({ companyId }: { companyId?: s
                   className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-xl text-sm bg-white outline-none focus:ring-2 focus:ring-indigo-500"
                 />
               </div>
-              <div className="flex items-center gap-3">
-                <div className="flex items-center gap-2 text-xs font-bold text-slate-500">
-                  <Filter className="w-3.5 h-3.5" /> FILTRAR:
+              <div className="grid w-full grid-cols-2 items-center gap-2 md:w-auto md:grid-cols-[auto_1fr_1fr]">
+                <div className="col-span-2 flex items-center gap-2 text-xs font-semibold text-on-surface-variant md:col-span-1">
+                  <Filter className="w-3.5 h-3.5" /> Filtros
                 </div>
                 <select
                   value={typeFilter}
                   onChange={e => setTypeFilter(e.target.value)}
-                  className="border border-slate-200 rounded-xl px-3 py-1.5 text-xs bg-white outline-none"
+                  className="min-w-0 rounded-lg border border-outline-variant bg-surface px-3 py-2 text-xs outline-none"
                 >
                   <option value="all">Todos os Tipos</option>
                   <option value="Normal">Normal</option>
@@ -448,7 +448,7 @@ export default function ChangeManagementDashboard({ companyId }: { companyId?: s
                 <select
                   value={riskFilter}
                   onChange={e => setRiskFilter(e.target.value)}
-                  className="border border-slate-200 rounded-xl px-3 py-1.5 text-xs bg-white outline-none"
+                  className="min-w-0 rounded-lg border border-outline-variant bg-surface px-3 py-2 text-xs outline-none"
                 >
                   <option value="all">Todos os Riscos</option>
                   <option value="Low">Low</option>
@@ -460,32 +460,34 @@ export default function ChangeManagementDashboard({ companyId }: { companyId?: s
             </div>
 
             {/* Table */}
-            <TicketDataTable
-              rows={filteredChanges}
-              fields={CHANGE_FIELDS}
-              storageKey="changes"
-              getRowId={c => c.id}
-              leadingCheckbox={false}
-              emptyLabel="Nenhuma solicitação de mudança encontrada."
-              actions={change => (
-                <div className="flex items-center justify-end gap-2">
-                  {change.state === 'Draft' && (
+            <div className="servicefy-change-table min-h-[18rem]">
+              <TicketDataTable
+                rows={filteredChanges}
+                fields={CHANGE_FIELDS}
+                storageKey="changes"
+                getRowId={c => c.id}
+                leadingCheckbox={false}
+                emptyLabel="Nenhuma solicitação de mudança encontrada."
+                actions={change => (
+                  <div className="flex items-center justify-end gap-2">
+                    {change.state === 'Draft' && (
+                      <button
+                        onClick={() => handleRequestApproval(change)}
+                        className="bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs py-1.5 px-3 rounded-lg flex items-center gap-1 cursor-pointer"
+                      >
+                        <CheckCircle className="w-3.5 h-3.5" /> Enviar CAB
+                      </button>
+                    )}
                     <button
-                      onClick={() => handleRequestApproval(change)}
-                      className="bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs py-1.5 px-3 rounded-lg flex items-center gap-1 cursor-pointer"
+                      onClick={() => openForm(change)}
+                      className="border border-slate-200 hover:bg-slate-50 text-slate-600 hover:text-slate-800 font-bold text-xs py-1.5 px-3 rounded-lg cursor-pointer"
                     >
-                      <CheckCircle className="w-3.5 h-3.5" /> Enviar CAB
+                      Abrir
                     </button>
-                  )}
-                  <button
-                    onClick={() => openForm(change)}
-                    className="border border-slate-200 hover:bg-slate-50 text-slate-600 hover:text-slate-800 font-bold text-xs py-1.5 px-3 rounded-lg cursor-pointer"
-                  >
-                    Abrir
-                  </button>
-                </div>
-              )}
-            />
+                  </div>
+                )}
+              />
+            </div>
           </div>
         ) : activeSubTab === 'calendar' ? (
           // ─── CALENDAR VIEW ───
