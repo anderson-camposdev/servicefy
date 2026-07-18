@@ -1122,48 +1122,67 @@ export default function App() {
     <div className="h-screen max-h-screen w-full max-w-full overflow-hidden text-on-surface flex flex-col" style={{ background: currentCompany.branding.backgroundColor || 'var(--color-bg-primary)', backgroundSize: 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat', backgroundAttachment: 'fixed' }}>
       {/* Top Header */}
       <header className="sticky top-0 z-40 flex min-h-16 min-w-0 shrink-0 items-center gap-2 border-b border-outline-variant bg-surface px-3 py-3 sm:px-4 lg:gap-3 lg:px-6">
-        {/* Logo */}
+        {/* Product brand */}
         <div className="flex items-center gap-2.5 shrink-0">
-          <div className="w-8 h-8 rounded-xl flex items-center justify-center shadow-md overflow-hidden" style={{ background: 'var(--brand-primary)' }}>
-            {currentCompany.branding.logoUrl ? (
-              <img src={currentCompany.branding.logoUrl} alt="" className="w-full h-full object-contain bg-white" />
-            ) : (
-              <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
-            )}
+          <div
+            className="flex h-8 w-11 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-slate-950 shadow-sm ring-1 ring-white/10"
+            role="img"
+            aria-label="ServiceFY"
+          >
+            <span className="text-[11px] font-black text-white">S</span>
+            <span className="ml-0.5 text-[11px] font-black tracking-[-0.08em] text-cyan-300">FY</span>
           </div>
-          <span className="text-lg font-black tracking-tight text-on-surface hidden sm:block">{currentCompany.branding.brandName || currentCompany.name}</span>
-          <span className="hidden text-xs font-semibold text-on-surface-variant sm:block">ITSM</span>
+          <span className="hidden text-lg font-black tracking-tight text-on-surface sm:block">ServiceFY</span>
+          <span className="hidden rounded-md bg-surface-container px-1.5 py-1 text-[10px] font-bold tracking-wide text-on-surface-variant sm:block">
+            ITSM
+          </span>
         </div>
 
         <div className="w-px h-6 bg-outline-variant mx-1 hidden sm:block" />
 
         {/* Tenant Indicator (+ selo de Provedor MSP) */}
         <div className="hidden min-w-0 max-w-[13rem] shrink items-center gap-2 rounded-lg bg-surface-container px-2.5 py-2 text-xs font-semibold text-on-surface sm:flex xl:max-w-[18rem]">
-          {currentCompany.branding.logoUrl && (
-            <img src={currentCompany.branding.logoUrl} alt={currentCompany.name} className="w-5 h-5 rounded-md" />
-          )}
-          <select 
-            value={currentCompany.slug || currentCompany.domain || ''}
-            onChange={e => {
-              const slug = e.target.value;
-              if (slug) {
-                setTenantOverride(slug);
-                window.location.href = `/?tenant=${slug}`;
-              }
-            }}
-            className="hidden sm:block min-w-0 max-w-[9rem] xl:max-w-[13rem] bg-transparent text-xs font-bold text-slate-800 border-none outline-none cursor-pointer hover:text-indigo-600 focus:ring-0 p-0 m-0 appearance-none pr-4 relative"
-            style={{ 
-              width: `${Math.max(currentCompany.name.length + 3, 10)}ch`,
-              backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`,
-              backgroundRepeat: 'no-repeat',
-              backgroundPosition: 'right center',
-              backgroundSize: '1em'
-            }}
-          >
-            {companies.map(c => (
-              <option key={c.id} value={c.slug || c.domain || c.name}>{c.name}</option>
-            ))}
-          </select>
+          <div className="relative flex min-w-0 items-center">
+            {currentCompany.branding.logoUrl && (
+              <>
+                <span className="flex h-6 w-20 items-center justify-start">
+                  <img
+                    src={currentCompany.branding.logoUrl}
+                    alt={`Tenant ${currentCompany.name}`}
+                    className="block max-h-6 max-w-full object-contain object-left"
+                  />
+                </span>
+                <svg className="ml-1 h-3.5 w-3.5 shrink-0 text-on-surface-variant" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="m6 9 6 6 6-6" />
+                </svg>
+              </>
+            )}
+            <select
+              value={currentCompany.slug || currentCompany.domain || ''}
+              onChange={e => {
+                const slug = e.target.value;
+                if (slug) {
+                  setTenantOverride(slug);
+                  window.location.href = `/?tenant=${slug}`;
+                }
+              }}
+              aria-label="Selecionar tenant"
+              className={currentCompany.branding.logoUrl
+                ? 'absolute inset-0 h-full w-full cursor-pointer opacity-0'
+                : 'relative m-0 hidden min-w-0 max-w-[9rem] cursor-pointer appearance-none border-none bg-transparent p-0 pr-4 text-xs font-bold text-slate-800 outline-none hover:text-indigo-600 focus:ring-0 sm:block xl:max-w-[13rem]'}
+              style={currentCompany.branding.logoUrl ? undefined : {
+                width: `${Math.max(currentCompany.name.length + 3, 10)}ch`,
+                backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`,
+                backgroundRepeat: 'no-repeat',
+                backgroundPosition: 'right center',
+                backgroundSize: '1em',
+              }}
+            >
+              {companies.map(c => (
+                <option key={c.id} value={c.slug || c.domain || c.name}>{c.name}</option>
+              ))}
+            </select>
+          </div>
           {isProvider && (
             <span className="hidden xl:inline-flex ml-1 px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-400 border border-sky-500/20 text-[9px] uppercase tracking-wider font-bold">
               Provedor MSP

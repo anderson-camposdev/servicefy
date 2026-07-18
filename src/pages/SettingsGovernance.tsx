@@ -73,9 +73,10 @@ interface SettingsGovernanceProps {
   activeRole: string
   startInDetails?: boolean
   initialTab?: GovTab
+  embedded?: boolean
 }
 
-export default function SettingsGovernance({ companyId, activeRole, startInDetails = false, initialTab = 'appearance' }: SettingsGovernanceProps) {
+export default function SettingsGovernance({ companyId, activeRole, startInDetails = false, initialTab = 'appearance', embedded = false }: SettingsGovernanceProps) {
   const { toast } = useToast()
   const { companies, profiles } = useAppData()
   
@@ -615,9 +616,9 @@ export default function SettingsGovernance({ companyId, activeRole, startInDetai
   }
 
   return (
-    <div className={`max-w-6xl mx-auto px-4 py-8 space-y-6 ${fontClass}`}>
+    <div className={`${embedded ? 'w-full space-y-5' : 'max-w-6xl mx-auto px-4 py-8 space-y-6'} ${fontClass}`}>
       {/* Title Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+      {!embedded && <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
           <h2 className={`text-5xl font-extrabold tracking-tight ${isAlpha ? 'text-zinc-100 font-mono' : 'text-slate-900'}`}>
             {isSysAdmin ? `Configurando: ${currentCompany?.name}` : 'Configurações'}
@@ -648,10 +649,10 @@ export default function SettingsGovernance({ companyId, activeRole, startInDetai
             </button>
           )}
         </div>
-      </div>
+      </div>}
 
       {/* Tabs list */}
-      <div className="flex border-b border-outline-variant gap-2 flex-wrap">
+      {!embedded && <div className="flex border-b border-outline-variant gap-2 flex-wrap">
         {tabs.map(t => (
           <button
             key={t.key}
@@ -665,7 +666,7 @@ export default function SettingsGovernance({ companyId, activeRole, startInDetai
             {t.icon} {t.label}
           </button>
         ))}
-      </div>
+      </div>}
 
       {/* Tab Contents */}
       <div className="space-y-4">

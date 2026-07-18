@@ -34,6 +34,15 @@ const CATEGORY_META: Record<SettingsCategoryKey, { title: string; description: s
   analytics_licensing: { title: 'Analytics e Licenciamento', description: 'Qualidade, uso e módulos.', icon: BarChart3 },
 }
 
+const SETTINGS_GROUPS = [
+  { key: 'access', title: 'Organização e acesso', description: 'Pessoas, papéis e estrutura', icon: Users, categories: ['organization'] },
+  { key: 'service', title: 'Práticas de serviço', description: 'Catálogos, SLA e mudanças', icon: Workflow, categories: ['service_management', 'sla_contracts'] },
+  { key: 'experience', title: 'Experiência e conhecimento', description: 'Portal, marca, KB e agente', icon: Palette, categories: ['knowledge_ai', 'portal_brand'] },
+  { key: 'operations', title: 'Operações e canais', description: 'Comunicação, rotas e notificações', icon: Network, categories: ['channels'] },
+  { key: 'data', title: 'Dados e integrações', description: 'CMDB, API e automação externa', icon: Boxes, categories: ['cmdb', 'integrations'] },
+  { key: 'governance', title: 'Governança da plataforma', description: 'Segurança, analytics e licenças', icon: ShieldCheck, categories: ['security', 'analytics_licensing'] },
+] as const
+
 const section = (
   key: string, category: SettingsCategoryKey, title: string, description: string,
   capabilities: string[], options: Partial<SettingsSection> = {},
@@ -85,6 +94,7 @@ export default function SettingsCenter({ companyId, activeRole, onNavigate }: Pr
   const isSysAdmin = activeRole === 'sysadmin'
   const [targetCompanyId, setTargetCompanyId] = useState(isSysAdmin ? '' : companyId)
   const [query, setQuery] = useState('')
+  const [activeGroup, setActiveGroup] = useState<(typeof SETTINGS_GROUPS)[number]['key']>('access')
   const [selected, setSelected] = useState<SettingsSection | null>(null)
   const [favorites, setFavorites] = useState<string[]>(() => storageList('servicefy.settings.favorites'))
   const [recent, setRecent] = useState<string[]>(() => storageList('servicefy.settings.recent'))
@@ -112,7 +122,7 @@ export default function SettingsCenter({ companyId, activeRole, onNavigate }: Pr
   const visibleSections = useMemo(() => {
     const needle = query.trim().toLocaleLowerCase('pt-BR')
     return needle ? effectiveSections.filter(item =>
-      [item.title, item.description, ...item.keywords].join(' ').toLocaleLowerCase('pt-BR').includes(needle),
+      [item.title, item.description, ...item.capabilities, ...item.keywords].join(' ').toLocaleLowerCase('pt-BR').includes(needle),
     ) : effectiveSections
   }, [effectiveSections, query])
 
@@ -203,7 +213,9 @@ export default function SettingsCenter({ companyId, activeRole, onNavigate }: Pr
       <button onClick={() => setSelected(null)} className="m-5 inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold">
         <ChevronLeft className="w-4 h-4" /> Central de Configurações
       </button>
-      <SettingsGovernance key={selected.key + targetCompanyId} companyId={targetCompanyId} activeRole={activeRole} startInDetails initialTab={selected.legacyTab as GovTab} />
+      <div className="mx-auto max-w-6xl px-4 pb-8 sm:px-6">
+        <SettingsGovernance key={selected.key + targetCompanyId} companyId={targetCompanyId} activeRole={activeRole} startInDetails embedded initialTab={selected.legacyTab as GovTab} />
+      </div>
     </div>
   )
 
@@ -225,6 +237,12 @@ export default function SettingsCenter({ companyId, activeRole, onNavigate }: Pr
     </div>
   )
 
+  const activeGroupMeta = SETTINGS_GROUPS.find(group => group.key === activeGroup) ?? SETTINGS_GROUPS[0]
+  const quickAccess = [...new Set([...favorites, ...recent])]
+    .map(key => effectiveSections.find(item => item.key === key))
+    .filter((item): item is SettingsSection => Boolean(item))
+    .slice(0, 5)
+
   return (
     <div className="h-full overflow-y-auto bg-background p-4 sm:p-6 lg:p-8"><div className="mx-auto max-w-6xl">
       <header className="flex flex-wrap items-start justify-between gap-5 border-b border-outline-variant pb-6">
@@ -232,27 +250,68 @@ export default function SettingsCenter({ companyId, activeRole, onNavigate }: Pr
         {isSysAdmin && <label className="text-xs font-semibold text-on-surface-variant">Tenant<select value={targetCompanyId} onChange={event => setTargetCompanyId(event.target.value)} className="mt-1 block rounded-lg border border-outline-variant bg-surface px-3 py-2 text-sm font-semibold text-on-surface">{companies.filter(company => company.active).map(company => <option key={company.id} value={company.id}>{company.name}</option>)}</select></label>}
       </header>
       <div className="relative mt-6"><Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-on-surface-variant" /><input value={query} onChange={event => setQuery(event.target.value)} placeholder="Buscar usuários, SLA, WhatsApp, CMDB ou LGPD" className="w-full rounded-xl border border-outline-variant bg-surface py-3 pl-12 pr-4 text-sm text-on-surface outline-none focus:border-primary focus:ring-2 focus:ring-primary/20" /></div>
-      {connections.length > 0 && <div className="mt-3 flex flex-wrap gap-2 text-xs font-bold"><span className="rounded-full bg-emerald-50 px-3 py-1.5 text-emerald-700">{connections.filter(item => item.status === 'healthy').length} canais saudáveis</span>{connections.some(item => item.rotationRequired) && <span className="rounded-full bg-amber-50 px-3 py-1.5 text-amber-700">Credenciais aguardando rotação</span>}</div>}
-      {recent.length > 0 && !query && <div className="mt-4 flex flex-wrap items-center gap-2 text-xs text-on-surface-variant"><Activity className="w-4 h-4" /><b>Recentes:</b>{recent.map(key => { const item = SECTIONS.find(candidate => candidate.key === key); return item && <button key={key} onClick={() => openSection(item)} className="rounded-full bg-surface-container px-3 py-2 font-semibold hover:bg-surface-container-high">{item.title}</button> })}</div>}
-      <div className="mt-7 space-y-6">
-        {(Object.keys(CATEGORY_META) as SettingsCategoryKey[]).map(categoryKey => {
-          const items = visibleSections.filter(item => item.category === categoryKey)
-          if (!items.length) return null
-          const meta = CATEGORY_META[categoryKey]
-          const Icon = meta.icon
-          return <section key={categoryKey} className="overflow-hidden rounded-xl border border-outline-variant bg-surface">
-            <div className="flex items-center gap-3 bg-surface-container px-4 py-3 sm:px-5"><span className="text-primary"><Icon className="w-5 h-5" /></span><div><h2 className="text-sm font-bold text-on-surface">{meta.title}</h2><p className="text-xs text-on-surface-variant">{meta.description}</p></div></div>
-            <div className="divide-y divide-outline-variant">{items.map(item =>
-              <article key={item.key} className="group flex min-h-16 items-center gap-2 px-3 transition-colors hover:bg-surface-container-low sm:px-4">
-                <button onClick={() => openSection(item)} className="flex min-w-0 flex-1 items-center gap-3 py-3 text-left">
-                  <span className="shrink-0">{item.status === 'locked' ? <Lock className="w-4 h-4 text-amber-600" /> : item.status === 'attention' ? <HeartPulse className="w-4 h-4 text-error" /> : <Wrench className="w-4 h-4 text-on-surface-variant" />}</span>
-                  <span className="min-w-0"><span className="block text-sm font-semibold text-on-surface">{item.title}</span><span className="mt-0.5 block text-xs text-on-surface-variant">{item.description}</span></span>
-                </button>
-                <button onClick={() => toggleFavorite(item.key)} aria-label={`${favorites.includes(item.key) ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}: ${item.title}`} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-on-surface-variant hover:bg-surface-container-high"><Star className={'w-4 h-4 ' + (favorites.includes(item.key) ? 'fill-amber-400 text-amber-500' : '')} /></button>
-              </article>,
-            )}</div>
-          </section>
-        })}
+      {connections.some(item => item.rotationRequired) && (
+        <button type="button" onClick={() => openSection(effectiveSections.find(item => item.key === 'connections')!)} className="mt-4 flex w-full items-center justify-between gap-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-left text-sm text-amber-900">
+          <span><strong>Credenciais aguardando rotação.</strong> Revise as conexões antes que os canais sejam interrompidos.</span>
+          <span className="shrink-0 font-semibold">Revisar canais</span>
+        </button>
+      )}
+      {quickAccess.length > 0 && !query && (
+        <div className="mt-4 flex flex-wrap items-center gap-2 text-xs text-on-surface-variant">
+          <Activity className="w-4 h-4" /><b>Acesso rápido:</b>
+          {quickAccess.map(item => <button key={item.key} onClick={() => openSection(item)} className="rounded-lg border border-outline-variant bg-surface px-3 py-2 font-semibold hover:bg-surface-container">{item.title}</button>)}
+        </div>
+      )}
+      <div className="mt-7 grid gap-6 lg:grid-cols-[260px_minmax(0,1fr)]">
+        <nav className="h-fit rounded-xl border border-outline-variant bg-surface p-2" aria-label="Grupos de configuração">
+          {SETTINGS_GROUPS.map(group => {
+            const GroupIcon = group.icon
+            const count = effectiveSections.filter(item => (group.categories as readonly string[]).includes(item.category)).length
+            return (
+              <button
+                key={group.key}
+                type="button"
+                onClick={() => { setActiveGroup(group.key); setQuery('') }}
+                className={`flex w-full items-start gap-3 rounded-lg px-3 py-3 text-left transition-colors ${activeGroup === group.key && !query ? 'bg-primary text-on-primary' : 'text-on-surface hover:bg-surface-container'}`}
+              >
+                <GroupIcon className="mt-0.5 h-4 w-4 shrink-0" />
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-semibold">{group.title}</span>
+                  <span className={`mt-0.5 block text-xs ${activeGroup === group.key && !query ? 'text-on-primary/75' : 'text-on-surface-variant'}`}>{group.description}</span>
+                </span>
+                <span className="text-xs tabular-nums opacity-70">{count}</span>
+              </button>
+            )
+          })}
+        </nav>
+        <main className="min-w-0">
+          <div className="mb-4">
+            <p className="text-xs font-semibold text-primary">{query ? 'Resultados da busca' : 'Configurações'}</p>
+            <h2 className="mt-1 text-xl font-bold text-on-surface">{query ? `${visibleSections.length} opções encontradas` : activeGroupMeta.title}</h2>
+            <p className="mt-1 text-sm text-on-surface-variant">{query ? `Resultados para “${query}” em toda a plataforma.` : activeGroupMeta.description}</p>
+          </div>
+          <div className="overflow-hidden rounded-xl border border-outline-variant bg-surface">
+            {(Object.keys(CATEGORY_META) as SettingsCategoryKey[]).map(categoryKey => {
+              if (!query && !(activeGroupMeta.categories as readonly string[]).includes(categoryKey)) return null
+              const items = visibleSections.filter(item => item.category === categoryKey)
+              if (!items.length) return null
+              const meta = CATEGORY_META[categoryKey]
+              const Icon = meta.icon
+              return <section key={categoryKey} className="border-b border-outline-variant last:border-b-0">
+                <div className="flex items-center gap-3 bg-surface-container px-4 py-3 sm:px-5"><Icon className="h-4 w-4 text-primary" /><div><h3 className="text-sm font-bold text-on-surface">{meta.title}</h3><p className="text-xs text-on-surface-variant">{meta.description}</p></div></div>
+                <div className="divide-y divide-outline-variant">{items.map(item =>
+                  <article key={item.key} className="group flex min-h-16 items-center gap-2 px-3 transition-colors hover:bg-surface-container-low sm:px-4">
+                    <button onClick={() => openSection(item)} className="flex min-w-0 flex-1 items-center gap-3 py-3 text-left">
+                      <span className="shrink-0">{item.status === 'locked' ? <Lock className="w-4 h-4 text-amber-600" /> : item.status === 'attention' ? <HeartPulse className="w-4 h-4 text-error" /> : <Wrench className="w-4 h-4 text-on-surface-variant" />}</span>
+                      <span className="min-w-0"><span className="block text-sm font-semibold text-on-surface">{item.title}</span><span className="mt-0.5 block text-xs text-on-surface-variant">{item.description}</span></span>
+                    </button>
+                    <button onClick={() => toggleFavorite(item.key)} aria-label={`${favorites.includes(item.key) ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}: ${item.title}`} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-on-surface-variant hover:bg-surface-container-high"><Star className={'w-4 h-4 ' + (favorites.includes(item.key) ? 'fill-amber-400 text-amber-500' : '')} /></button>
+                  </article>,
+                )}</div>
+              </section>
+            })}
+          </div>
+        </main>
       </div>
     </div></div>
   )

@@ -3,10 +3,13 @@ import { readFileSync } from 'node:fs'
 import { test } from 'node:test'
 
 const read = path => readFileSync(new URL('../../' + path, import.meta.url), 'utf8')
-const sql = read('supabase/migrations/20260713040000_120_executive_analytics_rpc.sql')
+const sql = [
+  read('supabase/migrations/20260713040000_120_executive_analytics_rpc.sql'),
+  read('supabase/migrations/20260718000900_140_executive_metrics_v2_and_measure_drilldown.sql'),
+].join('\n')
 
 function fnBody(name, closer = '\nEND;\n$$;') {
-  return sql.split(`CREATE OR REPLACE FUNCTION public.${name}`)[1].split(closer)[0]
+  return sql.split(`CREATE OR REPLACE FUNCTION public.${name}`).at(-1).split(closer)[0]
 }
 
 test('get_executive_metrics é SECURITY DEFINER com search_path fixo', () => {
@@ -34,24 +37,48 @@ test('valida sessão resolvida e período coerente antes de agregar', () => {
 
 test('CTE "scoped" filtra explicitamente por company_id (isolamento multitenant, função roda com bypass de RLS)', () => {
   const body = fnBody('get_executive_metrics(p_start_date date, p_end_date date)')
-  assert.match(body, /WITH scoped AS \(\s*\n\s*SELECT[\s\S]*?FROM public\.tickets\s+WHERE company_id = v_company_id/)
+  assert.match(body, /WITH scoped AS \(\s*\n\s*SELECT \*\s+FROM public\.bi_tickets_unified\s+WHERE company_id = v_company_id/)
 })
 
 test('MTTR reaproveita tickets.mttr_minutes (já persistido em minutos úteis por tg_persist_bi_sla_minutes), não recalcula business-hours na mão', () => {
   const body = fnBody('get_executive_metrics(p_start_date date, p_end_date date)')
   assert.match(body, /avg\(mttr_minutes\) FILTER \(WHERE resolved_at::date BETWEEN p_start_date AND p_end_date\)/)
+  assert.match(body, /percentile_cont\(0\.5\) WITHIN GROUP \(ORDER BY mttr_minutes\)/)
   assert.doesNotMatch(body, /sla_business_minutes_between/)
 })
 
 test('taxa de conformidade de SLA usa is_resolution_breached, dividido só sobre os resolvidos no período (NULLIF evita divisão por zero)', () => {
   const body = fnBody('get_executive_metrics(p_start_date date, p_end_date date)')
-  assert.match(body, /NOT is_resolution_breached/)
+  assert.match(body, /NOT COALESCE\(is_resolution_breached, false\)/)
   assert.match(body, /NULLIF\(count\(\*\) FILTER \(WHERE resolved_at::date BETWEEN p_start_date AND p_end_date\), 0\)/)
 })
 
-test('"Pending Approval" no by_status vem de approval_status, não de state (não existe esse valor no enum incident_state)', () => {
+test('by_status v2 representa somente o estoque no fechamento e não duplica aprovação com state', () => {
   const body = fnBody('get_executive_metrics(p_start_date date, p_end_date date)')
-  assert.match(body, /SELECT 'Pending Approval', count\(\*\)\s*\n\s*FROM scoped WHERE created_at::date BETWEEN p_start_date AND p_end_date AND approval_status = 'pending'/)
+  assert.match(body, /'by_status', COALESCE/)
+  assert.doesNotMatch(body, /Pending Approval/)
+})
+
+test('v2 compara período anterior e retorna backlog, criticidade, aging e prioridade', () => {
+  const body = fnBody('get_executive_metrics(p_start_date date, p_end_date date)')
+  for (const key of ['previous_total_opened', 'backlog_at_end', 'critical_backlog', 'aging_buckets', 'by_priority']) {
+    assert.match(body, new RegExp(`'${key}'`))
+  }
+})
+
+test('mediana do MTTR converte percentile_cont para numeric antes do round com precisão', () => {
+  const body = fnBody('get_executive_metrics(p_start_date date, p_end_date date)')
+  assert.match(
+    body,
+    /round\s*\(\s*\(\s*percentile_cont\s*\(\s*0\.5\s*\)[\s\S]*?\)\s*::numeric\s*,\s*1\s*\)\s+AS\s+mttr_median/i,
+  )
+})
+
+test('drill-down preserva medidas temporais e filtra a população usada pelo MTTR', () => {
+  assert.match(sql, /p_measure_key text DEFAULT NULL/)
+  assert.match(sql, /p_measure_key IN \('mttr_avg', 'mttr_median'\) THEN v_measure_filter := 'mttr_minutes IS NOT NULL'/)
+  assert.match(sql, /resolved_at timestamptz, mttr_minutes integer, mtta_minutes integer/)
+  assert.match(sql, /GRANT EXECUTE ON FUNCTION public\.bi_drilldown\([\s\S]*?text\) TO authenticated/)
 })
 
 test('índice de suporte para resolved_at é aditivo (parcial, IF NOT EXISTS) — não altera nenhuma estrutura existente', () => {

@@ -10,6 +10,7 @@ import { cubeService } from '../../../lib/bi/cubeService'
 import type { BiDrilldownRow, BiFilter, BiRecordType, BiDateField } from '../../../lib/bi/types'
 import { RECORD_TYPE_LABELS } from '../../../lib/bi/types'
 import type { BiChartTheme } from '../theme/echartsTheme'
+import { getDrilldownMeasurePresentation } from '../../../lib/bi-presentation'
 
 const PAGE_SIZE = 25
 
@@ -21,6 +22,8 @@ export interface DrilldownContext {
   dateFrom: Date
   dateTo: Date
   dateField?: BiDateField
+  measureKey?: string
+  measureValue?: number | null
 }
 
 interface DrilldownPanelProps {
@@ -51,6 +54,7 @@ export default function DrilldownPanel({ context, theme, onClose, onOpenTicket }
       dateFrom: context.dateFrom,
       dateTo: context.dateTo,
       dateField: context.dateField,
+      measureKey: context.measureKey,
       limit: PAGE_SIZE,
       offset: page * PAGE_SIZE,
     })
@@ -65,6 +69,7 @@ export default function DrilldownPanel({ context, theme, onClose, onOpenTicket }
   }, [context, page])
 
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE))
+  const measure = getDrilldownMeasurePresentation(context.measureKey, context.measureValue ?? null)
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-black/40" onClick={onClose}>
@@ -78,9 +83,10 @@ export default function DrilldownPanel({ context, theme, onClose, onOpenTicket }
              style={{ borderColor: theme.isDark ? 'rgba(148,163,184,.15)' : 'rgba(100,116,139,.18)' }}>
           <div>
             <h3 className="text-sm font-semibold" style={{ color: theme.textColor }}>{context.title}</h3>
-            <p className="text-xs" style={{ color: theme.mutedColor }}>
-              {total.toLocaleString('pt-BR')} registro(s)
-            </p>
+            <div className="mt-1 flex flex-wrap items-center gap-2 text-xs" style={{ color: theme.mutedColor }}>
+              {measure && <strong className="text-sm" style={{ color: theme.textColor }}>{measure.label} {measure.formatted}</strong>}
+              <span>{total.toLocaleString('pt-BR')} registro(s) na amostra</span>
+            </div>
           </div>
           <button type="button" onClick={onClose} className="rounded p-1 hover:opacity-70" style={{ color: theme.mutedColor }}>
             <X size={18} />
@@ -106,6 +112,7 @@ export default function DrilldownPanel({ context, theme, onClose, onOpenTicket }
                   <th className="px-2 py-2 font-medium">Status</th>
                   <th className="px-2 py-2 font-medium">Prioridade</th>
                   <th className="px-2 py-2 font-medium">Grupo</th>
+                  {measure && <th className="px-2 py-2 font-medium">{measure.label}</th>}
                   <th className="px-2 py-2 font-medium">SLA</th>
                 </tr>
               </thead>
@@ -123,6 +130,7 @@ export default function DrilldownPanel({ context, theme, onClose, onOpenTicket }
                     <td className="whitespace-nowrap px-2 py-2">{r.state}</td>
                     <td className="whitespace-nowrap px-2 py-2">{r.priority ?? '—'}</td>
                     <td className="max-w-[140px] truncate px-2 py-2">{r.group_name ?? '—'}</td>
+                    {measure && <td className="whitespace-nowrap px-2 py-2 font-semibold">{getDrilldownMeasurePresentation(context.measureKey, r[measure.field])?.formatted}</td>}
                     <td className="px-2 py-2">
                       {r.sla_breached && <AlertTriangle size={14} className="text-red-500" />}
                     </td>

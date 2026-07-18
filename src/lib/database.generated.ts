@@ -8052,17 +8052,23 @@ export type Database = {
           p_date_to?: string
           p_filters?: Json
           p_limit?: number
+          p_measure_key?: string
           p_offset?: number
           p_record_types?: string[]
         }
         Returns: {
           assigned_to_name: string
+          age_minutes: number | null
           created_at: string
           group_name: string
           id: string
+          mtta_minutes: number | null
+          mttr_minutes: number | null
           number: string
-          priority: string
+          paused_minutes: number | null
+          priority: string | null
           record_type: string
+          resolved_at: string | null
           short_description: string
           sla_breached: boolean
           state: string

@@ -4,6 +4,8 @@ import {
   getBiWidgetGridClass,
   getBiMeasureValue,
   isBiCubeRowReady,
+  widgetToPivotConfig,
+  getDrilldownMeasurePresentation,
   getReportSummary,
   presentBiError,
 } from '../bi-presentation'
@@ -30,6 +32,35 @@ describe('BI presentation', () => {
     expect(isBiCubeRowReady({ dims: {}, measures: {} })).toBe(true)
     expect(isBiCubeRowReady({ dims: undefined, measures: {} })).toBe(false)
     expect(isBiCubeRowReady(null)).toBe(false)
+  })
+
+  it('converte um widget pronto em uma análise editável preservando contexto', () => {
+    const config = widgetToPivotConfig({
+      id: 'by-priority',
+      title: 'Por prioridade',
+      visual: 'bar',
+      recordTypes: ['incident'],
+      dimensions: ['priority'],
+      measures: ['count'],
+      filters: [{ dim: 'state', op: 'neq', value: 'Closed' }],
+    }, {
+      periodDays: 90,
+      groupName: 'Service Desk',
+      priority: null,
+    })
+
+    expect(config.recordTypes).toEqual(['incident'])
+    expect(config.rows).toEqual(['priority'])
+    expect(config.periodDays).toBe(90)
+    expect(config.filters).toContainEqual({ dim: 'group_name', op: 'eq', value: 'Service Desk' })
+    expect(config.visual).toBe('bar')
+  })
+
+  it('apresenta MTTR agregado e individual em horas úteis', () => {
+    const presentation = getDrilldownMeasurePresentation('mttr_avg', 275)
+    expect(presentation).toEqual({ label: 'MTTR', field: 'mttr_minutes', formatted: '4h 35min' })
+    expect(getDrilldownMeasurePresentation('mttr_avg', null)?.formatted).toBe('—')
+    expect(getDrilldownMeasurePresentation('count', 12)).toBeNull()
   })
 
   it('resume o relatório em linguagem operacional', () => {

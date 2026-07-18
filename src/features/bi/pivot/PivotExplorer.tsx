@@ -222,6 +222,12 @@ export default function PivotExplorer({ companyId, theme, initialConfig, initial
 
       {/* Painel direito: definição + resultado */}
       <div className="min-w-0 flex-1 space-y-3">
+        <div className="rounded-xl border bg-white p-3" style={{ borderColor }}>
+          <h2 className="text-sm font-semibold" style={{ color: theme.textColor }}>Editor de análise</h2>
+          <p className="mt-1 text-xs leading-5" style={{ color: theme.mutedColor }}>
+            Escolha os registros e o período, adicione campos em linhas, colunas ou filtros e selecione o formato do resultado. As alterações são recalculadas automaticamente.
+          </p>
+        </div>
         {/* Controles superiores */}
         <div className="flex flex-wrap items-center gap-2">
           {ALL_RECORD_TYPES.map(rt => {

@@ -7,6 +7,7 @@
 // ============================================================
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { SlidersHorizontal } from 'lucide-react'
 import { cubeService } from '../../../lib/bi/cubeService'
 import type { BiCubeRow, BiFilter, BiMeasureDef } from '../../../lib/bi/types'
 import type { BiDashboardDef, BiWidgetDef } from '../../../lib/bi/dashboards'
@@ -17,7 +18,8 @@ import EChart from '../components/EChart'
 import FilterBar, { type GlobalFilters } from '../components/FilterBar'
 import DrilldownPanel, { type DrilldownContext } from '../components/DrilldownPanel'
 import { baseOption } from '../theme/echartsTheme'
-import { getBiMeasureValue, getBiWidgetGridClass } from '../../../lib/bi-presentation'
+import { getBiMeasureValue, getBiWidgetGridClass, widgetToPivotConfig } from '../../../lib/bi-presentation'
+import type { BiPivotConfig } from '../../../lib/bi/reportsService'
 
 const LOWER_IS_BETTER = new Set([
   'mttr_avg', 'mttr_median', 'mtta_avg', 'mtta_median', 'breached_count',
@@ -29,6 +31,7 @@ interface DashboardPageProps {
   companyId: string
   theme: BiChartTheme
   measureDefs: Map<string, BiMeasureDef>
+  onCustomize?: (config: BiPivotConfig) => void
 }
 
 interface WidgetData {
@@ -37,7 +40,7 @@ interface WidgetData {
   error?: string
 }
 
-export default function DashboardPage({ dashboard, companyId, theme, measureDefs }: DashboardPageProps) {
+export default function DashboardPage({ dashboard, companyId, theme, measureDefs, onCustomize }: DashboardPageProps) {
   const [filters, setFilters] = useState<GlobalFilters>({ periodDays: 30, groupName: null, priority: null })
   const [data, setData] = useState<Record<string, WidgetData>>({})
   const [trend, setTrend] = useState<Array<{ date: string; open: number; breached: number }>>([])
@@ -174,6 +177,9 @@ export default function DashboardPage({ dashboard, companyId, theme, measureDefs
         ...extra.map(e => ({ dim: e.dim, op: 'eq' as const, value: e.value })),
       ],
       dateFrom, dateTo,
+      dateField: w.dateField,
+      measureKey: w.primaryMeasure ?? w.measures[0],
+      measureValue: kpiValue(w, data[w.id]?.rows),
     })
   }
 
@@ -217,13 +223,27 @@ export default function DashboardPage({ dashboard, companyId, theme, measureDefs
           <h2 className="text-lg font-semibold" style={{ color: theme.textColor }}>{dashboard.title}</h2>
           <p className="text-xs" style={{ color: theme.mutedColor }}>{dashboard.subtitle}</p>
         </div>
-        <FilterBar
-          filters={filters}
-          groups={groups}
-          theme={theme}
-          showPriority={dashboard.id !== 'change_management'}
-          onChange={setFilters}
-        />
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <FilterBar
+            filters={filters}
+            groups={groups}
+            theme={theme}
+            showPriority={dashboard.id !== 'change_management'}
+            onChange={setFilters}
+          />
+          {onCustomize && (
+            <button
+              type="button"
+              onClick={() => onCustomize(widgetToPivotConfig(
+                dashboard.widgets.find(widget => !['kpi', 'gauge', 'backlog_trend'].includes(widget.visual)) ?? dashboard.widgets[0]!,
+                filters,
+              ))}
+              className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+            >
+              <SlidersHorizontal size={14} /> Personalizar análise
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Grid de widgets */}
@@ -258,9 +278,21 @@ export default function DashboardPage({ dashboard, companyId, theme, measureDefs
               className={`${gridClass} rounded-xl border p-4`}
               style={cardStyle}
             >
-              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide" style={{ color: theme.mutedColor }}>
-                {w.title}
-              </h3>
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <h3 className="text-xs font-semibold uppercase tracking-wide" style={{ color: theme.mutedColor }}>
+                  {w.title}
+                </h3>
+                {onCustomize && (
+                  <button
+                    type="button"
+                    onClick={() => onCustomize(widgetToPivotConfig(w, filters))}
+                    className="rounded-lg px-2 py-1 text-[11px] font-semibold text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+                    aria-label={`Personalizar gráfico ${w.title}`}
+                  >
+                    Editar
+                  </button>
+                )}
+              </div>
               {wd?.error ? (
                 <div className="py-8 text-center text-xs text-red-400">{wd.error}</div>
               ) : w.visual === 'backlog_trend' ? (

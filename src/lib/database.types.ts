@@ -477,12 +477,25 @@ export interface OutboundWebhookRow {
 // Fase 23 — Analytics e Relatórios Executivos (migration 120)
 export interface ExecutiveMetrics {
   period: { start: string; end: string }
+  previous_period: { start: string; end: string }
   total_opened: number
+  previous_total_opened: number
   total_resolved: number
+  previous_total_resolved: number
   sla_compliance_pct: number | null
+  previous_sla_compliance_pct: number | null
   mttr_minutes: number | null
   mttr_hours: number | null
+  mttr_median_minutes: number | null
+  previous_mttr_minutes: number | null
+  backlog_at_end: number
+  backlog_at_start: number
+  critical_backlog: number
+  breached_resolved: number
+  reopen_rate_pct: number | null
   by_status: Record<string, number>
+  by_priority: Record<string, number>
+  aging_buckets: Record<string, number>
 }
 
 /** Linha retornada pela RPC kb_suggest_for_case (cockpit). */

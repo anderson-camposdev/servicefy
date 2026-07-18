@@ -123,10 +123,10 @@ function barOption(w: BiWidgetDef, rows: BiCubeRow[], t: BiChartTheme, defs: Map
     },
     series: [{
       type: 'bar',
-      data: data.map((d, i) => ({
+      data: data.map(d => ({
         value: d.value,
         rawValue: d.raw,
-        itemStyle: { color: t.palette[(data.length - 1 - i) % t.palette.length], borderRadius: [0, 4, 4, 0] },
+        itemStyle: { color: t.primary, borderRadius: [0, 4, 4, 0] },
       })),
       barMaxWidth: 22,
       label: {
@@ -188,13 +188,13 @@ function lineOption(w: BiWidgetDef, rows: BiCubeRow[], t: BiChartTheme, defs: Ma
       splitLine: { lineStyle: { color: t.splitLineColor } },
       axisLabel: { color: t.mutedColor, fontSize: 10 },
     },
-    series: w.measures.map((mea, i) => ({
+    series: w.measures.map(mea => ({
       name: defs.get(mea)?.label ?? mea,
       type: 'line',
-      smooth: true,
+      smooth: false,
       showSymbol: false,
       lineStyle: { width: 2 },
-      areaStyle: i === 0 ? { opacity: 0.08 } : undefined,
+      symbol: 'circle',
       data: sorted.map(r => Number(r.measures[mea] ?? 0)),
     })),
   }

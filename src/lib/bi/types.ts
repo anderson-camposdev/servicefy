@@ -49,6 +49,11 @@ export interface BiDrilldownRow {
   group_name: string | null
   assigned_to_name: string | null
   created_at: string
+  resolved_at: string | null
+  mttr_minutes: number | null
+  mtta_minutes: number | null
+  paused_minutes: number | null
+  age_minutes: number | null
   sla_breached: boolean
   total_count: number
 }

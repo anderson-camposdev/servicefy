@@ -57,6 +57,7 @@ export const cubeService = {
     dateFrom: Date
     dateTo: Date
     dateField?: BiDateField
+    measureKey?: string
     limit?: number
     offset?: number
   }): Promise<{ rows: BiDrilldownRow[]; total: number }> {
@@ -68,6 +69,7 @@ export const cubeService = {
       p_date_to: params.dateTo.toISOString(),
       p_date_field: params.dateField ?? 'created_at',
       p_limit: params.limit ?? 100,
+      p_measure_key: params.measureKey,
       p_offset: params.offset ?? 0,
     })
     if (error) throw error

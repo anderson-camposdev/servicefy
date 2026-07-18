@@ -157,6 +157,11 @@ export default function BiApp({ companyId, themeName }: BiAppProps) {
             companyId={companyId}
             theme={theme}
             measureDefs={measureDefs}
+            onCustomize={config => {
+              setOpenReport(null)
+              setExplorerConfig(config)
+              setTab('explore')
+            }}
           />
         </>
       )}
