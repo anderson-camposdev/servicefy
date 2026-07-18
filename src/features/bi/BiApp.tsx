@@ -7,7 +7,7 @@
 // ============================================================
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { BarChart3, LayoutDashboard, Compass, FolderOpen, Trash2, Globe2, Lock } from 'lucide-react'
+import { BarChart3, LayoutDashboard, Compass, FolderOpen, Trash2, Globe2, Lock, Plus, RefreshCw } from 'lucide-react'
 import { BI_DASHBOARDS } from '../../lib/bi/dashboards'
 import { catalogService } from '../../lib/bi/catalogService'
 import { reportsService, type BiSavedReport, type BiPivotConfig } from '../../lib/bi/reportsService'
@@ -15,6 +15,7 @@ import type { BiMeasureDef } from '../../lib/bi/types'
 import { buildChartTheme } from './theme/echartsTheme'
 import DashboardPage from './dashboards/DashboardPage'
 import PivotExplorer from './pivot/PivotExplorer'
+import { getReportSummary, presentBiError } from '../../lib/bi-presentation'
 
 type BiTab = 'dashboards' | 'explore' | 'reports'
 
@@ -40,14 +41,14 @@ export default function BiApp({ companyId, themeName }: BiAppProps) {
   useEffect(() => {
     catalogService.getMeasures()
       .then(measures => setMeasureDefs(new Map(measures.map(m => [m.key, m]))))
-      .catch(err => setError(err.message ?? String(err)))
+      .catch(err => setError(presentBiError(err.message ?? String(err))))
   }, [])
 
   const loadReports = useCallback(() => {
     setReportsLoading(true)
     reportsService.list(companyId)
       .then(setReports)
-      .catch(err => setError(err.message ?? String(err)))
+      .catch(err => setError(presentBiError(err.message ?? String(err))))
       .finally(() => setReportsLoading(false))
   }, [companyId])
 
@@ -62,6 +63,7 @@ export default function BiApp({ companyId, themeName }: BiAppProps) {
   }
 
   const handleDeleteReport = async (id: string) => {
+    if (!window.confirm('Excluir este relatório salvo? Esta ação não pode ser desfeita.')) return
     await reportsService.remove(id)
     loadReports()
   }
@@ -76,11 +78,10 @@ export default function BiApp({ companyId, themeName }: BiAppProps) {
 
   return (
     <div
-      className="min-h-full rounded-2xl p-5"
-      style={{ background: 'linear-gradient(160deg, #f8fafc 0%, #eef2f7 60%, #f1f5f9 100%)' }}
+      className="min-h-full rounded-2xl bg-slate-50 p-4 sm:p-5"
     >
       {/* Cabeçalho do módulo */}
-      <div className="mb-4 flex items-center gap-3">
+      <div className="mb-5 flex flex-col gap-4 border-b pb-4 sm:flex-row sm:items-center" style={{ borderColor }}>
         <div
           className="flex h-10 w-10 items-center justify-center rounded-xl"
           style={{ backgroundColor: `${theme.primary}22`, color: theme.primary }}
@@ -95,7 +96,7 @@ export default function BiApp({ companyId, themeName }: BiAppProps) {
         </div>
 
         {/* Abas principais */}
-        <div className="ml-auto flex gap-1 rounded-xl border p-1" style={{ borderColor }}>
+        <div className="flex w-full gap-1 overflow-x-auto rounded-xl border p-1 sm:ml-auto sm:w-auto" style={{ borderColor }}>
           {tabs.map(t => (
             <button
               key={t.key}
@@ -104,7 +105,7 @@ export default function BiApp({ companyId, themeName }: BiAppProps) {
                 setTab(t.key)
                 if (t.key === 'explore' && tab !== 'explore') { /* mantém config atual */ }
               }}
-              className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors"
+              className="flex min-h-9 flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors sm:flex-none"
               style={{
                 color: tab === t.key ? '#ffffff' : theme.mutedColor,
                 backgroundColor: tab === t.key ? theme.primary : 'transparent',
@@ -117,8 +118,11 @@ export default function BiApp({ companyId, themeName }: BiAppProps) {
       </div>
 
       {error && (
-        <div className="mb-4 rounded-lg border border-red-400/40 bg-red-500/10 p-3 text-sm text-red-400">
-          {error}. Verifique se as migrations 061–066 foram aplicadas.
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-red-200 bg-red-50 p-3 text-sm font-medium text-red-700" role="alert">
+          <span>{error}</span>
+          <button type="button" onClick={() => window.location.reload()} className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold hover:bg-red-100">
+            <RefreshCw size={14} /> Tentar novamente
+          </button>
         </div>
       )}
 
@@ -171,52 +175,64 @@ export default function BiApp({ companyId, themeName }: BiAppProps) {
       {/* ── Relatórios salvos ── */}
       {tab === 'reports' && (
         <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <p className="text-xs" style={{ color: theme.mutedColor }}>
-              {reports.length} relatório(s) salvo(s) — clique para abrir no Explorar
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm" style={{ color: theme.mutedColor }}>
+              {reports.length === 1 ? '1 relatório salvo' : `${reports.length} relatórios salvos`}
             </p>
             <button
               type="button"
               onClick={() => { setOpenReport(null); setExplorerConfig(null); setTab('explore') }}
-              className="rounded-lg px-3 py-1.5 text-[11px] font-bold text-white"
+              className="inline-flex min-h-9 items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold text-white"
               style={{ backgroundColor: theme.primary }}
             >
-              + Novo relatório
+              <Plus size={14} /> Novo relatório
             </button>
           </div>
 
           {reportsLoading ? (
             <p className="py-8 text-center text-xs" style={{ color: theme.mutedColor }}>Carregando…</p>
           ) : reports.length === 0 ? (
-            <p className="py-8 text-center text-xs" style={{ color: theme.mutedColor }}>
-              Nenhum relatório salvo ainda — monte uma visão no Explorar e salve.
-            </p>
+            <div className="rounded-xl border border-dashed p-8 text-center" style={{ borderColor }}>
+              <FolderOpen className="mx-auto mb-3" size={24} style={{ color: theme.mutedColor }} />
+              <h2 className="text-sm font-semibold" style={{ color: theme.textColor }}>Nenhum relatório salvo</h2>
+              <p className="mx-auto mt-1 max-w-md text-xs leading-5" style={{ color: theme.mutedColor }}>
+                Monte uma análise com dimensões, medidas e filtros próprios. Depois salve para acompanhar novamente.
+              </p>
+              <button
+                type="button"
+                onClick={() => { setOpenReport(null); setExplorerConfig(null); setTab('explore') }}
+                className="mt-4 inline-flex min-h-9 items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold text-white"
+                style={{ backgroundColor: theme.primary }}
+              >
+                <Compass size={14} /> Criar primeira análise
+              </button>
+            </div>
           ) : (
             <div className="grid grid-cols-1 gap-2 md:grid-cols-2 lg:grid-cols-3">
               {reports.map(r => (
                 <div
                   key={r.id}
-                  className="group flex cursor-pointer items-start justify-between rounded-xl border p-4 transition-transform hover:scale-[1.01]"
+                  className="group flex items-start justify-between rounded-xl border p-4 transition-colors hover:border-slate-300"
                   style={{ borderColor, backgroundColor: theme.isDark ? 'rgba(255,255,255,.04)' : '#ffffff' }}
-                  onClick={() => handleOpenReport(r)}
                 >
-                  <div className="min-w-0">
+                  <button type="button" className="min-w-0 flex-1 text-left" onClick={() => handleOpenReport(r)}>
                     <p className="truncate text-sm font-semibold" style={{ color: theme.textColor }}>{r.name}</p>
-                    <p className="mt-0.5 flex items-center gap-2 text-[10px]" style={{ color: theme.mutedColor }}>
-                      {r.isPublic ? <Globe2 size={10} /> : <Lock size={10} />}
-                      {r.config.recordTypes.map(rt => rt).join(', ')} · {r.config.visual}
+                    <p className="mt-1 flex flex-wrap items-center gap-2 text-xs" style={{ color: theme.mutedColor }}>
+                      {r.isPublic ? <Globe2 size={12} /> : <Lock size={12} />}
+                      {getReportSummary(r.config.recordTypes, r.config.visual)}
                       {r.migratedFromV1 && (
-                        <span className="rounded bg-amber-500/15 px-1.5 py-0.5 font-bold uppercase tracking-wider text-amber-500">
-                          v1 convertido
+                        <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[11px] font-semibold text-amber-600">
+                          Importado
                         </span>
                       )}
                     </p>
-                  </div>
+                  </button>
                   <button
                     type="button"
-                    title="Excluir"
+                    title="Excluir relatório"
+                    aria-label={`Excluir relatório ${r.name}`}
                     onClick={e => { e.stopPropagation(); handleDeleteReport(r.id) }}
-                    className="hidden shrink-0 rounded p-1 text-red-400 hover:bg-red-500/10 group-hover:block"
+                    className="shrink-0 rounded-lg p-2 text-red-600/70 hover:bg-red-50 hover:text-red-700"
                   >
                     <Trash2 size={14} />
                   </button>

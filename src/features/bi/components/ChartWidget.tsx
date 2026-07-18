@@ -11,6 +11,7 @@ import type { BiCubeRow, BiMeasureDef } from '../../../lib/bi/types'
 import { formatMeasure } from '../../../lib/bi/types'
 import type { BiWidgetDef } from '../../../lib/bi/dashboards'
 import { type BiChartTheme, baseOption } from '../theme/echartsTheme'
+import { isBiCubeRowReady } from '../../../lib/bi-presentation'
 
 const WEEKDAY_LABELS: Record<string, string> = {
   '1': 'Seg', '2': 'Ter', '3': 'Qua', '4': 'Qui', '5': 'Sex', '6': 'Sáb', '7': 'Dom',
@@ -34,9 +35,10 @@ interface ChartWidgetProps {
 }
 
 export default function ChartWidget({ widget, rows, theme, measureDefs, onDrill }: ChartWidgetProps) {
+  const safeRows = rows.filter(isBiCubeRowReady) as BiCubeRow[]
   const option = useMemo(
-    () => buildOption(widget, rows, theme, measureDefs),
-    [widget, rows, theme, measureDefs],
+    () => buildOption(widget, safeRows, theme, measureDefs),
+    [widget, safeRows, theme, measureDefs],
   )
 
   const handleClick = (params: EChartClickParams) => {
@@ -57,7 +59,7 @@ export default function ChartWidget({ widget, rows, theme, measureDefs, onDrill 
     onDrill([{ dim: d1, value: raw }])
   }
 
-  if (!rows.length) {
+  if (!safeRows.length) {
     return (
       <div className="flex h-full min-h-[200px] items-center justify-center text-sm" style={{ color: theme.mutedColor }}>
         Sem dados no período selecionado

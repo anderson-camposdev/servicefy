@@ -17,6 +17,7 @@ import EChart from '../components/EChart'
 import FilterBar, { type GlobalFilters } from '../components/FilterBar'
 import DrilldownPanel, { type DrilldownContext } from '../components/DrilldownPanel'
 import { baseOption } from '../theme/echartsTheme'
+import { getBiMeasureValue, getBiWidgetGridClass } from '../../../lib/bi-presentation'
 
 const LOWER_IS_BETTER = new Set([
   'mttr_avg', 'mttr_median', 'mtta_avg', 'mtta_median', 'breached_count',
@@ -178,8 +179,7 @@ export default function DashboardPage({ dashboard, companyId, theme, measureDefs
 
   const kpiValue = (w: BiWidgetDef, rows?: BiCubeRow[]): number | null => {
     const mea = w.primaryMeasure ?? w.measures[0]
-    const v = rows?.[0]?.measures[mea]
-    return v == null ? null : Number(v)
+    return getBiMeasureValue(rows?.[0], mea)
   }
 
   const trendOption = useMemo(() => ({
@@ -231,11 +231,12 @@ export default function DashboardPage({ dashboard, companyId, theme, measureDefs
         {dashboard.widgets.map((w, wi) => {
           const wd = data[w.id]
           const span = w.span ?? 4
+          const gridClass = getBiWidgetGridClass(span)
 
           if (w.visual === 'kpi') {
             const mea = w.primaryMeasure ?? w.measures[0]
             return (
-              <div key={w.id} className="col-span-6 md:col-span-3" style={{ gridColumn: `span ${span} / span ${span}` }}>
+              <div key={w.id} className={gridClass}>
                 <KpiCard
                   title={w.title}
                   value={kpiValue(w, wd?.rows)}
@@ -254,8 +255,8 @@ export default function DashboardPage({ dashboard, companyId, theme, measureDefs
           return (
             <div
               key={w.id}
-              className="rounded-xl border p-4"
-              style={{ ...cardStyle, gridColumn: `span ${span} / span ${span}` }}
+              className={`${gridClass} rounded-xl border p-4`}
+              style={cardStyle}
             >
               <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide" style={{ color: theme.mutedColor }}>
                 {w.title}

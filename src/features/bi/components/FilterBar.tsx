@@ -5,6 +5,7 @@
 // ============================================================
 
 import type { BiChartTheme } from '../theme/echartsTheme'
+import { countActiveBiFilters } from '../../../lib/bi-presentation'
 
 export interface GlobalFilters {
   periodDays: number
@@ -33,6 +34,7 @@ interface FilterBarProps {
 }
 
 export default function FilterBar({ filters, groups, theme, showPriority = true, onChange }: FilterBarProps) {
+  const activeFilterCount = countActiveBiFilters(filters)
   const selectStyle: React.CSSProperties = {
     backgroundColor: theme.isDark ? 'rgba(255,255,255,.05)' : '#ffffff',
     color: theme.textColor,
@@ -40,7 +42,7 @@ export default function FilterBar({ filters, groups, theme, showPriority = true,
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
+    <div className="flex flex-wrap items-center gap-2" aria-label="Filtros do dashboard">
       <select
         className="rounded-lg border px-3 py-1.5 text-xs focus:outline-none"
         style={selectStyle}
@@ -72,6 +74,16 @@ export default function FilterBar({ filters, groups, theme, showPriority = true,
           <option value="">Todas as prioridades</option>
           {PRIORITY_OPTIONS.map(p => <option key={p} value={p}>{p}</option>)}
         </select>
+      )}
+      {activeFilterCount > 0 && (
+        <button
+          type="button"
+          onClick={() => onChange({ periodDays: 30, groupName: null, priority: null })}
+          className="rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-colors hover:bg-slate-100"
+          style={{ color: theme.mutedColor }}
+        >
+          Limpar {activeFilterCount} filtro{activeFilterCount === 1 ? '' : 's'}
+        </button>
       )}
     </div>
   )

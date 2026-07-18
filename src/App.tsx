@@ -2,7 +2,6 @@ import { lazy, Suspense, useState, useMemo, useEffect } from 'react'
 import { Plus, Settings, ShieldAlert, ClipboardList, AlertOctagon, RefreshCw, Home, BarChart3, CircleCheckBig, TrendingUp, Code2, BookOpen } from 'lucide-react'
 import { useBranding, useToast } from './context'
 import type { AppView, User, Company, Role } from './types'
-import { mockApiEndpoints } from './services/appMocks'
 import { useIncidents } from './hooks/useIncidents'
 import { useAppData, useProblems, useChanges } from './hooks/useDbData'
 import { useRealtimeNotifications } from './hooks/useRealtimeNotifications'
@@ -28,6 +27,7 @@ const ApprovalCenter = lazy(() => import('./pages/ApprovalCenter'))
 const KnowledgeCenter = lazy(() => import('./pages/KnowledgeCenter'))
 const AnalyticsDashboard = lazy(() => import('./pages/admin/AnalyticsDashboard'))
 const DeveloperSettings = lazy(() => import('./pages/admin/DeveloperSettings'))
+const ApiDocsPage = lazy(() => import('./pages/admin/ApiDocs'))
 const BiApp = lazy(() => import('./features/bi/BiApp'))
 import TicketDataTable from './components/TicketDataTable'
 import { LoadingSkeleton } from './components/portal/LoadingSkeleton'
@@ -177,14 +177,6 @@ const stateText: Record<string, string> = {
   'CAB Rejected': 'text-red-700 bg-red-50 border-red-200',
   'Failed': 'text-red-700 bg-red-50 border-red-200',
   'Completed': 'text-emerald-700 bg-emerald-50 border-emerald-200',
-}
-
-const methodBadge: Record<string, string> = {
-  GET:    'bg-sky-50 text-sky-700 border-sky-200',
-  POST:   'bg-emerald-50 text-emerald-700 border-emerald-200',
-  PATCH:  'bg-amber-50 text-amber-700 border-amber-200',
-  PUT:    'bg-blue-50 text-blue-700 border-blue-200',
-  DELETE: 'bg-red-50 text-red-700 border-red-200',
 }
 
 // ─── Shared Components ────────────────────────────────────────
@@ -538,98 +530,6 @@ function ProblemDashboard({ companyId }: { companyId: string }) {
           </div>
         </Modal>
       )}
-    </div>
-  )
-}
-
-
-// ─── API DOCS ─────────────────────────────────────────────────
-
-function ApiDocs() {
-  const [selectedEndpoint, setSelectedEndpoint] = useState(mockApiEndpoints[0].id)
-  const [activeModule, setActiveModule] = useState('all')
-  const endpoint = mockApiEndpoints.find(e => e.id === selectedEndpoint)!
-  const modules = ['all', ...Array.from(new Set(mockApiEndpoints.map(e => e.module)))]
-  const filtered = activeModule === 'all' ? mockApiEndpoints : mockApiEndpoints.filter(e => e.module === activeModule)
-
-  return (
-    <div>
-      <PageHeader title="API de Integração" subtitle="Referência REST para integrações externas com o ServiceFY ITSM" />
-
-      {/* Info Bar */}
-      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-4 flex flex-wrap items-center gap-3 mb-6">
-        <div className="flex items-center gap-2 text-xs font-mono bg-slate-50 border border-slate-200 rounded-xl px-3 py-2">
-          <span className="text-slate-400">Base URL:</span>
-          <span className="text-emerald-600 font-semibold">https://api.servicefy.com</span>
-        </div>
-        <div className="flex items-center gap-2 text-xs font-mono bg-slate-50 border border-slate-200 rounded-xl px-3 py-2">
-          <span className="text-slate-400">Auth:</span>
-          <span className="text-amber-600 font-semibold">Bearer &lt;API_KEY&gt;</span>
-        </div>
-        <div className="flex items-center gap-2 text-xs font-mono bg-slate-50 border border-slate-200 rounded-xl px-3 py-2">
-          <span className="text-slate-400">Versão:</span>
-          <span className="text-sky-600 font-semibold">v1</span>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-        {/* Endpoint List */}
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-          <div className="px-4 py-3 border-b border-slate-100 bg-slate-50">
-            <div className="flex flex-wrap gap-1.5">
-              {modules.map(m => (
-                <button key={m} onClick={() => setActiveModule(m)} className={`px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer ${activeModule === m ? 'bg-slate-800 text-white' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100'}`}>{m}</button>
-              ))}
-            </div>
-          </div>
-          <div className="divide-y divide-slate-50">
-            {filtered.map(ep => (
-              <button key={ep.id} onClick={() => setSelectedEndpoint(ep.id)} className={`w-full text-left px-4 py-3 flex items-center gap-3 transition-all cursor-pointer ${selectedEndpoint === ep.id ? 'bg-slate-50 border-l-2 border-l-emerald-500' : 'hover:bg-slate-50/70 border-l-2 border-l-transparent'}`}>
-                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md border w-11 text-center shrink-0 ${methodBadge[ep.method]}`}>{ep.method}</span>
-                <div className="min-w-0">
-                  <div className="font-mono text-xs text-slate-700 truncate font-semibold">{ep.path}</div>
-                  <div className="text-[10px] text-slate-400 mt-0.5">{ep.summary}</div>
-                </div>
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Endpoint Detail */}
-        <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-5">
-          <div className="flex items-center gap-3 flex-wrap">
-            <span className={`text-xs font-bold px-2.5 py-1 rounded-lg border ${methodBadge[endpoint.method]}`}>{endpoint.method}</span>
-            <span className="font-mono text-sm text-slate-700 font-semibold">{endpoint.path}</span>
-            {endpoint.requiresAuth && <span className="ml-auto text-[10px] text-amber-700 bg-amber-50 border border-amber-200 px-2 py-1 rounded-lg font-bold">🔒 Autenticado</span>}
-          </div>
-          <div>
-            <h3 className="text-slate-800 font-bold text-base">{endpoint.summary}</h3>
-            <p className="text-slate-500 text-sm mt-1">{endpoint.description}</p>
-          </div>
-          {endpoint.authScopes.length > 0 && (
-            <div>
-              <div className="text-xs text-slate-400 font-bold uppercase tracking-widest mb-2">Escopos Necessários</div>
-              <div className="flex flex-wrap gap-1.5">
-                {endpoint.authScopes.map(s => <span key={s} className="text-[10px] font-mono px-2 py-0.5 rounded-lg bg-slate-100 text-slate-600 border border-slate-200">{s}</span>)}
-              </div>
-            </div>
-          )}
-          {endpoint.requestBody && (
-            <div>
-              <div className="text-xs text-slate-400 font-bold uppercase tracking-widest mb-2">Request Body</div>
-              <pre className="text-xs font-mono text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-xl p-4 overflow-x-auto leading-relaxed">
-                {JSON.stringify(endpoint.requestBody, null, 2)}
-              </pre>
-            </div>
-          )}
-          <div>
-            <div className="text-xs text-slate-400 font-bold uppercase tracking-widest mb-2">Response Example (200 OK)</div>
-            <pre className="text-xs font-mono text-sky-700 bg-sky-50 border border-sky-100 rounded-xl p-4 overflow-x-auto leading-relaxed">
-              {JSON.stringify(endpoint.responseExample, null, 2)}
-            </pre>
-          </div>
-        </div>
-      </div>
     </div>
   )
 }
@@ -1211,7 +1111,7 @@ export default function App() {
     if (activeView === 'knowledge_center') return <KnowledgeCenter onNavigateHome={() => setActiveView('dashboard_incidents')} />
     if (activeView === 'analytics_executive') return <AnalyticsDashboard />
     if (activeView === 'developer_settings') return <DeveloperSettings companyId={currentCompany.id} />
-    if (activeView === 'api_docs') return isConfigEligible ? <ApiDocs /> : <WorkspaceLayout companyId={currentCompany.id} isProvider={isProvider} companies={companies} />
+    if (activeView === 'api_docs') return isConfigEligible ? <ApiDocsPage /> : <WorkspaceLayout companyId={currentCompany.id} isProvider={isProvider} companies={companies} />
     if (activeView === 'flowfy_bi') return <BiApp companyId={currentCompany.id} themeName={currentCompany.branding.primaryColor ?? undefined} />
     if (activeView === 'workflow_builder') return isConfigEligible ? <WorkflowBuilder companyId={currentCompany.id} /> : <WorkspaceLayout companyId={currentCompany.id} isProvider={isProvider} companies={companies} />
 

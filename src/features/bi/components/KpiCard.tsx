@@ -42,10 +42,9 @@ export default function KpiCard({
       className="relative flex h-full w-full flex-col items-start justify-between overflow-hidden rounded-xl p-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md focus:outline-none focus:ring-2"
       style={{ backgroundColor: '#ffffff', border: '1px solid rgba(100,116,139,.12)' }}
     >
-      {/* faixa de cor no topo (gradiente da paleta) */}
       <span
         className="absolute inset-x-0 top-0 h-1"
-        style={{ background: `linear-gradient(90deg, ${accent}, ${accent}88)` }}
+        style={{ backgroundColor: accent }}
       />
       <span className="text-xs font-medium uppercase tracking-wide" style={{ color: theme.mutedColor }}>
         {title}

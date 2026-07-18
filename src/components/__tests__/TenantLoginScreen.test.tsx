@@ -31,7 +31,7 @@ describe('TenantLoginScreen', () => {
 
     expect(screen.getByLabelText('E-mail corporativo')).toBeTruthy()
     expect(screen.getByLabelText('Senha')).toBeTruthy()
-    expect(screen.getByText('Ambiente protegido')).toBeTruthy()
+    expect(screen.getByText('Conta corporativa')).toBeTruthy()
     expect(screen.getByText('ServiceFY')).toBeTruthy()
   })
 
@@ -83,5 +83,27 @@ describe('TenantLoginScreen', () => {
     expect(screen.queryByLabelText('Senha')).toBeNull()
     expect(screen.queryByRole('button', { name: 'Entrar na central' })).toBeNull()
     expect(screen.getByText('Sua empresa exige autenticação corporativa via SSO.')).toBeTruthy()
+  })
+
+  it('apresenta erro de autenticação em linguagem segura', () => {
+    render(
+      <TenantLoginScreen
+        branding={customBranding}
+        onSignIn={vi.fn()}
+        authError="Invalid login credentials"
+      />,
+    )
+
+    expect(screen.getByRole('alert').textContent).toContain('E-mail ou senha incorretos')
+    expect(screen.queryByText('Invalid login credentials')).toBeNull()
+  })
+
+  it('substitui uma imagem de logo inválida pelas iniciais do tenant', () => {
+    render(<TenantLoginScreen branding={customBranding} onSignIn={vi.fn()} />)
+
+    fireEvent.error(screen.getByAltText('Logo Allied Tecnologia'))
+
+    expect(screen.queryByAltText('Logo Allied Tecnologia')).toBeNull()
+    expect(screen.getByText('AT')).toBeTruthy()
   })
 })

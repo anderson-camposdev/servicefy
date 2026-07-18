@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { ArrowRight, Eye, EyeOff, LockKeyhole, Mail, ShieldCheck } from 'lucide-react'
 import type { TenantBranding } from '../tenant/applyBranding'
 import type { SsoProvider } from '../lib/sso'
+import { getTenantInitials, presentAuthError } from '../lib/login-presentation'
 
 interface Props {
   branding: TenantBranding
@@ -16,11 +17,7 @@ interface Props {
 
 const heroBackground = (branding: TenantBranding): string => branding.backgroundUrl
   ? `linear-gradient(135deg, rgba(2,6,23,.88), rgba(2,6,23,.42)), url(${JSON.stringify(branding.backgroundUrl)})`
-  : [
-      'radial-gradient(circle at 18% 18%, color-mix(in srgb, var(--brand-primary) 72%, transparent), transparent 38%)',
-      'radial-gradient(circle at 82% 72%, color-mix(in srgb, var(--brand-accent) 45%, transparent), transparent 34%)',
-      'linear-gradient(145deg, #07111f 0%, #111827 52%, #020617 100%)',
-    ].join(', ')
+  : 'none'
 
 export default function TenantLoginScreen({
   branding,
@@ -38,6 +35,7 @@ export default function TenantLoginScreen({
   const [submitting, setSubmitting] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [oauthSubmitting, setOauthSubmitting] = useState<SsoProvider | null>(null)
+  const [logoFailed, setLogoFailed] = useState(false)
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault()
@@ -64,19 +62,18 @@ export default function TenantLoginScreen({
   }
 
   const busy = loading || submitting || oauthSubmitting !== null
-  const errorMessage = localError || authError
+  const errorMessage = localError || presentAuthError(authError)
   return (
     <main className="min-h-screen bg-slate-950 lg:grid lg:grid-cols-[minmax(0,1.15fr)_minmax(440px,.85fr)]">
       <section data-testid="tenant-login-hero"
-        className="relative isolate flex min-h-[330px] overflow-hidden bg-cover bg-center px-6 py-7 text-white sm:px-10 lg:min-h-screen lg:px-14 lg:py-12 xl:px-20"
-        style={{ backgroundImage: heroBackground(branding) }} aria-label={`Apresentação ${branding.name}`}>
-        <div className="absolute inset-0 -z-10 bg-[linear-gradient(180deg,rgba(2,6,23,.08),rgba(2,6,23,.72))]" />
-        <div className="flex w-full flex-col justify-between gap-12">
+        className="relative isolate flex min-h-[190px] overflow-hidden bg-cover bg-center px-6 py-6 text-white sm:min-h-[280px] sm:px-10 sm:py-7 lg:min-h-screen lg:px-14 lg:py-12 xl:px-20"
+        style={{ backgroundImage: heroBackground(branding), backgroundColor: '#0f172a' }} aria-label={`Apresentação ${branding.name}`}>
+        <div className="flex w-full flex-col justify-between gap-6 lg:gap-12">
           <div className="flex items-center gap-3">
             <div className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-xl bg-white">
-              {branding.logoUrl
-                ? <img src={branding.logoUrl} alt={`Logo ${branding.name}`} className="h-9 w-9 object-contain" />
-                : <span className="text-sm font-bold" style={{ color: 'var(--brand-primary)' }}>{branding.name.slice(0, 2).toUpperCase()}</span>}
+              {branding.logoUrl && !logoFailed
+                ? <img src={branding.logoUrl} onError={() => setLogoFailed(true)} alt={`Logo ${branding.name}`} className="h-9 w-9 object-contain" />
+                : <span className="text-sm font-bold" style={{ color: 'var(--brand-primary)' }}>{getTenantInitials(branding.name)}</span>}
             </div>
             <div><p className="text-lg font-bold tracking-tight">{branding.name}</p><p className="text-xs text-white/65">Central de serviços</p></div>
           </div>
@@ -84,9 +81,9 @@ export default function TenantLoginScreen({
           <div className="max-w-3xl">
             <h1 className="max-w-2xl text-3xl font-bold leading-[1.12] tracking-[-.025em] sm:text-4xl lg:text-5xl"
               style={{ color: branding.titleColor || undefined, fontFamily: branding.titleFont || undefined }}>{branding.welcomeTitle}</h1>
-            <p className="mt-4 max-w-xl text-sm leading-6 text-white/72 sm:text-base lg:mt-6 lg:text-lg lg:leading-8"
+            <p className="mt-4 hidden max-w-xl text-sm leading-6 text-white/72 sm:block sm:text-base lg:mt-6 lg:text-lg lg:leading-8"
               style={{ color: branding.subtitleColor || undefined, fontFamily: branding.subtitleFont || undefined }}>{branding.welcomeSubtitle}</p>
-            <p className="mt-8 flex items-center gap-2 text-sm font-medium text-white/70"><ShieldCheck className="h-4 w-4" aria-hidden="true" /> Chamados, serviços e conhecimento com a identidade da sua empresa.</p>
+            <p className="mt-4 hidden text-sm font-medium text-white/70 sm:block lg:mt-8">Acesso exclusivo para usuários autorizados.</p>
           </div>
           <p className="hidden text-xs font-medium text-white/50 lg:block">Atendimento digital de {branding.name}</p>
         </div>
@@ -95,7 +92,7 @@ export default function TenantLoginScreen({
       <section className="relative flex min-h-[620px] items-center justify-center bg-background px-5 py-10 sm:px-10 lg:min-h-screen">
         <div className="relative w-full max-w-[440px]">
           <div className="mb-8">
-            <p className="mb-5 flex items-center gap-2 text-xs font-semibold text-on-surface-variant"><ShieldCheck className="h-4 w-4 text-resolved" /> Ambiente protegido</p>
+            <p className="mb-5 flex items-center gap-2 text-xs font-semibold text-on-surface-variant"><ShieldCheck className="h-4 w-4 text-resolved" /> Conta corporativa</p>
             <h2 className="text-3xl font-bold tracking-[-.025em] text-on-surface">Acesse sua central</h2>
             <p className="mt-2 text-sm leading-6 text-on-surface-variant">Use sua conta corporativa para continuar.</p>
           </div>
@@ -131,8 +128,8 @@ export default function TenantLoginScreen({
           )}
 
           {providers.length > 0 && allowLocalLogin && (
-            <div className="my-5 flex items-center gap-3 text-[10px] font-bold uppercase tracking-[.16em] text-slate-400">
-              <span className="h-px flex-1 bg-slate-200" /> ou use sua senha <span className="h-px flex-1 bg-slate-200" />
+            <div className="my-5 flex items-center gap-3 text-xs font-medium text-slate-500">
+              <span className="h-px flex-1 bg-slate-200" /> ou entre com e-mail e senha <span className="h-px flex-1 bg-slate-200" />
             </div>
           )}
 

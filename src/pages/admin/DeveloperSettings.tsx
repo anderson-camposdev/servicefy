@@ -8,9 +8,10 @@
 // ============================================================
 
 import { useCallback, useEffect, useState } from 'react'
-import { AlertTriangle, Code2, Loader2, Plus, Trash2, Webhook, X } from 'lucide-react'
+import { Code2, Loader2, Plus, Trash2, Webhook, X } from 'lucide-react'
 import { outboundWebhooksService } from '../../lib/services'
 import type { OutboundWebhookEvent, OutboundWebhookRow } from '../../lib/database.types'
+import { getWebhookHealth, validateWebhookDraft } from '../../lib/developer-experience'
 
 interface DeveloperSettingsProps {
   companyId: string
@@ -57,8 +58,8 @@ export default function DeveloperSettings({ companyId }: DeveloperSettingsProps)
         <div className="flex items-center gap-3">
           <span className="rounded-xl bg-primary-container p-3 text-on-primary-container"><Code2 className="w-6 h-6" /></span>
           <div>
-            <h1 className="text-2xl font-black text-slate-900">Configurações de Desenvolvedor</h1>
-            <p className="text-sm text-slate-500 mt-1">Webhooks outbound para integrações corporativas.</p>
+            <h1 className="text-2xl font-bold tracking-tight text-slate-950">Webhooks</h1>
+            <p className="mt-1 text-sm text-slate-500">Acompanhe a saúde das entregas e gerencie os eventos enviados às suas integrações.</p>
           </div>
         </div>
         <button
@@ -84,31 +85,32 @@ export default function DeveloperSettings({ companyId }: DeveloperSettingsProps)
           </div>
         ) : (
           <div className="divide-y divide-slate-100">
-            {webhooks.map(webhook => (
+            {webhooks.map(webhook => {
+              const health = getWebhookHealth(webhook.is_active, webhook.consecutive_failures)
+              const healthStyle = {
+                healthy: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+                warning: 'border-amber-200 bg-amber-50 text-amber-800',
+                critical: 'border-red-200 bg-red-50 text-red-700',
+                inactive: 'border-slate-200 bg-slate-100 text-slate-600',
+              }[health.tone]
+              return (
               <div key={webhook.id} className="flex flex-col gap-3 p-4 md:flex-row md:items-center md:justify-between">
                 <button onClick={() => setEditing(webhook)} className="min-w-0 flex-1 text-left">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="truncate font-mono text-sm font-bold text-slate-800">{webhook.target_url}</span>
-                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
-                      webhook.is_active
-                        ? 'bg-emerald-100 text-emerald-700'
-                        : 'bg-slate-200 text-slate-500'
-                    }`}>
-                      {webhook.is_active ? 'Ativo' : 'Inativo'}
+                    <span className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${healthStyle}`}>
+                      {health.label}
                     </span>
-                    {webhook.consecutive_failures > 0 && (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700" title="Falhas consecutivas de entrega">
-                        <AlertTriangle className="w-3 h-3" /> {webhook.consecutive_failures} falha(s)
-                      </span>
-                    )}
                   </div>
-                  <p className="mt-1 text-xs text-slate-400">{webhook.events_subscribed.join(', ') || 'Nenhum evento selecionado'}</p>
+                  <p className="mt-1 text-xs text-slate-500">{health.detail} · {webhook.events_subscribed.length} evento{webhook.events_subscribed.length === 1 ? '' : 's'} assinado{webhook.events_subscribed.length === 1 ? '' : 's'}</p>
+                  <p className="mt-1 font-mono text-[11px] text-slate-400">{webhook.events_subscribed.join(' · ') || 'Nenhum evento selecionado'}</p>
                 </button>
-                <button onClick={() => handleDelete(webhook.id)} className="shrink-0 rounded-lg border border-slate-200 bg-white p-2 text-red-600/70 hover:bg-red-50 hover:border-red-200 hover:text-red-700 transition-colors" title="Remover">
+                <button onClick={() => handleDelete(webhook.id)} className="shrink-0 rounded-lg border border-slate-200 bg-white p-2 text-red-600/70 hover:bg-red-50 hover:border-red-200 hover:text-red-700 transition-colors" title="Remover webhook" aria-label={`Remover webhook ${webhook.target_url}`}>
                   <Trash2 className="w-4 h-4" />
                 </button>
               </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </div>
@@ -146,16 +148,14 @@ function WebhookEditorModal({ companyId, webhook, onClose, onSaved }: WebhookEdi
 
   const handleSubmit = async () => {
     const trimmedUrl = targetUrl.trim()
-    if (!trimmedUrl.startsWith('https://')) {
-      setError('A URL do webhook precisa começar com https://')
-      return
-    }
-    if (events.length === 0) {
-      setError('Selecione ao menos um evento.')
-      return
-    }
-    if (!webhook && !secret.trim()) {
-      setError('Informe um segredo de assinatura para o novo webhook.')
+    const validationError = validateWebhookDraft({
+      targetUrl: trimmedUrl,
+      events,
+      secret,
+      isNew: !webhook,
+    })
+    if (validationError) {
+      setError(validationError)
       return
     }
     setSubmitting(true)
