@@ -155,23 +155,27 @@ export default function DepartmentManager({ companyId, cardClass, primaryColor }
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h2 className="text-xl font-semibold">Departamentos</h2>
-          <p className="text-sm text-content-muted mt-1">Gerencie os departamentos/áreas que organizam os serviços e requisições do seu catálogo.</p>
+    <div className="space-y-5">
+      <header className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-surface p-5 shadow-sm lg:flex-row lg:items-center lg:justify-between">
+        <div className="min-w-0">
+          <span className="text-xs font-bold uppercase tracking-[0.16em] text-primary">Estrutura organizacional</span>
+          <h2 className="mt-1 text-xl font-semibold tracking-tight text-text-main">Departamentos</h2>
+          <p className="mt-1 max-w-2xl text-sm leading-6 text-text-muted">Organize serviços por área e controle quais grupos podem visualizar cada departamento.</p>
         </div>
-        {!isCreating && (
-          <button
-            onClick={() => setIsCreating(true)}
-            className="flex items-center gap-2 px-4 py-2 text-white rounded hover:opacity-90 transition-opacity"
-            style={{ backgroundColor: primaryColor }}
-          >
-            <Plus className="w-4 h-4" />
-            Novo Departamento
-          </button>
-        )}
-      </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="inline-flex h-9 items-center rounded-lg border border-slate-200 bg-surface-subtle px-3 text-xs font-semibold text-text-muted">
+            {departments.filter(department => department.is_active).length} ativos
+          </span>
+          <span className="inline-flex h-9 items-center rounded-lg border border-slate-200 bg-surface-subtle px-3 text-xs font-semibold text-text-muted">
+            {departments.filter(department => (department.visible_to_groups?.length ?? 0) > 0).length} restritos
+          </span>
+          {!isCreating && (
+            <button onClick={() => setIsCreating(true)} className="inline-flex min-h-9 items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-bold text-on-primary transition hover:brightness-95">
+              <Plus className="h-4 w-4" /> Novo departamento
+            </button>
+          )}
+        </div>
+      </header>
 
       {error && (
         <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-500 rounded">
@@ -180,8 +184,11 @@ export default function DepartmentManager({ companyId, cardClass, primaryColor }
       )}
 
       {isCreating && (
-        <div className={`${cardClass} p-4`} style={{ borderColor: primaryColor }}>
-          <h3 className="font-medium mb-4">Adicionar Departamento</h3>
+        <div className={`${cardClass} p-5`} style={{ borderColor: primaryColor }}>
+          <div className="mb-4">
+            <h3 className="font-semibold text-text-main">Adicionar departamento</h3>
+            <p className="mt-1 text-sm text-text-muted">Comece com nome e propósito. A visibilidade por grupos pode ser configurada após a criação.</p>
+          </div>
           <form onSubmit={handleCreate} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
@@ -219,8 +226,7 @@ export default function DepartmentManager({ companyId, cardClass, primaryColor }
               <button
                 type="submit"
                 disabled={loading}
-                className="px-4 py-2 text-white rounded hover:opacity-90 disabled:opacity-50"
-                style={{ backgroundColor: primaryColor }}
+                className="rounded-lg bg-primary px-4 py-2 text-sm font-bold text-on-primary hover:brightness-95 disabled:opacity-50"
               >
                 {loading ? 'Salvando...' : 'Criar Departamento'}
               </button>
@@ -231,9 +237,13 @@ export default function DepartmentManager({ companyId, cardClass, primaryColor }
 
       <div className={`${cardClass} overflow-hidden`}>
         {departments.length === 0 && !loading && !isCreating ? (
-          <div className="p-8 text-center text-content-muted">
+          <div className="p-10 text-center text-content-muted">
             <Network className="w-12 h-12 mx-auto mb-3 opacity-20" />
-            <p>Nenhum departamento cadastrado.</p>
+            <p className="font-semibold text-text-main">Nenhum departamento cadastrado</p>
+            <p className="mt-1 text-sm text-text-muted">Crie a primeira área para organizar o catálogo e a experiência do portal.</p>
+            <button type="button" onClick={() => setIsCreating(true)} className="mt-4 inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-surface px-3 py-2 text-sm font-semibold text-text-main hover:bg-surface-subtle">
+              <Plus className="h-4 w-4" /> Criar departamento
+            </button>
           </div>
         ) : (
           <div className="overflow-x-auto">

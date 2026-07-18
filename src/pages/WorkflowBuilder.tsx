@@ -19,6 +19,7 @@ import {
 import { workflowService } from '../lib/services'
 import type { WorkflowRuleRow, WorkflowExecutionLogRow } from '../lib/database.types'
 import { translateState } from '../lib/statusLabels'
+import { evaluateWorkflowQuality, getDefaultWorkflowActionParams } from '../lib/workflow-quality'
 
 // ─── Types ────────────────────────────────────────────────────
 
@@ -222,7 +223,10 @@ function rowToWorkflow(row: WorkflowRuleRow, stats?: { runsCount: number; lastRu
     triggerEvent: row.trigger_event,
     triggerSource: row.trigger_source,
     conditions: withLocalIds((row.conditions as any) ?? []),
-    actions: withLocalIds((row.actions as any) ?? []),
+    actions: withLocalIds<ActionRow>((row.actions as any) ?? []).map(action => ({
+      ...action,
+      params: { ...getDefaultWorkflowActionParams(action.type), ...action.params },
+    })),
     runsCount: stats?.runsCount ?? 0,
     lastRun: stats?.lastRun ?? 'Nunca',
     successRate: stats?.successRate ?? 0,
@@ -709,9 +713,10 @@ export default function WorkflowBuilder({ companyId }: { companyId: string }) {
     return () => { active = false }
   }, [companyId, wf?.id, activeTab])
 
+  const qualityReport = wf ? evaluateWorkflowQuality(wf) : null
   const validIssues = {
-    conditions: (wf?.conditions ?? []).some(c => !c.value.trim()),
-    actions: (wf?.actions.length ?? 0) === 0,
+    conditions: qualityReport?.issues.some(issue => issue.section === 'conditions') ?? false,
+    actions: qualityReport?.issues.some(issue => issue.section === 'actions') ?? false,
   }
 
   // ── Mutations (locais — persistidas ao clicar Salvar, exceto onde indicado) ──
@@ -723,7 +728,7 @@ export default function WorkflowBuilder({ companyId }: { companyId: string }) {
   const updateCondition = (id: string, diff: Partial<ConditionRow>) =>
     wf && patch({ conditions: wf.conditions.map(c => c.id === id ? { ...c, ...diff } : c) })
 
-  const addAction = () => wf && patch({ actions: [...wf.actions, { id: genId(), type: 'assign_group', params: {} }] })
+  const addAction = () => wf && patch({ actions: [...wf.actions, { id: genId(), type: 'assign_group', params: getDefaultWorkflowActionParams('assign_group') }] })
   const removeAction = (id: string) => wf && patch({ actions: wf.actions.filter(a => a.id !== id) })
   const updateAction = (id: string, diff: Partial<ActionRow>) =>
     wf && patch({ actions: wf.actions.map(a => a.id === id ? { ...a, ...diff } : a) })
@@ -780,6 +785,11 @@ export default function WorkflowBuilder({ companyId }: { companyId: string }) {
   const toggleEnabled = async () => {
     if (!wf) return
     const next = !wf.enabled
+    if (next && !qualityReport?.ready) {
+      setError('Revise os itens de prontidão antes de ativar esta automação.')
+      setActiveTab('config')
+      return
+    }
     patch({ enabled: next })
     try {
       await workflowService.setActive(wf.id, companyId, next)
@@ -828,12 +838,12 @@ export default function WorkflowBuilder({ companyId }: { companyId: string }) {
         <div className="flex flex-col items-center gap-4 text-center max-w-sm">
           <Layers className="w-12 h-12 text-slate-200" />
           <div>
-            <p className="text-sm font-bold text-slate-600">Nenhuma automação configurada</p>
-            <p className="text-xs text-slate-400 mt-1">Crie a primeira regra para começar a automatizar o atendimento.</p>
+            <p className="text-base font-bold text-slate-800">Automatize tarefas repetitivas com segurança</p>
+            <p className="text-sm text-slate-500 mt-1 leading-relaxed">Comece com um modelo ou uma regra vazia. Você poderá revisar, simular e salvar como rascunho antes de ativar.</p>
           </div>
           <button onClick={() => setShowTemplates(true)}
-            className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-4 py-2 rounded-lg transition-all shadow-sm">
-            <Plus className="w-3.5 h-3.5" /> Nova Automação
+            className="flex items-center gap-1.5 bg-primary hover:opacity-90 text-on-primary text-sm font-bold px-4 py-2.5 rounded-lg transition-all shadow-sm">
+            <Plus className="w-4 h-4" /> Criar primeira automação
           </button>
         </div>
         {showTemplates && <TemplateGallery onSelect={createFromTemplate} onClose={() => setShowTemplates(false)} />}
@@ -956,12 +966,7 @@ export default function WorkflowBuilder({ companyId }: { companyId: string }) {
           </div>
 
           <div className="servicefy-workflow-actions flex items-center gap-2">
-            {(validIssues.conditions || validIssues.actions) && (
-              <span className="flex items-center gap-1.5 text-[10px] font-bold text-amber-600 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-full">
-                <AlertCircle className="w-3 h-3" /> Configuração incompleta
-              </span>
-            )}
-            <button onClick={toggleEnabled}
+            <button onClick={toggleEnabled} aria-label={wf.enabled ? 'Pausar automação' : 'Ativar automação'}
               className={`flex items-center gap-2 text-xs font-bold px-3 py-1.5 rounded-full border transition-all ${
                 wf.enabled
                   ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
@@ -970,11 +975,11 @@ export default function WorkflowBuilder({ companyId }: { companyId: string }) {
               <span className={`w-2 h-2 rounded-full ${wf.enabled ? 'bg-emerald-500' : 'bg-slate-300'}`} />
               {wf.enabled ? 'Ativo' : 'Pausado'}
             </button>
-            <button onClick={duplicateWorkflow} title="Duplicar"
+            <button onClick={duplicateWorkflow} title="Duplicar" aria-label="Duplicar automação"
               className="w-8 h-8 flex items-center justify-center rounded-lg border border-slate-200 text-slate-400 hover:text-slate-600 hover:bg-slate-50 transition-colors">
               <Copy className="w-4 h-4" />
             </button>
-            <button onClick={deleteWorkflow} title="Excluir"
+            <button onClick={deleteWorkflow} title="Excluir" aria-label="Excluir automação"
               className="w-8 h-8 flex items-center justify-center rounded-lg border border-slate-200 text-red-600/70 hover:text-red-700 hover:bg-red-50 hover:border-red-200 transition-colors">
               <Trash2 className="w-4 h-4" />
             </button>
@@ -996,6 +1001,32 @@ export default function WorkflowBuilder({ companyId }: { companyId: string }) {
           <div className="bg-red-50 border-b border-red-100 px-6 py-2 flex items-center justify-between shrink-0">
             <span className="text-xs font-semibold text-red-700">{error}</span>
             <button onClick={() => setError(null)} className="text-red-400 hover:text-red-600"><X className="w-3.5 h-3.5" /></button>
+          </div>
+        )}
+        {qualityReport && (
+          <div className={`px-6 py-3 border-b flex items-start gap-3 shrink-0 ${
+            qualityReport.ready ? 'bg-emerald-50 border-emerald-100' : 'bg-amber-50 border-amber-100'
+          }`}>
+            {qualityReport.ready
+              ? <CheckCircle className="w-4 h-4 text-emerald-600 mt-0.5 shrink-0" />
+              : <AlertCircle className="w-4 h-4 text-amber-700 mt-0.5 shrink-0" />}
+            <div className="min-w-0 flex-1">
+              <div className={`text-sm font-bold ${qualityReport.ready ? 'text-emerald-800' : 'text-amber-900'}`}>
+                {qualityReport.ready
+                  ? 'Automação pronta para testar e ativar'
+                  : `${qualityReport.completedSections} de ${qualityReport.totalSections} etapas prontas`}
+              </div>
+              <p className={`text-xs mt-0.5 ${qualityReport.ready ? 'text-emerald-700' : 'text-amber-800'}`}>
+                {qualityReport.ready
+                  ? 'Revise a simulação antes de publicar mudanças em produção.'
+                  : qualityReport.issues.slice(0, 2).map(issue => issue.message).join(' ')}
+              </p>
+            </div>
+            {!qualityReport.ready && activeTab !== 'config' && (
+              <button onClick={() => setActiveTab('config')} className="text-xs font-bold text-amber-900 hover:underline shrink-0">
+                Revisar configuração
+              </button>
+            )}
           </div>
         )}
 
@@ -1263,7 +1294,7 @@ export default function WorkflowBuilder({ companyId }: { companyId: string }) {
                                 <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border ${meta.color}`}>
                                   <Icon className="w-4 h-4" />
                                 </div>
-                                <select value={action.type} onChange={e => updateAction(action.id, { type: e.target.value, params: {} })}
+                                <select value={action.type} onChange={e => updateAction(action.id, { type: e.target.value, params: getDefaultWorkflowActionParams(e.target.value) })}
                                   className="flex-1 text-sm font-semibold border border-slate-200 rounded-xl px-3 py-2 bg-white outline-none focus:ring-2 focus:ring-emerald-300 text-slate-700 cursor-pointer">
                                   {ACTION_TYPES.map(a => <option key={a.value} value={a.value}>{a.label}</option>)}
                                 </select>

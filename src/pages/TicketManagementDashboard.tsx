@@ -7,6 +7,7 @@ import type { WorkspaceTicket, CompanyLite } from './workspace.types'
 import type { AssignmentGroupRow } from '../lib/database.types'
 import TicketDataTable from '../components/TicketDataTable'
 import { INCIDENT_REQUEST_FIELDS } from '../lib/ticketTableFields'
+import { compareOperationalPriority, getSlaHealth } from '../lib/ticket-operations'
 import { incidentsService, assignmentGroupsService } from '../lib/services'
 import { useToast } from '../context'
 
@@ -162,7 +163,22 @@ function TypeBadge({ type }: { type?: string }) {
       }`}
       title={isReq ? 'Requisição (catálogo)' : 'Incidente (falha)'}
     >
-      {isReq ? '🧩 Requisição' : '🔧 Incidente'}
+      {isReq ? 'REQ' : 'INC'}
+    </span>
+  )
+}
+
+function SlaRiskBadge({ ticket }: { ticket: Row }) {
+  const health = getSlaHealth(ticket)
+  if (health !== 'breached' && health !== 'at-risk') return null
+  return (
+    <span className={`inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[10px] font-bold ${
+      health === 'breached'
+        ? 'border-rose-200 bg-rose-50 text-rose-700'
+        : 'border-amber-200 bg-amber-50 text-amber-700'
+    }`}>
+      <Clock className="h-3 w-3" />
+      {health === 'breached' ? 'SLA violado' : 'SLA vence em breve'}
     </span>
   )
 }
@@ -202,8 +218,8 @@ const AVAILABLE_METRICS = [
     icon: AlertTriangle,
     color: 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100',
     activeColor: 'bg-rose-600 text-white border-rose-600 shadow-md ring-2 ring-rose-600',
-    filterFn: (r: Row) => r.slaBreached === true || r.sla === 'Violado',
-    countFn: (rows: Row[]) => rows.filter(r => r.slaBreached === true || r.sla === 'Violado').length,
+    filterFn: (r: Row) => getSlaHealth(r) === 'breached',
+    countFn: (rows: Row[]) => rows.filter(r => getSlaHealth(r) === 'breached').length,
   },
   {
     key: 'slaToExpire',
@@ -211,8 +227,8 @@ const AVAILABLE_METRICS = [
     icon: Clock,
     color: 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100',
     activeColor: 'bg-amber-600 text-white border-amber-600 shadow-md ring-2 ring-amber-600',
-    filterFn: (r: Row) => !r.slaBreached && r.status !== 'Resolved' && r.status !== 'Closed' && r.status !== 'Resolvido' && r.status !== 'Fechado' && r.sla !== 'Violado' && !!r.slaDeadline,
-    countFn: (rows: Row[]) => rows.filter(r => !r.slaBreached && r.status !== 'Resolved' && r.status !== 'Closed' && r.status !== 'Resolvido' && r.status !== 'Fechado' && r.sla !== 'Violado' && !!r.slaDeadline).length,
+    filterFn: (r: Row) => getSlaHealth(r) === 'at-risk',
+    countFn: (rows: Row[]) => rows.filter(r => getSlaHealth(r) === 'at-risk').length,
   },
   {
     key: 'myQueue',
@@ -371,12 +387,13 @@ const TicketManagementDashboard = ({ onOpenTicket, companyId, isProvider, compan
 
   // 4. Filtro Ativo pelo Card selecionado
   const profileIdForMetrics = profile?.id || 'u-sys-1'
-  const finalFilteredRows = activeFilterCard
+  const filteredByMetric = activeFilterCard
     ? typedRows.filter(r => {
         const metric = AVAILABLE_METRICS.find(m => m.key === activeFilterCard)
         return metric ? metric.filterFn(r, profileIdForMetrics, myGroupIds) : true
       })
     : typedRows
+  const finalFilteredRows = [...filteredByMetric].sort((left, right) => compareOperationalPriority(left, right))
 
   const canClaim = (row: Row) =>
     realMode && !row.assignedToId && !!row.assignmentGroupId && myGroupIds.includes(row.assignmentGroupId)
@@ -471,6 +488,8 @@ const TicketManagementDashboard = ({ onOpenTicket, companyId, isProvider, compan
           <div className="flex bg-slate-100 p-1 rounded-lg border border-slate-200">
             <button
               onClick={() => setViewMode('table')}
+              aria-label="Exibir chamados em tabela"
+              aria-pressed={viewMode === 'table'}
               className={`p-1.5 rounded-md transition-all ${viewMode === 'table' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500 hover:text-slate-700'}`}
               title="Visão em Lista"
             >
@@ -478,6 +497,8 @@ const TicketManagementDashboard = ({ onOpenTicket, companyId, isProvider, compan
             </button>
             <button
               onClick={() => setViewMode('kanban')}
+              aria-label="Exibir chamados em kanban"
+              aria-pressed={viewMode === 'kanban'}
               className={`p-1.5 rounded-md transition-all ${viewMode === 'kanban' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500 hover:text-slate-700'}`}
               title="Visão em Kanban"
             >
@@ -584,12 +605,18 @@ const TicketManagementDashboard = ({ onOpenTicket, companyId, isProvider, compan
                           <MoreHorizontal className="w-4 h-4 text-slate-400 opacity-0 group-hover:opacity-100 ml-auto" />
                         </div>
                         <h4 className="text-sm font-bold text-slate-900 mb-2 leading-snug line-clamp-2">{ticket.title}</h4>
+                        <SlaRiskBadge ticket={ticket} />
                         <div className="space-y-2 mb-1 text-xs">
                           <span className="flex items-center gap-1 font-medium text-slate-600"><Building2 className="w-3 h-3" /> {ticket.client}</span>
                           <span className="text-slate-500 block truncate">{ticket.requester}</span>
                         </div>
                       </div>
                     ))}
+                    {colRows.length === 0 && (
+                      <div className="flex min-h-28 items-center justify-center rounded-xl border border-dashed border-slate-200 bg-white/60 px-4 text-center text-xs text-slate-400">
+                        Nenhum chamado nesta etapa
+                      </div>
+                    )}
                   </div>
                 </div>
               )

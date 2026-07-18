@@ -1,5 +1,6 @@
 import { STATE_LABELS_PT } from '../../lib/statusLabels'
 import type { IncidentRow } from '../../lib/database.types'
+import { getPortalTicketGuidance } from '../../lib/portal-ticket-guidance'
 
 const STATE_STYLE: Record<string, { bg: string; fg: string }> = {
   'New':          { bg:'#eff6ff', fg:'#1d4ed8' },
@@ -75,6 +76,7 @@ export function UserTicketList({
       {tickets.map(t => {
         const ss = STATE_STYLE[t.state] || { bg:'#f1f5f9', fg:'#475569' }
         const ps = PRIO_STYLE[t.priority || ''] || { bg:'#f1f5f9', fg:'#6b7280' }
+        const guidance = getPortalTicketGuidance(t)
         return (
           <button key={t.id} onClick={() => onSelectTicket(t)}
             style={{
@@ -101,6 +103,27 @@ export function UserTicketList({
               </span>
             </div>
             <div style={{ font:'600 15px sans-serif', color: isHistory ? '#334155' : '#0f172a' }}>{t.short_description}</div>
+            <div style={{
+              display:'flex',
+              gap:9,
+              alignItems:'flex-start',
+              padding:'10px 12px',
+              borderRadius:10,
+              background: guidance.requiresUserAction ? '#fff7ed' : '#f8fafc',
+              border: `1px solid ${guidance.requiresUserAction ? '#fed7aa' : '#e2e8f0'}`,
+            }}>
+              <span aria-hidden="true" style={{ color: guidance.requiresUserAction ? '#c2410c' : brand, lineHeight:1.2 }}>
+                {guidance.requiresUserAction ? '●' : '→'}
+              </span>
+              <div style={{ minWidth:0 }}>
+                <div style={{ font:'700 12px sans-serif', color: guidance.requiresUserAction ? '#9a3412' : '#334155', marginBottom:2 }}>
+                  {guidance.title}
+                </div>
+                <div style={{ font:'400 12px/1.45 sans-serif', color:'#64748b' }}>
+                  {guidance.description}
+                </div>
+              </div>
+            </div>
             <div style={{ font:'400 12px sans-serif', color:'#94a3b8' }}>
               {t.ticket_type === 'incident' ? 'Incidente' : 'Requisição'} · {isHistory ? 'Atualizado' : 'Aberto'} em {fmtDate(isHistory ? t.updated_at : t.created_at)}
               {!isHistory && t.sla_breached && <span style={{ marginLeft:10, color:'#dc2626', fontWeight:700 }}>⚠ SLA vencido</span>}

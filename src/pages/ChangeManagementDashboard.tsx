@@ -50,6 +50,7 @@ export default function ChangeManagementDashboard({ companyId }: { companyId?: s
   const [search, setSearch] = useState('')
   const [typeFilter, setTypeFilter] = useState<string>('all')
   const [riskFilter, setRiskFilter] = useState<string>('all')
+  const [stateFilter, setStateFilter] = useState<string>('all')
   
   // Modal de Nova/Edição de Mudança
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -141,10 +142,17 @@ export default function ChangeManagementDashboard({ companyId }: { companyId?: s
       const matchesSearch = c.number.toLowerCase().includes(search.toLowerCase()) ||
                             c.short_description.toLowerCase().includes(search.toLowerCase())
       const matchesType = typeFilter === 'all' || c.type === typeFilter
-      const matchesRisk = riskFilter === 'all' || c.risk === riskFilter
-      return matchesSearch && matchesType && matchesRisk
+      const matchesRisk = riskFilter === 'all' || (riskFilter === 'high-or-critical' ? ['High', 'Critical'].includes(c.risk) : c.risk === riskFilter)
+      const matchesState = stateFilter === 'all' || c.state === stateFilter
+      return matchesSearch && matchesType && matchesRisk && matchesState
     })
-  }, [changes, search, typeFilter, riskFilter])
+  }, [changes, search, typeFilter, riskFilter, stateFilter])
+
+  const resetOperationalFilters = () => {
+    setTypeFilter('all')
+    setRiskFilter('all')
+    setStateFilter('all')
+  }
 
   // Abrir Modal de Edição ou Criação
   const openForm = async (change?: ChangeRow) => {
@@ -354,26 +362,26 @@ export default function ChangeManagementDashboard({ companyId }: { companyId?: s
 
       {/* KPI Stats (compactos — a tabela abaixo é a prioridade de espaço) */}
       <div className="grid grid-cols-2 overflow-hidden rounded-xl border border-outline-variant bg-surface md:grid-cols-5">
-        <div className="flex items-center justify-between border-b border-r border-outline-variant px-3 py-3 md:border-b-0">
+        <button type="button" onClick={resetOperationalFilters} className="flex items-center justify-between border-b border-r border-outline-variant px-3 py-3 text-left transition hover:bg-surface-subtle md:border-b-0">
           <span className="text-xs font-semibold text-on-surface-variant">Total</span>
           <span className="text-lg font-bold text-on-surface">{kpis.total}</span>
-        </div>
-        <div className="flex items-center justify-between border-b border-outline-variant px-3 py-3 md:border-b-0 md:border-r">
+        </button>
+        <button type="button" onClick={() => { resetOperationalFilters(); setStateFilter('Awaiting CAB Approval'); setActiveSubTab('list') }} aria-pressed={stateFilter === 'Awaiting CAB Approval'} className={`flex items-center justify-between border-b border-outline-variant px-3 py-3 text-left transition md:border-b-0 md:border-r ${stateFilter === 'Awaiting CAB Approval' ? 'bg-amber-50' : 'hover:bg-surface-subtle'}`}>
           <span className="text-xs font-semibold text-on-surface-variant">Aguardando CAB</span>
           <span className="text-lg font-bold text-amber-700">{kpis.awaitingCAB}</span>
-        </div>
-        <div className="flex items-center justify-between border-b border-r border-outline-variant px-3 py-3 md:border-b-0">
+        </button>
+        <button type="button" onClick={() => { resetOperationalFilters(); setTypeFilter('Emergency'); setActiveSubTab('list') }} aria-pressed={typeFilter === 'Emergency'} className={`flex items-center justify-between border-b border-r border-outline-variant px-3 py-3 text-left transition md:border-b-0 ${typeFilter === 'Emergency' ? 'bg-rose-50' : 'hover:bg-surface-subtle'}`}>
           <span className="text-xs font-semibold text-on-surface-variant">Emergenciais</span>
           <span className="text-lg font-bold text-error">{kpis.emergency}</span>
-        </div>
-        <div className="flex items-center justify-between border-b border-outline-variant px-3 py-3 md:border-b-0 md:border-r">
+        </button>
+        <button type="button" onClick={() => { resetOperationalFilters(); setRiskFilter('high-or-critical'); setActiveSubTab('list') }} aria-pressed={riskFilter === 'high-or-critical'} className={`flex items-center justify-between border-b border-outline-variant px-3 py-3 text-left transition md:border-b-0 md:border-r ${riskFilter === 'high-or-critical' ? 'bg-orange-50' : 'hover:bg-surface-subtle'}`}>
           <span className="text-xs font-semibold text-on-surface-variant">Alto risco</span>
           <span className="text-lg font-bold text-orange-700">{kpis.highRisk}</span>
-        </div>
-        <div className="col-span-2 flex items-center justify-between px-3 py-3 md:col-span-1">
+        </button>
+        <button type="button" onClick={() => { resetOperationalFilters(); setStateFilter('Scheduled'); setActiveSubTab('list') }} aria-pressed={stateFilter === 'Scheduled'} className={`col-span-2 flex items-center justify-between px-3 py-3 text-left transition md:col-span-1 ${stateFilter === 'Scheduled' ? 'bg-primary-container' : 'hover:bg-surface-subtle'}`}>
           <span className="text-xs font-semibold text-on-surface-variant">Agendadas</span>
           <span className="text-lg font-bold text-primary">{kpis.scheduled}</span>
-        </div>
+        </button>
       </div>
 
       {/* Navigation Subtabs */}
@@ -431,7 +439,7 @@ export default function ChangeManagementDashboard({ companyId }: { companyId?: s
                   className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-xl text-sm bg-white outline-none focus:ring-2 focus:ring-indigo-500"
                 />
               </div>
-              <div className="grid w-full grid-cols-2 items-center gap-2 md:w-auto md:grid-cols-[auto_1fr_1fr]">
+              <div className="grid w-full grid-cols-2 items-center gap-2 md:w-auto md:grid-cols-[auto_1fr_1fr_1fr]">
                 <div className="col-span-2 flex items-center gap-2 text-xs font-semibold text-on-surface-variant md:col-span-1">
                   <Filter className="w-3.5 h-3.5" /> Filtros
                 </div>
@@ -453,8 +461,21 @@ export default function ChangeManagementDashboard({ companyId }: { companyId?: s
                   <option value="all">Todos os Riscos</option>
                   <option value="Low">Low</option>
                   <option value="Medium">Medium</option>
+                  <option value="high-or-critical">High + Critical</option>
                   <option value="High">High</option>
                   <option value="Critical">Critical</option>
+                </select>
+                <select
+                  value={stateFilter}
+                  onChange={e => setStateFilter(e.target.value)}
+                  className="min-w-0 rounded-lg border border-outline-variant bg-surface px-3 py-2 text-xs outline-none"
+                >
+                  <option value="all">Todos os Estados</option>
+                  <option value="Draft">Rascunho</option>
+                  <option value="Awaiting CAB Approval">Aguardando CAB</option>
+                  <option value="Scheduled">Agendada</option>
+                  <option value="Implementing">Em implementação</option>
+                  <option value="Completed">Concluída</option>
                 </select>
               </div>
             </div>

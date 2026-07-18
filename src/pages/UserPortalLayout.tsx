@@ -14,6 +14,7 @@ import type {
 } from '../lib/database.types'
 import { buildLabeledFormData, isEmptyFormValue, parseFormFields } from '../lib/catalogFormFields'
 import type { FormAnswers, FormFieldValue } from '../lib/catalogFormFields'
+import { getPortalTicketGuidance } from '../lib/portal-ticket-guidance'
 import DynamicFormFields from './DynamicFormFields'
 import CatalogIcon from './CatalogIcon'
 import VirtualAgentWidget from '../components/VirtualAgentWidget'
@@ -900,6 +901,7 @@ const UserPortalLayout = ({ companyId }: { companyId?: string } = {}) => {
   const isHistory     = screen === 'history'
   const isTicketDetail = screen === 'ticket-detail'
   const isKnowledge   = screen === 'knowledge'
+  const selectedTicketGuidance = selectedTicket ? getPortalTicketGuidance(selectedTicket) : null
   const stepNum = ({ 'dept-cats':0,'inc-cats':1,'inc-services':2,'inc-symptoms':3,'inc-form':4,'req-cats':1,'req-subcats':2,'req-items':2,'req-form':3 } as Record<string,number>)[screen] || 0
   const flowStepCount = screen.startsWith('inc-') ? 4 : 3
 
@@ -1209,6 +1211,39 @@ const UserPortalLayout = ({ companyId }: { companyId?: string } = {}) => {
             </div>
 
             {/* Painel de SLA (idêntico ao Cockpit do Analista) */}
+            {selectedTicketGuidance && (() => {
+              const tones = {
+                info: { bg:'#eff6ff', border:'#bfdbfe', accent:'#2563eb' },
+                progress: { bg:'#ecfdf5', border:'#a7f3d0', accent:'#047857' },
+                attention: { bg:'#fff7ed', border:'#fed7aa', accent:'#c2410c' },
+                success: { bg:'#f0fdf4', border:'#bbf7d0', accent:'#15803d' },
+                danger: { bg:'#fff1f2', border:'#fecdd3', accent:'#be123c' },
+              }[selectedTicketGuidance.tone]
+              return (
+                <div style={{ display:'flex', gap:14, alignItems:'flex-start', padding:'16px 18px', marginBottom:18, border:`1px solid ${tones.border}`, borderRadius:12, background:tones.bg }}>
+                  <span aria-hidden="true" style={{ color:tones.accent, font:'800 18px/1 sans-serif', paddingTop:2 }}>
+                    {selectedTicketGuidance.requiresUserAction ? '!' : '→'}
+                  </span>
+                  <div>
+                    <div style={{ font:'700 11px sans-serif', color:tones.accent, textTransform:'uppercase', letterSpacing:'.08em', marginBottom:4 }}>
+                      {selectedTicketGuidance.eyebrow}
+                    </div>
+                    <div style={{ font:'700 15px sans-serif', color:'#0f172a', marginBottom:4 }}>
+                      {selectedTicketGuidance.title}
+                    </div>
+                    <div style={{ font:'400 13px/1.55 sans-serif', color:'#475569' }}>
+                      {selectedTicketGuidance.description}
+                    </div>
+                    {selectedTicketGuidance.requiresUserAction && (
+                      <button onClick={() => setDetailTab('messages')} style={{ marginTop:10, padding:0, border:0, background:'transparent', color:tones.accent, font:'700 13px sans-serif', cursor:'pointer' }}>
+                        Ir para a conversa →
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )
+            })()}
+
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '14px', marginBottom: '24px' }}>
               {(() => {
                 const renderPortalSlaTimer = (

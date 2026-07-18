@@ -471,9 +471,9 @@ function ProblemDashboard({ companyId }: { companyId: string }) {
 
   return (
     <div className="h-full flex flex-col">
-      <div className="flex items-start justify-between gap-4 shrink-0">
+      <div className="flex flex-col items-start justify-between gap-3 shrink-0 sm:flex-row">
         <PageHeader title="Gerenciamento de Problemas" subtitle="Análise de Causa Raiz e KEDB — ITIL v4" />
-        <button onClick={() => setShowNew(true)} className="mt-1 flex items-center gap-1.5 px-3.5 py-2 bg-teal-600 hover:bg-teal-700 text-white text-sm font-bold rounded-xl shadow-sm transition-all shrink-0">
+        <button onClick={() => setShowNew(true)} className="flex min-h-10 w-full items-center justify-center gap-1.5 rounded-xl bg-primary px-3.5 py-2 text-sm font-bold text-on-primary shadow-sm transition-all hover:brightness-95 sm:mt-1 sm:w-auto sm:shrink-0">
           <Plus className="w-4 h-4" /> Novo Problema
         </button>
       </div>
@@ -514,7 +514,7 @@ function ProblemDashboard({ companyId }: { companyId: string }) {
             {detail.description && <InfoBlock label="Descrição" value={detail.description} mono />}
             {detail.root_cause && <InfoBlock label="Causa Raiz (RCA)" value={detail.root_cause} mono />}
             {detail.workaround && <InfoBlock label="Contorno Temporário (Workaround)" value={detail.workaround} mono />}
-            <div className="grid grid-cols-2 gap-4 pt-3 border-t border-slate-100">
+            <div className="grid grid-cols-1 gap-4 border-t border-slate-100 pt-3 sm:grid-cols-2">
               <InfoBlock label="Atribuído a" value={detail.assigned_to_name ?? '—'} />
               <InfoBlock label="Grupo" value={detail.assigned_group_name ?? '—'} />
             </div>
@@ -527,7 +527,7 @@ function ProblemDashboard({ companyId }: { companyId: string }) {
           <div className="space-y-4">
             <FieldText label="Descrição Curta *" value={form.short} onChange={v => setForm(f => ({ ...f, short: v }))} placeholder="Resumo do problema recorrente…" />
             <FieldArea label="Descrição / Detalhes" value={form.description} onChange={v => setForm(f => ({ ...f, description: v }))} placeholder="Contexto, incidentes relacionados, sintomas…" />
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <FieldSelect label="Prioridade" value={form.priority} onChange={v => setForm(f => ({ ...f, priority: v }))} options={['P1 - Critical', 'P2 - High', 'P3 - Moderate', 'P4 - Low', 'P5 - Planning']} />
               <FieldSelect label="Categoria" value={form.category} onChange={v => setForm(f => ({ ...f, category: v }))} options={['Hardware', 'Software', 'Network', 'Database', 'Security', 'Inquiry', 'Other']} />
             </div>

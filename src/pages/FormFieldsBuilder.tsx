@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react'
-import { Plus, Save, Trash2 } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { AlertCircle, CheckCircle2, ChevronDown, ChevronUp, Plus, Save, Trash2 } from 'lucide-react'
 import { normalizeFormFields, parseFormFields } from '../lib/catalogFormFields'
+import { assessFormBuilderQuality } from '../lib/form-builder-quality'
 import type { Json, RequestFormField } from '../lib/database.types'
 
 interface FormFieldsBuilderProps {
@@ -33,11 +34,14 @@ export default function FormFieldsBuilder({
   addLabel = 'Adicionar Campo',
 }: FormFieldsBuilderProps) {
   const [fields, setFields] = useState<RequestFormField[]>(() => parseFormFields(value))
+  const [savedSnapshot, setSavedSnapshot] = useState(() => JSON.stringify(normalizeFormFields(parseFormFields(value))))
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
 
   useEffect(() => {
-    setFields(parseFormFields(value))
+    const nextFields = parseFormFields(value)
+    setFields(nextFields)
+    setSavedSnapshot(JSON.stringify(normalizeFormFields(nextFields)))
     setMessage(null)
   }, [entityKey])
 
@@ -58,6 +62,23 @@ export default function FormFieldsBuilder({
     setFields(current => current.map(field => field.id === id ? { ...field, ...patch } : field))
     setMessage(null)
   }
+
+  const moveField = (index: number, direction: -1 | 1) => {
+    const targetIndex = index + direction
+    if (targetIndex < 0 || targetIndex >= fields.length) return
+    setFields(current => {
+      const next = [...current]
+      ;[next[index], next[targetIndex]] = [next[targetIndex], next[index]]
+      return next
+    })
+    setMessage(null)
+  }
+
+  const quality = useMemo(() => assessFormBuilderQuality(fields, inheritedFields), [fields, inheritedFields])
+  const hasChanges = useMemo(
+    () => JSON.stringify(normalizeFormFields(fields)) !== savedSnapshot,
+    [fields, savedSnapshot],
+  )
 
   const save = async () => {
     const normalized = normalizeFormFields(fields)
@@ -82,6 +103,7 @@ export default function FormFieldsBuilder({
     try {
       await onSave(normalized)
       setFields(normalized)
+      setSavedSnapshot(JSON.stringify(normalized))
       setMessage('Campos salvos com sucesso.')
     } catch {
       setMessage('Não foi possível salvar os campos.')
@@ -106,6 +128,26 @@ export default function FormFieldsBuilder({
         </button>
       </div>
 
+      <div className={`mt-4 flex flex-col gap-3 rounded-xl border px-4 py-3 sm:flex-row sm:items-center sm:justify-between ${
+        quality.ready ? 'border-emerald-200 bg-emerald-50/70' : 'border-amber-200 bg-amber-50/70'
+      }`}>
+        <div className="flex items-start gap-2.5">
+          {quality.ready
+            ? <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
+            : <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />}
+          <div>
+            <p className="text-xs font-bold text-slate-800">{quality.ready ? 'Formulário pronto para uso' : 'Revise antes de salvar'}</p>
+            <p className="mt-0.5 text-xs text-slate-500">
+              {quality.ready ? `${fields.length + inheritedFields.length} campo(s) configurado(s).` : quality.issues.join(' ')}
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          {hasChanges && <span className="rounded-full bg-white px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-amber-700">Alterações não salvas</span>}
+          <span className="text-sm font-black text-slate-700">{quality.score}%</span>
+        </div>
+      </div>
+
       <div className="mt-4 space-y-3">
         {inheritedFields.length > 0 && (
           <div className="rounded-xl border border-indigo-200 bg-white p-3">
@@ -124,7 +166,7 @@ export default function FormFieldsBuilder({
 
         {fields.map((field, index) => (
           <div key={field.id} className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
-            <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1fr_220px_auto_auto] lg:items-end">
+            <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1fr_220px_auto_auto_auto] lg:items-end">
               <label className="block">
                 <span className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-slate-500">Label / Rótulo</span>
                 <input
@@ -162,6 +204,14 @@ export default function FormFieldsBuilder({
                 />
                 Obrigatório?
               </label>
+              <div className="flex h-10 overflow-hidden rounded-lg border border-slate-200 bg-white">
+                <button type="button" onClick={() => moveField(index, -1)} disabled={index === 0} title="Mover campo para cima" className="flex w-9 items-center justify-center text-slate-500 transition hover:bg-slate-50 hover:text-slate-800 disabled:opacity-30">
+                  <ChevronUp className="h-4 w-4" />
+                </button>
+                <button type="button" onClick={() => moveField(index, 1)} disabled={index === fields.length - 1} title="Mover campo para baixo" className="flex w-9 items-center justify-center border-l border-slate-200 text-slate-500 transition hover:bg-slate-50 hover:text-slate-800 disabled:opacity-30">
+                  <ChevronDown className="h-4 w-4" />
+                </button>
+              </div>
               <button
                 type="button"
                 onClick={() => setFields(current => current.filter(candidate => candidate.id !== field.id))}
@@ -201,7 +251,7 @@ export default function FormFieldsBuilder({
         <button
           type="button"
           onClick={save}
-          disabled={saving}
+          disabled={saving || !quality.ready || !hasChanges}
           className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-slate-800 disabled:cursor-wait disabled:opacity-60"
         >
           <Save className="h-3.5 w-3.5" /> {saving ? 'Salvando...' : 'Salvar campos'}

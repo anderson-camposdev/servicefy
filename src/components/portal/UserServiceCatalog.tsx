@@ -1,7 +1,10 @@
+import { useEffect, useMemo, useState } from 'react'
+import { ArrowRight, Search, X } from 'lucide-react'
 import CatalogIcon from '../../pages/CatalogIcon'
+import { matchesCatalogSearch } from '../../lib/catalog-discovery'
 import type {
   CatalogCategoryRow, CatalogServiceRow, CatalogServiceSymptomRow,
-  RequestCategoryRow, RequestSubcategoryRow, RequestItemRow, DepartmentRow
+  RequestCategoryRow, RequestSubcategoryRow, RequestItemRow, DepartmentRow,
 } from '../../lib/database.types'
 
 interface PortalConfig {
@@ -11,14 +14,6 @@ interface PortalConfig {
   browseCats: any[]
   incCats: any[]
   reqCats: any[]
-  portalButtons?: {
-    incident_label?: string
-    incident_desc?: string
-    incident_emoji?: string
-    request_label?: string
-    request_desc?: string
-    request_emoji?: string
-  }
 }
 
 interface UserServiceCatalogProps {
@@ -60,324 +55,346 @@ interface UserServiceCatalogProps {
 
 const OTHERS_SUBCAT_ID = '__others__'
 
-function hexToRgba(hex: string, alpha: number): string {
-  const clean = (hex.startsWith('#') ? hex.slice(1) : hex).padEnd(6, '0')
-  const r = parseInt(clean.slice(0,2), 16) || 16
-  const g = parseInt(clean.slice(2,4), 16) || 185
-  const b = parseInt(clean.slice(4,6), 16) || 129
-  return `rgba(${r},${g},${b},${alpha})`
+export function UserServiceCatalog(props: UserServiceCatalogProps) {
+  const [query, setQuery] = useState('')
+  useEffect(() => setQuery(''), [props.screen])
+
+  const content = useMemo(() => {
+    const {
+      screen, visibleIncCategories, visibleReqCategories, services, serviceSymptoms,
+      reqSubcategories, reqItems, dbSelIncCat, dbSelIncService, dbSelReqCat,
+      dbSelReqSubcat, selIncCat, selReqCat,
+    } = props
+
+    if (screen === 'inc-cats') {
+      return {
+        eyebrow: 'Incidente',
+        title: 'Onde está o problema?',
+        description: 'Escolha a área afetada para direcionarmos o atendimento à equipe certa.',
+        placeholder: 'Buscar área ou serviço',
+        cards: visibleIncCategories
+          .filter(category => matchesCatalogSearch(
+            query,
+            category.name,
+            category.description,
+            ...services.filter(service => service.category_id === category.id).map(service => service.name),
+          ))
+          .map(category => ({
+            id: category.id,
+            title: category.name,
+            description: category.description || 'Serviços e sistemas desta área',
+            meta: plural(services.filter(service => service.category_id === category.id).length, 'serviço', 'serviços'),
+            icon: category.icon,
+            onClick: () => props.onSelectIncCat(category),
+          })),
+        legacy: props.categories.length === 0 && !props.selDept?.id
+          ? props.config.incCats
+              .filter(category => matchesCatalogSearch(query, category.name, ...category.symptoms))
+              .map(category => ({
+                id: category.id,
+                title: category.name,
+                description: 'Problemas e indisponibilidades desta área',
+                meta: plural(category.symptoms.length, 'sintoma', 'sintomas'),
+                emoji: category.emoji,
+                onClick: () => props.onSelectLegacyIncCat(category),
+              }))
+          : [],
+      }
+    }
+
+    if (screen === 'inc-services' && dbSelIncCat) {
+      const cards = services
+        .filter(service => service.category_id === dbSelIncCat.id)
+        .filter(service => matchesCatalogSearch(query, service.name, service.description))
+        .map(service => ({
+          id: service.id,
+          title: service.name,
+          description: service.description || `Serviço de ${dbSelIncCat.name}`,
+          meta: plural(serviceSymptoms.filter(item => item.service_id === service.id).length, 'situação', 'situações'),
+          icon: service.icon,
+          onClick: () => props.onSelectIncService(service),
+        }))
+      return {
+        eyebrow: dbSelIncCat.name,
+        title: 'Qual serviço foi afetado?',
+        description: 'Selecione o serviço para ver as situações de atendimento disponíveis.',
+        placeholder: 'Buscar serviço',
+        cards,
+        legacy: [],
+      }
+    }
+
+    if (screen === 'inc-symptoms' && (dbSelIncService || selIncCat)) {
+      const cards = dbSelIncService
+        ? serviceSymptoms
+            .filter(item => item.service_id === dbSelIncService.id)
+            .filter(item => matchesCatalogSearch(query, item.symptom?.name, dbSelIncService.name))
+            .map(item => ({
+              id: item.id,
+              title: item.symptom?.name || 'Situação não identificada',
+              description: item.group?.name ? `Atendimento por ${item.group.name}` : 'A equipe responsável será definida automaticamente',
+              meta: item.sla_hours ? `Prazo estimado: ${item.sla_hours}h` : 'Prazo conforme o SLA',
+              icon: item.symptom?.icon,
+              onClick: () => props.onSelectIncSymptom(item),
+            }))
+        : []
+      const legacy = !dbSelIncService
+        ? (selIncCat?.symptoms || [])
+            .filter((symptom: string) => matchesCatalogSearch(query, symptom))
+            .map((symptom: string) => ({
+              id: symptom,
+              title: symptom,
+              description: 'Descreva os detalhes na próxima etapa',
+              meta: 'Incidente',
+              onClick: () => props.onSelectLegacyIncSymptom(symptom),
+            }))
+        : []
+      return {
+        eyebrow: dbSelIncService?.name || selIncCat?.name || 'Incidente',
+        title: 'O que está acontecendo?',
+        description: 'Escolha a opção que mais se aproxima do que você está enfrentando.',
+        placeholder: 'Buscar situação',
+        cards,
+        legacy,
+      }
+    }
+
+    if (screen === 'req-cats') {
+      return {
+        eyebrow: 'Solicitação',
+        title: 'O que você precisa?',
+        description: 'Navegue pelas categorias ou pesquise pelo serviço que deseja solicitar.',
+        placeholder: 'Buscar categoria, acesso ou equipamento',
+        cards: visibleReqCategories
+          .filter(category => matchesCatalogSearch(
+            query,
+            category.name,
+            category.description,
+            ...reqItems.filter(item => belongsToRequestCategory(item, category.id, reqSubcategories)).map(item => item.name),
+          ))
+          .map(category => ({
+            id: category.id,
+            title: category.name,
+            description: category.description || 'Solicitações disponíveis nesta categoria',
+            meta: plural(reqItems.filter(item => belongsToRequestCategory(item, category.id, reqSubcategories)).length, 'item', 'itens'),
+            icon: category.icon,
+            onClick: () => props.onSelectReqCat(category),
+          })),
+        legacy: props.reqCategories.length === 0 && !props.selDept?.id
+          ? props.config.reqCats
+              .filter(category => matchesCatalogSearch(query, category.name, ...category.items))
+              .map(category => ({
+                id: category.id,
+                title: category.name,
+                description: 'Serviços disponíveis nesta categoria',
+                meta: plural(category.items.length, 'item', 'itens'),
+                emoji: category.emoji,
+                onClick: () => props.onSelectLegacyReqCat(category),
+              }))
+          : [],
+      }
+    }
+
+    if (screen === 'req-subcats' && dbSelReqCat) {
+      const cards = reqSubcategories
+        .filter(subcategory => subcategory.category_id === dbSelReqCat.id && subcategory.active)
+        .filter(subcategory => matchesCatalogSearch(query, subcategory.name, subcategory.description))
+        .map(subcategory => ({
+          id: subcategory.id,
+          title: subcategory.name,
+          description: subcategory.description || `Serviços de ${dbSelReqCat.name}`,
+          meta: plural(reqItems.filter(item => item.request_subcategory_id === subcategory.id).length, 'item', 'itens'),
+          icon: subcategory.icon,
+          onClick: () => props.onSelectReqSubcat(subcategory),
+        }))
+      const orphanCount = reqItems.filter(item => !item.request_subcategory_id && item.request_category_id === dbSelReqCat.id).length
+      if (orphanCount > 0 && matchesCatalogSearch(query, 'Outros', 'Demais solicitações')) {
+        cards.push({
+          id: OTHERS_SUBCAT_ID,
+          title: 'Outros',
+          description: 'Demais solicitações desta categoria',
+          meta: plural(orphanCount, 'item', 'itens'),
+          icon: 'FolderOpen',
+          onClick: props.onSelectLegacyReqSubcatOthers,
+        })
+      }
+      return {
+        eyebrow: dbSelReqCat.name,
+        title: 'Escolha uma subcategoria',
+        description: 'Isso ajuda a encontrar o item certo com menos etapas.',
+        placeholder: 'Buscar subcategoria',
+        cards,
+        legacy: [],
+      }
+    }
+
+    const requestItems = dbSelReqCat
+      ? dbSelReqSubcat && dbSelReqSubcat.id !== OTHERS_SUBCAT_ID
+        ? reqItems.filter(item => item.request_subcategory_id === dbSelReqSubcat.id)
+        : dbSelReqSubcat?.id === OTHERS_SUBCAT_ID
+          ? reqItems.filter(item => !item.request_subcategory_id && item.request_category_id === dbSelReqCat.id)
+          : reqItems.filter(item => belongsToRequestCategory(item, dbSelReqCat.id, reqSubcategories))
+      : []
+    const cards = requestItems
+      .filter(item => matchesCatalogSearch(query, item.name, item.description, item.group?.name))
+      .map(item => ({
+        id: item.id,
+        title: item.name,
+        description: item.description || 'Preencha os dados necessários na próxima etapa',
+        meta: item.group?.name ? `Atendimento por ${item.group.name}` : 'Solicitação de serviço',
+        icon: item.icon,
+        onClick: () => props.onSelectReqItem(item),
+      }))
+    const legacy = !dbSelReqCat
+      ? (selReqCat?.items || [])
+          .filter((item: string) => matchesCatalogSearch(query, item))
+          .map((item: string) => ({
+            id: item,
+            title: item,
+            description: 'Preencha os dados necessários na próxima etapa',
+            meta: 'Solicitação de serviço',
+            onClick: () => props.onSelectLegacyReqItem(item),
+          }))
+      : []
+    return {
+      eyebrow: dbSelReqSubcat?.name || dbSelReqCat?.name || selReqCat?.name || 'Solicitação',
+      title: 'Selecione o item desejado',
+      description: 'Confira a descrição antes de avançar para o formulário.',
+      placeholder: 'Buscar item do catálogo',
+      cards,
+      legacy,
+    }
+  }, [props, query])
+
+  if (props.catalogLoading) {
+    return <CatalogLoading />
+  }
+
+  const items = [...content.cards, ...content.legacy]
+
+  return (
+    <section className="mx-auto w-full max-w-5xl" aria-labelledby="catalog-step-title">
+      <div className="mb-6 max-w-2xl">
+        <span className="mb-2 block text-xs font-bold uppercase tracking-[0.16em] text-primary">{content.eyebrow}</span>
+        <h2 id="catalog-step-title" className="text-2xl font-semibold tracking-tight text-text-main sm:text-3xl">{content.title}</h2>
+        <p className="mt-2 text-sm leading-6 text-text-muted">{content.description}</p>
+      </div>
+
+      <div className="relative mb-5 max-w-xl">
+        <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted" />
+        <input
+          type="search"
+          value={query}
+          onChange={event => setQuery(event.target.value)}
+          placeholder={content.placeholder}
+          aria-label={content.placeholder}
+          className="h-11 w-full rounded-xl border border-slate-200 bg-surface pl-10 pr-10 text-sm text-text-main shadow-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15"
+        />
+        {query && (
+          <button
+            type="button"
+            onClick={() => setQuery('')}
+            aria-label="Limpar busca"
+            className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded-md p-1 text-text-muted transition hover:bg-surface-subtle hover:text-text-main"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        )}
+      </div>
+
+      {items.length > 0 ? (
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {items.map(item => (
+            <CatalogChoice
+              key={item.id}
+              {...item}
+              iconSize={props.catalogIconSize}
+              titleSize={props.catalogFontSize}
+              iconBackground={props.customIconBg}
+              cardBackground={props.customPillBg}
+              cardColor={props.customPillColor}
+            />
+          ))}
+        </div>
+      ) : (
+        <div className="rounded-2xl border border-dashed border-slate-200 bg-surface-subtle px-6 py-12 text-center">
+          <Search className="mx-auto h-6 w-6 text-text-muted" />
+          <h3 className="mt-3 text-sm font-semibold text-text-main">
+            {query ? `Nenhum resultado para “${query}”` : 'Nenhum item disponível'}
+          </h3>
+          <p className="mx-auto mt-1 max-w-md text-sm text-text-muted">
+            {query ? 'Tente um termo mais curto ou busque pelo nome do serviço.' : `O catálogo${props.selDept ? ` de ${props.selDept.name}` : ''} ainda não possui itens ativos nesta etapa.`}
+          </p>
+          {query && (
+            <button type="button" onClick={() => setQuery('')} className="mt-4 text-sm font-semibold text-primary hover:underline">
+              Limpar busca
+            </button>
+          )}
+        </div>
+      )}
+    </section>
+  )
 }
 
-export function UserServiceCatalog({
-  screen,
-  catalogLoading,
-  visibleIncCategories,
-  visibleReqCategories,
-  services,
-  serviceSymptoms,
-  reqSubcategories,
-  reqItems,
-  selIncCat,
-  selReqCat,
-  dbSelIncCat,
-  dbSelIncService,
-  dbSelReqCat,
-  dbSelReqSubcat,
-  catalogIconSize,
-  catalogFontSize,
-  customIconBg,
-  customPillBg,
-  customPillColor,
-  selDept,
-  config,
-  categories,
-  reqCategories,
-  onSelectIncCat,
-  onSelectLegacyIncCat,
-  onSelectIncService,
-  onSelectIncSymptom,
-  onSelectLegacyIncSymptom,
-  onSelectReqCat,
-  onSelectLegacyReqCat,
-  onSelectReqSubcat,
-  onSelectLegacyReqSubcatOthers,
-  onSelectReqItem,
-  onSelectLegacyReqItem,
-}: UserServiceCatalogProps) {
+interface CatalogChoiceProps {
+  title: string
+  description: string
+  meta: string
+  icon?: string | null
+  emoji?: string
+  onClick: () => void
+  iconSize: number
+  titleSize: string
+  iconBackground?: string
+  cardBackground?: string
+  cardColor?: string
+}
+
+function CatalogChoice({
+  title, description, meta, icon, emoji, onClick, iconSize, titleSize,
+  iconBackground, cardBackground, cardColor,
+}: CatalogChoiceProps) {
   return (
-    <>
-      {/* INC: Categorias */}
-      {screen === 'inc-cats' && (
-        <div>
-          <h2 style={{ font:'700 20px sans-serif', color:'#0f172a', marginBottom:6 }}>Qual área está com problema?</h2>
-          <p style={{ font:'400 14px sans-serif', color:'#94a3b8', marginBottom:20 }}>Selecione a categoria mais próxima do que está acontecendo.</p>
-
-          {catalogLoading ? (
-            <div style={{ padding:20, color:'#94a3b8', font:'500 14px sans-serif', textAlign:'center' }}>Carregando categorias...</div>
-          ) : (
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
-              {visibleIncCategories.length > 0 ? (
-                visibleIncCategories.map(c => {
-                  const catServices = services.filter(service => service.category_id === c.id)
-                  return (
-                    <button key={c.id} onClick={() => onSelectIncCat(c)}
-                      style={{
-                        display:'flex',
-                        alignItems:'center',
-                        gap:14,
-                        padding:18,
-                        background: customPillBg || '#fff',
-                        border: customPillBg ? `1.5px solid ${customPillBg}` : '1.5px solid #e2e8f0',
-                        borderRadius:14,
-                        textAlign:'left',
-                        boxShadow:'0 1px 2px rgba(15,23,42,.04)',
-                        cursor:'pointer',
-                        transition:'transform .15s,box-shadow .15s'
-                      }}>
-                      <CatalogIcon icon={c.icon} name={c.name} size={catalogIconSize} bg={customIconBg} />
-                      <div style={{ minWidth:0 }}>
-                        <div style={{ font:`700 ${catalogFontSize} sans-serif`, color: customPillColor || '#0f172a' }}>{c.name}</div>
-                        <div style={{ font:'400 12px sans-serif', color: customPillColor ? hexToRgba(customPillColor, 0.7) : '#94a3b8', marginTop:2 }}>{catServices.length} servi&ccedil;o{catServices.length === 1 ? '' : 's'}</div>
-                      </div>
-                    </button>
-                  )
-                })
-              ) : !selDept?.id && categories.length === 0 ? (
-                config.incCats.map(c => (
-                  <button key={c.id} onClick={() => onSelectLegacyIncCat(c)}
-                    style={{ display:'flex', alignItems:'center', gap:14, padding:18, background:'#fff', border:'1.5px solid #e2e8f0', borderRadius:14, textAlign:'left', boxShadow:'0 1px 2px rgba(15,23,42,.04)', cursor:'pointer', transition:'transform .15s,box-shadow .15s' }}>
-                    <div style={{ width:52, height:52, borderRadius:14, background:c.bg, display:'flex', alignItems:'center', justifyContent:'center', fontSize:26, flexShrink:0 }}>{c.emoji}</div>
-                    <div style={{ minWidth:0 }}>
-                      <div style={{ font:'700 15px sans-serif', color:'#0f172a' }}>{c.name}</div>
-                      <div style={{ font:'400 12px sans-serif', color:'#94a3b8', marginTop:2 }}>{c.symptoms.length} sintomas</div>
-                    </div>
-                  </button>
-                ))
-              ) : (
-                <div style={{ gridColumn:'1 / -1', padding:20, color:'#94a3b8', font:'500 14px sans-serif', textAlign:'center' }}>
-                  Nenhuma categoria de incidente cadastrada{selDept ? ` em ${selDept.name}` : ''}.
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* INC: Servicos */}
-      {screen === 'inc-services' && dbSelIncCat && (
-        <div>
-          <h2 style={{ font:'700 20px sans-serif', color:'#0f172a', marginBottom:6 }}>Qual servi&ccedil;o foi afetado?</h2>
-          <p style={{ font:'400 14px sans-serif', color:'#94a3b8', marginBottom:20 }}>Selecione o servi&ccedil;o para visualizar os sintomas dispon&iacute;veis.</p>
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
-            {(() => {
-              const catServices = services.filter(service => service.category_id === dbSelIncCat.id)
-              if (catServices.length === 0) {
-                return <div style={{ gridColumn:'1 / -1', padding:20, color:'#94a3b8', font:'400 14px sans-serif', textAlign:'center' }}>Nenhum servi&ccedil;o cadastrado nesta categoria.</div>
-              }
-              return catServices.map(service => {
-                const symptomCount = serviceSymptoms.filter(item => item.service_id === service.id).length
-                return (
-                  <button key={service.id} onClick={() => onSelectIncService(service)}
-                    style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:12, padding:'16px 18px', background:'#fff', border:'1.5px solid #e2e8f0', borderRadius:13, textAlign:'left', width:'100%', cursor:'pointer', transition:'transform .15s,box-shadow .15s' }}>
-                    <div style={{ display:'flex', alignItems:'center', gap:12, minWidth:0 }}>
-                      <CatalogIcon icon={service.icon} name={service.name} size={36} />
-                      <div style={{ minWidth:0 }}>
-                        <div style={{ font:'700 14.5px sans-serif', color:'#0f172a' }}>{service.name}</div>
-                        <div style={{ font:'400 12px sans-serif', color:'#94a3b8', marginTop:2 }}>{symptomCount} sintoma{symptomCount === 1 ? '' : 's'}</div>
-                      </div>
-                    </div>
-                    <span style={{ fontSize:15, color:'#94a3b8', flexShrink:0 }}>&rarr;</span>
-                  </button>
-                )
-              })
-            })()}
-          </div>
-        </div>
-      )}
-
-      {/* INC: Sintomas */}
-      {screen === 'inc-symptoms' && (dbSelIncService || selIncCat) && (
-        <div>
-          <h2 style={{ font:'700 20px sans-serif', color:'#0f172a', marginBottom:6 }}>O que está acontecendo?</h2>
-          <p style={{ font:'400 14px sans-serif', color:'#94a3b8', marginBottom:20 }}>Selecione o sintoma que melhor descreve o problema.</p>
-          <div style={{ display:'flex', flexDirection:'column', gap:9 }}>
-            {dbSelIncService ? (
-              (() => {
-                const catSymptoms = serviceSymptoms.filter(ss => ss.service_id === dbSelIncService.id)
-                if (catSymptoms.length === 0) {
-                  return <div style={{ padding:20, color:'#94a3b8', font:'400 14px sans-serif', textAlign:'center' }}>Nenhum sintoma cadastrado neste servi&ccedil;o.</div>
-                }
-                return catSymptoms.map(ss => {
-                  const svc = services.find(s => s.id === ss.service_id)
-                  const label = ss.symptom?.name ? `${svc?.name || ''} — ${ss.symptom.name}` : (svc?.name || '')
-                  const symptomLabel = ss.symptom?.name || label
-                  return (
-                    <button key={ss.id} onClick={() => onSelectIncSymptom(ss)}
-                      style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:12, padding:'15px 18px', background:'#fff', border:'1.5px solid #e2e8f0', borderRadius:13, textAlign:'left', width:'100%', cursor:'pointer', transition:'transform .15s,box-shadow .15s' }}>
-                      <div style={{ display:'flex', alignItems:'center', gap:11 }}>
-                        <CatalogIcon icon={ss.symptom?.icon} name={symptomLabel} size={28} />
-                        <span style={{ font:'600 14.5px sans-serif', color:'#0f172a', marginLeft:8 }}>{symptomLabel}</span>
-                      </div>
-                      <span style={{ fontSize:15, color:'#94a3b8', flexShrink:0 }}>→</span>
-                    </button>
-                  )
-                })
-              })()
-            ) : (
-              selIncCat?.symptoms.map((s: string) => (
-                <button key={s} onClick={() => onSelectLegacyIncSymptom(s)}
-                  style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:12, padding:'15px 18px', background:'#fff', border:'1.5px solid #e2e8f0', borderRadius:13, textAlign:'left', width:'100%', cursor:'pointer', transition:'transform .15s,box-shadow .15s' }}>
-                  <div style={{ display:'flex', alignItems:'center', gap:11 }}>
-                    <div style={{ width:8, height:8, borderRadius:'50%', background:'#e2e8f0', flexShrink:0 }} />
-                    <span style={{ font:'600 14.5px sans-serif', color:'#0f172a' }}>{s}</span>
-                  </div>
-                  <span style={{ fontSize:15, color:'#94a3b8', flexShrink:0 }}>→</span>
-                </button>
-              ))
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* REQ: Categorias */}
-      {screen === 'req-cats' && (
-        <div>
-          <h2 style={{ font:'700 20px sans-serif', color:'#0f172a', marginBottom:6 }}>O que você quer solicitar?</h2>
-          <p style={{ font:'400 14px sans-serif', color:'#94a3b8', marginBottom:20 }}>Selecione a categoria da solicitação.</p>
-
-          {catalogLoading ? (
-            <div style={{ padding:20, color:'#94a3b8', font:'500 14px sans-serif', textAlign:'center' }}>Carregando categorias...</div>
-          ) : (
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
-              {visibleReqCategories.length > 0 ? (
-                visibleReqCategories.map(c => {
-                  const catItems = reqItems.filter(it => {
-                    if (it.request_category_id) return it.request_category_id === c.id
-                    const sub = reqSubcategories.find(s => s.id === it.request_subcategory_id)
-                    return sub ? sub.category_id === c.id : false
-                  })
-                  return (
-                    <button key={c.id} onClick={() => onSelectReqCat(c)}
-                      style={{
-                        display:'flex',
-                        alignItems:'center',
-                        gap:14,
-                        padding:18,
-                        background: customPillBg || '#fff',
-                        border: customPillBg ? `1.5px solid ${customPillBg}` : '1.5px solid #e2e8f0',
-                        borderRadius:14,
-                        textAlign:'left',
-                        boxShadow:'0 1px 2px rgba(15,23,42,.04)',
-                        cursor:'pointer',
-                        transition:'transform .15s,box-shadow .15s'
-                      }}>
-                      <CatalogIcon icon={c.icon} name={c.name} size={catalogIconSize} bg={customIconBg} />
-                      <div style={{ minWidth:0 }}>
-                        <div style={{ font:`700 ${catalogFontSize} sans-serif`, color: customPillColor || '#0f172a' }}>{c.name}</div>
-                        <div style={{ font:'400 12px sans-serif', color: customPillColor ? hexToRgba(customPillColor, 0.7) : '#94a3b8', marginTop:2 }}>{catItems.length} itens</div>
-                      </div>
-                    </button>
-                  )
-                })
-              ) : !selDept?.id && reqCategories.length === 0 ? (
-                config.reqCats.map(c => (
-                  <button key={c.id} onClick={() => onSelectLegacyReqCat(c)}
-                    style={{ display:'flex', alignItems:'center', gap:14, padding:18, background:'#fff', border:'1.5px solid #e2e8f0', borderRadius:14, textAlign:'left', boxShadow:'0 1px 2px rgba(15,23,42,.04)', cursor:'pointer', transition:'transform .15s,box-shadow .15s' }}>
-                    <div style={{ width:52, height:52, borderRadius:14, background:c.bg, display:'flex', alignItems:'center', justifyContent:'center', fontSize:26, flexShrink:0 }}>{c.emoji}</div>
-                    <div style={{ minWidth:0 }}>
-                      <div style={{ font:'700 15px sans-serif', color:'#0f172a' }}>{c.name}</div>
-                      <div style={{ font:'400 12px sans-serif', color:'#94a3b8', marginTop:2 }}>{c.items.length} itens</div>
-                    </div>
-                  </button>
-                ))
-              ) : (
-                <div style={{ gridColumn:'1 / -1', padding:20, color:'#94a3b8', font:'500 14px sans-serif', textAlign:'center' }}>
-                  Nenhuma categoria de requisição cadastrada{selDept ? ` em ${selDept.name}` : ''}.
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* REQ: Subcategorias */}
-      {screen === 'req-subcats' && dbSelReqCat && (
-        <div>
-          <h2 style={{ font:'700 20px sans-serif', color:'#0f172a', marginBottom:6 }}>{dbSelReqCat.name}</h2>
-          <p style={{ font:'400 14px sans-serif', color:'#94a3b8', marginBottom:20 }}>Selecione a subcategoria.</p>
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
-            {reqSubcategories.filter(s => s.category_id === dbSelReqCat.id && s.active).map(s => {
-              const count = reqItems.filter(it => it.request_subcategory_id === s.id).length
-              return (
-                <button key={s.id} onClick={() => onSelectReqSubcat(s)}
-                  style={{ display:'flex', alignItems:'center', gap:14, padding:18, background: customPillBg || '#fff', border: customPillBg ? `1.5px solid ${customPillBg}` : '1.5px solid #e2e8f0', borderRadius:14, textAlign:'left', boxShadow:'0 1px 2px rgba(15,23,42,.04)', cursor:'pointer', transition:'transform .15s,box-shadow .15s' }}>
-                  <CatalogIcon icon={s.icon} name={s.name} size={catalogIconSize} bg={customIconBg} />
-                  <div style={{ minWidth:0 }}>
-                    <div style={{ font:`700 ${catalogFontSize} sans-serif`, color: customPillColor || '#0f172a' }}>{s.name}</div>
-                    <div style={{ font:'400 12px sans-serif', color: customPillColor ? hexToRgba(customPillColor, 0.7) : '#94a3b8', marginTop:2 }}>{count} iten{count === 1 ? '' : 's'}</div>
-                  </div>
-                </button>
-              )
-            })}
-            {reqItems.some(it => !it.request_subcategory_id && it.request_category_id === dbSelReqCat.id) && (
-              <button onClick={onSelectLegacyReqSubcatOthers}
-                style={{ display:'flex', alignItems:'center', gap:14, padding:18, background: customPillBg || '#fff', border: customPillBg ? `1.5px solid ${customPillBg}` : '1.5px solid #e2e8f0', borderRadius:14, textAlign:'left', boxShadow:'0 1px 2px rgba(15,23,42,.04)', cursor:'pointer', transition:'transform .15s,box-shadow .15s' }}>
-                <CatalogIcon icon="📂" name="Outros" size={catalogIconSize} bg={customIconBg} />
-                <div style={{ minWidth:0 }}>
-                  <div style={{ font:`700 ${catalogFontSize} sans-serif`, color: customPillColor || '#0f172a' }}>Outros</div>
-                  <div style={{ font:'400 12px sans-serif', color: customPillColor ? hexToRgba(customPillColor, 0.7) : '#94a3b8', marginTop:2 }}>Demais solicitações</div>
-                </div>
-              </button>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* REQ: Itens */}
-      {screen === 'req-items' && (dbSelReqCat || selReqCat) && (
-        <div>
-          <h2 style={{ font:'700 20px sans-serif', color:'#0f172a', marginBottom:6 }}>{dbSelReqSubcat && dbSelReqSubcat.id !== OTHERS_SUBCAT_ID ? dbSelReqSubcat.name : dbSelReqCat ? dbSelReqCat.name : selReqCat?.name}</h2>
-          <p style={{ font:'400 14px sans-serif', color:'#94a3b8', marginBottom:20 }}>Selecione o item desejado.</p>
-          <div style={{ display:'flex', flexDirection:'column', gap:9 }}>
-            {dbSelReqCat ? (
-              (() => {
-                const catItems = dbSelReqSubcat && dbSelReqSubcat.id !== OTHERS_SUBCAT_ID
-                  ? reqItems.filter(it => it.request_subcategory_id === dbSelReqSubcat.id)
-                  : dbSelReqSubcat?.id === OTHERS_SUBCAT_ID
-                    ? reqItems.filter(it => !it.request_subcategory_id && it.request_category_id === dbSelReqCat.id)
-                    : reqItems.filter(it => {
-                        if (it.request_category_id) return it.request_category_id === dbSelReqCat.id
-                        const sub = reqSubcategories.find(s => s.id === it.request_subcategory_id)
-                        return sub ? sub.category_id === dbSelReqCat.id : false
-                      })
-
-                if (catItems.length === 0) {
-                  return <div style={{ padding:20, color:'#94a3b8', font:'400 14px sans-serif', textAlign:'center' }}>Nenhum item disponível nesta categoria.</div>
-                }
-
-                return catItems.map(item => (
-                  <button key={item.id} onClick={() => onSelectReqItem(item)}
-                    style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:12, padding:'15px 18px', background:'#fff', border:'1.5px solid #e2e8f0', borderRadius:13, textAlign:'left', width:'100%', cursor:'pointer', transition:'transform .15s,box-shadow .15s' }}>
-                    <div style={{ display:'flex', alignItems:'center', gap:11 }}>
-                      <CatalogIcon icon={item.icon} name={item.name} size={28} />
-                      <span style={{ font:'600 14.5px sans-serif', color:'#0f172a', marginLeft:8 }}>{item.name}</span>
-                    </div>
-                    <span style={{ fontSize:15, color:'#94a3b8', flexShrink:0 }}>→</span>
-                  </button>
-                ))
-              })()
-            ) : (
-              selReqCat?.items.map((item: string) => (
-                <button key={item} onClick={() => onSelectLegacyReqItem(item)}
-                  style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:12, padding:'15px 18px', background:'#fff', border:'1.5px solid #e2e8f0', borderRadius:13, textAlign:'left', width:'100%', cursor:'pointer', transition:'transform .15s,box-shadow .15s' }}>
-                  <span style={{ font:'600 14.5px sans-serif', color:'#0f172a' }}>{item}</span>
-                  <span style={{ fontSize:15, color:'#94a3b8', flexShrink:0 }}>→</span>
-                </button>
-              ))
-            )}
-          </div>
-        </div>
-      )}
-    </>
+    <button
+      type="button"
+      onClick={onClick}
+      className="group flex min-h-36 w-full flex-col rounded-2xl border border-slate-200 bg-surface p-5 text-left shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-primary/35 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+      style={{ backgroundColor: cardBackground || undefined, color: cardColor || undefined }}
+    >
+      <div className="flex w-full items-start justify-between gap-4">
+        {emoji ? (
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-surface-subtle text-xl" aria-hidden="true">{emoji}</span>
+        ) : (
+          <CatalogIcon icon={icon} name={title} size={Math.min(iconSize, 44)} bg={iconBackground} />
+        )}
+        <ArrowRight className="mt-1 h-4 w-4 shrink-0 text-text-muted transition group-hover:translate-x-0.5 group-hover:text-primary" />
+      </div>
+      <div className="mt-4 font-semibold leading-snug text-text-main" style={{ fontSize: titleSize, color: cardColor || undefined }}>{title}</div>
+      <p className="mt-1 line-clamp-2 text-sm leading-5 text-text-muted" style={{ color: cardColor || undefined }}>{description}</p>
+      <div className="mt-auto pt-4 text-xs font-medium text-text-muted" style={{ color: cardColor || undefined }}>{meta}</div>
+    </button>
   )
+}
+
+function CatalogLoading() {
+  return (
+    <div className="mx-auto w-full max-w-5xl animate-pulse">
+      <div className="h-3 w-20 rounded bg-surface-subtle" />
+      <div className="mt-3 h-8 w-72 max-w-full rounded bg-surface-subtle" />
+      <div className="mt-3 h-4 w-96 max-w-full rounded bg-surface-subtle" />
+      <div className="mt-7 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        {Array.from({ length: 6 }, (_, index) => <div key={index} className="h-36 rounded-2xl border border-slate-200 bg-surface" />)}
+      </div>
+    </div>
+  )
+}
+
+function plural(count: number, singular: string, pluralForm: string): string {
+  return `${count} ${count === 1 ? singular : pluralForm}`
+}
+
+function belongsToRequestCategory(item: RequestItemRow, categoryId: string, subcategories: RequestSubcategoryRow[]): boolean {
+  if (item.request_category_id) return item.request_category_id === categoryId
+  const subcategory = subcategories.find(candidate => candidate.id === item.request_subcategory_id)
+  return subcategory?.category_id === categoryId
 }
