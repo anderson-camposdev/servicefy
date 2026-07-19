@@ -41,9 +41,11 @@ vi.mock('../../lib/supabase', () => ({
 const {
   mockGetAuthProfile,
   mockAuthSignOut,
+  mockValidateStoredSession,
 } = vi.hoisted(() => ({
   mockGetAuthProfile: vi.fn(),
   mockAuthSignOut: vi.fn(),
+  mockValidateStoredSession: vi.fn(),
 }))
 
 vi.mock('../authService', () => ({
@@ -51,6 +53,7 @@ vi.mock('../authService', () => ({
   isProviderUser: vi.fn().mockReturnValue(false),
   signInWithPassword: vi.fn(),
   signOut: mockAuthSignOut,
+  validateStoredSession: mockValidateStoredSession,
 }))
 
 // A helper component to read the auth state and trigger tests
@@ -93,6 +96,7 @@ describe('AuthContext — Reactive Session Revocation (Realtime)', () => {
     mockOnAuthStateChange.mockReturnValue({
       data: { subscription: { unsubscribe: vi.fn() } },
     })
+    mockValidateStoredSession.mockImplementation(async session => session)
 
     // Setup profile mock response
     mockGetAuthProfile.mockResolvedValue({
@@ -138,6 +142,9 @@ describe('AuthContext — Reactive Session Revocation (Realtime)', () => {
     })
 
     expect(capturedAuth.status).toBe('authenticated')
+    expect(mockValidateStoredSession).toHaveBeenCalledWith(expect.objectContaining({
+      access_token: 'token-abc',
+    }))
     expect(mockChannel).toHaveBeenCalledWith('profile-status-profile-user-123')
     expect(mockOn).toHaveBeenCalledWith(
       'postgres_changes',
@@ -150,6 +157,29 @@ describe('AuthContext — Reactive Session Revocation (Realtime)', () => {
       expect.any(Function)
     )
     expect(realtimeCallback).toBeTruthy()
+  })
+
+  it('não carrega perfil quando o servidor rejeita a sessão persistida', async () => {
+    mockValidateStoredSession.mockResolvedValue(null)
+
+    const root = createRoot(container!)
+    let capturedAuth: any = null
+
+    await act(async () => {
+      root.render(
+        <AuthProvider>
+          <AuthConsumer onStateReady={(auth) => { capturedAuth = auth }} />
+        </AuthProvider>
+      )
+    })
+
+    await act(async () => {
+      await new Promise(resolve => setTimeout(resolve, 0))
+    })
+
+    expect(capturedAuth.status).toBe('unauthenticated')
+    expect(capturedAuth.session).toBeNull()
+    expect(mockGetAuthProfile).not.toHaveBeenCalled()
   })
 
   it('deve invocar o logout e alertar o usuario quando o status for alterado para active=false em tempo real', async () => {

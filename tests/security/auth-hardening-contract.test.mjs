@@ -22,6 +22,12 @@ test('frontend não autentica profile desativado', () => {
   assert.match(authService, /\.eq\('company\.active',\s*true\)/)
 })
 
+test('sessão persistida é validada no servidor antes de resolver o perfil', () => {
+  assert.match(authService, /supabase\.auth\.getUser\(session\.access_token\)/)
+  assert.match(authService, /data\.user\.id !== session\.user\.id/)
+  assert.match(authService, /signOut\(\{\s*scope:\s*'local'\s*\}\)/)
+})
+
 test('container publica SPA com headers de segurança e sem CORS global', () => {
   assert.match(dockerfile, /FROM nginx:.*alpine/i)
   assert.match(dockerfile, /COPY nginx\.conf/)

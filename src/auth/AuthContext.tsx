@@ -18,6 +18,7 @@ import {
   signInWithPassword,
   signInWithOAuth,
   signOut as authSignOut,
+  validateStoredSession,
 } from './authService'
 import type { SsoProvider } from '../lib/sso'
 
@@ -84,14 +85,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let active = true
+    let authEventReceived = false
 
-    supabase.auth.getSession().then(({ data }) => {
-      if (!active) return
-      setSession(data.session)
-      void loadProfile(data.session)
-    })
+    void supabase.auth.getSession()
+      .then(({ data }) => validateStoredSession(data.session))
+      .then(validatedSession => {
+        if (!active || authEventReceived) return
+        setSession(validatedSession)
+        void loadProfile(validatedSession)
+      })
+      .catch(() => {
+        if (!active || authEventReceived) return
+        setSession(null)
+        void loadProfile(null)
+      })
 
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, newSession) => {
+    const { data: sub } = supabase.auth.onAuthStateChange((event, newSession) => {
+      authEventReceived = true
+
+      if (event === 'INITIAL_SESSION') {
+        void validateStoredSession(newSession).then(validatedSession => {
+          if (!active) return
+          setSession(validatedSession)
+          void loadProfile(validatedSession)
+        })
+        return
+      }
+
       setSession(newSession)
       void loadProfile(newSession)
     })

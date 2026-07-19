@@ -4,6 +4,7 @@
 // ============================================================
 
 import { supabase } from '../lib/supabase'
+import type { Session } from '@supabase/supabase-js'
 import type { CompanyRow, ProfileRow } from '../lib/database.types'
 import type { SsoProvider } from '../lib/sso'
 
@@ -44,6 +45,23 @@ export async function getAuthProfile(authUserId: string): Promise<AuthProfile | 
 export function isProviderUser(authProfile: AuthProfile | null): boolean {
   if (!authProfile) return false
   return Boolean(authProfile.company?.is_provider_tenant) || authProfile.profile.role === 'sysadmin'
+}
+
+/**
+ * Confirma no Supabase Auth que uma sessão recuperada do storage ainda pertence
+ * ao usuário informado. O perfil e o papel só são carregados depois desta
+ * verificação server-side.
+ */
+export async function validateStoredSession(session: Session | null): Promise<Session | null> {
+  if (!session?.access_token || !session.user?.id) return null
+
+  const { data, error } = await supabase.auth.getUser(session.access_token)
+  if (error || !data.user || data.user.id !== session.user.id) {
+    await supabase.auth.signOut({ scope: 'local' }).catch(() => undefined)
+    return null
+  }
+
+  return { ...session, user: data.user }
 }
 
 /** Login com e-mail e senha. */
