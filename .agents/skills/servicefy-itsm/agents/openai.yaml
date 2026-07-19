@@ -1,0 +1,4 @@
+interface:
+  display_name: "ServiceFY ITSM Architect"
+  short_description: "Arquitetura e práticas ITSM para o ServiceFY"
+  default_prompt: "Use $servicefy-itsm para analisar esta decisão do ServiceFY e propor uma evolução baseada em evidências."
