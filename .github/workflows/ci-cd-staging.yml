@@ -1,5 +1,8 @@
 name: CI/CD Staging
 
+permissions:
+  contents: read
+
 # Gatilhos: toda PR e todo push contra staging ou main. Job 3 (deploy real) só
 # roda em push — nunca em PR, mesmo de dentro do repositório — para que migrations
 # e Edge Functions só sejam aplicadas quando o código já estiver na branch de
@@ -20,6 +23,33 @@ env:
   NODE_VERSION: '24'
 
 jobs:
+  security-gates:
+    name: 'Security — Supply chain & secrets'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - run: npm ci
+
+      - name: Dependências de produção
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Segredos em arquivos versionados
+        run: npm run audit:secrets
+
+      - name: Baseline de migrations
+        run: npm run audit:migrations
+
+      - name: Contrato dos gates de CI
+        run: npm run test:security:ci
+
   # ── Job 1: Lint & Build ──────────────────────────────────────────────────
   lint-and-build:
     name: 'Job 1 — Lint & Build'
@@ -73,7 +103,7 @@ jobs:
   #    exigir aprovação manual antes deste job rodar, se desejado.
   supabase-dry-run-deploy:
     name: 'Job 3 — Supabase Dry-Run & Deploy'
-    needs: [automated-tests]
+    needs: [automated-tests, security-gates]
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
     environment: staging

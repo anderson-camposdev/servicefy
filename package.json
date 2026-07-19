@@ -18,6 +18,8 @@
     "test:simulate:inbound-email": "node tests/simulators/inbound_email.ts",
     "test:unit:vitest": "vitest run",
     "test:unit:coverage": "vitest run --coverage",
+    "test:security:ci": "node --test tests/security/ci-security-contract.test.mjs",
+    "audit:secrets": "node scripts/audit-secrets.mjs",
     "audit:migrations": "node scripts/audit-migration-baseline.mjs",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:headed": "playwright test --headed",
