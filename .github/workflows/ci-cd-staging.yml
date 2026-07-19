@@ -123,7 +123,7 @@ jobs:
       - name: Baseline estático (tabelas core, prefixos duplicados, config.toml)
         run: npm run audit:migrations
 
-      - uses: supabase/setup-cli@v1
+      - uses: supabase/setup-cli@v3
         with:
           version: latest
 
