@@ -4,6 +4,7 @@ import test from 'node:test'
 
 const read = path => readFileSync(new URL('../../' + path, import.meta.url), 'utf8')
 const sql = read('supabase/migrations/20260719010000_145_identity_integrity.sql')
+const fixes = read('supabase/migrations/20260719030000_147_security_review_fixes.sql')
 const preflight = read('scripts/preflight-data-integrity.sql')
 const pkg = JSON.parse(read('package.json'))
 
@@ -51,6 +52,12 @@ test('department_id inválido é rejeitado por item sem abortar o lote', () => {
   assert.match(body, /v_dept_raw := NULLIF\(v_invite->>'department_id', ''\)/i)
   assert.match(body, /IF v_dept_raw IS NOT NULL AND v_dept_raw !~\*\s+/i)
   assert.match(body, /'department_id inválido'/i)
+})
+
+test('convites só concedem papéis da allowlist — nunca sysadmin', () => {
+  assert.match(fixes, /v_allowed_roles constant text\[\] :=\s*ARRAY\['end_user', 'agent', 'ops_manager', 'governance_manager', 'company_admin'\]/)
+  assert.match(fixes, /IF NOT \(v_role = ANY \(v_allowed_roles\)\) THEN/)
+  assert.doesNotMatch(fixes, /'sysadmin'/)
 })
 
 test('preflight remoto retorna somente contagens agregadas e cobre todas as invariantes da migration 144', () => {

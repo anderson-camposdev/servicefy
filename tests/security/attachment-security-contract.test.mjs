@@ -4,6 +4,7 @@ import test from 'node:test'
 
 const root = new URL('../../', import.meta.url)
 const migration = await readFile(new URL('supabase/migrations/20260718001200_143_attachment_security_foundation.sql', root), 'utf8')
+const fixes = await readFile(new URL('supabase/migrations/20260719030000_147_security_review_fixes.sql', root), 'utf8')
 const client = await readFile(new URL('src/lib/attachment-security.ts', root), 'utf8')
 const settings = await readFile(new URL('src/pages/PlatformModuleSettings.tsx', root), 'utf8')
 const pkg = JSON.parse(await readFile(new URL('package.json', root), 'utf8'))
@@ -20,6 +21,11 @@ test('enforcement do Storage confere tenant, tamanho, MIME e extensão', () => {
   assert.match(migration, /metadata->>'size'/)
   assert.match(migration, /metadata->>'mimetype'/)
   assert.match(migration, /pdf.*png.*jpg.*jpeg.*txt/is)
+})
+
+test('policy de upload consegue executar a função de validação como authenticated', () => {
+  // A policy roda como o papel da sessão; sem este GRANT todo upload falha com 42501.
+  assert.match(fixes, /GRANT EXECUTE ON FUNCTION public\.can_upload_service_attachment\(text, jsonb\) TO authenticated/)
 })
 
 test('cliente não oferece download e abre preview isolado', () => {
