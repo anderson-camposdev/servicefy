@@ -15,6 +15,7 @@ import { useTenantFeatureAccess } from '../hooks/useTenantFeatureAccess'
 import { useAuth } from '../auth'
 import { useTenant } from '../tenant'
 import SettingsPageShell from '../components/settings/SettingsPageShell'
+import { PREVIEWABLE_ATTACHMENT_EXTENSIONS } from '../lib/attachment-security'
 
 export type OperationalModuleKey = 'domains' | 'macros' | 'templates' | 'ci' | 'compliance' | 'licensing' | 'branding' | 'iam' | 'smtp'
 
@@ -275,7 +276,7 @@ export default function PlatformModuleSettings({ moduleKey, companyId, activeRol
         setForm({
           allowed_extensions: Array.isArray(policyRow.allowed_extensions) ? policyRow.allowed_extensions.join(', ') : 'pdf, png, jpg, docx, xlsx',
           blocked_extensions: Array.isArray(policyRow.blocked_extensions) ? policyRow.blocked_extensions.join(', ') : 'exe, dll, bat, cmd, ps1, js',
-          max_size_mb: String(Math.round(Number(policyRow.max_size_bytes ?? 26214400) / 1048576)),
+          max_size_mb: String(Math.round(Number(policyRow.max_size_bytes ?? 10485760) / 1048576)),
           retention_days: String(policyRow.retention_days ?? 365),
           malware_scan_required: policyRow.malware_scan_required !== false,
         })
@@ -374,9 +375,10 @@ export default function PlatformModuleSettings({ moduleKey, companyId, activeRol
   const saveCompliance = async () => {
     setSaving(true); setError('')
     const payload = {
-      allowed_extensions: String(form.allowed_extensions).split(',').map(v => v.trim().toLowerCase()).filter(Boolean),
+      allowed_extensions: String(form.allowed_extensions).split(',').map(v => v.trim().toLowerCase())
+        .filter(v => PREVIEWABLE_ATTACHMENT_EXTENSIONS.includes(v as never)),
       blocked_extensions: String(form.blocked_extensions).split(',').map(v => v.trim().toLowerCase()).filter(Boolean),
-      max_size_bytes: Number(form.max_size_mb) * 1048576,
+      max_size_bytes: Math.min(10, Math.max(1, Number(form.max_size_mb) || 10)) * 1048576,
       retention_days: Number(form.retention_days),
       malware_scan_required: Boolean(form.malware_scan_required),
     }
@@ -524,9 +526,9 @@ export default function PlatformModuleSettings({ moduleKey, companyId, activeRol
     {loading ? <div className="py-20 text-center"><Loader2 className="mx-auto h-6 w-6 animate-spin text-indigo-600" /></div> : moduleKey === 'compliance' ? (
       <div className="mt-6 grid gap-6 lg:grid-cols-[420px_1fr]">
         <section className="rounded-xl border border-slate-200 bg-white p-5"><h2 className="text-base font-bold text-slate-950">Política de anexos e retenção</h2><div className="mt-4 space-y-3">
-          <TextInput label="Extensões permitidas" value={String(form.allowed_extensions ?? '')} onChange={v => setForm(f => ({ ...f, allowed_extensions: v }))} />
+          <TextInput label="Extensões permitidas para visualização" value={String(form.allowed_extensions ?? '')} onChange={v => setForm(f => ({ ...f, allowed_extensions: v }))} />
           <TextInput label="Extensões bloqueadas" value={String(form.blocked_extensions ?? '')} onChange={v => setForm(f => ({ ...f, blocked_extensions: v }))} />
-          <TextInput label="Tamanho máximo (MB)" type="number" value={String(form.max_size_mb ?? '')} onChange={v => setForm(f => ({ ...f, max_size_mb: v }))} />
+          <TextInput label="Tamanho máximo (MB, entre 1 e 10)" type="number" value={String(form.max_size_mb ?? '')} onChange={v => setForm(f => ({ ...f, max_size_mb: v }))} />
           <TextInput label="Retenção (dias)" type="number" value={String(form.retention_days ?? '')} onChange={v => setForm(f => ({ ...f, retention_days: v }))} />
           <label className="flex items-center gap-2 text-sm font-semibold"><input type="checkbox" checked={Boolean(form.malware_scan_required)} onChange={e => setForm(f => ({ ...f, malware_scan_required: e.target.checked }))} /> Verificação de malware obrigatória</label>
           <button onClick={() => void saveCompliance()} disabled={saving} className="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-lg bg-slate-950 px-4 text-sm font-semibold text-white hover:bg-slate-800"><Save className="h-4 w-4" /> Salvar política</button>
