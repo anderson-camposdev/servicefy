@@ -7,7 +7,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import {
-  ArrowLeft, Plus, Trash2, RefreshCw, AlertTriangle, Network, Inbox,
+  Plus, Trash2, RefreshCw, AlertTriangle, Network, Inbox,
   CheckCircle2, XCircle, RotateCcw, Loader2,
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
@@ -15,6 +15,7 @@ import {
   platformAdminService,
   type ChannelRoute, type ChannelTriageEvent, type ChannelMatchType, type ConnectionOption,
 } from '../lib/platform-admin-service'
+import SettingsPageShell from '../components/settings/SettingsPageShell'
 
 interface Props { companyId: string; activeRole: string; onBack: () => void }
 interface Group { id: string; name: string }
@@ -106,18 +107,15 @@ export default function ChannelRoutingSettings({ companyId, onBack }: Props) {
   }
 
   return (
-    <div className="h-full overflow-y-auto bg-slate-50 p-6"><div className="mx-auto max-w-6xl">
-      <button onClick={onBack} className="mb-5 inline-flex items-center gap-2 text-sm font-bold text-slate-600"><ArrowLeft className="h-4 w-4" /> Central de Configurações</button>
-      <header className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <p className="text-xs font-bold uppercase tracking-wider text-primary">Canais e comunicação</p>
-          <h1 className="mt-2 text-2xl font-black sm:text-3xl">Rotas e filas</h1>
-          <p className="mt-2 text-sm text-slate-500">Identificação de destinatário, prioridade e triagem de eventos ambíguos.</p>
-        </div>
-        <button onClick={() => void load()} className="rounded-xl border bg-white p-2.5"><RefreshCw className="h-4 w-4" /></button>
-      </header>
+    <SettingsPageShell
+      title="Rotas e filas"
+      description="Identificação de destinatário, prioridade e triagem de eventos ambíguos."
+      scopeLabel="Configuração do tenant"
+      onBack={onBack}
+      actions={<button onClick={() => void load()} aria-label="Atualizar rotas" className="rounded-lg border border-slate-300 bg-white p-2.5 hover:bg-slate-50"><RefreshCw className="h-4 w-4" /></button>}
+    >
 
-      <div className="mt-5 flex gap-1 border-b border-slate-200">
+      <div className="flex gap-1 border-b border-slate-200">
         <button onClick={() => setTab('routes')} className={`flex items-center gap-1.5 px-4 py-2 text-sm font-bold ${tab === 'routes' ? 'border-b-2 border-primary text-primary' : 'text-slate-500'}`}><Network className="h-4 w-4" /> Rotas</button>
         <button onClick={() => setTab('triage')} className={`flex items-center gap-1.5 px-4 py-2 text-sm font-bold ${tab === 'triage' ? 'border-b-2 border-primary text-primary' : 'text-slate-500'}`}>
           <Inbox className="h-4 w-4" /> Triagem {triage.length > 0 && <span className="rounded-full bg-amber-100 px-2 text-xs text-amber-700">{triage.length}</span>}
@@ -127,9 +125,9 @@ export default function ChannelRoutingSettings({ companyId, onBack }: Props) {
       {error && <div className="mt-5 flex gap-2 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700"><AlertTriangle className="h-4 w-4" />{error}</div>}
 
       {tab === 'routes' && (
-        <div className="mt-6 grid gap-6 lg:grid-cols-[360px_1fr]">
-          <section className="rounded-2xl border bg-white p-5 shadow-sm">
-            <h2 className="font-extrabold">Nova rota</h2>
+        <div className="mt-6 grid gap-5 xl:grid-cols-[22rem_minmax(0,1fr)]">
+          <section className="rounded-xl border border-slate-200 bg-white p-5">
+            <h2 className="text-base font-bold text-slate-950">Nova rota</h2>
             {connections.length === 0 ? (
               <p className="mt-4 rounded-xl border border-dashed p-4 text-sm text-slate-500">Cadastre uma conexão em "Conexões omnichannel" antes de criar rotas.</p>
             ) : (
@@ -144,13 +142,13 @@ export default function ChannelRoutingSettings({ companyId, onBack }: Props) {
                   <label className="block text-xs font-bold">Grupo<select value={form.assignmentGroupId} onChange={e => setForm(f => ({ ...f, assignmentGroupId: e.target.value }))} className="mt-1 w-full rounded-xl border bg-white px-3 py-2.5 text-sm"><option value="">— Nenhum —</option>{groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}</select></label>
                 </div>
                 <label className="flex items-center gap-2 text-sm font-semibold"><input type="checkbox" checked={form.enabled} onChange={e => setForm(f => ({ ...f, enabled: e.target.checked }))} /> Ativa</label>
-                <button onClick={() => void addRoute()} className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-bold text-on-primary hover:opacity-90"><Plus className="h-4 w-4" /> Adicionar rota</button>
+                <button onClick={() => void addRoute()} className="flex min-h-10 w-full items-center justify-center gap-2 rounded-lg bg-slate-950 px-4 text-sm font-semibold text-white hover:bg-slate-800"><Plus className="h-4 w-4" /> Adicionar rota</button>
               </div>
             )}
           </section>
 
-          <section className="rounded-2xl border bg-white p-5 shadow-sm">
-            <h2 className="flex items-center gap-2 font-extrabold"><Network className="h-4 w-4 text-primary" /> Rotas configuradas</h2>
+          <section className="rounded-xl border border-slate-200 bg-white p-5">
+            <h2 className="flex items-center gap-2 text-base font-bold text-slate-950"><Network className="h-4 w-4 text-slate-500" /> Rotas configuradas</h2>
             {loading ? <div className="py-12 text-center text-sm text-slate-500"><Loader2 className="mx-auto h-5 w-5 animate-spin" /></div> :
               routes.length === 0 ? <div className="mt-4 rounded-xl border border-dashed p-8 text-center text-sm text-slate-500">Nenhuma rota configurada.</div> :
               <div className="mt-4 space-y-2">{routes.map(r => (
@@ -168,8 +166,8 @@ export default function ChannelRoutingSettings({ companyId, onBack }: Props) {
       )}
 
       {tab === 'triage' && (
-        <section className="mt-6 rounded-2xl border bg-white p-5 shadow-sm">
-          <h2 className="flex items-center gap-2 font-extrabold"><Inbox className="h-4 w-4 text-primary" /> Eventos aguardando triagem</h2>
+        <section className="mt-6 rounded-xl border border-slate-200 bg-white p-5">
+          <h2 className="flex items-center gap-2 text-base font-bold text-slate-950"><Inbox className="h-4 w-4 text-slate-500" /> Eventos aguardando triagem</h2>
           {loading ? <div className="py-12 text-center text-sm text-slate-500"><Loader2 className="mx-auto h-5 w-5 animate-spin" /></div> :
             triage.length === 0 ? <div className="mt-4 rounded-xl border border-dashed p-8 text-center text-sm text-slate-500">Nenhum evento pendente. Rotas ambíguas ou sem correspondência aparecem aqui.</div> :
             <div className="mt-4 space-y-2">{triage.map(ev => (
@@ -192,6 +190,6 @@ export default function ChannelRoutingSettings({ companyId, onBack }: Props) {
       )}
 
       {toast && <div className="fixed bottom-5 right-5 z-50 flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white shadow-lg"><CheckCircle2 className="h-4 w-4 text-emerald-400" />{toast}</div>}
-    </div></div>
+    </SettingsPageShell>
   )
 }

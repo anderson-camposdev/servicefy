@@ -1,5 +1,5 @@
 # Build stage
-FROM node:22-alpine AS builder
+FROM node:24-alpine AS builder
 
 WORKDIR /app
 
@@ -21,23 +21,17 @@ COPY public ./public
 RUN npm run build
 
 # Production stage
-FROM node:22-alpine
+FROM nginx:1.27-alpine
 
-WORKDIR /app
-
-# Install simple HTTP server for static files
-RUN npm install -g http-server
-
-# Copy built app from builder
-COPY --from=builder /app/dist ./dist
+# Copy built app and the reviewed production server policy.
+COPY --from=builder /app/dist /usr/share/nginx/html
+COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 # Expose port
 EXPOSE 5173
 
 # Health check
-RUN apk add --no-cache curl
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-  CMD curl -f http://localhost:5173/ || exit 1
+  CMD wget --quiet --tries=1 --spider http://127.0.0.1:5173/ || exit 1
 
-# Start server
-CMD ["http-server", "dist", "-p", "5173", "--cors"]
+CMD ["nginx", "-g", "daemon off;"]

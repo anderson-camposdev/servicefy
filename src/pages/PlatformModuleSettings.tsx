@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useState, useRef } from 'react'
-import { ArrowLeft, CheckCircle2, Loader2, Moon, Plus, RefreshCw, Save, ShieldCheck, Sun, Upload, X, Palette, Image as ImageIcon, LayoutGrid, Type } from 'lucide-react'
+import { CheckCircle2, Loader2, Moon, Plus, RefreshCw, Save, ShieldCheck, Sun, Upload, X, Palette, Image as ImageIcon, LayoutGrid, Type } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { companiesService } from '../lib/services'
-import { validateBrandingFile } from '../lib/branding.types'
+import { validateBrandingDimensions, validateBrandingFile } from '../lib/branding.types'
 import type { BrandingSettings, CatalogUiConfig } from '../lib/branding.types'
 import type { ThemeName, FontScale } from '../lib/theme-engine'
 import { THEME_HEX_COLORS, getPortalSidebar, LIGHT_THEMES, DARK_THEMES } from '../lib/theme-engine'
@@ -14,6 +14,7 @@ import { EmailDeliveryHistoryTable } from '../components/portal/EmailDeliveryHis
 import { useTenantFeatureAccess } from '../hooks/useTenantFeatureAccess'
 import { useAuth } from '../auth'
 import { useTenant } from '../tenant'
+import SettingsPageShell from '../components/settings/SettingsPageShell'
 
 export type OperationalModuleKey = 'domains' | 'macros' | 'templates' | 'ci' | 'compliance' | 'licensing' | 'branding' | 'iam' | 'smtp'
 
@@ -405,6 +406,10 @@ export default function PlatformModuleSettings({ moduleKey, companyId, activeRol
     setError('')
     setLogoUploading(true)
     try {
+      const image = await createImageBitmap(file)
+      const dimensions = validateBrandingDimensions(image.width, image.height, 'logo')
+      image.close()
+      if (!dimensions.valid) throw new Error(dimensions.error || 'Dimensões de logotipo inválidas.')
       const url = await companiesService.uploadBrandAsset(companyId, file, 'logo')
       setForm(f => ({ ...f, logoUrl: url }))
       setSuccess('Logotipo enviado com sucesso!')
@@ -427,6 +432,10 @@ export default function PlatformModuleSettings({ moduleKey, companyId, activeRol
     setError('')
     setBgUploading(true)
     try {
+      const image = await createImageBitmap(file)
+      const dimensions = validateBrandingDimensions(image.width, image.height, 'background')
+      image.close()
+      if (!dimensions.valid) throw new Error(dimensions.error || 'Dimensões de imagem inválidas.')
       const url = await companiesService.uploadBrandAsset(companyId, file, 'background')
       setForm(f => ({ ...f, backgroundUrl: url }))
       setSuccess('Imagem de fundo enviada com sucesso!')
@@ -503,27 +512,49 @@ export default function PlatformModuleSettings({ moduleKey, companyId, activeRol
         ? 'Configure o servidor SMTP e a identidade de envio deste tenant.'
       : 'Entitlements, origem da habilitação e consumo de licenças concorrentes.')
 
-  return <div className="h-full overflow-y-auto bg-slate-50 p-6"><div className="mx-auto max-w-6xl">
-    <button onClick={onBack} className="mb-5 inline-flex items-center gap-2 text-sm font-bold text-slate-600"><ArrowLeft className="h-4 w-4" /> Central de Configurações</button>
-    <header className="flex items-start justify-between gap-4"><div><h1 className="text-2xl font-black">{title}</h1><p className="mt-1 text-sm text-slate-500">{description}</p></div><button onClick={() => void load()} className="rounded-xl border bg-white p-2.5"><RefreshCw className="h-4 w-4" /></button></header>
+  return <SettingsPageShell
+    title={title}
+    description={description}
+    scopeLabel="Configuração do tenant"
+    onBack={onBack}
+    actions={<button onClick={() => void load()} aria-label="Atualizar configurações" className="rounded-lg border border-slate-300 bg-white p-2.5 hover:bg-slate-50"><RefreshCw className="h-4 w-4" /></button>}
+  >
     {error && <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
     {success && <div className="mt-4 flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700"><CheckCircle2 className="h-4 w-4" />{success}</div>}
     {loading ? <div className="py-20 text-center"><Loader2 className="mx-auto h-6 w-6 animate-spin text-indigo-600" /></div> : moduleKey === 'compliance' ? (
       <div className="mt-6 grid gap-6 lg:grid-cols-[420px_1fr]">
-        <section className="rounded-2xl border bg-white p-5"><h2 className="font-extrabold">Política de anexos e retenção</h2><div className="mt-4 space-y-3">
+        <section className="rounded-xl border border-slate-200 bg-white p-5"><h2 className="text-base font-bold text-slate-950">Política de anexos e retenção</h2><div className="mt-4 space-y-3">
           <TextInput label="Extensões permitidas" value={String(form.allowed_extensions ?? '')} onChange={v => setForm(f => ({ ...f, allowed_extensions: v }))} />
           <TextInput label="Extensões bloqueadas" value={String(form.blocked_extensions ?? '')} onChange={v => setForm(f => ({ ...f, blocked_extensions: v }))} />
           <TextInput label="Tamanho máximo (MB)" type="number" value={String(form.max_size_mb ?? '')} onChange={v => setForm(f => ({ ...f, max_size_mb: v }))} />
           <TextInput label="Retenção (dias)" type="number" value={String(form.retention_days ?? '')} onChange={v => setForm(f => ({ ...f, retention_days: v }))} />
           <label className="flex items-center gap-2 text-sm font-semibold"><input type="checkbox" checked={Boolean(form.malware_scan_required)} onChange={e => setForm(f => ({ ...f, malware_scan_required: e.target.checked }))} /> Verificação de malware obrigatória</label>
-          <button onClick={() => void saveCompliance()} disabled={saving} className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-3 text-sm font-bold text-white"><Save className="h-4 w-4" /> Salvar política</button>
+          <button onClick={() => void saveCompliance()} disabled={saving} className="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-lg bg-slate-950 px-4 text-sm font-semibold text-white hover:bg-slate-800"><Save className="h-4 w-4" /> Salvar política</button>
         </div></section>
-        <section className="rounded-2xl border bg-white p-5"><h2 className="flex items-center gap-2 font-extrabold"><ShieldCheck className="h-4 w-4 text-primary" /> Auditoria administrativa recente</h2><RowList rows={audit} empty="Nenhum evento administrativo registrado." /></section>
+        <section className="rounded-xl border border-slate-200 bg-white p-5"><h2 className="flex items-center gap-2 text-base font-bold text-slate-950"><ShieldCheck className="h-4 w-4 text-slate-500" /> Auditoria administrativa recente</h2><RowList rows={audit} empty="Nenhum evento administrativo registrado." /></section>
       </div>
     ) : moduleKey === 'licensing' ? (
       <div className="mt-6 space-y-6">
-        {usage && <section className="grid gap-3 rounded-2xl border bg-white p-5 sm:grid-cols-4"><Metric label="Plano" value={text(usage, 'license_plan')} /><Metric label="Em uso" value={String(usage.active_connections ?? 0)} /><Metric label="Limite" value={String(usage.license_limit ?? 0)} /><Metric label="Status" value={text(usage, 'license_status')} /></section>}
-        <section className="rounded-2xl border bg-white p-5"><h2 className="font-extrabold">Entitlements do tenant</h2><div className="mt-4 grid gap-2 md:grid-cols-2">{rows.map(row => <div key={text(row, 'id')} className="flex items-center gap-3 rounded-xl border p-3"><span className={`h-2.5 w-2.5 rounded-full ${bool(row, 'enabled') ? 'bg-emerald-500' : 'bg-slate-300'}`} /><div className="flex-1"><b className="text-sm">{text(row, 'module_key')}</b><p className="text-xs text-on-surface-variant">{text(row, 'source')}</p></div>{activeRole === 'sysadmin' && <button onClick={() => void toggleEntitlement(row)} className="rounded-lg border px-2 py-1 text-xs font-bold">{bool(row, 'enabled') ? 'Desativar' : 'Ativar'}</button>}</div>)}</div></section>
+        {usage && <section className="grid gap-3 rounded-xl border border-slate-200 bg-white p-5 sm:grid-cols-4"><Metric label="Plano" value={text(usage, 'license_plan')} /><Metric label="Em uso" value={String(usage.active_connections ?? 0)} /><Metric label="Limite" value={String(usage.license_limit ?? 0)} /><Metric label="Status" value={text(usage, 'license_status')} /></section>}
+        <section className="rounded-xl border border-slate-200 bg-white p-5">
+          <h2 className="text-base font-bold text-slate-950">Módulos e direitos do tenant</h2>
+          <div className="mt-4 grid gap-2 md:grid-cols-2">
+            {rows.map(row => (
+              <div key={text(row, 'id')} className="flex items-center gap-3 rounded-lg border border-slate-200 p-3">
+                <span className={`h-2.5 w-2.5 rounded-full ${bool(row, 'enabled') ? 'bg-emerald-500' : 'bg-slate-300'}`} />
+                <div className="flex-1">
+                  <b className="text-sm">{text(row, 'module_key')}</b>
+                  <p className="text-xs text-on-surface-variant">{text(row, 'source')}</p>
+                </div>
+                {activeRole === 'sysadmin' && (
+                  <button onClick={() => void toggleEntitlement(row)} className="rounded-lg border border-slate-300 px-2 py-1 text-xs font-semibold">
+                    {bool(row, 'enabled') ? 'Desativar' : 'Ativar'}
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        </section>
       </div>
     ) : moduleKey === 'smtp' ? (
       <div className="mt-6 space-y-6">
@@ -591,7 +622,7 @@ export default function PlatformModuleSettings({ moduleKey, companyId, activeRol
                         <>
                           <Upload className="w-6 h-6 text-slate-400" />
                           <span className="text-sm font-semibold text-slate-600">Selecione o logotipo</span>
-                          <span className="text-xs text-slate-400">PNG, JPG ou WebP · Máx 2 MB</span>
+                          <span className="text-xs text-slate-400">PNG, JPG ou WebP · mínimo 240×80px · proporção até 6:1</span>
                         </>
                       )}
                       <input ref={logoInputRef} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={handleLogoChange} />
@@ -641,7 +672,7 @@ export default function PlatformModuleSettings({ moduleKey, companyId, activeRol
                         <>
                           <Upload className="w-6 h-6 text-slate-400" />
                           <span className="text-sm font-semibold text-slate-600">Selecione imagem de fundo</span>
-                          <span className="text-xs text-slate-400">PNG, JPG ou WebP · Máx 2 MB</span>
+                          <span className="text-xs text-slate-400">PNG, JPG ou WebP · mínimo 1280×720px · máx. 2 MB</span>
                         </>
                       )}
                       <input ref={bgInputRef} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={handleBgChange} />
@@ -965,7 +996,7 @@ export default function PlatformModuleSettings({ moduleKey, companyId, activeRol
         </div>
       </div>
     )}
-  </div></div>
+  </SettingsPageShell>
 }
 
 function FormField({ field, value, classes, groups, onChange }: { field: FieldDef; value: FormValue | undefined; classes: Row[]; groups: Row[]; onChange: (value: FormValue) => void }) {

@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
-import { ArrowLeft, CheckCircle2, Globe2, KeyRound, Loader2, Save, ShieldCheck } from 'lucide-react'
+import { CheckCircle2, Globe2, Loader2, Save, ShieldCheck } from 'lucide-react'
 import { loginIntegrationService } from '../lib/login-integration-service'
 import { SSO_PROVIDERS, type SsoProvider } from '../lib/sso'
+import SettingsPageShell from '../components/settings/SettingsPageShell'
 
 interface Props {
   companyId: string
@@ -77,28 +78,19 @@ export default function LoginIntegrationSettings({ companyId, onBack }: Props) {
   }
 
   return (
-    <div className="min-h-full bg-slate-50 p-5 lg:p-8">
-      <div className="mx-auto max-w-5xl">
-        <button onClick={onBack} className="mb-5 inline-flex items-center gap-2 text-sm font-bold text-slate-600 hover:text-slate-900">
-          <ArrowLeft className="h-4 w-4" /> Central de Configurações
-        </button>
-
-        <header className="py-3">
-          <div className="flex items-start gap-4">
-            <span className="rounded-xl bg-primary-container p-3 text-on-primary-container"><KeyRound className="h-6 w-6" /></span>
-            <div>
-              <p className="text-xs font-bold uppercase tracking-wider text-primary">Identidade corporativa</p>
-              <h1 className="mt-1 text-2xl font-black text-slate-950 sm:text-3xl">Integração de login</h1>
-              <p className="mt-2 text-sm text-slate-500">Configure Google/Microsoft, domínios autorizados e a exigência de SSO para este tenant.</p>
-            </div>
-          </div>
-        </header>
+    <SettingsPageShell
+      title="Integração de login"
+      description="Configure Google/Microsoft, domínios autorizados e a exigência de SSO para este tenant."
+      scopeLabel="Configuração do tenant"
+      onBack={onBack}
+      actions={<button onClick={() => void save()} disabled={saving || loading} className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-slate-950 px-4 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50">{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Salvar política</button>}
+    >
 
         {loading ? (
-          <div className="mt-5 flex items-center justify-center rounded-2xl border bg-white p-12 text-sm text-slate-500"><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Carregando política…</div>
+          <div className="flex items-center justify-center rounded-xl border bg-white p-12 text-sm text-slate-500"><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Carregando política…</div>
         ) : (
-          <div className="mt-5 space-y-5">
-            <section className="rounded-2xl border border-slate-200 bg-white p-6">
+          <div className="space-y-5">
+            <section className="rounded-xl border border-slate-200 bg-white p-5 sm:p-6">
               <div className="flex items-center gap-3"><Globe2 className="h-5 w-5 text-primary" /><div><h2 className="font-black text-slate-900">Domínios vinculados</h2><p className="text-xs text-slate-500">O provisionamento automático usa somente domínios verificados pelo provedor MSP.</p></div></div>
               <div className="mt-4 grid gap-3 sm:grid-cols-2">
                 {domains.map(domain => (
@@ -117,7 +109,7 @@ export default function LoginIntegrationSettings({ companyId, onBack }: Props) {
               </div>
             </section>
 
-            <section className="rounded-2xl border border-slate-200 bg-white p-6">
+            <section className="rounded-xl border border-slate-200 bg-white p-5 sm:p-6">
               <div className="flex items-center gap-3"><ShieldCheck className="h-5 w-5 text-primary" /><div><h2 className="font-black text-slate-900">Provedores corporativos</h2><p className="text-xs text-slate-500">As credenciais OAuth ficam no ambiente seguro; aqui você controla quais provedores o tenant pode usar.</p></div></div>
               <div className="mt-4 grid gap-3 md:grid-cols-2">
                 {SSO_PROVIDERS.map(provider => {
@@ -140,10 +132,8 @@ export default function LoginIntegrationSettings({ companyId, onBack }: Props) {
 
             {error && <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700">{error}</div>}
             {success && <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-semibold text-emerald-700">{success}</div>}
-            <div className="flex justify-end"><button onClick={() => void save()} disabled={saving} className="inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-3 text-sm font-bold text-on-primary hover:opacity-90 disabled:opacity-50">{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Salvar política</button></div>
           </div>
         )}
-      </div>
-    </div>
+    </SettingsPageShell>
   )
 }

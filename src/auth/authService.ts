@@ -23,8 +23,10 @@ export interface AuthProfile {
 export async function getAuthProfile(authUserId: string): Promise<AuthProfile | null> {
   const { data, error } = await supabase
     .from('profiles')
-    .select('*, company:companies(*)')
+    .select('*, company:companies!inner(*)')
     .eq('auth_id', authUserId)
+    .eq('active', true)
+    .eq('company.active', true)
     .maybeSingle()
 
   if (error) throw error

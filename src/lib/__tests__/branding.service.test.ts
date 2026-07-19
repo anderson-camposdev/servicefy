@@ -12,6 +12,7 @@
 import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest'
 import {
   validateBrandingFile,
+  validateBrandingDimensions,
   buildBrandAssetPath,
   BRANDING_MAX_FILE_SIZE_BYTES,
 } from '../branding.types'
@@ -134,6 +135,25 @@ describe('validateBrandingFile', () => {
     const exactLimit = makeFile('exact.png', 'image/png', BRANDING_MAX_FILE_SIZE_BYTES)
     const result = validateBrandingFile(exactLimit)
     expect(result.valid).toBe(true)
+  })
+})
+
+describe('validateBrandingDimensions', () => {
+  it('accepts a horizontal tenant wordmark with adequate resolution', () => {
+    expect(validateBrandingDimensions(500, 148, 'logo')).toEqual({ valid: true, error: null })
+  })
+
+  it('rejects a low-resolution logo', () => {
+    expect(validateBrandingDimensions(120, 40, 'logo').error).toMatch(/baixa resolução/i)
+  })
+
+  it('rejects an excessively wide logo', () => {
+    expect(validateBrandingDimensions(1200, 100, 'logo').error).toMatch(/proporção/i)
+  })
+
+  it('requires a widescreen-quality background', () => {
+    expect(validateBrandingDimensions(1024, 576, 'background').error).toMatch(/1280×720/)
+    expect(validateBrandingDimensions(1920, 1080, 'background')).toEqual({ valid: true, error: null })
   })
 })
 

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
-  Activity, BarChart3, Bot, Boxes, Building2, ChevronLeft, Code2, FileCheck2,
+  Activity, BarChart3, Bot, Boxes, Building2, Code2, FileCheck2,
   Gauge, HeartPulse, Lock, Network, Palette, Search, ShieldCheck, Star, Users, Workflow, Wrench,
 } from 'lucide-react'
 import { useAppData } from '../hooks/useDbData'
@@ -14,6 +14,7 @@ import KnowledgeAdmin from './KnowledgeAdmin'
 import VirtualAgentAdmin from './VirtualAgentAdmin'
 import PlatformModuleSettings, { type OperationalModuleKey } from './PlatformModuleSettings'
 import LoginIntegrationSettings from './LoginIntegrationSettings'
+import SettingsPageShell from '../components/settings/SettingsPageShell'
 
 interface Props {
   companyId: string
@@ -209,32 +210,44 @@ export default function SettingsCenter({ companyId, activeRole, onNavigate }: Pr
   )
 
   if (selected?.legacyTab) return (
-    <div className="min-h-full bg-slate-50">
-      <button onClick={() => setSelected(null)} className="m-5 inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold">
-        <ChevronLeft className="w-4 h-4" /> Central de Configurações
-      </button>
-      <div className="mx-auto max-w-6xl px-4 pb-8 sm:px-6">
+    <SettingsPageShell
+      title={selected.title}
+      description={selected.description}
+      scopeLabel={companies.find(company => company.id === targetCompanyId)?.name ?? 'Tenant selecionado'}
+      onBack={() => setSelected(null)}
+      status={<span className="rounded-md bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700">Ativo</span>}
+    >
+      <div className="pb-8">
         <SettingsGovernance key={selected.key + targetCompanyId} companyId={targetCompanyId} activeRole={activeRole} startInDetails embedded initialTab={selected.legacyTab as GovTab} />
       </div>
-    </div>
+    </SettingsPageShell>
   )
 
   if (selected) return (
-    <div className="mx-auto max-w-5xl p-4 sm:p-6">
-      <button onClick={() => setSelected(null)} className="mb-5 inline-flex min-h-11 items-center gap-2 rounded-lg px-2 text-sm font-semibold text-on-surface-variant hover:bg-surface-container"><ChevronLeft className="w-4 h-4" /> Central de Configurações</button>
-      <div className="rounded-xl border border-outline-variant bg-surface p-5 sm:p-8">
-        <div className="flex flex-col items-start justify-between gap-5 sm:flex-row">
-          <div><p className="text-sm font-semibold text-primary">{CATEGORY_META[selected.category].title}</p><h1 className="mt-1 text-2xl font-bold text-on-surface">{selected.title}</h1><p className="mt-2 max-w-2xl text-sm text-on-surface-variant">{selected.description}</p></div>
-          {selected.status === 'locked' && <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-3 py-1 text-xs font-bold text-amber-700"><Lock className="w-3.5 h-3.5" /> Módulo não contratado</span>}
+    <SettingsPageShell
+      title={selected.title}
+      description={selected.description}
+      scopeLabel={companies.find(company => company.id === targetCompanyId)?.name ?? 'Tenant selecionado'}
+      onBack={() => setSelected(null)}
+      status={selected.status === 'locked'
+        ? <span className="inline-flex items-center gap-1 rounded-md bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-700"><Lock className="h-3.5 w-3.5" /> Módulo não contratado</span>
+        : <span className="rounded-md bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700">Ativo</span>}
+    >
+      <section className="max-w-4xl rounded-xl border border-slate-200 bg-white">
+        <div className="border-b border-slate-200 px-5 py-4">
+          <p className="text-sm font-semibold text-slate-900">{CATEGORY_META[selected.category].title}</p>
+          <p className="mt-1 text-sm text-slate-500">Capacidades incluídas neste módulo.</p>
         </div>
-        <div className="mt-7 divide-y divide-outline-variant border-y border-outline-variant">{selected.capabilities.map(item =>
-          <div key={item} className="flex min-h-12 items-center gap-3 py-3 text-sm font-semibold text-on-surface"><FileCheck2 className="w-4 h-4 text-resolved" />{item}</div>,
+        <div className="divide-y divide-slate-100 px-5">{selected.capabilities.map(item =>
+          <div key={item} className="flex min-h-12 items-center gap-3 py-3 text-sm font-medium text-slate-700"><FileCheck2 className="h-4 w-4 text-emerald-600" />{item}</div>,
         )}</div>
-        {selected.status === 'locked'
-          ? <button className="mt-7 rounded-lg bg-on-surface px-5 py-3 text-sm font-bold text-surface">Solicitar habilitação</button>
-          : <div className="mt-7 rounded-lg bg-resolved-bg p-4 text-sm font-semibold text-resolved-fg">Módulo disponível para este tenant.</div>}
-      </div>
-    </div>
+        <div className="border-t border-slate-200 p-5">
+          {selected.status === 'locked'
+            ? <button className="min-h-10 rounded-lg bg-slate-950 px-4 text-sm font-semibold text-white hover:bg-slate-800">Solicitar habilitação</button>
+            : <p className="text-sm font-medium text-emerald-700">Módulo disponível para este tenant.</p>}
+        </div>
+      </section>
+    </SettingsPageShell>
   )
 
   const activeGroupMeta = SETTINGS_GROUPS.find(group => group.key === activeGroup) ?? SETTINGS_GROUPS[0]

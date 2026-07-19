@@ -332,10 +332,9 @@ export default function CatalogManager({ companyId, section = 'incident' }: { co
     <div className="space-y-5">
       {error && <div className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-xl p-3">{error}</div>}
 
-      <header className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-surface p-5 shadow-sm lg:flex-row lg:items-center lg:justify-between">
+      <header className="flex flex-col gap-4 rounded-xl border border-slate-200 bg-white p-5 lg:flex-row lg:items-center lg:justify-between">
         <div className="min-w-0">
-          <span className="text-xs font-bold uppercase tracking-[0.16em] text-primary">Catálogo de serviços</span>
-          <h2 className="mt-1 text-xl font-semibold tracking-tight text-text-main">
+          <h2 className="text-base font-bold text-slate-950">
             {section === 'incident' ? 'Incidentes e situações' : section === 'request' ? 'Solicitações e itens' : 'Modelos de formulário'}
           </h2>
           <p className="mt-1 max-w-2xl text-sm leading-6 text-text-muted">
@@ -352,18 +351,18 @@ export default function CatalogManager({ companyId, section = 'incident' }: { co
               {categories.filter(category => category.is_active).length} de {categories.length} categorias ativas
             </span>
           )}
-          <button type="button" onClick={() => setShowAppearance(current => !current)} className="inline-flex h-9 items-center gap-2 rounded-lg border border-slate-200 bg-surface px-3 text-sm font-semibold text-text-main transition hover:border-primary/35 hover:bg-surface-subtle" aria-expanded={showAppearance}>
-            <Palette className="h-4 w-4 text-primary" /> Aparência
+          <button type="button" onClick={() => setShowAppearance(current => !current)} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50" aria-expanded={showAppearance}>
+            <Palette className="h-4 w-4 text-slate-500" /> Aparência
           </button>
-          <button type="button" onClick={reload} className="inline-flex h-9 items-center gap-2 rounded-lg border border-slate-200 bg-surface px-3 text-sm font-semibold text-text-main transition hover:border-primary/35 hover:bg-surface-subtle">
+          <button type="button" onClick={reload} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">
             <RefreshCw className="h-4 w-4 text-text-muted" /> Atualizar
           </button>
         </div>
       </header>
 
       {/* ── Estilo Global dos Cartões ── */}
-      {showAppearance && <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-4 mb-6">
-        <h4 className="text-sm font-bold text-slate-700 mb-2">Estilo Global dos Cartões do Catálogo</h4>
+      {showAppearance && <div className="mb-6 rounded-xl border border-slate-200 bg-white p-5">
+        <h4 className="mb-2 text-base font-bold text-slate-950">Aparência dos cartões</h4>
         <p className="text-xs text-slate-500 mb-4">Estas configurações se aplicam a todas as categorias e itens do catálogo.</p>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-1">

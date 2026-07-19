@@ -1213,7 +1213,7 @@ export default function SettingsGovernance({ companyId, activeRole, startInDetai
         {/* Políticas de SLA */}
         {activeTab === 'policies' && (
           <div className="space-y-6">
-            <div className={`${cardClass} overflow-hidden`}>
+            <div className={`${cardClass} overflow-x-auto`}>
               {policyError && (
                 <div className="p-4 bg-red-500/10 border-b border-red-500/20 text-red-500 text-sm flex items-center gap-2">
                   <AlertCircle className="w-4 h-4 shrink-0" /> {policyError}
@@ -1224,9 +1224,9 @@ export default function SettingsGovernance({ companyId, activeRole, startInDetai
                 <h3 className="text-xl font-bold text-on-surface">Prazos por Nível de Prioridade</h3>
                 <span className="ml-auto text-sm text-on-surface-variant font-semibold">Tempos configurados em minutos úteis</span>
               </div>
-              <table className="w-full text-base">
+              <table className="w-full min-w-[760px] text-sm">
                 <thead className={`bg-surface-container/10 border-b ${isAlpha ? 'border-zinc-800' : 'border-outline-variant'}`}>
-                  <tr className="text-on-surface-variant font-bold uppercase text-xs tracking-wider">
+                  <tr className="text-xs font-semibold text-on-surface-variant">
                     <th className="px-6 py-4.5 text-left">Prioridade</th>
                     <th className="px-6 py-4.5 text-left">Tempo de Resposta (minutos)</th>
                     <th className="px-6 py-4.5 text-left">Tempo de Solução (minutos)</th>
@@ -1433,10 +1433,10 @@ export default function SettingsGovernance({ companyId, activeRole, startInDetai
         )}
 
         {activeTab === 'change_cab' && (
-          <div className={`${cardClass} p-8 space-y-6 bg-surface`}>
+          <div className="space-y-6 rounded-xl border border-slate-200 bg-white p-5 sm:p-6">
             <div>
-              <h3 className="text-2xl font-bold text-text-main flex items-center gap-2.5">
-                <ShieldCheck className="w-6 h-6 text-primary" /> Comitê de Aprovação de Mudanças (CAB)
+              <h3 className="flex items-center gap-2.5 text-base font-bold text-slate-950">
+                <ShieldCheck className="h-5 w-5 text-slate-500" /> Comitê de Aprovação de Mudanças (CAB)
               </h3>
               <p className="text-sm text-on-surface-variant mt-1.5">
                 Defina os membros permanentes do comitê. Estes usuários serão pré-selecionados automaticamente ao criar novas solicitações de mudança do tipo Normal ou Crítica.
@@ -1495,7 +1495,7 @@ export default function SettingsGovernance({ companyId, activeRole, startInDetai
               <button
                 onClick={() => void handleSaveCab(selectedCabIds)}
                 disabled={savingCab}
-                className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm rounded-xl disabled:opacity-50 transition-all cursor-pointer"
+                className="flex min-h-10 items-center gap-2 rounded-lg bg-slate-950 px-4 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50"
               >
                 <Save className="w-4 h-4" /> {savingCab ? 'Salvando...' : 'Salvar Membros do CAB'}
               </button>

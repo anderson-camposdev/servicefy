@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useCallback } from 'react'
-import { Users, Plus, UserPlus, Settings, Edit2, X, Upload, Image as ImageIcon, LayoutTemplate, ExternalLink, KeyRound } from 'lucide-react'
+import { Plus, UserPlus, Settings, Edit2, X, Upload, Image as ImageIcon, LayoutTemplate, ExternalLink, KeyRound, Search } from 'lucide-react'
 import type { Company, Role } from '../types'
 import { useAppData } from '../hooks/useDbData'
 import { companiesService, profilesService, assignmentGroupsService } from '../lib/services'
@@ -13,12 +13,12 @@ import { useToast } from '../context'
 // Migration 131 adicionou ops_manager/governance_manager ao enum real —
 // diferente dos papéis acima, esses dois são de fato persistíveis.
 const REAL_ROLE_OPTIONS: { value: Role; label: string }[] = [
-  { value: 'end_user', label: 'EndUser (Usuário Final)' },
-  { value: 'agent', label: 'Agent (Analista)' },
-  { value: 'ops_manager', label: 'OpsManager (Gestor de Operação)' },
-  { value: 'governance_manager', label: 'GovernanceManager (Gestor de Governança)' },
-  { value: 'company_admin', label: 'CompanyAdmin (Admin do Tenant)' },
-  { value: 'sysadmin', label: 'SysAdmin (Admin Global)' },
+  { value: 'end_user', label: 'Usuário final' },
+  { value: 'agent', label: 'Analista' },
+  { value: 'ops_manager', label: 'Gestor de operações' },
+  { value: 'governance_manager', label: 'Gestor de governança' },
+  { value: 'company_admin', label: 'Administrador do tenant' },
+  { value: 'sysadmin', label: 'Administrador global' },
 ]
 // Fase 27: roles que consomem uma licença de analista (seat) — mesma lista
 // usada pelo trigger tg_enforce_analyst_license_limit no banco.
@@ -79,6 +79,8 @@ function AssignmentGroupsAdmin({ currentCompany, rawProfiles }: AssignmentGroups
   const [newGroupDesc, setNewGroupDesc] = useState('')
   const [newGroupPrivate, setNewGroupPrivate] = useState(false)
   const [savingGroup, setSavingGroup] = useState(false)
+  const [showGroupForm, setShowGroupForm] = useState(false)
+  const [groupQuery, setGroupQuery] = useState('')
 
   // Select analyst to add
   const [selectedAnalystId, setSelectedAnalystId] = useState('')
@@ -141,6 +143,7 @@ function AssignmentGroupsAdmin({ currentCompany, rawProfiles }: AssignmentGroups
       setNewGroupName('')
       setNewGroupDesc('')
       setNewGroupPrivate(false)
+      setShowGroupForm(false)
       alert('Equipe solucionadora criada com sucesso!')
 
       const data = await assignmentGroupsService.list(currentCompany.id)
@@ -220,23 +223,49 @@ function AssignmentGroupsAdmin({ currentCompany, rawProfiles }: AssignmentGroups
   }, [companyProfiles, members])
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      <div className="lg:col-span-2 space-y-6">
-        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-6 space-y-4">
-          <h3 className="text-slate-800 font-bold text-sm uppercase tracking-widest border-b border-slate-100 pb-3 flex items-center gap-2">
-            <Users className="w-4 h-4 text-indigo-600" /> Equipes Solucionadoras (Assignment Groups)
-          </h3>
+    <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_22rem]">
+      <div className="min-w-0 space-y-5">
+        <section className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+          <div className="flex flex-col gap-4 border-b border-slate-200 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
+            <div>
+              <h2 className="text-base font-bold text-slate-950">Equipes solucionadoras</h2>
+              <p className="mt-1 text-sm text-slate-500">Organize filas, privacidade e responsáveis pelo atendimento.</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowGroupForm(value => !value)}
+              className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-slate-950 px-4 text-sm font-semibold text-white hover:bg-slate-800"
+            >
+              {showGroupForm ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+              {showGroupForm ? 'Fechar cadastro' : 'Nova equipe'}
+            </button>
+          </div>
+          <div className="border-b border-slate-100 p-4 sm:p-5">
+            <label className="relative block">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <input
+                type="search"
+                value={groupQuery}
+                onChange={event => setGroupQuery(event.target.value)}
+                placeholder="Buscar equipe por nome ou responsabilidade"
+                className="min-h-10 w-full rounded-lg border border-slate-300 bg-white pl-10 pr-3 text-sm text-slate-900 outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"
+              />
+            </label>
+          </div>
           {loading ? (
             <div className="text-sm text-slate-400 animate-pulse text-center py-6">Carregando equipes...</div>
           ) : groups.length === 0 ? (
             <div className="text-sm text-slate-400 text-center py-6">Nenhuma equipe cadastrada.</div>
           ) : (
-            <div className="divide-y divide-slate-100 overflow-y-auto max-h-[400px] space-y-1 pr-1">
-              {groups.map(g => (
+            <div className="divide-y divide-slate-100 overflow-y-auto max-h-[400px]">
+              {groups.filter(group => {
+                const needle = groupQuery.trim().toLocaleLowerCase('pt-BR')
+                return !needle || [group.name, group.description].join(' ').toLocaleLowerCase('pt-BR').includes(needle)
+              }).map(g => (
                 <div
                   key={g.id}
                   onClick={() => setSelectedGroup(g)}
-                  className={`p-3 flex items-center justify-between gap-4 cursor-pointer transition-colors rounded-xl border ${selectedGroup?.id === g.id ? 'bg-indigo-50/50 border-indigo-200' : 'hover:bg-slate-50 border-slate-100 bg-white'}`}
+                  className={`flex cursor-pointer flex-col gap-3 p-4 transition-colors sm:flex-row sm:items-center sm:justify-between sm:px-5 ${selectedGroup?.id === g.id ? 'bg-indigo-50/60' : 'hover:bg-slate-50'}`}
                 >
                   <div className="min-w-0">
                     <div className="text-xs font-extrabold text-slate-800 flex items-center gap-2 flex-wrap">
@@ -250,7 +279,7 @@ function AssignmentGroupsAdmin({ currentCompany, rawProfiles }: AssignmentGroups
                     </div>
                     {g.description && <div className="text-[10px] text-slate-400 mt-1 truncate">{g.description}</div>}
                   </div>
-                  <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
+                  <div className="flex flex-wrap items-center gap-2" onClick={e => e.stopPropagation()}>
                     <button
                       onClick={() => handleTogglePrivate(g)}
                       title="Tickets deste grupo só ficam visíveis para membros + gestores"
@@ -273,12 +302,11 @@ function AssignmentGroupsAdmin({ currentCompany, rawProfiles }: AssignmentGroups
               ))}
             </div>
           )}
-        </div>
+        </section>
 
-        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-6">
-          <h3 className="text-slate-800 font-bold text-sm uppercase tracking-widest border-b border-slate-100 pb-3 mb-4 flex items-center gap-2">
-            <Plus className="w-4 h-4 text-indigo-600" /> Nova Equipe Solucionadora
-          </h3>
+        {showGroupForm && <section className="rounded-xl border border-slate-200 bg-white p-5">
+          <h2 className="text-base font-bold text-slate-950">Nova equipe solucionadora</h2>
+          <p className="mb-4 mt-1 text-sm text-slate-500">Defina a responsabilidade e o nível de visibilidade da fila.</p>
           <form onSubmit={handleCreateGroup} className="space-y-4">
             <div>
               <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Nome da Equipe</label>
@@ -322,10 +350,10 @@ function AssignmentGroupsAdmin({ currentCompany, rawProfiles }: AssignmentGroups
               {savingGroup ? 'Criando...' : 'Criar Equipe'}
             </button>
           </form>
-        </div>
+        </section>}
       </div>
 
-      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-6 flex flex-col h-full min-h-[400px]">
+      <aside className="flex h-full min-h-[400px] flex-col rounded-xl border border-slate-200 bg-white p-5">
         {selectedGroup ? (
           <>
             <div className="border-b border-slate-100 pb-3 mb-4 flex items-center justify-between">
@@ -394,7 +422,7 @@ function AssignmentGroupsAdmin({ currentCompany, rawProfiles }: AssignmentGroups
             Selecione uma equipe na lista para gerenciar seus membros.
           </div>
         )}
-      </div>
+      </aside>
     </div>
   )
 }
@@ -433,6 +461,8 @@ export default function AdminDashboard({ refetchAppData, currentCompany, activeT
   const [usrManagerId, setUsrManagerId] = useState('')
   const [usrCompanyId, setUsrCompanyId] = useState(currentCompany.id)
   const [usrSaving, setUsrSaving] = useState(false)
+  const [showUserForm, setShowUserForm] = useState(false)
+  const [userQuery, setUserQuery] = useState('')
 
   const { companies: rawCompanies, profiles: rawProfiles } = useAppData()
 
@@ -516,6 +546,7 @@ export default function AdminDashboard({ refetchAppData, currentCompany, activeT
       setUsrEmail('')
       setUsrDept('')
       setUsrManagerId('')
+      setShowUserForm(false)
       if (refetchAppData) await refetchAppData()
     } catch (err) {
       // O trigger tg_enforce_analyst_license_limit (Fase 27) já devolve uma
@@ -621,22 +652,51 @@ export default function AdminDashboard({ refetchAppData, currentCompany, activeT
       )}
 
       {activeTab === 'users' && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 bg-white border border-slate-200 rounded-2xl shadow-sm p-6 space-y-4">
-            <h3 className="text-slate-800 font-bold text-sm uppercase tracking-widest border-b border-slate-100 pb-3">Usuários & Matriz de Acessos</h3>
+        <div className={`grid grid-cols-1 gap-5 ${showUserForm ? 'xl:grid-cols-[minmax(0,1fr)_22rem]' : ''}`}>
+          <section className="min-w-0 rounded-xl border border-slate-200 bg-white">
+            <div className="flex flex-col gap-4 border-b border-slate-200 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
+              <div>
+                <h2 className="text-base font-bold text-slate-950">Usuários e acessos</h2>
+                <p className="mt-1 text-sm text-slate-500">Gerencie papéis, gestores e consumo de licenças.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowUserForm(value => !value)}
+                className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-slate-950 px-4 text-sm font-semibold text-white hover:bg-slate-800"
+              >
+                {showUserForm ? <X className="h-4 w-4" /> : <UserPlus className="h-4 w-4" />}
+                {showUserForm ? 'Fechar cadastro' : 'Adicionar usuário'}
+              </button>
+            </div>
+            <div className="border-b border-slate-100 p-4 sm:p-5">
+              <label className="relative block">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="search"
+                  value={userQuery}
+                  onChange={event => setUserQuery(event.target.value)}
+                  placeholder="Buscar por nome, e-mail, departamento ou papel"
+                  className="min-h-10 w-full rounded-lg border border-slate-300 bg-white pl-10 pr-3 text-sm text-slate-900 outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"
+                />
+              </label>
+            </div>
             <div className="divide-y divide-slate-100 overflow-y-auto max-h-[500px]">
-              {rawProfiles.filter(p => p.company_id === currentCompany.id).map(p => {
+              {rawProfiles.filter(p => {
+                if (p.company_id !== currentCompany.id) return false
+                const needle = userQuery.trim().toLocaleLowerCase('pt-BR')
+                return !needle || [p.name, p.email, p.department, p.role].join(' ').toLocaleLowerCase('pt-BR').includes(needle)
+              }).map(p => {
                 const sameCompanyProfiles = rawProfiles.filter(x => x.company_id === p.company_id && x.id !== p.id)
                 return (
-                  <div key={p.id} className="py-3 flex items-center justify-between gap-4">
-                    <div className="flex items-center gap-3">
-                      <img src={p.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${p.name}`} className="w-7 h-7 rounded-full" alt={p.name} />
-                      <div>
-                        <div className="text-xs font-bold text-slate-800">{p.name}</div>
-                        <div className="text-[10px] text-slate-400 font-mono">{p.email} · {p.department || 'Operações'}</div>
+                  <div key={p.id} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <img src={p.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${p.name}`} className="h-9 w-9 shrink-0 rounded-full" alt="" />
+                      <div className="min-w-0">
+                        <div className="truncate text-sm font-semibold text-slate-900">{p.name}</div>
+                        <div className="truncate text-xs text-slate-500">{p.email} · {p.department || 'Sem departamento'}</div>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex min-w-0 items-center gap-2 sm:justify-end">
                       <select
                         value={p.manager_id ?? ''}
                         onChange={async (e) => {
@@ -647,21 +707,22 @@ export default function AdminDashboard({ refetchAppData, currentCompany, activeT
                             alert('Erro ao atualizar gestor: ' + err.message)
                           }
                         }}
-                        className="border border-slate-200 rounded px-2 py-1 text-[10px] bg-white min-w-[120px]"
+                        className="min-h-9 min-w-0 flex-1 rounded-lg border border-slate-300 bg-white px-2 text-xs text-slate-700 sm:w-36 sm:flex-none"
                         title="Gestor Direto"
                       >
                         <option value="">Sem gestor</option>
                         {sameCompanyProfiles.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
                       </select>
-                      <span className="text-[9px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded font-bold uppercase">{p.role}</span>
+                      <span className="shrink-0 rounded-md bg-slate-100 px-2 py-1 text-[10px] font-semibold text-slate-600">{p.role}</span>
                     </div>
                   </div>
                 )
               })}
             </div>
-          </div>
-          <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-6">
-            <h3 className="text-slate-800 font-bold text-sm uppercase tracking-widest border-b border-slate-100 pb-3 mb-4">Adicionar Novo Colaborador</h3>
+          </section>
+          {showUserForm && <aside className="rounded-xl border border-slate-200 bg-white p-5">
+            <h2 className="text-base font-bold text-slate-950">Adicionar usuário</h2>
+            <p className="mb-4 mt-1 text-sm text-slate-500">Defina o acesso inicial. Ele poderá ser alterado depois.</p>
             <LicenseUsageBadge companyId={usrCompanyId} rawCompanies={rawCompanies} rawProfiles={rawProfiles} />
             <form onSubmit={handleSaveUser} className="space-y-3">
               <div>
@@ -700,11 +761,11 @@ export default function AdminDashboard({ refetchAppData, currentCompany, activeT
                   {rawCompanies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
               </div>
-              <button type="submit" disabled={usrSaving} className="w-full py-2.5 rounded-xl bg-slate-800 text-white font-bold text-xs mt-3 disabled:opacity-50">
-                {usrSaving ? 'Salvando...' : 'Create Profile'}
+              <button type="submit" disabled={usrSaving} className="mt-3 min-h-10 w-full rounded-lg bg-slate-950 px-4 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50">
+                {usrSaving ? 'Salvando...' : 'Adicionar usuário'}
               </button>
             </form>
-          </div>
+          </aside>}
         </div>
       )}
 
@@ -713,15 +774,11 @@ export default function AdminDashboard({ refetchAppData, currentCompany, activeT
       )}
 
       {activeTab === 'departments' && (
-        <DepartmentManager companyId={currentCompany.id} cardClass="bg-white border border-slate-200 rounded-2xl shadow-sm" primaryColor={currentCompany.primary_color || '#4f46e5'} />
+        <DepartmentManager companyId={currentCompany.id} cardClass="overflow-hidden rounded-xl border border-slate-200 bg-white" primaryColor={currentCompany.primary_color || '#4f46e5'} />
       )}
 
       {(['catalog_incidents', 'catalog_requests', 'form_templates'] as string[]).includes(activeTab) && (
-        <div className="space-y-4">
-          <div className="flex items-center gap-3 flex-wrap">
-            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Catálogo Ativo</span>
-            <span className="text-xs text-slate-400">Gerencie os catálogos para o tenant selecionado no topo da página.</span>
-          </div>
+        <div>
           <CatalogManager
             companyId={currentCompany.id}
             section={

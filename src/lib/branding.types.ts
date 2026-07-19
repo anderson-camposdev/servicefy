@@ -153,6 +153,30 @@ export function validateBrandingFile(file: File): FileValidationResult {
   return { valid: true, error: null }
 }
 
+export function validateBrandingDimensions(
+  width: number,
+  height: number,
+  assetType: 'logo' | 'background',
+): FileValidationResult {
+  if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
+    return { valid: false, error: 'Não foi possível identificar as dimensões da imagem.' }
+  }
+
+  if (assetType === 'logo') {
+    const ratio = width / height
+    if (width < 240 || height < 80) {
+      return { valid: false, error: `Logotipo com baixa resolução (${width}×${height}px). Use no mínimo 240×80px.` }
+    }
+    if (ratio < 0.5 || ratio > 6) {
+      return { valid: false, error: 'Proporção de logotipo incompatível. Use uma imagem entre 1:2 e 6:1.' }
+    }
+  } else if (width < 1280 || height < 720) {
+    return { valid: false, error: `Imagem de fundo com baixa resolução (${width}×${height}px). Use no mínimo 1280×720px.` }
+  }
+
+  return { valid: true, error: null }
+}
+
 // ─── Helpers ─────────────────────────────────────────────────
 
 /**
