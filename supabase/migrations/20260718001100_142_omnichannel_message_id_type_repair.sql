@@ -1,5 +1,5 @@
--- Corrige regressão da migration 127: ticket_messages.id é bigint no banco
--- efetivo, portanto as referências omnichannel também precisam ser bigint.
+-- Mantém as referências omnichannel alinhadas ao tipo canônico de
+-- ticket_messages.id, que é UUID desde a criação da tabela.
 
 DO $block$
 BEGIN
@@ -9,13 +9,13 @@ BEGIN
      WHERE table_schema = 'public'
        AND table_name = 'channel_messages'
        AND column_name = 'ticket_message_id'
-       AND data_type <> 'bigint'
+       AND data_type <> 'uuid'
   ) THEN
     IF EXISTS (SELECT 1 FROM public.channel_messages WHERE ticket_message_id IS NOT NULL) THEN
-      RAISE EXCEPTION 'channel_messages.ticket_message_id contém valores incompatíveis com ticket_messages.id bigint';
+      RAISE EXCEPTION 'channel_messages.ticket_message_id contém valores incompatíveis com ticket_messages.id UUID';
     END IF;
     ALTER TABLE public.channel_messages
-      ALTER COLUMN ticket_message_id TYPE bigint USING NULL::bigint;
+      ALTER COLUMN ticket_message_id TYPE uuid USING NULL::uuid;
   END IF;
 
   IF EXISTS (
@@ -24,13 +24,13 @@ BEGIN
      WHERE table_schema = 'public'
        AND table_name = 'channel_outbox'
        AND column_name = 'source_ticket_message_id'
-       AND data_type <> 'bigint'
+       AND data_type <> 'uuid'
   ) THEN
     IF EXISTS (SELECT 1 FROM public.channel_outbox WHERE source_ticket_message_id IS NOT NULL) THEN
-      RAISE EXCEPTION 'channel_outbox.source_ticket_message_id contém valores incompatíveis com ticket_messages.id bigint';
+      RAISE EXCEPTION 'channel_outbox.source_ticket_message_id contém valores incompatíveis com ticket_messages.id UUID';
     END IF;
     ALTER TABLE public.channel_outbox
-      ALTER COLUMN source_ticket_message_id TYPE bigint USING NULL::bigint;
+      ALTER COLUMN source_ticket_message_id TYPE uuid USING NULL::uuid;
   END IF;
 END
 $block$;

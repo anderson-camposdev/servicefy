@@ -23,9 +23,9 @@ test('locks de SLA usam tickets e tipos de aprovação continuam explícitos', (
   assert.match(sql, /check_sla_warnings[\s\S]*v_inc public\.tickets/i)
 })
 
-test('omnichannel acompanha o bigint real de ticket_messages e BI inicializa arrays e OUT params tipados', () => {
-  assert.match(omnichannelRepair, /ALTER COLUMN source_ticket_message_id TYPE bigint/i)
-  assert.match(omnichannelRepair, /ALTER COLUMN ticket_message_id TYPE bigint/i)
+test('omnichannel acompanha o UUID real de ticket_messages e BI inicializa arrays e OUT params tipados', () => {
+  assert.match(omnichannelRepair, /ALTER COLUMN source_ticket_message_id TYPE uuid/i)
+  assert.match(omnichannelRepair, /ALTER COLUMN ticket_message_id TYPE uuid/i)
   assert.match(omnichannelRepair, /v_ticket_message_id public\.ticket_messages\.id%TYPE/i)
   assert.match(omnichannelRepair, /v_existing_ticket_message_id public\.channel_messages\.ticket_message_id%TYPE/i)
   assert.match(omnichannelRepair, /cm\.ticket_message_id = v_row\.source_ticket_message_id/i)
