@@ -5,6 +5,8 @@ import test from 'node:test'
 const root = new URL('../../', import.meta.url)
 const migration = await readFile(new URL('supabase/migrations/20260718001000_141_auth_context_hardening.sql', root), 'utf8')
 const authService = await readFile(new URL('src/auth/authService.ts', root), 'utf8')
+const loginScreen = await readFile(new URL('src/components/TenantLoginScreen.tsx', root), 'utf8')
+const app = await readFile(new URL('src/App.tsx', root), 'utf8')
 const nginx = await readFile(new URL('nginx.conf', root), 'utf8')
 const dockerfile = await readFile(new URL('Dockerfile', root), 'utf8')
 const baseline = await readFile(new URL('docs/SECURITY_AUTH_BASELINE.md', root), 'utf8')
@@ -47,4 +49,12 @@ test('baseline preserva login por senha e deixa MFA gradual', () => {
   assert.match(baseline, /login por senha.*permitido/i)
   assert.match(baseline, /Supabase Cloud/i)
   assert.match(baseline, /homologa[cç][aã]o/i)
+})
+
+test('recuperação de senha usa origem confiável e resposta anti-enumeração', () => {
+  assert.match(authService, /resetPasswordForEmail\(email\.trim\(\), \{\s*redirectTo: `\$\{window\.location\.origin\}\/`/)
+  assert.match(authService, /updateUser\(\{ password \}\)/)
+  assert.match(loginScreen, /Se houver uma conta elegível/)
+  assert.doesNotMatch(loginScreen, /usuário não encontrado|e-mail não cadastrado/i)
+  assert.match(app, /if \(recoveryMode\) return <LoginScreen \/>/)
 })

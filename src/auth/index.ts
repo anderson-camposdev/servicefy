@@ -8,6 +8,8 @@ export {
   isProviderUser,
   signInWithPassword,
   signInWithOAuth,
+  requestPasswordRecovery,
+  updatePassword,
   signOut,
 } from './authService'
 export type { AuthProfile } from './authService'

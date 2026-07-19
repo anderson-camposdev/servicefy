@@ -85,6 +85,19 @@ export async function signInWithOAuth(provider: SsoProvider) {
 }
 
 /** Encerra a sessão atual. */
+export async function requestPasswordRecovery(email: string) {
+  const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+    redirectTo: `${window.location.origin}/`,
+  })
+  if (error) throw error
+}
+
+export async function updatePassword(password: string) {
+  const { data, error } = await supabase.auth.updateUser({ password })
+  if (error) throw error
+  return data
+}
+
 export async function signOut() {
   const { error } = await supabase.auth.signOut()
   if (error) throw error

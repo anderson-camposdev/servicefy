@@ -106,4 +106,40 @@ describe('TenantLoginScreen', () => {
     expect(screen.queryByAltText('Logo Allied Tecnologia')).toBeNull()
     expect(screen.getByText('AT')).toBeTruthy()
   })
+
+  it('solicita recuperação sem revelar se a conta existe', async () => {
+    const onRequestPasswordRecovery = vi.fn()
+    render(
+      <TenantLoginScreen
+        branding={customBranding}
+        onSignIn={vi.fn()}
+        onRequestPasswordRecovery={onRequestPasswordRecovery}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Esqueci minha senha' }))
+    fireEvent.change(screen.getByLabelText('E-mail para recuperação'), { target: { value: ' user@allied.it ' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar instruções' }))
+
+    await waitFor(() => expect(onRequestPasswordRecovery).toHaveBeenCalledWith('user@allied.it'))
+    expect(screen.getByText(/Se houver uma conta elegível/)).toBeTruthy()
+  })
+
+  it('permite definir uma nova senha quando a sessão está em recuperação', async () => {
+    const onUpdatePassword = vi.fn()
+    render(
+      <TenantLoginScreen
+        branding={customBranding}
+        onSignIn={vi.fn()}
+        recoveryMode
+        onUpdatePassword={onUpdatePassword}
+      />,
+    )
+
+    fireEvent.change(screen.getByLabelText('Nova senha'), { target: { value: 'long-secure-password' } })
+    fireEvent.change(screen.getByLabelText('Confirmar nova senha'), { target: { value: 'long-secure-password' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Atualizar senha' }))
+
+    await waitFor(() => expect(onUpdatePassword).toHaveBeenCalledWith('long-secure-password'))
+  })
 })

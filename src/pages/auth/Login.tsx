@@ -12,6 +12,9 @@ export default function Login() {
     signInWithProvider,
     status: authStatus,
     error: authError,
+    requestPasswordRecovery,
+    updatePassword,
+    recoveryMode,
   } = useAuth()
 
   const providers = tenantStatus === 'not-found'
@@ -25,6 +28,9 @@ export default function Login() {
       branding={branding}
       onSignIn={signIn}
       onOAuth={signInWithProvider}
+      onRequestPasswordRecovery={requestPasswordRecovery}
+      onUpdatePassword={updatePassword}
+      recoveryMode={recoveryMode}
       providers={providers}
       allowLocalLogin={tenant?.allow_local_login ?? true}
       authError={authError}

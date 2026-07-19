@@ -1,9 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Session, User } from '@supabase/supabase-js'
 
-const { mockGetUser, mockSignOut } = vi.hoisted(() => ({
+const { mockGetUser, mockSignOut, mockResetPasswordForEmail, mockUpdateUser } = vi.hoisted(() => ({
   mockGetUser: vi.fn(),
   mockSignOut: vi.fn(),
+  mockResetPasswordForEmail: vi.fn(),
+  mockUpdateUser: vi.fn(),
 }))
 
 vi.mock('../../lib/supabase', () => ({
@@ -11,11 +13,13 @@ vi.mock('../../lib/supabase', () => ({
     auth: {
       getUser: mockGetUser,
       signOut: mockSignOut,
+      resetPasswordForEmail: mockResetPasswordForEmail,
+      updateUser: mockUpdateUser,
     },
   },
 }))
 
-import { validateStoredSession } from '../authService'
+import { requestPasswordRecovery, updatePassword, validateStoredSession } from '../authService'
 
 const user = (id: string): User => ({
   id,
@@ -60,5 +64,23 @@ describe('validateStoredSession', () => {
   it('não consulta o servidor quando a sessão está incompleta', async () => {
     await expect(validateStoredSession(null)).resolves.toBeNull()
     expect(mockGetUser).not.toHaveBeenCalled()
+  })
+
+  it('solicita recuperação com redirecionamento restrito à origem atual', async () => {
+    mockResetPasswordForEmail.mockResolvedValue({ data: {}, error: null })
+
+    await requestPasswordRecovery(' user@acme.com ')
+
+    expect(mockResetPasswordForEmail).toHaveBeenCalledWith('user@acme.com', {
+      redirectTo: `${window.location.origin}/`,
+    })
+  })
+
+  it('atualiza a senha usando a sessão de recuperação', async () => {
+    mockUpdateUser.mockResolvedValue({ data: { user: user('auth-user-1') }, error: null })
+
+    await updatePassword('new-safe-password')
+
+    expect(mockUpdateUser).toHaveBeenCalledWith({ password: 'new-safe-password' })
   })
 })

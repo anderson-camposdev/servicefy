@@ -17,7 +17,9 @@ import {
   isProviderUser,
   signInWithPassword,
   signInWithOAuth,
+  requestPasswordRecovery,
   signOut as authSignOut,
+  updatePassword as authUpdatePassword,
   validateStoredSession,
 } from './authService'
 import type { SsoProvider } from '../lib/sso'
@@ -40,6 +42,9 @@ export interface AuthContextValue {
   error: string | null
   signIn: (email: string, password: string) => Promise<void>
   signInWithProvider: (provider: SsoProvider) => Promise<void>
+  requestPasswordRecovery: (email: string) => Promise<void>
+  updatePassword: (password: string) => Promise<void>
+  recoveryMode: boolean
   signOut: () => Promise<void>
   /** Recarrega profile + empresa da sessão atual (SPA, sem F5). */
   refreshCompany: () => Promise<void>
@@ -54,6 +59,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isProvider, setIsProvider] = useState(false)
   const [status, setStatus] = useState<AuthStatus>('loading')
   const [error, setError] = useState<string | null>(null)
+  const [recoveryMode, setRecoveryMode] = useState(false)
 
   const loadProfile = useCallback(async (activeSession: Session | null) => {
     if (!activeSession?.user) {
@@ -102,6 +108,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const { data: sub } = supabase.auth.onAuthStateChange((event, newSession) => {
       authEventReceived = true
+      if (event === 'PASSWORD_RECOVERY') setRecoveryMode(true)
 
       if (event === 'INITIAL_SESSION') {
         void validateStoredSession(newSession).then(validatedSession => {
@@ -152,6 +159,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  const recoverPassword = useCallback(async (email: string) => {
+    setError(null)
+    await requestPasswordRecovery(email)
+  }, [])
+
+  const updatePassword = useCallback(async (password: string) => {
+    setError(null)
+    await authUpdatePassword(password)
+    setRecoveryMode(false)
+  }, [])
+
   // Listen to profile updates in real-time to detect administrative deactivation — migration 071/IAM
   useEffect(() => {
     if (!profile?.id) return
@@ -198,6 +216,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     error,
     signIn,
     signInWithProvider,
+    requestPasswordRecovery: recoverPassword,
+    updatePassword,
+    recoveryMode,
     signOut,
     refreshCompany,
   }

@@ -864,7 +864,7 @@ function TechnicianDashboard({ companyId, currentUser, ticketType }: { companyId
 export default function App() {
   const { tenant: resolvedTenant } = useTenant()
   const { companies: dbCompanies, loading: dbLoading, error: dbError } = useAppData()
-  const { status: authStatus, profile, company: authCompany, isProvider, signOut } = useAuth()
+  const { status: authStatus, profile, company: authCompany, isProvider, signOut, recoveryMode } = useAuth()
   const { toast } = useToast()
 
   // Lista de empresas (leitura pública) — usada pelo Portal do Provedor MSP.
@@ -940,6 +940,10 @@ export default function App() {
       </div>
     )
   }
+
+  // A sessão temporária emitida pelo link de recuperação não deve abrir o
+  // workspace antes de o usuário concluir a troca da senha.
+  if (recoveryMode) return <LoginScreen />
 
   if (dbError) {
     return (

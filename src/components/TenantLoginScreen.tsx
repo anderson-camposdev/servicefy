@@ -8,6 +8,9 @@ interface Props {
   branding: TenantBranding
   onSignIn: (email: string, password: string) => Promise<void> | void
   onOAuth?: (provider: SsoProvider) => Promise<void> | void
+  onRequestPasswordRecovery?: (email: string) => Promise<void> | void
+  onUpdatePassword?: (password: string) => Promise<void> | void
+  recoveryMode?: boolean
   providers?: SsoProvider[]
   allowLocalLogin?: boolean
   authError?: string | null
@@ -23,6 +26,9 @@ export default function TenantLoginScreen({
   branding,
   onSignIn,
   onOAuth,
+  onRequestPasswordRecovery,
+  onUpdatePassword,
+  recoveryMode = false,
   providers = [],
   allowLocalLogin = true,
   authError = '',
@@ -36,6 +42,11 @@ export default function TenantLoginScreen({
   const [showPassword, setShowPassword] = useState(false)
   const [oauthSubmitting, setOauthSubmitting] = useState<SsoProvider | null>(null)
   const [logoFailed, setLogoFailed] = useState(false)
+  const [recovering, setRecovering] = useState(false)
+  const [recoveryEmail, setRecoveryEmail] = useState('')
+  const [recoverySent, setRecoverySent] = useState(false)
+  const [newPassword, setNewPassword] = useState('')
+  const [passwordConfirmation, setPasswordConfirmation] = useState('')
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault()
@@ -59,6 +70,33 @@ export default function TenantLoginScreen({
     } finally {
       setOauthSubmitting(null)
     }
+  }
+
+  const handleRecoveryRequest = async (event: FormEvent) => {
+    event.preventDefault()
+    if (!onRequestPasswordRecovery || !recoveryEmail.trim()) {
+      setLocalError('Informe seu e-mail corporativo.')
+      return
+    }
+    setSubmitting(true)
+    setLocalError('')
+    try { await onRequestPasswordRecovery(recoveryEmail.trim()) } catch { /* resposta uniforme */ }
+    finally {
+      setRecoverySent(true)
+      setSubmitting(false)
+    }
+  }
+
+  const handlePasswordUpdate = async (event: FormEvent) => {
+    event.preventDefault()
+    if (newPassword.length < 12) return setLocalError('Use uma senha com pelo menos 12 caracteres.')
+    if (newPassword !== passwordConfirmation) return setLocalError('As senhas informadas não coincidem.')
+    if (!onUpdatePassword) return
+    setSubmitting(true)
+    setLocalError('')
+    try { await onUpdatePassword(newPassword) }
+    catch { setLocalError('Não foi possível atualizar a senha. Solicite um novo link.') }
+    finally { setSubmitting(false) }
   }
 
   const busy = loading || submitting || oauthSubmitting !== null
@@ -93,13 +131,13 @@ export default function TenantLoginScreen({
         <div className="relative w-full max-w-[440px]">
           <div className="mb-8">
             <p className="mb-5 flex items-center gap-2 text-xs font-semibold text-on-surface-variant"><ShieldCheck className="h-4 w-4 text-resolved" /> Conta corporativa</p>
-            <h2 className="text-3xl font-bold tracking-[-.025em] text-on-surface">Acesse sua central</h2>
-            <p className="mt-2 text-sm leading-6 text-on-surface-variant">Use sua conta corporativa para continuar.</p>
+            <h2 className="text-3xl font-bold tracking-[-.025em] text-on-surface">{recoveryMode ? 'Defina uma nova senha' : recovering ? 'Recupere seu acesso' : 'Acesse sua central'}</h2>
+            <p className="mt-2 text-sm leading-6 text-on-surface-variant">{recoveryMode ? 'Crie uma senha exclusiva com pelo menos 12 caracteres.' : recovering ? 'Enviaremos as instruções para o e-mail informado.' : 'Use sua conta corporativa para continuar.'}</p>
           </div>
 
           {errorMessage && <div role="alert" className="mb-4 rounded-2xl border border-red-100 bg-red-50 p-3 text-xs font-semibold text-red-600">{errorMessage}</div>}
 
-          {providers.length > 0 && (
+          {!recoveryMode && !recovering && providers.length > 0 && (
             <div className="space-y-3">
               {providers.map(provider => {
                 const isGoogle = provider === 'google'
@@ -127,13 +165,25 @@ export default function TenantLoginScreen({
             </div>
           )}
 
-          {providers.length > 0 && allowLocalLogin && (
+          {!recoveryMode && !recovering && providers.length > 0 && allowLocalLogin && (
             <div className="my-5 flex items-center gap-3 text-xs font-medium text-slate-500">
               <span className="h-px flex-1 bg-slate-200" /> ou entre com e-mail e senha <span className="h-px flex-1 bg-slate-200" />
             </div>
           )}
 
-          {allowLocalLogin ? (
+          {recoveryMode ? (
+            <form onSubmit={handlePasswordUpdate} className="space-y-5" noValidate>
+              <div><label htmlFor="new-password" className="mb-2 block text-xs font-extrabold text-slate-700">Nova senha</label><input id="new-password" type="password" autoComplete="new-password" value={newPassword} onChange={event => setNewPassword(event.target.value)} className="h-14 w-full rounded-xl border border-outline-variant bg-surface px-4 text-sm outline-none" /></div>
+              <div><label htmlFor="confirm-password" className="mb-2 block text-xs font-extrabold text-slate-700">Confirmar nova senha</label><input id="confirm-password" type="password" autoComplete="new-password" value={passwordConfirmation} onChange={event => setPasswordConfirmation(event.target.value)} className="h-14 w-full rounded-xl border border-outline-variant bg-surface px-4 text-sm outline-none" /></div>
+              <button type="submit" disabled={busy} className="h-14 w-full rounded-xl text-sm font-bold text-white disabled:opacity-55" style={{ background: 'var(--brand-primary)' }}>Atualizar senha</button>
+            </form>
+          ) : recovering ? (
+            recoverySent ? <div role="status" className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4 text-sm leading-6 text-emerald-800">Se houver uma conta elegível para este e-mail, as instruções serão enviadas em instantes.</div> :
+            <form onSubmit={handleRecoveryRequest} className="space-y-5" noValidate>
+              <div><label htmlFor="recovery-email" className="mb-2 block text-xs font-extrabold text-slate-700">E-mail para recuperação</label><input id="recovery-email" type="email" autoComplete="email" value={recoveryEmail} onChange={event => setRecoveryEmail(event.target.value)} className="h-14 w-full rounded-xl border border-outline-variant bg-surface px-4 text-sm outline-none" /></div>
+              <button type="submit" disabled={busy} className="h-14 w-full rounded-xl text-sm font-bold text-white disabled:opacity-55" style={{ background: 'var(--brand-primary)' }}>Enviar instruções</button>
+            </form>
+          ) : allowLocalLogin ? (
           <form onSubmit={handleSubmit} className="space-y-5" noValidate>
             <div>
               <label htmlFor="tenant-login-email" className="mb-2 block text-xs font-extrabold text-slate-700">E-mail corporativo</label>
@@ -161,6 +211,7 @@ export default function TenantLoginScreen({
             <button type="submit" disabled={busy} className="group flex h-14 w-full items-center justify-center gap-2 rounded-xl px-5 text-sm font-bold text-white transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-55" style={{ background: 'var(--brand-primary)' }}>
               {busy ? 'Autenticando…' : 'Entrar na central'} {!busy && <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" aria-hidden="true" />}
             </button>
+            {onRequestPasswordRecovery && <button type="button" onClick={() => { setRecovering(true); setLocalError('') }} className="w-full text-center text-xs font-bold text-[var(--brand-primary)]">Esqueci minha senha</button>}
           </form>
           ) : (
             <div className="mt-5 rounded-2xl border border-indigo-100 bg-indigo-50 p-4 text-center text-xs font-semibold leading-5 text-indigo-800">

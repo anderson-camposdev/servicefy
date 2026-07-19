@@ -52,6 +52,9 @@ vi.mock('../authService', () => ({
   getAuthProfile: mockGetAuthProfile,
   isProviderUser: vi.fn().mockReturnValue(false),
   signInWithPassword: vi.fn(),
+  signInWithOAuth: vi.fn(),
+  requestPasswordRecovery: vi.fn(),
+  updatePassword: vi.fn(),
   signOut: mockAuthSignOut,
   validateStoredSession: mockValidateStoredSession,
 }))
