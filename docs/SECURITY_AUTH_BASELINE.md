@@ -25,6 +25,31 @@ inclui uma conta administrativa de contingência e exige teste de recuperação.
 - JIT aceita somente domínio verificado e cria exclusivamente `end_user`.
 - `service_role` permanece restrita a Edge Functions e jobs internos.
 - O container web publica CSP e headers defensivos sem habilitar CORS global.
+- Novas senhas exigem no mínimo 12 caracteres no Supabase Auth.
+- Auto cadastro público permanece desabilitado; onboarding ocorre por convite
+  administrativo governado.
+- Trocas sensíveis de senha exigem sessão recente e e-mails de autenticação têm
+  intervalo mínimo de 60 segundos.
+
+## Aplicação da configuração
+
+`supabase/config.toml` é a fonte versionada para ambientes locais e para o
+comando de sincronização da configuração do projeto. Alterar esse arquivo não
+comprova, sozinho, que o Supabase Cloud recebeu a política. Em cada ambiente:
+
+1. confirmar o projeto vinculado;
+2. revisar o diff de configuração;
+3. aplicar a configuração com a CLI;
+4. validar login por senha, convite administrativo e recuperação;
+5. registrar evidência dos valores no painel do Supabase.
+
+O endurecimento não ativa MFA, confirmação obrigatória de e-mail ou CAPTCHA.
+Esses controles continuam sujeitos ao rollout gradual descrito abaixo.
+
+Não executar `supabase config push` diretamente a partir de uma estação local:
+o mesmo arquivo contém `site_url` e redirects de desenvolvimento. No Cloud,
+aplicar somente os controles de Auth acima ou gerar uma configuração específica
+do ambiente com os hosts oficiais revisados.
 
 ## Checklist do Supabase Cloud
 

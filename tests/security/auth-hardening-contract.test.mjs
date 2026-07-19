@@ -10,6 +10,7 @@ const app = await readFile(new URL('src/App.tsx', root), 'utf8')
 const nginx = await readFile(new URL('nginx.conf', root), 'utf8')
 const dockerfile = await readFile(new URL('Dockerfile', root), 'utf8')
 const baseline = await readFile(new URL('docs/SECURITY_AUTH_BASELINE.md', root), 'utf8')
+const authConfig = await readFile(new URL('supabase/config.toml', root), 'utf8')
 
 test('helpers de identidade ignoram perfil ou tenant desativado', () => {
   for (const helper of ['get_current_profile_id', 'get_current_user_company_id', 'get_current_user_role']) {
@@ -57,4 +58,13 @@ test('recuperação de senha usa origem confiável e resposta anti-enumeração'
   assert.match(loginScreen, /Se houver uma conta elegível/)
   assert.doesNotMatch(loginScreen, /usuário não encontrado|e-mail não cadastrado/i)
   assert.match(app, /if \(recoveryMode\) return <LoginScreen \/>/)
+})
+
+test('Supabase aplica política de credenciais no servidor sem exigir MFA', () => {
+  assert.match(authConfig, /minimum_password_length\s*=\s*12/)
+  assert.match(authConfig, /\[auth\][\s\S]*?enable_signup\s*=\s*false/)
+  assert.match(authConfig, /\[auth\.email\][\s\S]*?enable_signup\s*=\s*false/)
+  assert.match(authConfig, /secure_password_change\s*=\s*true/)
+  assert.match(authConfig, /max_frequency\s*=\s*"60s"/)
+  assert.match(authConfig, /\[auth\.mfa\.totp\][\s\S]*?enroll_enabled\s*=\s*false[\s\S]*?verify_enabled\s*=\s*false/)
 })
