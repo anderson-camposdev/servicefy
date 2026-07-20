@@ -69,13 +69,27 @@ export default function FormTemplateManager({ companyId, templates, onChange }: 
         {templates.map(template => (
           <div key={template.id} className="p-3">
             <div className="flex items-center gap-3">
+              <input
+                value={template.name}
+                onChange={event => onChange(templates.map(candidate => candidate.id === template.id ? { ...candidate, name: event.target.value } : candidate))}
+                onBlur={async event => {
+                  const trimmed = event.target.value.trim()
+                  if (!trimmed || trimmed === template.name) return
+                  try {
+                    const updated = await serviceCatalogService.updateFormTemplate(template.id, { name: trimmed })
+                    onChange(templates.map(candidate => candidate.id === template.id ? updated : candidate))
+                  } catch (cause) {
+                    setError(cause instanceof Error ? cause.message : 'Falha ao renomear template.')
+                  }
+                }}
+                className="min-w-0 flex-1 rounded-lg border border-transparent bg-transparent px-1.5 py-1 text-sm font-bold text-slate-800 outline-none hover:border-slate-200 focus:border-indigo-300 focus:bg-white"
+              />
               <button
                 type="button"
                 onClick={() => setExpandedId(current => current === template.id ? null : template.id)}
-                className="min-w-0 flex-1 text-left"
+                className="shrink-0 text-xs font-semibold text-slate-500 hover:text-indigo-600"
               >
-                <span className="block truncate text-sm font-bold text-slate-800">{template.name}</span>
-                <span className="text-xs text-slate-400">Clique para editar os campos reutilizáveis</span>
+                {expandedId === template.id ? 'Fechar campos' : 'Editar campos'}
               </button>
               <button type="button" onClick={() => remove(template)} className="rounded-lg p-2 text-red-600/70 hover:bg-red-50 hover:text-red-700">
                 <Trash2 className="h-4 w-4" />

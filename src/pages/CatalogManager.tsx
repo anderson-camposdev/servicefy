@@ -204,6 +204,14 @@ export default function CatalogManager({ companyId, section = 'incident' }: { co
       setCategories(prev => prev.map(row => row.id === c.id ? updated : row))
     } catch (e: any) { setError(e?.message || 'Falha ao atualizar o ícone da categoria.') }
   }
+  const renameCategory = async (c: CatalogCategoryRow, name: string) => {
+    const trimmed = name.trim()
+    if (!trimmed || trimmed === c.name) return
+    try {
+      const updated = await serviceCatalogService.updateCategory(c.id, { name: trimmed })
+      setCategories(prev => prev.map(row => row.id === c.id ? updated : row))
+    } catch (e: any) { setError(e?.message || 'Falha ao renomear a categoria.') }
+  }
   const removeCategory = async (c: CatalogCategoryRow) => {
     if (!confirm(`Excluir a categoria "${c.name}" e seus serviços?`)) return
     try { await serviceCatalogService.deleteCategory(c.id); setCategories(prev => prev.filter(x => x.id !== c.id)) }
@@ -234,6 +242,17 @@ export default function CatalogManager({ companyId, section = 'incident' }: { co
         [svc.category_id]: (prev[svc.category_id] ?? []).map(row => row.id === svc.id ? updated : row),
       }))
     } catch (e: any) { setError(e?.message || 'Falha ao atualizar o ícone do serviço.') }
+  }
+  const renameService = async (svc: CatalogServiceRow, name: string) => {
+    const trimmed = name.trim()
+    if (!trimmed || trimmed === svc.name) return
+    try {
+      const updated = await serviceCatalogService.updateService(svc.id, { name: trimmed })
+      setServicesByCat(prev => ({
+        ...prev,
+        [svc.category_id]: (prev[svc.category_id] ?? []).map(row => row.id === svc.id ? updated : row),
+      }))
+    } catch (e: any) { setError(e?.message || 'Falha ao renomear o serviço.') }
   }
   const removeService = async (svc: CatalogServiceRow) => {
     if (!confirm(`Excluir o serviço "${svc.name}"?`)) return
@@ -568,7 +587,12 @@ export default function CatalogManager({ companyId, section = 'incident' }: { co
                         {expandedCat.has(cat.id) ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                       </button>
                       <IconPicker value={cat.icon} onChange={icon => updateCategoryIcon(cat, icon)} companyId={companyId} label="" />
-                      <span className="text-sm font-bold text-slate-800 flex-1">{cat.name}</span>
+                      <input
+                        value={cat.name}
+                        onChange={e => setCategories(prev => prev.map(row => row.id === cat.id ? { ...row, name: e.target.value } : row))}
+                        onBlur={e => renameCategory(cat, e.target.value)}
+                        className="min-w-0 flex-1 rounded-lg border border-transparent bg-transparent px-1.5 py-1 text-sm font-bold text-slate-800 outline-none hover:border-slate-200 focus:border-indigo-300 focus:bg-white"
+                      />
                       <select value={cat.department_id || ''} onChange={e => updateCategoryDepartment(cat, e.target.value || null)} className="border border-slate-200 rounded-lg px-2 py-1 text-xs bg-white text-slate-600 max-w-[150px]">
                         <option value="">Área: Global</option>
                         {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
@@ -587,7 +611,12 @@ export default function CatalogManager({ companyId, section = 'incident' }: { co
                                 {expandedSvc.has(svc.id) ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                               </button>
                               <IconPicker value={svc.icon} onChange={icon => updateServiceIcon(svc, icon)} companyId={companyId} label="" />
-                              <span className="text-sm font-semibold text-slate-700 flex-1">{svc.name}</span>
+                              <input
+                                value={svc.name}
+                                onChange={e => setServicesByCat(prev => ({ ...prev, [svc.category_id]: (prev[svc.category_id] ?? []).map(row => row.id === svc.id ? { ...row, name: e.target.value } : row) }))}
+                                onBlur={e => renameService(svc, e.target.value)}
+                                className="min-w-0 flex-1 rounded-lg border border-transparent bg-transparent px-1.5 py-1 text-sm font-semibold text-slate-700 outline-none hover:border-slate-200 focus:border-indigo-300 focus:bg-white"
+                              />
                               <button onClick={() => toggleServiceActive(svc)} className="p-1 text-slate-400 hover:text-indigo-600">{svc.is_active ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}</button>
                               <button onClick={() => removeService(svc)} className="p-1 text-slate-400 hover:text-red-600"><Trash2 className="w-3.5 h-3.5" /></button>
                             </div>
@@ -859,6 +888,14 @@ function RequestCatalogManager({ companyId, groups, templates, departments, cale
       setCats(prev => prev.map(row => row.id === c.id ? updated : row))
     } catch (e: any) { setError(e?.message || 'Falha ao atualizar o ícone da categoria.') }
   }
+  const renameCat = async (c: RequestCategoryRow, name: string) => {
+    const trimmed = name.trim()
+    if (!trimmed || trimmed === c.name) return
+    try {
+      const updated = await serviceCatalogService.updateRequestCategory(c.id, { name: trimmed })
+      setCats(prev => prev.map(row => row.id === c.id ? updated : row))
+    } catch (e: any) { setError(e?.message || 'Falha ao renomear a categoria.') }
+  }
   const delCat = async (c: RequestCategoryRow) => {
     if (!confirm(`Excluir a categoria "${c.name}" e seus itens?`)) return
     try { await serviceCatalogService.deleteRequestCategory(c.id); setCats(p => p.filter(x => x.id !== c.id)) } catch (e: any) { setError(e?.message) }
@@ -1041,7 +1078,12 @@ function RequestCatalogManager({ companyId, groups, templates, departments, cale
                   <div className={`flex items-center gap-2 pl-8 pr-3 py-2.5 ${!cat.active ? 'opacity-50' : ''}`}>
                     <button onClick={() => toggle(cat.id)} className="p-1 text-slate-400 hover:text-slate-700">{expanded.has(cat.id) ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}</button>
                     <IconPicker value={cat.icon} onChange={icon => updateCatIcon(cat, icon)} companyId={companyId} label="" />
-                    <span className="text-sm font-bold text-slate-800 flex-1">{cat.name}</span>
+                    <input
+                      value={cat.name}
+                      onChange={e => setCats(prev => prev.map(row => row.id === cat.id ? { ...row, name: e.target.value } : row))}
+                      onBlur={e => renameCat(cat, e.target.value)}
+                      className="min-w-0 flex-1 rounded-lg border border-transparent bg-transparent px-1.5 py-1 text-sm font-bold text-slate-800 outline-none hover:border-slate-200 focus:border-indigo-300 focus:bg-white"
+                    />
                     <select value={cat.department_id || ''} onChange={e => updateCatDepartment(cat, e.target.value || null)} className="border border-slate-200 rounded-lg px-2 py-1 text-xs bg-white text-slate-600 max-w-[150px]">
                       <option value="">Área: Global</option>
                       {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
@@ -1059,7 +1101,12 @@ function RequestCatalogManager({ companyId, groups, templates, departments, cale
                       <div key={it.id} className={`bg-white border border-slate-200 rounded-xl p-2.5 ${!it.active ? 'opacity-60' : ''}`}>
                         <div className="flex items-center gap-2 flex-wrap">
                           <IconPicker value={it.icon} onChange={icon => patchItem(it, { icon })} companyId={companyId} label="" />
-                          <span className="text-sm font-semibold text-slate-700 flex-1 min-w-[120px]">{it.name}</span>
+                          <input
+                            value={it.name}
+                            onChange={e => { const nextName = e.target.value; setItemsByCat(p => ({ ...p, [it.request_category_id ?? '']: (p[it.request_category_id ?? ''] ?? []).map(row => row.id === it.id ? { ...row, name: nextName } : row) })) }}
+                            onBlur={e => { const trimmed = e.target.value.trim(); if (trimmed && trimmed !== it.name) void patchItem(it, { name: trimmed }) }}
+                            className="flex-1 min-w-[120px] rounded-lg border border-transparent bg-transparent px-1.5 py-1 text-sm font-semibold text-slate-700 outline-none hover:border-slate-200 focus:border-indigo-300 focus:bg-white"
+                          />
                           {catSubcats.length > 0 && (
                             <select value={it.request_subcategory_id ?? ''} onChange={e => patchItem(it, { request_subcategory_id: e.target.value || null })} className="border border-slate-200 rounded px-2 py-1 text-xs bg-white min-w-[130px]" title="Subcategoria do item">
                               <option value="">Sem subcategoria</option>
@@ -1174,7 +1221,12 @@ function RequestCatalogManager({ companyId, groups, templates, departments, cale
                             <div className="flex items-center gap-2 px-2.5 py-2">
                               <Layers className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
                               <IconPicker value={sc.icon} onChange={icon => patchSubcat(sc, { icon })} companyId={companyId} label="" />
-                              <span className="text-sm font-bold text-slate-700 flex-1">{sc.name}</span>
+                              <input
+                                value={sc.name}
+                                onChange={e => { const nextName = e.target.value; setSubcats(p => p.map(row => row.id === sc.id ? { ...row, name: nextName } : row)) }}
+                                onBlur={e => { const trimmed = e.target.value.trim(); if (trimmed && trimmed !== sc.name) void patchSubcat(sc, { name: trimmed }) }}
+                                className="min-w-0 flex-1 rounded-lg border border-transparent bg-transparent px-1.5 py-1 text-sm font-bold text-slate-700 outline-none hover:border-slate-200 focus:border-indigo-300 focus:bg-white"
+                              />
                               <button onClick={() => moveSubcat(sc, -1)} disabled={si === 0} className="p-1 text-slate-400 hover:text-indigo-600 disabled:opacity-20"><ArrowUp className="w-3.5 h-3.5" /></button>
                               <button onClick={() => moveSubcat(sc, 1)} disabled={si === catSubcats.length - 1} className="p-1 text-slate-400 hover:text-indigo-600 disabled:opacity-20"><ArrowDown className="w-3.5 h-3.5" /></button>
                               <button onClick={() => patchSubcat(sc, { active: !sc.active })} className="p-1 text-slate-400 hover:text-indigo-600">{sc.active ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}</button>

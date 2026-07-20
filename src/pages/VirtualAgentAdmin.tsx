@@ -7,7 +7,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import {
-  ArrowLeft, Bot, Plus, Trash2, RefreshCw, AlertTriangle, Loader2,
+  ArrowLeft, Bot, Edit2, Plus, Trash2, RefreshCw, AlertTriangle, Loader2,
   History, ListChecks, MessageSquareText, CheckCircle2,
 } from 'lucide-react'
 import { virtualAgentService, type ItsmReadiness, type SaveActionInput } from '../lib/virtual-agent-service'
@@ -135,19 +135,38 @@ function ActionsPanel({ companyId, actions, loading, onChanged, onError, onFlash
   const [form, setForm] = useState({
     actionKey: '', name: '', keywords: '', requiresConfirmation: false, minConfidence: 0.15, enabled: true,
   })
+  const [editingId, setEditingId] = useState<string | null>(null)
+
+  const startEdit = (a: VirtualAgentActionRow) => {
+    setEditingId(a.id)
+    setForm({
+      actionKey: a.action_key, name: a.name,
+      keywords: (a.config.keywords ?? []).join(', '),
+      requiresConfirmation: a.requires_confirmation,
+      minConfidence: a.min_confidence,
+      enabled: a.enabled,
+    })
+  }
+
+  const cancelEdit = () => {
+    setEditingId(null)
+    setForm({ actionKey: '', name: '', keywords: '', requiresConfirmation: false, minConfidence: 0.15, enabled: true })
+  }
 
   const add = async () => {
     if (!form.actionKey.trim() || !form.name.trim()) { onError('Informe a chave e o nome da ação.'); return }
     try {
       const input: SaveActionInput = {
+        id: editingId ?? undefined,
         companyId, actionKey: form.actionKey.trim(), name: form.name.trim(),
         enabled: form.enabled, requiresConfirmation: form.requiresConfirmation,
         minConfidence: form.minConfidence,
         keywords: form.keywords.split(',').map(k => k.trim()).filter(Boolean),
       }
       await virtualAgentService.saveAction(input)
-      setForm({ actionKey: '', name: '', keywords: '', requiresConfirmation: false, minConfidence: 0.15, enabled: true })
-      onFlash('Ação criada.'); onChanged()
+      const wasEditing = Boolean(editingId)
+      cancelEdit()
+      onFlash(wasEditing ? 'Ação atualizada.' : 'Ação criada.'); onChanged()
     } catch (cause) { onError(cause instanceof Error ? cause.message : 'Falha ao salvar ação.') }
   }
 
@@ -171,15 +190,22 @@ function ActionsPanel({ companyId, actions, loading, onChanged, onError, onFlash
   return (
     <div className="mt-6 grid gap-6 lg:grid-cols-[360px_1fr]">
       <section className="rounded-2xl border bg-white p-5 shadow-sm">
-        <h2 className="font-extrabold">Nova ação</h2>
+        <div className="flex items-center justify-between">
+          <h2 className="font-extrabold">{editingId ? 'Editar ação' : 'Nova ação'}</h2>
+          {editingId && <button onClick={cancelEdit} className="text-xs font-bold text-slate-500 hover:text-slate-800">Cancelar</button>}
+        </div>
         <div className="mt-4 space-y-3">
-          <label className="block text-xs font-bold">Chave (action_key)<input value={form.actionKey} onChange={e => setForm(f => ({ ...f, actionKey: e.target.value }))} className="mt-1 w-full rounded-xl border px-3 py-2.5 text-sm" placeholder="ex: reset_password" /></label>
+          {editingId ? (
+            <label className="block text-xs font-bold">Chave (action_key)<input value={form.actionKey} disabled title="Identificador usado internamente pelo agente virtual — não pode ser alterado após a criação." className="mt-1 w-full cursor-not-allowed rounded-xl border bg-slate-100 px-3 py-2.5 text-sm text-slate-500" /></label>
+          ) : (
+            <label className="block text-xs font-bold">Chave (action_key)<input value={form.actionKey} onChange={e => setForm(f => ({ ...f, actionKey: e.target.value }))} className="mt-1 w-full rounded-xl border px-3 py-2.5 text-sm" placeholder="ex: reset_password" /></label>
+          )}
           <label className="block text-xs font-bold">Nome<input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} className="mt-1 w-full rounded-xl border px-3 py-2.5 text-sm" placeholder="Redefinir senha" /></label>
           <label className="block text-xs font-bold">Palavras-chave (vírgula)<input value={form.keywords} onChange={e => setForm(f => ({ ...f, keywords: e.target.value }))} className="mt-1 w-full rounded-xl border px-3 py-2.5 text-sm" placeholder="senha, redefinir, esqueci" /></label>
           <label className="block text-xs font-bold">Confiança mínima (0–1)<input type="number" step="0.01" min="0" max="1" value={form.minConfidence} onChange={e => setForm(f => ({ ...f, minConfidence: Number(e.target.value) }))} className="mt-1 w-full rounded-xl border px-3 py-2.5 text-sm" /></label>
           <label className="flex items-center gap-2 text-sm font-semibold"><input type="checkbox" checked={form.requiresConfirmation} onChange={e => setForm(f => ({ ...f, requiresConfirmation: e.target.checked }))} /> Exige confirmação (Sim/Não)</label>
           <label className="flex items-center gap-2 text-sm font-semibold"><input type="checkbox" checked={form.enabled} onChange={e => setForm(f => ({ ...f, enabled: e.target.checked }))} /> Ativa</label>
-          <button onClick={() => void add()} className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-bold text-on-primary hover:opacity-90"><Plus className="h-4 w-4" /> Adicionar ação</button>
+          <button onClick={() => void add()} className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-bold text-on-primary hover:opacity-90">{editingId ? <CheckCircle2 className="h-4 w-4" /> : <Plus className="h-4 w-4" />} {editingId ? 'Salvar alterações' : 'Adicionar ação'}</button>
         </div>
       </section>
 
@@ -197,6 +223,7 @@ function ActionsPanel({ companyId, actions, loading, onChanged, onError, onFlash
                 </div>
                 <div className="truncate text-xs text-slate-500">{a.action_key} · confiança mín. {a.min_confidence} · {(a.config.keywords ?? []).join(', ') || 'sem palavras-chave'}</div>
               </div>
+              <button onClick={() => startEdit(a)} title="Editar" className="rounded-lg border p-1.5 text-slate-400 hover:bg-slate-50 hover:text-slate-900"><Edit2 className="h-3.5 w-3.5" /></button>
               <button onClick={() => void toggleEnabled(a)} className="rounded-lg border px-2.5 py-1 text-xs font-bold text-slate-600">{a.enabled ? 'Desativar' : 'Ativar'}</button>
               <button onClick={() => void remove(a)} title="Excluir" className="rounded-lg p-2 text-slate-400 hover:text-red-600"><Trash2 className="h-4 w-4" /></button>
             </article>

@@ -86,6 +86,13 @@ function AssignmentGroupsAdmin({ currentCompany, rawProfiles }: AssignmentGroups
   const [selectedAnalystId, setSelectedAnalystId] = useState('')
   const [addingMember, setAddingMember] = useState(false)
 
+  // Edit selected group's name/description (privacidade e status já têm
+  // toggle direto na lista — só nome/descrição ficavam sem edição)
+  const [editingGroupDetails, setEditingGroupDetails] = useState(false)
+  const [groupNameDraft, setGroupNameDraft] = useState('')
+  const [groupDescDraft, setGroupDescDraft] = useState('')
+  const [savingGroupDetails, setSavingGroupDetails] = useState(false)
+
   // Fetch groups
   const fetchGroups = useCallback(async () => {
     setLoading(true)
@@ -185,6 +192,31 @@ function AssignmentGroupsAdmin({ currentCompany, rawProfiles }: AssignmentGroups
     }
   }
 
+  const startEditGroupDetails = () => {
+    if (!selectedGroup) return
+    setGroupNameDraft(selectedGroup.name)
+    setGroupDescDraft(selectedGroup.description ?? '')
+    setEditingGroupDetails(true)
+  }
+
+  const handleSaveGroupDetails = async () => {
+    if (!selectedGroup || !groupNameDraft.trim()) return
+    setSavingGroupDetails(true)
+    try {
+      const updated = await assignmentGroupsService.update(selectedGroup.id, {
+        name: groupNameDraft.trim(),
+        description: groupDescDraft.trim() || null,
+      })
+      setGroups(prev => prev.map(g => g.id === updated.id ? updated : g))
+      setSelectedGroup(updated)
+      setEditingGroupDetails(false)
+    } catch (err: any) {
+      alert('Erro ao atualizar equipe: ' + err.message)
+    } finally {
+      setSavingGroupDetails(false)
+    }
+  }
+
   // Handle member addition
   const handleAddMember = async () => {
     if (!selectedGroup || !selectedAnalystId) return
@@ -264,7 +296,7 @@ function AssignmentGroupsAdmin({ currentCompany, rawProfiles }: AssignmentGroups
               }).map(g => (
                 <div
                   key={g.id}
-                  onClick={() => setSelectedGroup(g)}
+                  onClick={() => { setSelectedGroup(g); setEditingGroupDetails(false) }}
                   className={`flex cursor-pointer flex-col gap-3 p-4 transition-colors sm:flex-row sm:items-center sm:justify-between sm:px-5 ${selectedGroup?.id === g.id ? 'bg-indigo-50/60' : 'hover:bg-slate-50'}`}
                 >
                   <div className="min-w-0">
@@ -356,12 +388,37 @@ function AssignmentGroupsAdmin({ currentCompany, rawProfiles }: AssignmentGroups
       <aside className="flex h-full min-h-[400px] flex-col rounded-xl border border-slate-200 bg-white p-5">
         {selectedGroup ? (
           <>
-            <div className="border-b border-slate-100 pb-3 mb-4 flex items-center justify-between">
-              <div>
-                <h3 className="text-slate-800 font-bold text-sm uppercase tracking-widest">Membros de {selectedGroup.name}</h3>
-                <p className="text-[10px] text-slate-400 mt-0.5">Gerencie os analistas associados a esta equipe</p>
-              </div>
-              <Settings className="w-4 h-4 text-slate-400" />
+            <div className="border-b border-slate-100 pb-3 mb-4">
+              {editingGroupDetails ? (
+                <div className="space-y-2">
+                  <input
+                    type="text"
+                    value={groupNameDraft}
+                    onChange={e => setGroupNameDraft(e.target.value)}
+                    className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-bold text-slate-800 bg-white focus:ring-2 focus:ring-indigo-500 outline-none"
+                    placeholder="Nome da equipe"
+                  />
+                  <textarea
+                    value={groupDescDraft}
+                    onChange={e => setGroupDescDraft(e.target.value)}
+                    rows={2}
+                    className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-[11px] text-slate-600 bg-white focus:ring-2 focus:ring-indigo-500 outline-none"
+                    placeholder="Descrição"
+                  />
+                  <div className="flex gap-2">
+                    <button type="button" onClick={() => void handleSaveGroupDetails()} disabled={savingGroupDetails || !groupNameDraft.trim()} className="rounded-lg bg-slate-950 px-3 py-1.5 text-[11px] font-bold text-white hover:bg-slate-800 disabled:opacity-50">{savingGroupDetails ? 'Salvando...' : 'Salvar'}</button>
+                    <button type="button" onClick={() => setEditingGroupDetails(false)} className="rounded-lg border px-3 py-1.5 text-[11px] font-bold text-slate-600 hover:bg-slate-50">Cancelar</button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-slate-800 font-bold text-sm uppercase tracking-widest">Membros de {selectedGroup.name}</h3>
+                    <p className="text-[10px] text-slate-400 mt-0.5">Gerencie os analistas associados a esta equipe</p>
+                  </div>
+                  <button type="button" onClick={startEditGroupDetails} title="Editar nome e descrição" aria-label="Editar nome e descrição da equipe" className="rounded-lg border p-1.5 text-slate-400 hover:bg-slate-50 hover:text-slate-900"><Edit2 className="w-4 h-4" /></button>
+                </div>
+              )}
             </div>
 
             <div className="mb-6 bg-slate-50 border border-slate-100 rounded-xl p-3.5 space-y-3">
@@ -431,11 +488,14 @@ interface AdminDashboardProps {
   refetchAppData?: () => Promise<void>
   currentCompany: Company
   activeTab: string
+  activeRole?: string
   setManagedCompanyId?: (id: string) => void
   setActiveTab?: (tab: any) => void
 }
 
-export default function AdminDashboard({ refetchAppData, currentCompany, activeTab, setManagedCompanyId, setActiveTab }: AdminDashboardProps) {
+export default function AdminDashboard({ refetchAppData, currentCompany, activeTab, activeRole, setManagedCompanyId, setActiveTab }: AdminDashboardProps) {
+  const isMspAdmin = activeRole === 'sysadmin'
+  const assignableRoleOptions = isMspAdmin ? REAL_ROLE_OPTIONS : REAL_ROLE_OPTIONS.filter(option => option.value !== 'sysadmin')
   const { toast } = useToast()
   // States for tenant onboarding
   const [tenantName, setTenantName] = useState('')
@@ -463,6 +523,10 @@ export default function AdminDashboard({ refetchAppData, currentCompany, activeT
   const [usrSaving, setUsrSaving] = useState(false)
   const [showUserForm, setShowUserForm] = useState(false)
   const [userQuery, setUserQuery] = useState('')
+
+  // States for user edition
+  const [editingUser, setEditingUser] = useState<ProfileRow | null>(null)
+  const [userUpdating, setUserUpdating] = useState(false)
 
   const { companies: rawCompanies, profiles: rawProfiles } = useAppData()
 
@@ -555,6 +619,29 @@ export default function AdminDashboard({ refetchAppData, currentCompany, activeT
       toast.error(err instanceof Error ? err.message : 'Erro ao cadastrar usuário.')
     } finally {
       setUsrSaving(false)
+    }
+  }
+
+  const handleUpdateUser = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!editingUser) return
+    setUserUpdating(true)
+    try {
+      await profilesService.update(editingUser.id, {
+        name: editingUser.name,
+        email: editingUser.email,
+        role: editingUser.role,
+        department: editingUser.department || null,
+      })
+      toast.success('Usuário atualizado com sucesso!')
+      setEditingUser(null)
+      if (refetchAppData) await refetchAppData()
+    } catch (err) {
+      // update_profile_secure (migration 149) devolve mensagem amigável em
+      // português quando o papel solicitado exige admin do provedor.
+      toast.error(err instanceof Error ? err.message : 'Erro ao atualizar usuário.')
+    } finally {
+      setUserUpdating(false)
     }
   }
 
@@ -652,7 +739,7 @@ export default function AdminDashboard({ refetchAppData, currentCompany, activeT
       )}
 
       {activeTab === 'users' && (
-        <div className={`grid grid-cols-1 gap-5 ${showUserForm ? 'xl:grid-cols-[minmax(0,1fr)_22rem]' : ''}`}>
+        <div className={`grid grid-cols-1 gap-5 ${showUserForm || editingUser ? 'xl:grid-cols-[minmax(0,1fr)_22rem]' : ''}`}>
           <section className="min-w-0 rounded-xl border border-slate-200 bg-white">
             <div className="flex flex-col gap-4 border-b border-slate-200 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
               <div>
@@ -661,7 +748,7 @@ export default function AdminDashboard({ refetchAppData, currentCompany, activeT
               </div>
               <button
                 type="button"
-                onClick={() => setShowUserForm(value => !value)}
+                onClick={() => { setShowUserForm(value => !value); setEditingUser(null) }}
                 className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-slate-950 px-4 text-sm font-semibold text-white hover:bg-slate-800"
               >
                 {showUserForm ? <X className="h-4 w-4" /> : <UserPlus className="h-4 w-4" />}
@@ -714,12 +801,57 @@ export default function AdminDashboard({ refetchAppData, currentCompany, activeT
                         {sameCompanyProfiles.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
                       </select>
                       <span className="shrink-0 rounded-md bg-slate-100 px-2 py-1 text-[10px] font-semibold text-slate-600">{p.role}</span>
+                      <button
+                        type="button"
+                        onClick={() => { setEditingUser(p); setShowUserForm(false) }}
+                        className="shrink-0 rounded-lg border border-slate-200 bg-white p-2 text-slate-500 hover:bg-slate-50 hover:text-slate-900"
+                        title="Editar usuário"
+                        aria-label={`Editar usuário ${p.name}`}
+                      >
+                        <Edit2 className="h-4 w-4" />
+                      </button>
                     </div>
                   </div>
                 )
               })}
             </div>
           </section>
+          {editingUser && <aside className="rounded-xl border border-slate-200 bg-white p-5">
+            <div className="flex items-center justify-between">
+              <h2 className="text-base font-bold text-slate-950">Editar usuário</h2>
+              <button type="button" onClick={() => setEditingUser(null)} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700" aria-label="Fechar edição"><X className="h-4 w-4" /></button>
+            </div>
+            <p className="mb-4 mt-1 text-sm text-slate-500">Alterações no papel exigem que você seja administrador do tenant ou do provedor.</p>
+            <form onSubmit={handleUpdateUser} className="space-y-3">
+              <div>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Nome Completo</label>
+                <input required type="text" value={editingUser.name} onChange={e => setEditingUser(current => current && ({ ...current, name: e.target.value }))} className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-700 bg-white" />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">E-mail Corporativo</label>
+                <input required type="email" value={editingUser.email ?? ''} onChange={e => setEditingUser(current => current && ({ ...current, email: e.target.value }))} className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-700 bg-white" />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Departamento</label>
+                <input type="text" value={editingUser.department ?? ''} onChange={e => setEditingUser(current => current && ({ ...current, department: e.target.value }))} className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-700 bg-white" placeholder="ex: TI" />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Papel de Acesso (RBAC)</label>
+                <select value={editingUser.role} onChange={e => setEditingUser(current => current && ({ ...current, role: e.target.value as Role }))} className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-700 bg-white">
+                  {assignableRoleOptions.some(option => option.value === editingUser.role)
+                    ? null
+                    : <option value={editingUser.role}>{editingUser.role} (papel não atribuível por você)</option>}
+                  {assignableRoleOptions.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
+                </select>
+                {LICENSE_CONSUMING_ROLES.includes(editingUser.role as Role) && (
+                  <p className="mt-1 text-[10px] text-slate-400">Este papel consome uma licença de analista.</p>
+                )}
+              </div>
+              <button type="submit" disabled={userUpdating} className="mt-3 min-h-10 w-full rounded-lg bg-slate-950 px-4 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50">
+                {userUpdating ? 'Salvando...' : 'Salvar alterações'}
+              </button>
+            </form>
+          </aside>}
           {showUserForm && <aside className="rounded-xl border border-slate-200 bg-white p-5">
             <h2 className="text-base font-bold text-slate-950">Adicionar usuário</h2>
             <p className="mb-4 mt-1 text-sm text-slate-500">Defina o acesso inicial. Ele poderá ser alterado depois.</p>
@@ -749,7 +881,7 @@ export default function AdminDashboard({ refetchAppData, currentCompany, activeT
               <div>
                 <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Papel de Acesso (RBAC)</label>
                 <select value={usrRole} onChange={e => setUsrRole(e.target.value as Role)} className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-700 bg-white">
-                  {REAL_ROLE_OPTIONS.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
+                  {assignableRoleOptions.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
                 </select>
                 {LICENSE_CONSUMING_ROLES.includes(usrRole) && (
                   <p className="mt-1 text-[10px] text-slate-400">Este papel consome uma licença de analista.</p>

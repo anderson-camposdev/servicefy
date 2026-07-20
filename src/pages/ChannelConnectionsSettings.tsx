@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { AlertTriangle, KeyRound, Loader2, Network, Plus, RefreshCw, ShieldCheck, Trash2, X } from 'lucide-react'
+import { AlertTriangle, Edit2, KeyRound, Loader2, Network, Plus, RefreshCw, ShieldCheck, Trash2, X } from 'lucide-react'
 import { platformAdminService, type SafeConnectionHealth } from '../lib/platform-admin-service'
 import type { ChannelProvider } from '../lib/platform-foundation'
 import SettingsPageShell from '../components/settings/SettingsPageShell'
@@ -28,11 +28,31 @@ export default function ChannelConnectionsSettings({ companyId, activeRole, onBa
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [showForm, setShowForm] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState({
     provider: 'microsoft_graph' as ChannelProvider,
     scope: 'tenant' as 'tenant' | 'provider',
     name: '', address: '', secret: '', enabled: true,
   })
+
+  const startEdit = (connection: SafeConnectionHealth) => {
+    setEditingId(connection.id)
+    setForm({
+      provider: connection.provider as ChannelProvider,
+      scope: 'tenant',
+      name: connection.name,
+      address: connection.address ?? '',
+      secret: '',
+      enabled: connection.enabled,
+    })
+    setShowForm(true)
+  }
+
+  const closeForm = () => {
+    setShowForm(false)
+    setEditingId(null)
+    setForm(current => ({ ...current, name: '', address: '', secret: '' }))
+  }
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -52,13 +72,12 @@ export default function ChannelConnectionsSettings({ companyId, activeRole, onBa
     setSaving(true)
     try {
       await platformAdminService.saveConnection({
-        companyId, provider: form.provider,
+        companyId, connectionId: editingId, provider: form.provider,
         scope: activeRole === 'sysadmin' ? form.scope : 'tenant',
         name: form.name, address: form.address, enabled: form.enabled,
         secret: form.secret || null,
       })
-      setForm(current => ({ ...current, name: '', address: '', secret: '' }))
-      setShowForm(false)
+      closeForm()
       await load()
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Falha ao salvar conexão.')
@@ -83,23 +102,23 @@ export default function ChannelConnectionsSettings({ companyId, activeRole, onBa
       actions={<>
           <span className="inline-flex h-10 items-center rounded-xl border border-emerald-200 bg-emerald-50 px-3 text-xs font-bold text-emerald-700">{healthyConnections} operacionais</span>
           {attentionConnections > 0 && <span className="inline-flex h-10 items-center rounded-xl border border-amber-200 bg-amber-50 px-3 text-xs font-bold text-amber-700">{attentionConnections} requerem atenção</span>}
-          <button onClick={() => setShowForm(value => !value)} className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-slate-950 px-4 text-sm font-semibold text-white hover:bg-slate-800">{showForm ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}{showForm ? 'Fechar' : 'Nova conexão'}</button>
+          <button onClick={() => (showForm ? closeForm() : setShowForm(true))} className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-slate-950 px-4 text-sm font-semibold text-white hover:bg-slate-800">{showForm ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}{showForm ? 'Fechar' : 'Nova conexão'}</button>
           <button onClick={() => void load()} aria-label="Atualizar conexões" className="rounded-lg border border-slate-300 bg-white p-2.5 transition hover:bg-slate-50"><RefreshCw className="w-4 h-4" /></button>
       </>}
     >
       {error && <div className="mb-5 flex gap-2 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700"><AlertTriangle className="w-4 h-4" />{error}</div>}
       <div className={`grid gap-5 ${showForm ? 'xl:grid-cols-[22rem_minmax(0,1fr)]' : ''}`}>
         {showForm && <section className="rounded-xl border border-slate-200 bg-white p-5">
-          <h2 className="text-base font-bold text-slate-950">Nova conexão segura</h2>
-          <p className="mt-1 text-sm text-slate-500">Informe o provedor e grave a credencial diretamente no cofre.</p>
+          <h2 className="text-base font-bold text-slate-950">{editingId ? 'Editar conexão' : 'Nova conexão segura'}</h2>
+          <p className="mt-1 text-sm text-slate-500">{editingId ? 'A credencial só é substituída se você informar uma nova.' : 'Informe o provedor e grave a credencial diretamente no cofre.'}</p>
           <div className="mt-4 space-y-3">
             <label className="block text-xs font-bold">Provedor<select value={form.provider} onChange={event => setForm(v => ({ ...v, provider: event.target.value as ChannelProvider }))} className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm">{PROVIDERS.map(item => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
             {activeRole === 'sysadmin' && <label className="block text-xs font-bold">Escopo<select value={form.scope} onChange={event => setForm(v => ({ ...v, scope: event.target.value as 'tenant' | 'provider' }))} className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm"><option value="tenant">Próprio do tenant</option><option value="provider">Compartilhado pelo MSP</option></select></label>}
             <label className="block text-xs font-bold">Nome<input value={form.name} onChange={event => setForm(v => ({ ...v, name: event.target.value }))} className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" placeholder="Suporte Microsoft 365" /></label>
             <label className="block text-xs font-bold">Endereço/identificador<input value={form.address} onChange={event => setForm(v => ({ ...v, address: event.target.value }))} className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" placeholder="suporte@empresa.com" /></label>
-            <label className="block text-xs font-bold">Credencial<input type="password" value={form.secret} onChange={event => setForm(v => ({ ...v, secret: event.target.value }))} autoComplete="new-password" className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" placeholder="Enviada diretamente ao Vault" /></label>
-            <label className="flex items-center gap-2 text-sm font-semibold"><input type="checkbox" checked={form.enabled} onChange={event => setForm(v => ({ ...v, enabled: event.target.checked }))} /> Ativar após salvar</label>
-            <button onClick={() => void save()} disabled={saving || !form.name.trim()} className="flex min-h-10 w-full items-center justify-center gap-2 rounded-lg bg-slate-950 px-4 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50">{saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <KeyRound className="w-4 h-4" />} Salvar conexão</button>
+            <label className="block text-xs font-bold">Credencial<input type="password" value={form.secret} onChange={event => setForm(v => ({ ...v, secret: event.target.value }))} autoComplete="new-password" className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" placeholder={editingId ? 'Deixe em branco para manter a atual' : 'Enviada diretamente ao Vault'} /></label>
+            <label className="flex items-center gap-2 text-sm font-semibold"><input type="checkbox" checked={form.enabled} onChange={event => setForm(v => ({ ...v, enabled: event.target.checked }))} /> {editingId ? 'Ativa' : 'Ativar após salvar'}</label>
+            <button onClick={() => void save()} disabled={saving || !form.name.trim()} className="flex min-h-10 w-full items-center justify-center gap-2 rounded-lg bg-slate-950 px-4 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50">{saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <KeyRound className="w-4 h-4" />} {editingId ? 'Salvar alterações' : 'Salvar conexão'}</button>
           </div>
         </section>}
         <section className="rounded-xl border border-slate-200 bg-white p-5">
@@ -110,6 +129,7 @@ export default function ChannelConnectionsSettings({ companyId, activeRole, onBa
               <span className={'h-2.5 w-2.5 rounded-full ' + (item.status === 'healthy' ? 'bg-emerald-500' : item.status === 'error' ? 'bg-red-500' : 'bg-amber-400')} />
               <div className="min-w-0 flex-1"><div className="font-bold">{item.name}</div><div className="truncate text-xs text-slate-500">{PROVIDERS.find(provider => provider.value === item.provider)?.label || item.provider} · {item.address || 'sem endereço'} · {connectionStatusLabel(item.status)}</div>{item.rotationRequired && <div className="mt-1 text-xs font-bold text-amber-600">Rotação de credencial necessária</div>}</div>
               <ShieldCheck className="w-4 h-4 text-emerald-600" />
+              <button onClick={() => startEdit(item)} title="Editar" className="rounded-lg p-2 text-slate-400 hover:bg-slate-50 hover:text-slate-900"><Edit2 className="w-4 h-4" /></button>
               <button onClick={() => void revoke(item.id)} title="Revogar" className="rounded-lg p-2 text-slate-400 hover:text-red-600"><Trash2 className="w-4 h-4" /></button>
             </article>)}</div>}
         </section>

@@ -598,6 +598,7 @@ export default function SettingsGovernance({ companyId, activeRole, startInDetai
         <div className={`${cardClass} p-6 bg-surface`}>
           <AdminDashboard
             activeTab="tenants"
+            activeRole={activeRole}
             currentCompany={currentCompany as any}
             setManagedCompanyId={(id) => {
               setManagedCompanyId(id)
@@ -1421,6 +1422,7 @@ export default function SettingsGovernance({ companyId, activeRole, startInDetai
           <div className={`${cardClass} p-6 bg-surface`}>
             <AdminDashboard
               activeTab={activeTab}
+              activeRole={activeRole}
               currentCompany={currentCompany as any}
               setManagedCompanyId={setManagedCompanyId}
               setActiveTab={setActiveTab}

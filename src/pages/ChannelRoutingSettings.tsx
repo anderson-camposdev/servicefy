@@ -7,7 +7,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import {
-  Plus, Trash2, RefreshCw, AlertTriangle, Network, Inbox,
+  Edit2, Plus, Trash2, RefreshCw, AlertTriangle, Network, Inbox,
   CheckCircle2, XCircle, RotateCcw, Loader2,
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
@@ -48,8 +48,26 @@ export default function ChannelRoutingSettings({ companyId, onBack }: Props) {
     connectionId: '', matchType: 'address' as ChannelMatchType, matchValue: '',
     priority: 100, assignmentGroupId: '', enabled: true,
   })
+  const [editingId, setEditingId] = useState<string | null>(null)
 
   const flash = (m: string) => { setToast(m); setTimeout(() => setToast(''), 2500) }
+
+  const startEdit = (route: ChannelRoute) => {
+    setEditingId(route.id)
+    setForm({
+      connectionId: route.connection_id,
+      matchType: route.match_type,
+      matchValue: route.match_value ?? '',
+      priority: route.priority,
+      assignmentGroupId: route.assignment_group_id ?? '',
+      enabled: route.enabled,
+    })
+  }
+
+  const cancelEdit = () => {
+    setEditingId(null)
+    setForm(f => ({ ...f, matchValue: '', priority: 100, assignmentGroupId: '', enabled: true }))
+  }
 
   const load = useCallback(async () => {
     setLoading(true); setError('')
@@ -82,13 +100,14 @@ export default function ChannelRoutingSettings({ companyId, onBack }: Props) {
     if (form.matchType !== 'default' && !form.matchValue.trim()) { setError('Informe o valor de identificação.'); return }
     try {
       await platformAdminService.saveRoute({
-        connectionId: form.connectionId, targetCompanyId: companyId,
+        id: editingId, connectionId: form.connectionId, targetCompanyId: companyId,
         priority: form.priority, matchType: form.matchType,
         matchValue: form.matchValue.trim() || null,
         assignmentGroupId: form.assignmentGroupId || null, enabled: form.enabled,
       })
-      setForm(f => ({ ...f, matchValue: '' }))
-      flash('Rota salva.'); load()
+      const wasEditing = Boolean(editingId)
+      cancelEdit()
+      flash(wasEditing ? 'Rota atualizada.' : 'Rota salva.'); load()
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'Falha ao salvar rota.') }
   }
 
@@ -127,7 +146,10 @@ export default function ChannelRoutingSettings({ companyId, onBack }: Props) {
       {tab === 'routes' && (
         <div className="mt-6 grid gap-5 xl:grid-cols-[22rem_minmax(0,1fr)]">
           <section className="rounded-xl border border-slate-200 bg-white p-5">
-            <h2 className="text-base font-bold text-slate-950">Nova rota</h2>
+            <div className="flex items-center justify-between">
+              <h2 className="text-base font-bold text-slate-950">{editingId ? 'Editar rota' : 'Nova rota'}</h2>
+              {editingId && <button onClick={cancelEdit} className="text-xs font-bold text-slate-500 hover:text-slate-800">Cancelar</button>}
+            </div>
             {connections.length === 0 ? (
               <p className="mt-4 rounded-xl border border-dashed p-4 text-sm text-slate-500">Cadastre uma conexão em "Conexões omnichannel" antes de criar rotas.</p>
             ) : (
@@ -142,7 +164,7 @@ export default function ChannelRoutingSettings({ companyId, onBack }: Props) {
                   <label className="block text-xs font-bold">Grupo<select value={form.assignmentGroupId} onChange={e => setForm(f => ({ ...f, assignmentGroupId: e.target.value }))} className="mt-1 w-full rounded-xl border bg-white px-3 py-2.5 text-sm"><option value="">— Nenhum —</option>{groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}</select></label>
                 </div>
                 <label className="flex items-center gap-2 text-sm font-semibold"><input type="checkbox" checked={form.enabled} onChange={e => setForm(f => ({ ...f, enabled: e.target.checked }))} /> Ativa</label>
-                <button onClick={() => void addRoute()} className="flex min-h-10 w-full items-center justify-center gap-2 rounded-lg bg-slate-950 px-4 text-sm font-semibold text-white hover:bg-slate-800"><Plus className="h-4 w-4" /> Adicionar rota</button>
+                <button onClick={() => void addRoute()} className="flex min-h-10 w-full items-center justify-center gap-2 rounded-lg bg-slate-950 px-4 text-sm font-semibold text-white hover:bg-slate-800"><Plus className="h-4 w-4" /> {editingId ? 'Salvar alterações' : 'Adicionar rota'}</button>
               </div>
             )}
           </section>
@@ -158,6 +180,7 @@ export default function ChannelRoutingSettings({ companyId, onBack }: Props) {
                     <div className="font-bold">{MATCH_TYPES.find(m => m.value === r.match_type)?.label}{r.match_value ? `: ${r.match_value}` : ''}</div>
                     <div className="truncate text-xs text-slate-500">{connName(r.connection_id)} · prioridade {r.priority} · grupo {groupName(r.assignment_group_id)}</div>
                   </div>
+                  <button onClick={() => startEdit(r)} title="Editar" className="rounded-lg p-2 text-slate-400 hover:bg-slate-50 hover:text-slate-900"><Edit2 className="h-4 w-4" /></button>
                   <button onClick={() => void removeRoute(r)} title="Excluir" className="rounded-lg p-2 text-slate-400 hover:text-red-600"><Trash2 className="h-4 w-4" /></button>
                 </article>
               ))}</div>}

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, useRef } from 'react'
-import { CheckCircle2, Loader2, Moon, Plus, RefreshCw, Save, ShieldCheck, Sun, Upload, X, Palette, Image as ImageIcon, LayoutGrid, Type } from 'lucide-react'
+import { CheckCircle2, Edit2, Loader2, Moon, Plus, RefreshCw, Save, ShieldCheck, Sun, Upload, X, Palette, Image as ImageIcon, LayoutGrid, Type } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { companiesService } from '../lib/services'
 import { validateBrandingDimensions, validateBrandingFile } from '../lib/branding.types'
@@ -164,6 +164,7 @@ export default function PlatformModuleSettings({ moduleKey, companyId, activeRol
   const [audit, setAudit] = useState<Row[]>([])
   const [usage, setUsage] = useState<Row | null>(null)
   const [form, setForm] = useState<Record<string, FormValue>>(def?.defaults ?? {})
+  const [editingRow, setEditingRow] = useState<Row | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -398,15 +399,51 @@ export default function PlatformModuleSettings({ moduleKey, companyId, activeRol
     return field
   }) ?? [], [classes, groups, domains, def])
 
+  // Hidrata o formulário a partir de uma linha existente — os builders de
+  // workflow/formulário guardam jsonb no banco mas o campo do formulário
+  // trabalha com a string serializada, igual ao fluxo de criação.
+  const hydrateForm = (row: Row): Record<string, FormValue> => {
+    if (!def) return {}
+    const next: Record<string, FormValue> = { ...def.defaults }
+    for (const field of def.fields) {
+      const raw = row[field.key]
+      if (field.type === 'workflow_builder' || field.type === 'form_builder') {
+        next[field.key] = JSON.stringify(raw ?? {})
+      } else if (field.type === 'checkbox') {
+        next[field.key] = raw === true
+      } else {
+        next[field.key] = raw == null ? '' : String(raw)
+      }
+    }
+    return next
+  }
+
+  const startEdit = (row: Row) => {
+    setEditingRow(row)
+    setForm(hydrateForm(row))
+    setError(''); setSuccess('')
+  }
+
+  const cancelEdit = () => {
+    setEditingRow(null)
+    setForm(def?.defaults ?? {})
+    setError('')
+  }
+
   const saveNew = async () => {
     if (!def) return
     const missing = def.fields.find(field => field.required && !String(form[field.key] ?? '').trim())
     if (missing) { setError(`Informe: ${missing.label}.`); return }
     setSaving(true); setError('')
-    const { error: saveError } = await dynamicTable.from(def.table).insert(def.payload(form, companyId))
+    const { error: saveError } = editingRow
+      ? await dynamicTable.from(def.table).update(def.payload(form, companyId)).eq('id', text(editingRow, 'id'))
+      : await dynamicTable.from(def.table).insert(def.payload(form, companyId))
     setSaving(false)
     if (saveError) { setError(saveError.message); return }
-    setSuccess('Configuração salva e auditável.'); setForm(def.defaults); await load()
+    setSuccess(editingRow ? 'Alterações salvas e auditáveis.' : 'Configuração salva e auditável.')
+    setEditingRow(null)
+    setForm(def.defaults)
+    await load()
   }
 
   const toggle = async (row: Row) => {
@@ -925,8 +962,14 @@ export default function PlatformModuleSettings({ moduleKey, companyId, activeRol
       </div>
     ) : (
       <div className="mt-6 grid gap-6 lg:grid-cols-[380px_1fr]">
-        <section className="rounded-2xl border bg-white p-5"><h2 className="font-extrabold">Nova configuração</h2><div className="mt-4 space-y-3">{fields.map(field => <FormField key={field.key} field={field} value={form[field.key]} classes={classes} groups={groups} domains={domains} onChange={value => setForm(current => ({ ...current, [field.key]: value }))} />)}<button onClick={() => void saveNew()} disabled={saving} className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-3 text-sm font-bold text-white"><Plus className="h-4 w-4" /> Adicionar</button></div></section>
-        <section className="rounded-2xl border bg-white p-5"><h2 className="font-extrabold">Configurações atuais</h2><RowList rows={rows} empty="Nenhuma configuração cadastrada." activeField={def!.activeField} groups={groups} domains={domains} onToggle={toggle} onManageRelations={moduleKey === 'ci' ? openRelationships : undefined} /></section>
+        <section className="rounded-2xl border bg-white p-5">
+          <div className="flex items-center justify-between">
+            <h2 className="font-extrabold">{editingRow ? 'Editar configuração' : 'Nova configuração'}</h2>
+            {editingRow && <button onClick={cancelEdit} className="text-xs font-bold text-slate-500 hover:text-slate-800">Cancelar</button>}
+          </div>
+          <div className="mt-4 space-y-3">{fields.map(field => <FormField key={field.key} field={field} value={form[field.key]} classes={classes} groups={groups} domains={domains} locked={Boolean(editingRow) && field.key === 'key'} onChange={value => setForm(current => ({ ...current, [field.key]: value }))} />)}<button onClick={() => void saveNew()} disabled={saving} className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-3 text-sm font-bold text-white">{editingRow ? <Save className="h-4 w-4" /> : <Plus className="h-4 w-4" />} {editingRow ? 'Salvar alterações' : 'Adicionar'}</button></div>
+        </section>
+        <section className="rounded-2xl border bg-white p-5"><h2 className="font-extrabold">Configurações atuais</h2><RowList rows={rows} empty="Nenhuma configuração cadastrada." activeField={def!.activeField} groups={groups} domains={domains} onToggle={toggle} onEdit={startEdit} onManageRelations={moduleKey === 'ci' ? openRelationships : undefined} /></section>
       </div>
     )}
 
@@ -1044,7 +1087,12 @@ export default function PlatformModuleSettings({ moduleKey, companyId, activeRol
   </SettingsPageShell>
 }
 
-function FormField({ field, value, classes, groups, domains, onChange }: { field: FieldDef; value: FormValue | undefined; classes: Row[]; groups: Row[]; domains: Row[]; onChange: (value: FormValue) => void }) {
+function FormField({ field, value, classes, groups, domains, locked, onChange }: { field: FieldDef; value: FormValue | undefined; classes: Row[]; groups: Row[]; domains: Row[]; locked?: boolean; onChange: (value: FormValue) => void }) {
+  if (locked) return (
+    <label className="block text-xs font-bold">{field.label}
+      <input value={String(value ?? '')} disabled title="Identificador usado internamente pelo banco — não pode ser alterado após a criação." className="mt-1 w-full cursor-not-allowed rounded-xl border bg-slate-100 px-3 py-2 text-sm text-slate-500" />
+    </label>
+  )
   if (field.type === 'workflow_builder') return <WorkflowBuilder label={field.label} value={String(value ?? '')} onChange={onChange} />
   if (field.type === 'form_builder') return <FormBuilder label={field.label} value={String(value ?? '')} onChange={onChange} />
   if (field.type === 'textarea') return <label className="block text-xs font-bold">{field.label}<textarea value={String(value ?? '')} onChange={e => onChange(e.target.value)} className="mt-1 min-h-24 w-full rounded-xl border px-3 py-2 text-sm" /></label>
@@ -1126,7 +1174,7 @@ function ColorSwatchField({ label, value, onChange, presets }: { label: string; 
   )
 }
 
-function RowList({ rows, empty, activeField, groups, domains, onToggle, onManageRelations }: { rows: Row[]; empty: string; activeField?: 'active' | 'enabled'; groups?: Row[]; domains?: Row[]; onToggle?: (row: Row) => void; onManageRelations?: (row: Row) => void }) {
+function RowList({ rows, empty, activeField, groups, domains, onToggle, onEdit, onManageRelations }: { rows: Row[]; empty: string; activeField?: 'active' | 'enabled'; groups?: Row[]; domains?: Row[]; onToggle?: (row: Row) => void; onEdit?: (row: Row) => void; onManageRelations?: (row: Row) => void }) {
   if (!rows.length) return <div className="mt-4 rounded-xl border border-dashed p-8 text-center text-sm text-slate-500">{empty}</div>
   return <div className="mt-4 space-y-2">{rows.map((row, index) => {
     const grpId = text(row, 'default_assignment_group_id')
@@ -1147,6 +1195,7 @@ function RowList({ rows, empty, activeField, groups, domains, onToggle, onManage
           {onManageRelations && (
             <button onClick={() => onManageRelations(row)} className="rounded-lg border border-indigo-200 bg-indigo-50 px-2 py-1 text-xs font-bold text-indigo-600 hover:bg-indigo-100 transition-colors">Relacionamentos</button>
           )}
+          {onEdit && <button onClick={() => onEdit(row)} title="Editar" aria-label={`Editar ${text(row, 'name') || text(row, 'key') || `registro ${index + 1}`}`} className="rounded-lg border p-1.5 text-slate-500 hover:bg-slate-50 hover:text-slate-900"><Edit2 className="h-3.5 w-3.5" /></button>}
           {activeField && onToggle && <button onClick={() => void onToggle(row)} className="rounded-lg border px-2 py-1 text-xs font-bold">{bool(row, activeField) ? 'Desativar' : 'Ativar'}</button>}
         </div>
       </article>
