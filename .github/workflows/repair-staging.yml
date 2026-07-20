@@ -1,0 +1,30 @@
+name: Repair Staging Migrations
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/repair-staging.yml'
+
+jobs:
+  repair-staging:
+    runs-on: ubuntu-latest
+    environment: staging
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_STAGING_DB_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Link ao projeto de staging
+        run: supabase link --project-ref "$SUPABASE_PROJECT_ID_STAGING"
+        env:
+          SUPABASE_PROJECT_ID_STAGING: ${{ secrets.SUPABASE_PROJECT_ID_STAGING }}
+
+      - name: Reparar histórico de migrations fantasmas
+        run: supabase migration repair --status reverted 20260719173922 20260720132617 20260720141544 20260720151528 20260720151547 20260720152401 20260720152711 20260720153836 20260720154233 20260720155329 20260720173050 20260720191401
