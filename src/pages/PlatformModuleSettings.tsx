@@ -28,10 +28,27 @@ type FormValue = string | boolean
 interface FieldDef {
   key: string
   label: string
-  type?: 'text' | 'textarea' | 'select' | 'checkbox' | 'number' | 'workflow_builder' | 'form_builder'
+  type?: 'text' | 'textarea' | 'select' | 'checkbox' | 'number' | 'workflow_builder' | 'form_builder' | 'auto_key'
   options?: string[]
   required?: boolean
 }
+
+/**
+ * Deriva o identificador técnico (key) a partir do Nome digitado pelo admin.
+ * Alguns valores de key são âncoras usadas por triggers do banco (ex.:
+ * service_domains.key='it', case_types.key='incident'/'request') — deixar o
+ * admin digitar livremente permitia renomear/duplicar essas âncoras sem
+ * querer. A key nunca é editável à mão: nasce do Nome e fica travada depois
+ * de criada (ver `locked` em FormField).
+ */
+const slugify = (value: string): string =>
+  value
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/(^_|_$)/g, '')
 
 interface ModuleDef {
   title: string
@@ -73,7 +90,7 @@ const defs: Record<Exclude<OperationalModuleKey, 'compliance' | 'licensing' | 'b
     title: 'Domínios de serviço', description: 'Separe TI, RH, Jurídico e Facilities com privacidade e ciclo próprios.',
     table: 'service_domains', order: 'name', activeField: 'active',
     fields: [
-      { key: 'key', label: 'Chave', required: true }, { key: 'name', label: 'Nome', required: true },
+      { key: 'name', label: 'Nome', required: true }, { key: 'key', label: 'Chave (gerada automaticamente)', type: 'auto_key', required: true },
       { key: 'description', label: 'Descrição', type: 'textarea' },
       { key: 'privacy', label: 'Privacidade', type: 'select', options: ['standard', 'private', 'restricted'], required: true },
       { key: 'default_assignment_group_id', label: 'Equipe Solucionadora Padrão', type: 'select', required: false },
@@ -86,8 +103,8 @@ const defs: Record<Exclude<OperationalModuleKey, 'compliance' | 'licensing' | 'b
     table: 'case_types', order: 'name', activeField: 'active',
     fields: [
       { key: 'service_domain_id', label: 'Domínio', type: 'select', required: true },
-      { key: 'key', label: 'Chave', required: true },
       { key: 'name', label: 'Nome', required: true },
+      { key: 'key', label: 'Chave (gerada automaticamente)', type: 'auto_key', required: true },
       { key: 'specialization', label: 'Especialização', type: 'select', options: ['incident', 'request', 'general'], required: true },
       { key: 'initial_state', label: 'Estado Inicial', required: true },
       { key: 'form_schema', label: 'Formulário Específico (Builder)', type: 'form_builder' },
@@ -126,7 +143,7 @@ const defs: Record<Exclude<OperationalModuleKey, 'compliance' | 'licensing' | 'b
     title: 'Templates e notificações', description: 'Mensagens por evento, canal e idioma com variáveis controladas.',
     table: 'notification_templates', order: 'name', activeField: 'enabled',
     fields: [
-      { key: 'key', label: 'Chave do evento', required: true }, { key: 'name', label: 'Nome', required: true },
+      { key: 'name', label: 'Nome', required: true }, { key: 'key', label: 'Chave do evento (gerada automaticamente)', type: 'auto_key', required: true },
       { key: 'channel', label: 'Canal', type: 'select', options: ['email', 'portal', 'teams', 'google_chat', 'whatsapp'], required: true },
       { key: 'locale', label: 'Idioma', type: 'select', options: ['pt-BR', 'en-US', 'es-ES'], required: true },
       { key: 'subject_template', label: 'Assunto' }, { key: 'body_template', label: 'Corpo', type: 'textarea', required: true },
@@ -967,7 +984,14 @@ export default function PlatformModuleSettings({ moduleKey, companyId, activeRol
             <h2 className="font-extrabold">{editingRow ? 'Editar configuração' : 'Nova configuração'}</h2>
             {editingRow && <button onClick={cancelEdit} className="text-xs font-bold text-slate-500 hover:text-slate-800">Cancelar</button>}
           </div>
-          <div className="mt-4 space-y-3">{fields.map(field => <FormField key={field.key} field={field} value={form[field.key]} classes={classes} groups={groups} domains={domains} locked={Boolean(editingRow) && field.key === 'key'} onChange={value => setForm(current => ({ ...current, [field.key]: value }))} />)}<button onClick={() => void saveNew()} disabled={saving} className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-3 text-sm font-bold text-white">{editingRow ? <Save className="h-4 w-4" /> : <Plus className="h-4 w-4" />} {editingRow ? 'Salvar alterações' : 'Adicionar'}</button></div>
+          <div className="mt-4 space-y-3">{fields.map(field => <FormField key={field.key} field={field} value={form[field.key]} classes={classes} groups={groups} domains={domains} locked={Boolean(editingRow) && (field.key === 'key' || field.type === 'auto_key')} onChange={value => setForm(current => {
+            const next = { ...current, [field.key]: value }
+            if (field.key === 'name' && !editingRow) {
+              const keyField = def?.fields.find(f => f.type === 'auto_key')
+              if (keyField) next[keyField.key] = slugify(String(value))
+            }
+            return next
+          })} />)}<button onClick={() => void saveNew()} disabled={saving} className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-3 text-sm font-bold text-white">{editingRow ? <Save className="h-4 w-4" /> : <Plus className="h-4 w-4" />} {editingRow ? 'Salvar alterações' : 'Adicionar'}</button></div>
         </section>
         <section className="rounded-2xl border bg-white p-5"><h2 className="font-extrabold">Configurações atuais</h2><RowList rows={rows} empty="Nenhuma configuração cadastrada." activeField={def!.activeField} groups={groups} domains={domains} onToggle={toggle} onEdit={startEdit} onManageRelations={moduleKey === 'ci' ? openRelationships : undefined} /></section>
       </div>
@@ -1088,9 +1112,9 @@ export default function PlatformModuleSettings({ moduleKey, companyId, activeRol
 }
 
 function FormField({ field, value, classes, groups, domains, locked, onChange }: { field: FieldDef; value: FormValue | undefined; classes: Row[]; groups: Row[]; domains: Row[]; locked?: boolean; onChange: (value: FormValue) => void }) {
-  if (locked) return (
+  if (locked || field.type === 'auto_key') return (
     <label className="block text-xs font-bold">{field.label}
-      <input value={String(value ?? '')} disabled title="Identificador usado internamente pelo banco — não pode ser alterado após a criação." className="mt-1 w-full cursor-not-allowed rounded-xl border bg-slate-100 px-3 py-2 text-sm text-slate-500" />
+      <input value={String(value ?? '')} disabled title="Identificador técnico usado internamente pelo banco — gerado a partir do Nome, nunca digitado à mão." placeholder="Preencha o Nome para gerar" className="mt-1 w-full cursor-not-allowed rounded-xl border bg-slate-100 px-3 py-2 font-mono text-xs text-slate-500" />
     </label>
   )
   if (field.type === 'workflow_builder') return <WorkflowBuilder label={field.label} value={String(value ?? '')} onChange={onChange} />
