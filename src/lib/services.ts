@@ -1373,7 +1373,56 @@ export const changesService = {
     })
     if (error) throw error
   },
+
+  async listCiIds(id: string): Promise<string[]> {
+    const { data, error } = await changeCiTable
+      .from('change_configuration_items')
+      .select('ci_id')
+      .eq('change_id', id)
+    if (error) throw new Error(error.message)
+    return (data ?? []).map(row => row.ci_id)
+  },
+
+  async setCiLinks(id: string, ciIds: string[]): Promise<void> {
+    const { error } = await untypedRpc.rpc('set_change_ci_links', { p_change_id: id, p_ci_ids: ciIds })
+    if (error) throw new Error(error.message)
+  },
+
+  async getWindowConflicts(id: string): Promise<ChangeWindowConflict[]> {
+    const { data, error } = await untypedRpc.rpc('get_change_window_conflicts', { p_change_id: id })
+    if (error) throw new Error(error.message)
+    return data ?? []
+  },
 }
+
+export interface ChangeWindowConflict {
+  conflicting_change_id: string
+  conflicting_change_number: string
+  conflicting_change_short_description: string
+  conflicting_change_state: string
+  shared_ci_id: string
+  shared_ci_name: string
+}
+
+/**
+ * change_configuration_items e as RPCs de vinculo/conflito (migration 155)
+ * ainda não estão em database.generated.ts — mesma view estrutural mínima
+ * usada em outros pontos deste arquivo para escapar do union tipado.
+ */
+interface ChangeCiTableClient {
+  from(table: 'change_configuration_items'): {
+    select(columns: string): {
+      eq(column: string, value: string): Promise<{ data: { ci_id: string }[] | null; error: { message: string } | null }>
+    }
+  }
+}
+const changeCiTable = supabase as unknown as ChangeCiTableClient
+
+interface ChangeCiRpcClient {
+  rpc(fn: 'set_change_ci_links', args: { p_change_id: string; p_ci_ids: string[] }): Promise<{ error: { message: string } | null }>
+  rpc(fn: 'get_change_window_conflicts', args: { p_change_id: string }): Promise<{ data: ChangeWindowConflict[] | null; error: { message: string } | null }>
+}
+const untypedRpc = supabase as unknown as ChangeCiRpcClient
 
 // ─── REQUEST APPROVALS (modelo unificado incidents/request_items) ──
 

@@ -4,7 +4,7 @@ import {
   Clock, ChevronLeft, ChevronRight, Filter,
   Check, X, CalendarRange, Users, ClipboardList
 } from 'lucide-react'
-import { changesService } from '../lib/services'
+import { changesService, type ChangeWindowConflict } from '../lib/services'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../auth'
 import { useToast } from '../context'
@@ -77,11 +77,18 @@ export default function ChangeManagementDashboard({ companyId }: { companyId?: s
   const [cabApprovers, setCabApprovers] = useState<string[]>([])
   const [selectedIncidentIds, setSelectedIncidentIds] = useState<string[]>([])
   const [selectedProblemId, setSelectedProblemId] = useState('')
+  // CIs afetados pela mudança + conflitos de janela nesses CIs (achado da
+  // auditoria ITSM: o CAB aprovava sem saber quais CIs a mudança tocava, e
+  // duas mudanças podiam ser agendadas no mesmo período sem nenhum aviso).
+  const [selectedCiIds, setSelectedCiIds] = useState<string[]>([])
+  const [windowConflicts, setWindowConflicts] = useState<ChangeWindowConflict[]>([])
+  const [checkingConflicts, setCheckingConflicts] = useState(false)
 
   // Banco de Dados Auxiliares
   const [profiles, setProfiles] = useState<Profile[]>([])
   const [incidents, setIncidents] = useState<Incident[]>([])
   const [problems, setProblems] = useState<Problem[]>([])
+  const [cis, setCis] = useState<{ id: string; name: string }[]>([])
   
   // Navegação do Calendário
   const [currentDate, setCurrentDate] = useState(new Date())
@@ -124,6 +131,10 @@ export default function ChangeManagementDashboard({ companyId }: { companyId?: s
     // Problemas do mesmo tenant (mesmo bug: short_description/state, não title/status)
     supabase.from('problems').select('id, short_description, state').eq('company_id', companyId)
       .then(({ data }) => setProblems((data ?? []).map(row => ({ id: row.id!, title: row.short_description ?? '', status: row.state ?? '' }))))
+
+    // Itens de configuração do tenant, para vincular à mudança (impacto/CMDB)
+    supabase.from('configuration_items').select('id, name').eq('company_id', companyId).order('name')
+      .then(({ data }) => setCis((data ?? []).map(row => ({ id: row.id!, name: row.name ?? '' }))))
   }, [companyId])
 
   // KPIs calculados
@@ -182,6 +193,12 @@ export default function ChangeManagementDashboard({ companyId }: { companyId?: s
       } catch {
         setSelectedIncidentIds(legacyIncidentIds)
       }
+      try {
+        setSelectedCiIds(await changesService.listCiIds(change.id))
+      } catch {
+        setSelectedCiIds([])
+      }
+      setWindowConflicts([])
     } else {
       setEditingChange(null)
       setShortDescription('')
@@ -203,8 +220,22 @@ export default function ChangeManagementDashboard({ companyId }: { companyId?: s
       
       setSelectedProblemId('')
       setSelectedIncidentIds([])
+      setSelectedCiIds([])
+      setWindowConflicts([])
     }
     setIsModalOpen(true)
+  }
+
+  const checkWindowConflicts = async () => {
+    if (!editingChange) return
+    setCheckingConflicts(true)
+    try {
+      setWindowConflicts(await changesService.getWindowConflicts(editingChange.id))
+    } catch (e: any) {
+      toast.error('Erro ao verificar conflitos: ' + e.message)
+    } finally {
+      setCheckingConflicts(false)
+    }
   }
 
   // Ação de Salvar Mudança (Criação/Edição)
@@ -256,6 +287,7 @@ export default function ChangeManagementDashboard({ companyId }: { companyId?: s
 
         await changesService.update(editingChange.id, companyId, dbPayload)
         await changesService.setIncidentLinks(editingChange.id, selectedIncidentIds)
+        await changesService.setCiLinks(editingChange.id, selectedCiIds)
         if (type !== editingChange.type && type === 'Standard') {
           await changesService.scheduleStandard(editingChange.id)
         }
@@ -269,6 +301,7 @@ export default function ChangeManagementDashboard({ companyId }: { companyId?: s
         }
         const created = await changesService.create(payload)
         await changesService.setIncidentLinks(created.id, selectedIncidentIds)
+        await changesService.setCiLinks(created.id, selectedCiIds)
         toast.success('Solicitação de mudança registrada!')
       }
       setIsModalOpen(false)
@@ -1019,6 +1052,60 @@ export default function ChangeManagementDashboard({ companyId }: { companyId?: s
                         })
                       )}
                     </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Itens de Configuração Afetados (CMDB)</label>
+                    <p className="text-xs text-slate-400 -mt-1 mb-3">Marque os CIs que esta mudança afeta — habilita a checagem de conflito de janela abaixo.</p>
+                    <div className="max-h-[220px] overflow-y-auto border border-slate-200 rounded-xl divide-y divide-slate-100">
+                      {cis.length === 0 ? (
+                        <div className="text-center py-8 text-slate-400 text-xs">Nenhum item de configuração cadastrado no tenant.</div>
+                      ) : (
+                        cis.map(ci => {
+                          const checked = selectedCiIds.includes(ci.id)
+                          return (
+                            <label key={ci.id} className="flex items-center gap-3 p-3 cursor-pointer hover:bg-slate-50 transition-colors">
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                onChange={() => {
+                                  setSelectedCiIds(prev => prev.includes(ci.id) ? prev.filter(id => id !== ci.id) : [...prev, ci.id])
+                                  setWindowConflicts([])
+                                }}
+                                className="w-4 h-4 rounded text-indigo-600 border-slate-300 focus:ring-indigo-500 cursor-pointer"
+                              />
+                              <span className="text-xs font-bold text-slate-700 truncate">{ci.name}</span>
+                            </label>
+                          )
+                        })
+                      )}
+                    </div>
+
+                    {editingChange ? (
+                      <div className="mt-3">
+                        <button
+                          onClick={checkWindowConflicts}
+                          disabled={checkingConflicts || selectedCiIds.length === 0}
+                          className="px-4 py-2 border border-slate-200 hover:bg-slate-50 rounded-xl text-slate-600 font-bold text-xs cursor-pointer disabled:opacity-40"
+                        >
+                          {checkingConflicts ? 'Verificando…' : 'Verificar conflito de janela'}
+                        </button>
+                        {windowConflicts.length > 0 && (
+                          <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 space-y-2">
+                            <p className="text-xs font-bold text-amber-800">
+                              ⚠ {windowConflicts.length} mudança(s) agendada(s) no mesmo período, no(s) mesmo(s) CI(s):
+                            </p>
+                            {windowConflicts.map(c => (
+                              <p key={`${c.conflicting_change_id}-${c.shared_ci_id}`} className="text-xs text-amber-700">
+                                <strong>{c.conflicting_change_number}</strong> ({translateState(c.conflicting_change_state)}) em <strong>{c.shared_ci_name}</strong> — {c.conflicting_change_short_description}
+                              </p>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <p className="mt-2 text-[11px] text-slate-400">Salve a mudança para poder verificar conflito de janela nos CIs marcados.</p>
+                    )}
                   </div>
                 </div>
               )}
