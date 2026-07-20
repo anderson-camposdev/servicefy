@@ -16,8 +16,10 @@ import { useAuth } from '../auth'
 import { useTenant } from '../tenant'
 import SettingsPageShell from '../components/settings/SettingsPageShell'
 import { PREVIEWABLE_ATTACHMENT_EXTENSIONS } from '../lib/attachment-security'
+import { WorkflowBuilder } from '../components/settings/WorkflowBuilder'
+import { FormBuilder } from '../components/settings/FormBuilder'
 
-export type OperationalModuleKey = 'domains' | 'macros' | 'templates' | 'ci' | 'compliance' | 'licensing' | 'branding' | 'iam' | 'smtp'
+export type OperationalModuleKey = 'domains' | 'case_types' | 'macros' | 'templates' | 'ci' | 'compliance' | 'licensing' | 'branding' | 'iam' | 'smtp'
 
 interface Props { moduleKey: OperationalModuleKey; companyId: string; activeRole: string; onBack: () => void }
 type Row = Record<string, unknown>
@@ -26,7 +28,7 @@ type FormValue = string | boolean
 interface FieldDef {
   key: string
   label: string
-  type?: 'text' | 'textarea' | 'select' | 'checkbox' | 'number'
+  type?: 'text' | 'textarea' | 'select' | 'checkbox' | 'number' | 'workflow_builder' | 'form_builder'
   options?: string[]
   required?: boolean
 }
@@ -79,6 +81,37 @@ const defs: Record<Exclude<OperationalModuleKey, 'compliance' | 'licensing' | 'b
     defaults: { key: '', name: '', description: '', privacy: 'standard', default_assignment_group_id: '' },
     payload: (f, companyId) => ({ company_id: companyId, key: f.key, name: f.name, description: f.description || null, privacy: f.privacy, default_assignment_group_id: f.default_assignment_group_id || null, active: true }),
   },
+  case_types: {
+    title: 'Tipos de Caso', description: 'Defina especializações (Incidente, Requisição) vinculadas a domínios.',
+    table: 'case_types', order: 'name', activeField: 'active',
+    fields: [
+      { key: 'service_domain_id', label: 'Domínio', type: 'select', required: true },
+      { key: 'key', label: 'Chave', required: true },
+      { key: 'name', label: 'Nome', required: true },
+      { key: 'specialization', label: 'Especialização', type: 'select', options: ['incident', 'request', 'general'], required: true },
+      { key: 'initial_state', label: 'Estado Inicial', required: true },
+      { key: 'form_schema', label: 'Formulário Específico (Builder)', type: 'form_builder' },
+      { key: 'workflow_config', label: 'Workflow e Regras (Builder)', type: 'workflow_builder' }
+    ],
+    defaults: { service_domain_id: '', key: '', name: '', specialization: 'general', initial_state: 'New', form_schema: '{}', workflow_config: '{}' },
+    payload: (f, companyId) => {
+      let form_schema = {};
+      let workflow_config = {};
+      try { form_schema = JSON.parse(f.form_schema as string || '{}'); } catch (e) { /* ignore */ }
+      try { workflow_config = JSON.parse(f.workflow_config as string || '{}'); } catch (e) { /* ignore */ }
+      return { 
+        company_id: companyId, 
+        service_domain_id: f.service_domain_id, 
+        key: f.key, 
+        name: f.name, 
+        specialization: f.specialization, 
+        initial_state: f.initial_state, 
+        form_schema,
+        workflow_config,
+        active: true 
+      };
+    },
+  },
   macros: {
     title: 'Macros de resposta', description: 'Respostas aprovadas com variáveis, uso público ou interno e governança de conteúdo.',
     table: 'response_macros', order: 'name', activeField: 'active',
@@ -127,6 +160,7 @@ export default function PlatformModuleSettings({ moduleKey, companyId, activeRol
   const [rows, setRows] = useState<Row[]>([])
   const [classes, setClasses] = useState<Row[]>([])
   const [groups, setGroups] = useState<Row[]>([])
+  const [domains, setDomains] = useState<Row[]>([])
   const [audit, setAudit] = useState<Row[]>([])
   const [usage, setUsage] = useState<Row | null>(null)
   const [form, setForm] = useState<Record<string, FormValue>>(def?.defaults ?? {})
@@ -338,6 +372,12 @@ export default function PlatformModuleSettings({ moduleKey, companyId, activeRol
           if (groupResult.error) throw groupResult.error
           setGroups(groupResult.data ?? [])
         }
+        if (moduleKey === 'case_types') {
+          const domainResult = await supabase.from('service_domains').select('id,name').eq('company_id', companyId).eq('active', true).order('name')
+          if (domainResult.error) throw domainResult.error
+          setDomains(domainResult.data ?? [])
+          setForm(current => ({ ...current, service_domain_id: current.service_domain_id || text((domainResult.data?.[0] ?? {}) as Row, 'id') }))
+        }
       }
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'Falha ao carregar configuração.') }
     finally { setLoading(false) }
@@ -352,8 +392,11 @@ export default function PlatformModuleSettings({ moduleKey, companyId, activeRol
     if (field.key === 'default_assignment_group_id') {
       return { ...field, options: groups.map(row => text(row, 'id')) }
     }
+    if (field.key === 'service_domain_id') {
+      return { ...field, options: domains.map(row => text(row, 'id')) }
+    }
     return field
-  }) ?? [], [classes, groups, def])
+  }) ?? [], [classes, groups, domains, def])
 
   const saveNew = async () => {
     if (!def) return
@@ -882,8 +925,8 @@ export default function PlatformModuleSettings({ moduleKey, companyId, activeRol
       </div>
     ) : (
       <div className="mt-6 grid gap-6 lg:grid-cols-[380px_1fr]">
-        <section className="rounded-2xl border bg-white p-5"><h2 className="font-extrabold">Nova configuração</h2><div className="mt-4 space-y-3">{fields.map(field => <FormField key={field.key} field={field} value={form[field.key]} classes={classes} groups={groups} onChange={value => setForm(current => ({ ...current, [field.key]: value }))} />)}<button onClick={() => void saveNew()} disabled={saving} className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-3 text-sm font-bold text-white"><Plus className="h-4 w-4" /> Adicionar</button></div></section>
-        <section className="rounded-2xl border bg-white p-5"><h2 className="font-extrabold">Configurações atuais</h2><RowList rows={rows} empty="Nenhuma configuração cadastrada." activeField={def!.activeField} groups={groups} onToggle={toggle} onManageRelations={moduleKey === 'ci' ? openRelationships : undefined} /></section>
+        <section className="rounded-2xl border bg-white p-5"><h2 className="font-extrabold">Nova configuração</h2><div className="mt-4 space-y-3">{fields.map(field => <FormField key={field.key} field={field} value={form[field.key]} classes={classes} groups={groups} domains={domains} onChange={value => setForm(current => ({ ...current, [field.key]: value }))} />)}<button onClick={() => void saveNew()} disabled={saving} className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-3 text-sm font-bold text-white"><Plus className="h-4 w-4" /> Adicionar</button></div></section>
+        <section className="rounded-2xl border bg-white p-5"><h2 className="font-extrabold">Configurações atuais</h2><RowList rows={rows} empty="Nenhuma configuração cadastrada." activeField={def!.activeField} groups={groups} domains={domains} onToggle={toggle} onManageRelations={moduleKey === 'ci' ? openRelationships : undefined} /></section>
       </div>
     )}
 
@@ -1001,11 +1044,14 @@ export default function PlatformModuleSettings({ moduleKey, companyId, activeRol
   </SettingsPageShell>
 }
 
-function FormField({ field, value, classes, groups, onChange }: { field: FieldDef; value: FormValue | undefined; classes: Row[]; groups: Row[]; onChange: (value: FormValue) => void }) {
+function FormField({ field, value, classes, groups, domains, onChange }: { field: FieldDef; value: FormValue | undefined; classes: Row[]; groups: Row[]; domains: Row[]; onChange: (value: FormValue) => void }) {
+  if (field.type === 'workflow_builder') return <WorkflowBuilder label={field.label} value={String(value ?? '')} onChange={onChange} />
+  if (field.type === 'form_builder') return <FormBuilder label={field.label} value={String(value ?? '')} onChange={onChange} />
   if (field.type === 'textarea') return <label className="block text-xs font-bold">{field.label}<textarea value={String(value ?? '')} onChange={e => onChange(e.target.value)} className="mt-1 min-h-24 w-full rounded-xl border px-3 py-2 text-sm" /></label>
   if (field.type === 'select') return <label className="block text-xs font-bold">{field.label}<select value={String(value ?? '')} onChange={e => onChange(e.target.value)} className="mt-1 w-full rounded-xl border bg-white px-3 py-2.5 text-sm"><option value="">Selecione…</option>{(field.options ?? []).map(option => <option key={option} value={option}>{
     field.key === 'class_id' ? text(classes.find(row => text(row, 'id') === option) ?? {}, 'name') :
     field.key === 'default_assignment_group_id' ? text(groups.find(row => text(row, 'id') === option) ?? {}, 'name') :
+    field.key === 'service_domain_id' ? text(domains.find(row => text(row, 'id') === option) ?? {}, 'name') :
     option
   }</option>)}</select></label>
   return <TextInput label={field.label} type={field.type === 'number' ? 'number' : 'text'} value={String(value ?? '')} onChange={onChange} />
@@ -1080,17 +1126,20 @@ function ColorSwatchField({ label, value, onChange, presets }: { label: string; 
   )
 }
 
-function RowList({ rows, empty, activeField, groups, onToggle, onManageRelations }: { rows: Row[]; empty: string; activeField?: 'active' | 'enabled'; groups?: Row[]; onToggle?: (row: Row) => void; onManageRelations?: (row: Row) => void }) {
+function RowList({ rows, empty, activeField, groups, domains, onToggle, onManageRelations }: { rows: Row[]; empty: string; activeField?: 'active' | 'enabled'; groups?: Row[]; domains?: Row[]; onToggle?: (row: Row) => void; onManageRelations?: (row: Row) => void }) {
   if (!rows.length) return <div className="mt-4 rounded-xl border border-dashed p-8 text-center text-sm text-slate-500">{empty}</div>
   return <div className="mt-4 space-y-2">{rows.map((row, index) => {
     const grpId = text(row, 'default_assignment_group_id')
     const grpName = grpId && groups ? text(groups.find(g => text(g, 'id') === grpId) ?? {}, 'name') : ''
+    const domainId = text(row, 'service_domain_id')
+    const domainName = domainId && domains ? text(domains.find(d => text(d, 'id') === domainId) ?? {}, 'name') : ''
     return (
       <article key={text(row, 'id') || String(index)} className="flex items-center gap-3 rounded-xl border p-3">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <b className="text-sm">{text(row, 'name') || text(row, 'action') || text(row, 'module_key') || text(row, 'key') || `Registro ${index + 1}`}</b>
             {grpName && <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-indigo-50 text-indigo-600 border border-indigo-100">{grpName}</span>}
+            {domainName && <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-slate-100 text-slate-600 border border-slate-200">{domainName}</span>}
           </div>
           <p className="truncate text-xs text-slate-500">{text(row, 'description') || text(row, 'body') || text(row, 'resource_type') || text(row, 'lifecycle') || text(row, 'channel')}</p>
         </div>

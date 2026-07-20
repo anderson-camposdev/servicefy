@@ -61,6 +61,7 @@ const SECTIONS: SettingsSection[] = [
   section('groups', 'organization', 'Equipes solucionadoras', 'Grupos, membros e filas.', ['Filas', 'Membros', 'Roteamento'], { legacyTab: 'groups' }),
   section('login_integration', 'organization', 'Integração de Login', 'SSO Microsoft/Google, domínios e política de acesso.', ['Microsoft Entra ID', 'Google Workspace', 'JIT end_user', 'SSO obrigatório']),
   section('domains', 'service_management', 'Domínios de serviço', 'TI, RH, Jurídico e Facilities.', ['Caso unificado', 'Domínios privados', 'Tipos configuráveis'], { entitlementKey: 'esm' }),
+  section('case_types', 'service_management', 'Tipos de Caso', 'Configuração de tipos de caso e processos.', ['Domínio pai', 'Especialização', 'Estado inicial'], { entitlementKey: 'esm' }),
   section('incident_catalog', 'service_management', 'Catálogo de incidentes', 'Categorias, serviços e sintomas.', ['Três níveis', 'SLA por item', 'Grupo solucionador'], { legacyTab: 'catalog_incidents', entitlementKey: 'itsm' }),
   section('request_catalog', 'service_management', 'Catálogo de requisições', 'Itens, aprovações e entrega.', ['Hierarquia', 'Formulários', 'Aprovações'], { legacyTab: 'catalog_requests', entitlementKey: 'itsm' }),
   section('change_cab', 'service_management', 'Comitê de Mudanças (CAB)', 'Membros permanentes e aprovação padrão.', ['Aprovadores padrão', 'Janelas restritas', 'Notificações'], { legacyTab: 'change_cab', entitlementKey: 'itsm' }),
@@ -200,7 +201,7 @@ export default function SettingsCenter({ companyId, activeRole, onNavigate }: Pr
     />
   )
 
-  if (selected && ['domains', 'macros', 'templates', 'ci', 'compliance', 'licensing', 'branding', 'smtp'].includes(selected.key)) return (
+  if (selected && ['domains', 'case_types', 'macros', 'templates', 'ci', 'compliance', 'licensing', 'branding', 'smtp'].includes(selected.key)) return (
     <PlatformModuleSettings
       moduleKey={selected.key as OperationalModuleKey}
       companyId={targetCompanyId}
