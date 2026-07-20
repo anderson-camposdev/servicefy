@@ -24,7 +24,7 @@ describe('UserImportZone', () => {
     const file = new File([
       'email,name,role\n' +
       'user1@test.local,User One,agent\n' +
-      'user2@test.local,User Two,sysadmin'
+      'user2@test.local,User Two,company_admin'
     ], 'users.csv', { type: 'text/csv' })
 
     const input = screen.getByTestId('file-upload') as HTMLInputElement // We need to add test id to input
