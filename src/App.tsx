@@ -9,7 +9,7 @@ import GlobalSearchSpotlight from './components/portal/GlobalSearchSpotlight'
 import AppNavigation, { type AppNavigationItem } from './components/AppNavigation'
 import Login from './pages/auth/Login'
 import { usePersistentState } from './hooks/usePersistentState'
-import type { ProblemRow, CompanyRow, ProfileRow, TicketPriority, IncidentCategory } from './lib/database.types'
+import type { ProblemRow, ProblemState, CompanyRow, ProfileRow, TicketPriority, IncidentCategory, IncidentRow } from './lib/database.types'
 import { incidentsService, cioService, problemsService } from './lib/services'
 import { translateState } from './lib/statusLabels'
 import { useTenant } from './tenant'
@@ -425,11 +425,85 @@ export function PageHeader({ title, subtitle }: { title: string; subtitle: strin
 
 function ProblemDashboard({ companyId }: { companyId: string }) {
   const { toast } = useToast()
+  const { profile } = useAuth()
   const [detail, setDetail] = useState<ProblemRow | null>(null)
   const { problems: base, kpis: stats, loading, error, refetch } = useProblems(companyId)
   const [showNew, setShowNew] = useState(false)
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState({ short: '', description: '', priority: 'P3 - Moderate', category: 'Software' })
+
+  // Edição da RCA/KEDB (achado da auditoria ITSM: a tela existia mas nunca
+  // chamava problemsService.update — Gestão de Problemas era só um cadastro
+  // que nascia e morria, sem causa raiz nem erro conhecido registrados).
+  const [editForm, setEditForm] = useState<{ state: ProblemState; root_cause: string; workaround: string; known_error: boolean } | null>(null)
+  const [savingEdit, setSavingEdit] = useState(false)
+  const [linkedIncidents, setLinkedIncidents] = useState<Pick<IncidentRow, 'id' | 'number' | 'short_description' | 'state'>[]>([])
+  const [incidentQuery, setIncidentQuery] = useState('')
+  const [incidentOptions, setIncidentOptions] = useState<IncidentRow[]>([])
+  const [linkingIncident, setLinkingIncident] = useState(false)
+
+  const openDetail = (problem: ProblemRow) => {
+    setDetail(problem)
+    setEditForm({ state: problem.state, root_cause: problem.root_cause ?? '', workaround: problem.workaround ?? '', known_error: problem.known_error })
+    setIncidentQuery('')
+    setIncidentOptions([])
+    problemsService.listLinkedIncidents(problem.id, companyId).then(setLinkedIncidents).catch(() => setLinkedIncidents([]))
+  }
+
+  const saveEdit = async () => {
+    if (!detail || !editForm) return
+    setSavingEdit(true)
+    try {
+      const updated = await problemsService.update(detail.id, companyId, {
+        state: editForm.state,
+        root_cause: editForm.root_cause.trim() || null,
+        workaround: editForm.workaround.trim() || null,
+        known_error: editForm.known_error,
+      }, profile?.name ?? 'Analista')
+      setDetail(updated)
+      toast.success('Problema atualizado.')
+      refetch()
+    } catch (e) {
+      toast.error(`Falha ao atualizar problema: ${e instanceof Error ? e.message : 'erro'}`)
+    } finally {
+      setSavingEdit(false)
+    }
+  }
+
+  const searchIncidents = async (query: string) => {
+    setIncidentQuery(query)
+    if (query.trim().length < 2) { setIncidentOptions([]); return }
+    try {
+      const rows = await incidentsService.list({ companyId, search: query.trim(), limit: 20 })
+      const byNumber = rows.filter(r => r.number?.toLowerCase().includes(query.trim().toLowerCase()))
+      setIncidentOptions((byNumber.length ? byNumber : rows).slice(0, 8))
+    } catch { setIncidentOptions([]) }
+  }
+
+  const addLinkedIncident = async (incident: IncidentRow) => {
+    if (!detail) return
+    setLinkingIncident(true)
+    try {
+      await problemsService.linkIncident(detail.id, incident.id, companyId)
+      setLinkedIncidents(prev => prev.some(i => i.id === incident.id) ? prev : [...prev, incident])
+      setIncidentQuery('')
+      setIncidentOptions([])
+    } catch (e) {
+      toast.error(`Falha ao vincular incidente: ${e instanceof Error ? e.message : 'erro'}`)
+    } finally {
+      setLinkingIncident(false)
+    }
+  }
+
+  const removeLinkedIncident = async (incidentId: string) => {
+    if (!detail) return
+    try {
+      await problemsService.unlinkIncident(detail.id, incidentId, companyId)
+      setLinkedIncidents(prev => prev.filter(i => i.id !== incidentId))
+    } catch (e) {
+      toast.error(`Falha ao desvincular incidente: ${e instanceof Error ? e.message : 'erro'}`)
+    }
+  }
 
   const submitNew = async () => {
     if (!form.short.trim()) { toast.error('Informe a descrição curta do problema.'); return }
@@ -488,14 +562,14 @@ function ProblemDashboard({ companyId }: { companyId: string }) {
           fields={PROBLEM_FIELDS}
           storageKey="problems"
           getRowId={p => p.id}
-          onRowClick={setDetail}
+          onRowClick={openDetail}
           leadingCheckbox={false}
           loading={loading}
           emptyLabel="Nenhum problema encontrado."
         />
       </div>
 
-      {detail && (
+      {detail && editForm && (
         <Modal title={detail.number} subtitle="Detalhes do Problema" onClose={() => setDetail(null)}>
           <div className="space-y-4">
             <div className="flex flex-wrap gap-2">
@@ -505,8 +579,69 @@ function ProblemDashboard({ companyId }: { companyId: string }) {
             </div>
             <InfoBlock label="Descrição Curta" value={detail.short_description} />
             {detail.description && <InfoBlock label="Descrição" value={detail.description} mono />}
-            {detail.root_cause && <InfoBlock label="Causa Raiz (RCA)" value={detail.root_cause} mono />}
-            {detail.workaround && <InfoBlock label="Contorno Temporário (Workaround)" value={detail.workaround} mono />}
+
+            <div className="space-y-3 border-t border-slate-100 pt-3">
+              <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Análise de Causa Raiz (RCA) e KEDB</p>
+              <FieldSelect
+                label="Estado"
+                value={editForm.state}
+                onChange={v => setEditForm(f => f && ({ ...f, state: v as ProblemState }))}
+                options={['New', 'Under Investigation', 'Root Cause Identified', 'Known Error', 'Resolved', 'Closed']}
+              />
+              <FieldArea label="Causa Raiz (RCA)" value={editForm.root_cause} onChange={v => setEditForm(f => f && ({ ...f, root_cause: v }))} placeholder="O que causou o problema…" />
+              <FieldArea label="Contorno Temporário (Workaround)" value={editForm.workaround} onChange={v => setEditForm(f => f && ({ ...f, workaround: v }))} placeholder="Como contornar até a correção definitiva…" />
+              <label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+                <input type="checkbox" checked={editForm.known_error} onChange={e => setEditForm(f => f && ({ ...f, known_error: e.target.checked }))} />
+                Registrar como Erro Conhecido (KEDB)
+              </label>
+              <div className="flex justify-end">
+                <button onClick={saveEdit} disabled={savingEdit} className="px-4 py-2 rounded-xl text-sm font-bold text-white bg-teal-600 hover:bg-teal-700 disabled:opacity-50">
+                  {savingEdit ? 'Salvando…' : 'Salvar análise'}
+                </button>
+              </div>
+            </div>
+
+            <div className="space-y-3 border-t border-slate-100 pt-3">
+              <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Incidentes relacionados</p>
+              {linkedIncidents.length === 0 ? (
+                <p className="text-sm text-slate-400">Nenhum incidente vinculado ainda.</p>
+              ) : (
+                <div className="space-y-1.5">
+                  {linkedIncidents.map(incident => (
+                    <div key={incident.id} className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 px-3 py-2">
+                      <div className="min-w-0">
+                        <p className="text-sm font-bold text-slate-800 truncate">{incident.number} · {incident.short_description}</p>
+                        <p className="text-xs text-slate-400">{translateState(incident.state)}</p>
+                      </div>
+                      <button onClick={() => removeLinkedIncident(incident.id)} className="shrink-0 text-xs font-semibold text-red-600 hover:text-red-700">Desvincular</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div className="relative">
+                <input
+                  value={incidentQuery}
+                  onChange={e => void searchIncidents(e.target.value)}
+                  placeholder="Buscar incidente por número ou descrição…"
+                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-teal-500"
+                  disabled={linkingIncident}
+                />
+                {incidentOptions.length > 0 && (
+                  <div className="absolute z-10 mt-1 w-full rounded-xl border border-slate-200 bg-white shadow-lg max-h-56 overflow-y-auto">
+                    {incidentOptions.filter(o => !linkedIncidents.some(li => li.id === o.id)).map(option => (
+                      <button
+                        key={option.id}
+                        onClick={() => void addLinkedIncident(option)}
+                        className="block w-full px-3 py-2 text-left text-sm hover:bg-slate-50"
+                      >
+                        <span className="font-bold text-slate-800">{option.number}</span> · {option.short_description}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
             <div className="grid grid-cols-1 gap-4 border-t border-slate-100 pt-3 sm:grid-cols-2">
               <InfoBlock label="Atribuído a" value={detail.assigned_to_name ?? '—'} />
               <InfoBlock label="Grupo" value={detail.assigned_group_name ?? '—'} />

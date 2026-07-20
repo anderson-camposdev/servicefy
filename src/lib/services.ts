@@ -1228,6 +1228,31 @@ export const problemsService = {
     if (he) throw he
     return data!
   },
+
+  async listLinkedIncidents(problemId: string, companyId: string): Promise<Pick<IncidentRow, 'id' | 'number' | 'short_description' | 'state'>[]> {
+    const client = getClientForCompany(companyId)
+    const { data: links, error: linkErr } = await client
+      .from('problem_incidents').select('incident_id').eq('problem_id', problemId)
+    if (linkErr) throw linkErr
+    const ids = (links ?? []).map(l => l.incident_id)
+    if (ids.length === 0) return []
+    const { data, error } = await client
+      .from('incidents').select('id, number, short_description, state').in('id', ids)
+    if (error) throw error
+    return (data ?? []) as Pick<IncidentRow, 'id' | 'number' | 'short_description' | 'state'>[]
+  },
+
+  async linkIncident(problemId: string, incidentId: string, companyId: string): Promise<void> {
+    const { error } = await getClientForCompany(companyId)
+      .from('problem_incidents').insert({ problem_id: problemId, incident_id: incidentId })
+    if (error) throw error
+  },
+
+  async unlinkIncident(problemId: string, incidentId: string, companyId: string): Promise<void> {
+    const { error } = await getClientForCompany(companyId)
+      .from('problem_incidents').delete().eq('problem_id', problemId).eq('incident_id', incidentId)
+    if (error) throw error
+  },
 }
 
 // ─── CHANGES ─────────────────────────────────────────────────

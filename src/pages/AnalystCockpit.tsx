@@ -5,7 +5,7 @@ import {
   ShieldAlert, PlayCircle, ArrowRightLeft, X, ChevronDown, ChevronUp, Timer,
   Paperclip, Trash2, Upload, Loader2,
 } from 'lucide-react'
-import { incidentsService, messagesService, assignmentGroupsService, pendingReasonsService, responseMacrosService, cmdbService } from '../lib/services'
+import { incidentsService, messagesService, assignmentGroupsService, pendingReasonsService, responseMacrosService, cmdbService, problemsService } from '../lib/services'
 import type { CmdbImpactRow } from '../lib/services'
 import { knowledgeService, type CaseLinkedArticle } from '../lib/knowledge-service'
 import { attachmentsService, type TicketAttachmentRow } from '../lib/attachments-service'
@@ -232,7 +232,7 @@ const AnalystCockpit = ({ ticket = FALLBACK_TICKET }: { ticket?: WorkspaceTicket
 
   const realMode = Boolean(ticket.incidentId && ticket.companyId)
   // God Mode: admin/sysadmin têm passe livre nas travas de governança.
-  const isAdmin = Boolean(profile && ['sysadmin', 'company_admin', 'admin'].includes(profile.role))
+  const isAdmin = Boolean(profile && ['sysadmin', 'company_admin', 'ops_manager', 'governance_manager'].includes(profile.role))
 
   const [detail, setDetail] = useState<IncidentDetail | null>(null)
   const [loading, setLoading] = useState(false)
@@ -596,6 +596,33 @@ const AnalystCockpit = ({ ticket = FALLBACK_TICKET }: { ticket?: WorkspaceTicket
       toast.error(dbErrMsg(err, 'Falha ao remover o anexo.'))
     }
   }, [toast, loadAttachments])
+
+  // Promove este incidente a um Problema (achado da auditoria ITSM: não
+  // havia caminho de UI para correlacionar incidentes recorrentes a um
+  // registro de Problema/KEDB a partir do próprio chamado).
+  const [promotingToProblem, setPromotingToProblem] = useState(false)
+  const handlePromoteToProblem = useCallback(async () => {
+    const incidentId = ticket.incidentId
+    const companyId = ticket.companyId
+    if (!incidentId || !companyId || !detail) return
+    if (!window.confirm(`Criar um Problema a partir de "${detail.short_description}" e vincular este incidente a ele?`)) return
+    setPromotingToProblem(true)
+    try {
+      const problem = await problemsService.create({
+        companyId,
+        shortDescription: detail.short_description,
+        description: detail.description ?? undefined,
+        priority: detail.priority,
+        category: detail.category,
+      })
+      await problemsService.linkIncident(problem.id, incidentId, companyId)
+      toast.success(`Problema ${problem.number} criado e vinculado a este incidente.`)
+    } catch (err) {
+      toast.error(dbErrMsg(err, 'Falha ao promover a Problema.'))
+    } finally {
+      setPromotingToProblem(false)
+    }
+  }, [ticket.incidentId, ticket.companyId, detail, toast])
 
   // Load active assignment groups for this company
   useEffect(() => {
@@ -1013,7 +1040,7 @@ const AnalystCockpit = ({ ticket = FALLBACK_TICKET }: { ticket?: WorkspaceTicket
     ? Object.entries(detail.form_data)
     : []
   const auditRows = detail ? detail.history : []
-  const isTechnicalUser = profile && ['admin', 'sysadmin', 'analyst', 'agent', 'company_admin'].includes(profile.role)
+  const isTechnicalUser = profile && ['sysadmin', 'agent', 'company_admin', 'ops_manager', 'governance_manager'].includes(profile.role)
   const visibleMessages = isTechnicalUser ? messages : messages.filter(m => !m.is_internal)
   const visibleAuditRows = isTechnicalUser ? auditRows : auditRows.filter(h => h.is_public)
   const canAct = realMode && Boolean(profile)
@@ -1079,6 +1106,16 @@ const AnalystCockpit = ({ ticket = FALLBACK_TICKET }: { ticket?: WorkspaceTicket
             <button onClick={() => setKbOpen(true)} className="flex items-center gap-1.5 px-3 py-2 text-sm font-semibold transition-colors border border-outline-variant text-text-main hover:bg-surface-container rounded-lg">
               <BookOpen className="w-4 h-4" /> <span className="hidden lg:inline">Base de Conhecimento</span>
             </button>
+            {isTechnicalUser && ticket.incidentId && ticket.ticketType !== 'request' && (
+              <button
+                onClick={() => void handlePromoteToProblem()}
+                disabled={promotingToProblem}
+                title="Criar um Problema (RCA/KEDB) a partir deste incidente"
+                className="flex items-center gap-1.5 px-3 py-2 text-sm font-semibold transition-colors border border-outline-variant text-text-main hover:bg-surface-container rounded-lg disabled:opacity-50"
+              >
+                <AlertTriangle className="w-4 h-4" /> <span className="hidden lg:inline">{promotingToProblem ? 'Promovendo…' : 'Promover a Problema'}</span>
+              </button>
+            )}
             {isResolved ? (
               <>
                 {isAdmin && (
