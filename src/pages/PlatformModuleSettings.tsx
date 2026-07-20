@@ -30,7 +30,52 @@ interface FieldDef {
   label: string
   type?: 'text' | 'textarea' | 'select' | 'checkbox' | 'number' | 'workflow_builder' | 'form_builder' | 'auto_key'
   options?: string[]
+  /** Traduz o valor bruto salvo no banco (ex.: 'restricted') para o rótulo mostrado ao admin (ex.: 'Restrito'). */
+  optionLabels?: Record<string, string>
+  /** Frase curta abaixo do campo explicando para que serve e o que acontece com o valor padrão/vazio. */
+  help?: string
   required?: boolean
+}
+
+const PRIVACY_LABELS: Record<string, string> = {
+  standard: 'Padrão (visível a todos os agentes)',
+  private: 'Privado (só quem participa do caso)',
+  restricted: 'Restrito (só o grupo responsável)',
+}
+const SPECIALIZATION_LABELS: Record<string, string> = {
+  incident: 'Incidente (algo quebrou ou parou de funcionar)',
+  request: 'Requisição (um pedido de algo novo)',
+  general: 'Geral (outros tipos de caso)',
+}
+const VISIBILITY_LABELS: Record<string, string> = {
+  public: 'Visível para o cliente',
+  internal: 'Somente uso interno',
+  both: 'Cliente e equipe interna',
+}
+const CHANNEL_LABELS: Record<string, string> = {
+  email: 'E-mail',
+  portal: 'Portal do cliente',
+  teams: 'Microsoft Teams',
+  google_chat: 'Google Chat',
+  whatsapp: 'WhatsApp',
+}
+const LOCALE_LABELS: Record<string, string> = {
+  'pt-BR': 'Português (Brasil)',
+  'en-US': 'Inglês (EUA)',
+  'es-ES': 'Espanhol (Espanha)',
+}
+const LIFECYCLE_LABELS: Record<string, string> = {
+  planned: 'Planejado (ainda não está em uso)',
+  active: 'Em uso',
+  maintenance: 'Em manutenção',
+  retired: 'Desativado (fora de operação)',
+  disposed: 'Descartado',
+}
+const CRITICALITY_LABELS: Record<string, string> = {
+  low: 'Baixa',
+  medium: 'Média',
+  high: 'Alta',
+  critical: 'Crítica',
 }
 
 /**
@@ -92,8 +137,8 @@ const defs: Record<Exclude<OperationalModuleKey, 'compliance' | 'licensing' | 'b
     fields: [
       { key: 'name', label: 'Nome', required: true }, { key: 'key', label: 'Chave (gerada automaticamente)', type: 'auto_key', required: true },
       { key: 'description', label: 'Descrição', type: 'textarea' },
-      { key: 'privacy', label: 'Privacidade', type: 'select', options: ['standard', 'private', 'restricted'], required: true },
-      { key: 'default_assignment_group_id', label: 'Equipe Solucionadora Padrão', type: 'select', required: false },
+      { key: 'privacy', label: 'Privacidade', type: 'select', options: ['standard', 'private', 'restricted'], optionLabels: PRIVACY_LABELS, required: true, help: 'Controla quem consegue ver os casos abertos neste domínio.' },
+      { key: 'default_assignment_group_id', label: 'Equipe Solucionadora Padrão', type: 'select', required: false, help: 'Equipe para onde novos casos deste domínio vão automaticamente. Deixe em branco para atribuir manualmente depois.' },
     ],
     defaults: { key: '', name: '', description: '', privacy: 'standard', default_assignment_group_id: '' },
     payload: (f, companyId) => ({ company_id: companyId, key: f.key, name: f.name, description: f.description || null, privacy: f.privacy, default_assignment_group_id: f.default_assignment_group_id || null, active: true }),
@@ -105,7 +150,7 @@ const defs: Record<Exclude<OperationalModuleKey, 'compliance' | 'licensing' | 'b
       { key: 'service_domain_id', label: 'Domínio', type: 'select', required: true },
       { key: 'name', label: 'Nome', required: true },
       { key: 'key', label: 'Chave (gerada automaticamente)', type: 'auto_key', required: true },
-      { key: 'specialization', label: 'Especialização', type: 'select', options: ['incident', 'request', 'general'], required: true },
+      { key: 'specialization', label: 'Especialização', type: 'select', options: ['incident', 'request', 'general'], optionLabels: SPECIALIZATION_LABELS, required: true, help: 'Define o comportamento padrão deste tipo de caso (prazos e formulário base).' },
       { key: 'initial_state', label: 'Estado Inicial', required: true },
       { key: 'form_schema', label: 'Formulário Específico (Builder)', type: 'form_builder' },
       { key: 'workflow_config', label: 'Workflow e Regras (Builder)', type: 'workflow_builder' }
@@ -133,8 +178,8 @@ const defs: Record<Exclude<OperationalModuleKey, 'compliance' | 'licensing' | 'b
     title: 'Macros de resposta', description: 'Respostas aprovadas com variáveis, uso público ou interno e governança de conteúdo.',
     table: 'response_macros', order: 'name', activeField: 'active',
     fields: [
-      { key: 'name', label: 'Nome', required: true }, { key: 'body', label: 'Mensagem', type: 'textarea', required: true },
-      { key: 'visibility', label: 'Visibilidade', type: 'select', options: ['public', 'internal', 'both'], required: true },
+      { key: 'name', label: 'Nome', required: true }, { key: 'body', label: 'Mensagem', type: 'textarea', required: true, help: 'Use {{cliente.nome}} e {{caso.numero}} para personalizar automaticamente ao inserir esta resposta em um caso.' },
+      { key: 'visibility', label: 'Visibilidade', type: 'select', options: ['public', 'internal', 'both'], optionLabels: VISIBILITY_LABELS, required: true, help: 'Define quem pode ver esta resposta pronta quando ela for inserida no caso.' },
     ],
     defaults: { name: '', body: '', visibility: 'public' },
     payload: (f, companyId) => ({ company_id: companyId, name: f.name, body: f.body, visibility: f.visibility, active: true }),
@@ -144,9 +189,9 @@ const defs: Record<Exclude<OperationalModuleKey, 'compliance' | 'licensing' | 'b
     table: 'notification_templates', order: 'name', activeField: 'enabled',
     fields: [
       { key: 'name', label: 'Nome', required: true }, { key: 'key', label: 'Chave do evento (gerada automaticamente)', type: 'auto_key', required: true },
-      { key: 'channel', label: 'Canal', type: 'select', options: ['email', 'portal', 'teams', 'google_chat', 'whatsapp'], required: true },
-      { key: 'locale', label: 'Idioma', type: 'select', options: ['pt-BR', 'en-US', 'es-ES'], required: true },
-      { key: 'subject_template', label: 'Assunto' }, { key: 'body_template', label: 'Corpo', type: 'textarea', required: true },
+      { key: 'channel', label: 'Canal', type: 'select', options: ['email', 'portal', 'teams', 'google_chat', 'whatsapp'], optionLabels: CHANNEL_LABELS, required: true, help: 'Por onde esta notificação será enviada.' },
+      { key: 'locale', label: 'Idioma', type: 'select', options: ['pt-BR', 'en-US', 'es-ES'], optionLabels: LOCALE_LABELS, required: true },
+      { key: 'subject_template', label: 'Assunto' }, { key: 'body_template', label: 'Corpo', type: 'textarea', required: true, help: 'Você pode usar variáveis como {{cliente.nome}}, {{caso.numero}} e {{caso.titulo}} — elas são substituídas automaticamente ao enviar.' },
     ],
     defaults: { key: '', name: '', channel: 'email', locale: 'pt-BR', subject_template: '', body_template: '' },
     payload: (f, companyId) => ({ company_id: companyId, key: f.key, name: f.name, channel: f.channel, locale: f.locale, subject_template: f.subject_template || null, body_template: f.body_template, variables: [], enabled: true }),
@@ -157,8 +202,8 @@ const defs: Record<Exclude<OperationalModuleKey, 'compliance' | 'licensing' | 'b
     fields: [
       { key: 'class_id', label: 'Classe', type: 'select', required: true }, { key: 'name', label: 'Nome', required: true },
       { key: 'asset_tag', label: 'Asset tag' }, { key: 'hostname', label: 'Hostname' },
-      { key: 'lifecycle', label: 'Ciclo de vida', type: 'select', options: ['planned', 'active', 'maintenance', 'retired', 'disposed'], required: true },
-      { key: 'criticality', label: 'Criticidade', type: 'select', options: ['low', 'medium', 'high', 'critical'], required: true },
+      { key: 'lifecycle', label: 'Ciclo de vida', type: 'select', options: ['planned', 'active', 'maintenance', 'retired', 'disposed'], optionLabels: LIFECYCLE_LABELS, required: true, help: 'Define se este item ainda está em operação. Itens desativados somem das listas de atribuição.' },
+      { key: 'criticality', label: 'Criticidade', type: 'select', options: ['low', 'medium', 'high', 'critical'], optionLabels: CRITICALITY_LABELS, required: true, help: 'Usada para priorizar incidentes que afetam este item.' },
     ],
     defaults: { class_id: '', name: '', asset_tag: '', hostname: '', lifecycle: 'active', criticality: 'medium' },
     payload: (f, companyId) => ({ company_id: companyId, class_id: f.class_id, name: f.name, asset_tag: f.asset_tag || null, hostname: f.hostname || null, lifecycle: f.lifecycle, criticality: f.criticality, attributes: {} }),
@@ -623,30 +668,35 @@ export default function PlatformModuleSettings({ moduleKey, companyId, activeRol
     {loading ? <div className="py-20 text-center"><Loader2 className="mx-auto h-6 w-6 animate-spin text-indigo-600" /></div> : moduleKey === 'compliance' ? (
       <div className="mt-6 grid gap-6 lg:grid-cols-[420px_1fr]">
         <section className="rounded-xl border border-slate-200 bg-white p-5"><h2 className="text-base font-bold text-slate-950">Política de anexos e retenção</h2><div className="mt-4 space-y-3">
-          <TextInput label="Extensões permitidas para visualização" value={String(form.allowed_extensions ?? '')} onChange={v => setForm(f => ({ ...f, allowed_extensions: v }))} />
-          <TextInput label="Extensões bloqueadas" value={String(form.blocked_extensions ?? '')} onChange={v => setForm(f => ({ ...f, blocked_extensions: v }))} />
+          <div><TextInput label="Tipos de arquivo aceitos em anexos" value={String(form.allowed_extensions ?? '')} onChange={v => setForm(f => ({ ...f, allowed_extensions: v }))} /><span className="mt-1 block text-[11px] leading-4 text-slate-400">Extensões separadas por vírgula, sem o ponto (ex.: pdf, png, docx).</span></div>
+          <div><TextInput label="Tipos de arquivo bloqueados em anexos" value={String(form.blocked_extensions ?? '')} onChange={v => setForm(f => ({ ...f, blocked_extensions: v }))} /><span className="mt-1 block text-[11px] leading-4 text-slate-400">Arquivos com extensão bloqueada são rejeitados automaticamente no envio.</span></div>
           <TextInput label="Tamanho máximo (MB, entre 1 e 10)" type="number" value={String(form.max_size_mb ?? '')} onChange={v => setForm(f => ({ ...f, max_size_mb: v }))} />
-          <TextInput label="Retenção (dias)" type="number" value={String(form.retention_days ?? '')} onChange={v => setForm(f => ({ ...f, retention_days: v }))} />
-          <label className="flex items-center gap-2 text-sm font-semibold"><input type="checkbox" checked={Boolean(form.malware_scan_required)} onChange={e => setForm(f => ({ ...f, malware_scan_required: e.target.checked }))} /> Verificação de malware obrigatória</label>
+          <div><TextInput label="Retenção de anexos (dias)" type="number" value={String(form.retention_days ?? '')} onChange={v => setForm(f => ({ ...f, retention_days: v }))} /><span className="mt-1 block text-[11px] leading-4 text-slate-400">Depois desse número de dias, os anexos são excluídos permanentemente do sistema. Ex.: 365 = 1 ano.</span></div>
+          <label className="flex items-center gap-2 text-sm font-semibold" title="Quando ativado, todo anexo é verificado contra vírus antes de ficar disponível."><input type="checkbox" checked={Boolean(form.malware_scan_required)} onChange={e => setForm(f => ({ ...f, malware_scan_required: e.target.checked }))} /> Verificação de malware obrigatória</label>
+          <p className="text-[11px] leading-4 text-slate-400">Desativar libera uploads sem essa checagem — recomendado apenas em ambientes de teste.</p>
           <button onClick={() => void saveCompliance()} disabled={saving} className="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-lg bg-slate-950 px-4 text-sm font-semibold text-white hover:bg-slate-800"><Save className="h-4 w-4" /> Salvar política</button>
         </div></section>
         <section className="rounded-xl border border-slate-200 bg-white p-5"><h2 className="flex items-center gap-2 text-base font-bold text-slate-950"><ShieldCheck className="h-4 w-4 text-slate-500" /> Auditoria administrativa recente</h2><RowList rows={audit} empty="Nenhum evento administrativo registrado." /></section>
       </div>
     ) : moduleKey === 'licensing' ? (
       <div className="mt-6 space-y-6">
-        {usage && <section className="grid gap-3 rounded-xl border border-slate-200 bg-white p-5 sm:grid-cols-4"><Metric label="Plano" value={text(usage, 'license_plan')} /><Metric label="Em uso" value={String(usage.active_connections ?? 0)} /><Metric label="Limite" value={String(usage.license_limit ?? 0)} /><Metric label="Status" value={text(usage, 'license_status')} /></section>}
+        {usage && <section className="grid gap-3 rounded-xl border border-slate-200 bg-white p-5 sm:grid-cols-4"><Metric label="Plano" value={text(usage, 'license_plan')} /><Metric label="Em uso" value={String(usage.active_connections ?? 0)} /><Metric label="Limite" value={String(usage.license_limit ?? 0)} /><Metric label="Status" value={LICENSE_STATUS_LABELS[text(usage, 'license_status')] ?? text(usage, 'license_status')} /></section>}
         <section className="rounded-xl border border-slate-200 bg-white p-5">
           <h2 className="text-base font-bold text-slate-950">Módulos e direitos do tenant</h2>
+          <p className="mt-1 text-xs text-slate-400">Desativar um módulo remove o acesso a ele para todos os usuários deste cliente imediatamente.</p>
           <div className="mt-4 grid gap-2 md:grid-cols-2">
             {rows.map(row => (
               <div key={text(row, 'id')} className="flex items-center gap-3 rounded-lg border border-slate-200 p-3">
                 <span className={`h-2.5 w-2.5 rounded-full ${bool(row, 'enabled') ? 'bg-emerald-500' : 'bg-slate-300'}`} />
                 <div className="flex-1">
-                  <b className="text-sm">{text(row, 'module_key')}</b>
-                  <p className="text-xs text-on-surface-variant">{text(row, 'source')}</p>
+                  <b className="text-sm">{MODULE_KEY_LABELS[text(row, 'module_key')] ?? text(row, 'module_key')}</b>
+                  <p className="text-xs text-on-surface-variant">{LICENSE_SOURCE_LABELS[text(row, 'source')] ?? text(row, 'source')}</p>
                 </div>
                 {activeRole === 'sysadmin' && (
-                  <button onClick={() => void toggleEntitlement(row)} className="rounded-lg border border-slate-300 px-2 py-1 text-xs font-semibold">
+                  <button onClick={() => {
+                    if (bool(row, 'enabled') && !confirm(`Desativar "${MODULE_KEY_LABELS[text(row, 'module_key')] ?? text(row, 'module_key')}"? Todos os usuários deste cliente perdem acesso a este módulo imediatamente.`)) return
+                    void toggleEntitlement(row)
+                  }} className="rounded-lg border border-slate-300 px-2 py-1 text-xs font-semibold">
                     {bool(row, 'enabled') ? 'Desativar' : 'Ativar'}
                   </button>
                 )}
@@ -1002,8 +1052,9 @@ export default function PlatformModuleSettings({ moduleKey, companyId, activeRol
         <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col animate-fade-in">
           <header className="flex items-center justify-between px-5 py-4 border-b">
             <div>
-              <h2 className="text-base font-bold text-slate-800">Relacionamentos do CI</h2>
+              <h2 className="text-base font-bold text-slate-800">Relacionamentos do Item de Configuração</h2>
               <p className="text-xs text-slate-500 font-semibold mt-0.5">{text(activeCi, 'name')}</p>
+              <p className="text-[11px] text-slate-400 mt-0.5">Mostra de quais outros itens este depende, e quais dependem dele — útil para avaliar o impacto de uma mudança ou pane.</p>
             </div>
             <button onClick={() => setActiveCi(null)} className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg">✕</button>
           </header>
@@ -1019,8 +1070,8 @@ export default function PlatformModuleSettings({ moduleKey, companyId, activeRol
                     onChange={e => setRelDirection(e.target.value as 'upstream' | 'downstream')}
                     className="mt-1 w-full rounded-lg border bg-white px-2.5 py-2 text-xs font-semibold"
                   >
-                    <option value="downstream">Downstream (Saída)</option>
-                    <option value="upstream">Upstream (Entrada)</option>
+                    <option value="downstream">Este item depende do outro</option>
+                    <option value="upstream">O outro item depende deste</option>
                   </select>
                 </label>
 
@@ -1119,14 +1170,14 @@ function FormField({ field, value, classes, groups, domains, locked, onChange }:
   )
   if (field.type === 'workflow_builder') return <WorkflowBuilder label={field.label} value={String(value ?? '')} onChange={onChange} />
   if (field.type === 'form_builder') return <FormBuilder label={field.label} value={String(value ?? '')} onChange={onChange} />
-  if (field.type === 'textarea') return <label className="block text-xs font-bold">{field.label}<textarea value={String(value ?? '')} onChange={e => onChange(e.target.value)} className="mt-1 min-h-24 w-full rounded-xl border px-3 py-2 text-sm" /></label>
+  if (field.type === 'textarea') return <label className="block text-xs font-bold">{field.label}<textarea value={String(value ?? '')} onChange={e => onChange(e.target.value)} className="mt-1 min-h-24 w-full rounded-xl border px-3 py-2 text-sm" />{field.help && <span className="mt-1 block text-[11px] font-normal leading-4 text-slate-400">{field.help}</span>}</label>
   if (field.type === 'select') return <label className="block text-xs font-bold">{field.label}<select value={String(value ?? '')} onChange={e => onChange(e.target.value)} className="mt-1 w-full rounded-xl border bg-white px-3 py-2.5 text-sm"><option value="">Selecione…</option>{(field.options ?? []).map(option => <option key={option} value={option}>{
     field.key === 'class_id' ? text(classes.find(row => text(row, 'id') === option) ?? {}, 'name') :
     field.key === 'default_assignment_group_id' ? text(groups.find(row => text(row, 'id') === option) ?? {}, 'name') :
     field.key === 'service_domain_id' ? text(domains.find(row => text(row, 'id') === option) ?? {}, 'name') :
-    option
-  }</option>)}</select></label>
-  return <TextInput label={field.label} type={field.type === 'number' ? 'number' : 'text'} value={String(value ?? '')} onChange={onChange} />
+    field.optionLabels?.[option] ?? option
+  }</option>)}</select>{field.help && <span className="mt-1 block text-[11px] font-normal leading-4 text-slate-400">{field.help}</span>}</label>
+  return <div><TextInput label={field.label} type={field.type === 'number' ? 'number' : 'text'} value={String(value ?? '')} onChange={onChange} />{field.help && <span className="mt-1 block text-[11px] font-normal leading-4 text-slate-400">{field.help}</span>}</div>
 }
 
 function TextInput({ label, value, type = 'text', onChange }: { label: string; value: string; type?: string; onChange: (value: string) => void }) {

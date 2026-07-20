@@ -46,3 +46,10 @@ coverage/
 *.key
 *.p12
 *.pfx
+
+# AI and Tools
+.agents/
+.claude/
+.cli-home/
+.impeccable/
+everything-claude-code-main/
