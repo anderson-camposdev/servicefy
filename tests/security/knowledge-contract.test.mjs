@@ -202,7 +202,7 @@ test('UI foi conectada em admin, Central de Conhecimento, portal e cockpit (sem 
   assert.match(knowledgeCenter, /isKbCapableRole/)
   assert.match(knowledgeCenter, /<KnowledgeAdmin/)
   assert.match(app, /KnowledgeCenter/)
-  assert.match(app, /'knowledge_center'/)
+  assert.match(app, /'conhecimento'/)
   // KnowledgeAdmin não ignora mais a prop activeRole (bug original corrigido).
   assert.match(admin, /hasKbCapability\(activeRole/)
   assert.match(portal, /setScreen\('knowledge'\)/)
