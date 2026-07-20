@@ -330,6 +330,7 @@ const TicketManagementDashboard = ({ onOpenTicket, companyId, isProvider, compan
   const rows: Row[] = realMode
     ? incidents.map(i => ({
         id: i.number,
+        number: i.number,
         title: i.short_description,
         status: i.state,
         priority: i.priority || '—',

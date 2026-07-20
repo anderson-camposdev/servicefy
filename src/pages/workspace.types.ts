@@ -12,6 +12,7 @@ export interface CompanyLite {
 export interface WorkspaceTicket {
   id: string
   title: string
+  number?: string
   status: string
   priority: string
   // Campos contextuais (podem faltar dependendo da origem)

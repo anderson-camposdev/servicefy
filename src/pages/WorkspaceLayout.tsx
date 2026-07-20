@@ -71,6 +71,21 @@ const WorkspaceLayout = ({ companyId, isProvider, companies, ticketType, initial
     }
   }, [initialTicketNumber, companyId])
 
+  // Sincroniza a aba ativa com a URL (sem disparar navegação do React Router)
+  useEffect(() => {
+    if (activeId === ROOT_ID) {
+      window.history.pushState({}, '', ticketType === 'request' ? '/requisicoes' : '/incidentes')
+    } else if (activeId === 'changes') {
+      window.history.pushState({}, '', '/mudancas')
+    } else {
+      const activeTab = tabs.find(t => t.id === activeId)
+      const ticketNumber = activeTab?.ticket?.number || (activeTab?.title?.startsWith('INC') ? activeTab.title : null)
+      if (ticketNumber) {
+        window.history.pushState({}, '', `/ticket/${ticketNumber}`)
+      }
+    }
+  }, [activeId, ticketType, tabs])
+
   // Classes limpas baseadas no tema dinâmico
   const barBg = 'bg-surface-container/60 border-b border-outline-variant'
 
