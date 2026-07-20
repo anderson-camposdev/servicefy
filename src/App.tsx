@@ -1004,7 +1004,17 @@ export default function App() {
   const location = useLocation()
   
   // View ativa guiada pela URL
-  const activeView = (location.pathname === '/' ? 'dashboard_incidents' : location.pathname.slice(1)) as AppView
+  let parsedView = location.pathname.slice(1)
+  let initialTicketNumber: string | undefined
+
+  if (parsedView.startsWith('ticket/')) {
+    initialTicketNumber = parsedView.split('/')[1]
+    parsedView = 'incidentes'
+  } else if (!parsedView) {
+    parsedView = 'incidentes'
+  }
+
+  const activeView = parsedView as AppView
   const setActiveView = (view: AppView | string) => navigate(`/${view}`)
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
   const [simulatedRole, setSimulatedRole] = usePersistentState<Role | null>('flowfy_sim_role', null)
@@ -1017,14 +1027,14 @@ export default function App() {
 
   // Usuário final SEMPRE no portal.
   useEffect(() => {
-    if (profile?.role === 'end_user' && activeView !== 'user_portal') {
-      setActiveView('user_portal')
+    if (profile?.role === 'end_user' && activeView !== 'portal') {
+      setActiveView('portal')
     }
   }, [profile, activeView, navigate])
 
   const handleLogout = async () => {
     setSimulatedRole(null)
-    setActiveView('dashboard_incidents')
+    setActiveView('incidentes')
     setIsUserMenuOpen(false)
     await signOut()
   }
@@ -1094,7 +1104,7 @@ export default function App() {
   if (!currentUser || !currentCompany) return <LoginScreen />
 
   // User Portal — full page, no sidebar
-  if (activeView === 'user_portal' || activeRole === 'end_user') {
+  if (activeView === 'portal' || activeRole === 'end_user') {
     return (
       <div>
         <div className="servicefy-portal-agent-actions fixed right-4 top-4 z-50 flex gap-2">
@@ -1109,11 +1119,11 @@ export default function App() {
                       const r = e.target.value as Role
                       setSimulatedRole(r)
                       if (r === 'end_user') {
-                        setActiveView('user_portal')
+                        setActiveView('portal')
                       } else if (r === 'sysadmin' || r === 'company_admin') {
-                        setActiveView('settings_governance')
+                        setActiveView('configuracoes')
                       } else {
-                        setActiveView('dashboard_incidents')
+                        setActiveView('incidentes')
                       }
                     }}
                     className="text-xs font-semibold text-slate-700 bg-white border-none outline-none cursor-pointer focus:ring-0"
@@ -1133,7 +1143,7 @@ export default function App() {
                 </div>
               )}
               <button 
-                onClick={() => setActiveView(currentUser.role === 'sysadmin' || currentUser.role === 'company_admin' ? 'settings_governance' : 'dashboard_incidents')} 
+                onClick={() => setActiveView(currentUser.role === 'sysadmin' || currentUser.role === 'company_admin' ? 'configuracoes' : 'incidentes')} 
                 className="px-3 py-1.5 rounded-xl bg-white border border-slate-200 text-slate-600 text-xs font-semibold hover:bg-slate-50 hover:border-slate-300 transition-all cursor-pointer shadow-sm"
               >
                 ← Painel do Agente
@@ -1148,29 +1158,29 @@ export default function App() {
   }
 
   const navItems: AppNavigationItem[] = [
-    { view: 'dashboard_incidents', label: 'Incidentes', icon: <ShieldAlert className="w-5 h-5" />, group: 'operation' },
-    { view: 'dashboard_requests', label: 'Requisições', icon: <ClipboardList className="w-5 h-5" />, group: 'operation' },
-    { view: 'dashboard_problems', label: 'Problemas', icon: <AlertOctagon className="w-5 h-5" />, group: 'operation' },
-    { view: 'dashboard_changes', label: 'Mudanças', icon: <RefreshCw className="w-5 h-5" />, group: 'operation' },
-    { view: 'approval_inbox', label: 'Minhas Aprovações', icon: <CircleCheckBig className="w-5 h-5" />, group: 'access' },
-    { view: 'user_portal', label: 'Portal do Usuário', icon: <Home className="w-5 h-5" />, group: 'access' },
+    { view: 'incidentes', label: 'Incidentes', icon: <ShieldAlert className="w-5 h-5" />, group: 'operation' },
+    { view: 'requisicoes', label: 'Requisições', icon: <ClipboardList className="w-5 h-5" />, group: 'operation' },
+    { view: 'problemas', label: 'Problemas', icon: <AlertOctagon className="w-5 h-5" />, group: 'operation' },
+    { view: 'mudancas', label: 'Mudanças', icon: <RefreshCw className="w-5 h-5" />, group: 'operation' },
+    { view: 'aprovacoes', label: 'Minhas Aprovações', icon: <CircleCheckBig className="w-5 h-5" />, group: 'access' },
+    { view: 'portal', label: 'Portal do Usuário', icon: <Home className="w-5 h-5" />, group: 'access' },
   ]
 
   // Central de Conhecimento: analista/gestor de operação/gestor de governança
   // + admins (a RLS/RPC de KB, migrations 131-133, já governa quem pode fazer
   // o quê dentro da tela; este filtro é só conveniência de navegação).
   if (isKbCapableRole(activeRole)) {
-    navItems.push({ view: 'knowledge_center', label: 'Base de Conhecimento', icon: <BookOpen className="w-5 h-5" />, group: 'access' })
+    navItems.push({ view: 'conhecimento', label: 'Base de Conhecimento', icon: <BookOpen className="w-5 h-5" />, group: 'access' })
   }
 
   // O ServiceFY BI fica disponível para todos os perfis gerenciais/técnicos que alcançam esta tela
-  navItems.push({ view: 'flowfy_bi', label: 'Analytics', icon: <BarChart3 className="w-5 h-5" />, group: 'access' })
+  navItems.push({ view: 'estatisticas', label: 'Analytics', icon: <BarChart3 className="w-5 h-5" />, group: 'access' })
 
   // Fase 23 — Analytics Executivo: camada gerencial (a RPC get_executive_metrics
   // já bloqueia end_user no banco; este filtro é só conveniência de navegação).
   const managerialRoles: Role[] = ['sysadmin', 'company_admin', 'cio', 'client_manager', 'it_manager', 'area_manager']
   if (managerialRoles.includes(activeRole)) {
-    navItems.push({ view: 'analytics_executive', label: 'Visão Executiva', icon: <TrendingUp className="w-5 h-5" />, group: 'access' })
+    navItems.push({ view: 'executivo', label: 'Visão Executiva', icon: <TrendingUp className="w-5 h-5" />, group: 'access' })
   }
 
   // API/webhooks e automação continuam exclusivas dos administradores do
@@ -1180,7 +1190,7 @@ export default function App() {
   const isConfigEligible = activeRole === 'sysadmin' || activeRole === 'company_admin'
   if (isConfigEligible || isOperationalAdminRole(activeRole)) {
     navItems.push({
-      view: 'settings_governance',
+      view: 'configuracoes',
       label: 'Configurações',
       icon: <Settings className="w-5 h-5" />,
       group: 'access',
@@ -1191,22 +1201,22 @@ export default function App() {
   // save_outbound_webhook já valida is_settings_admin no banco; este filtro
   // de navegação é só conveniência de UI).
   if (activeRole === 'company_admin') {
-    navItems.push({ view: 'developer_settings', label: 'Desenvolvedor', icon: <Code2 className="w-5 h-5" />, group: 'access' })
+    navItems.push({ view: 'desenvolvedor', label: 'Desenvolvedor', icon: <Code2 className="w-5 h-5" />, group: 'access' })
   }
 
   const customDashRoles: Role[] = ['cio', 'client_manager', 'it_manager', 'area_manager', 'technician']
-  const showWorkspace = (activeView === 'dashboard_incidents' || activeView === 'dashboard_requests') && (isProvider || !customDashRoles.includes(activeRole))
+  const showWorkspace = (activeView === 'incidentes' || activeView === 'requisicoes') && (isProvider || !customDashRoles.includes(activeRole))
 
   const renderActiveDashboard = () => {
-    if (activeView === 'settings_governance') {
+    if (activeView === 'configuracoes') {
       return <SettingsCenter companyId={currentCompany.id} activeRole={activeRole} onNavigate={view => setActiveView(view)} />
     }
     
     // Customize layout if viewing the default dashboard view based on active role
-    if (activeView === 'dashboard_incidents' || activeView === 'dashboard_requests') {
-      const ticketType = activeView === 'dashboard_incidents' ? 'incident' : 'request'
+    if (activeView === 'incidentes' || activeView === 'requisicoes') {
+      const ticketType = activeView === 'incidentes' ? 'incident' : 'request'
       if (isProvider) {
-        return <WorkspaceLayout companyId={currentCompany.id} isProvider companies={companies} ticketType={ticketType} />
+        return <WorkspaceLayout companyId={currentCompany.id} isProvider companies={companies} ticketType={ticketType} initialTicketNumber={initialTicketNumber} />
       }
       switch (activeRole) {
         case 'cio':
@@ -1220,21 +1230,21 @@ export default function App() {
         case 'technician':
           return <TechnicianDashboard companyId={currentCompany.id} currentUser={currentUser} ticketType={ticketType} />
         default:
-          return <WorkspaceLayout companyId={currentCompany.id} isProvider={isProvider} companies={companies} ticketType={ticketType} />
+          return <WorkspaceLayout companyId={currentCompany.id} isProvider={isProvider} companies={companies} ticketType={ticketType} initialTicketNumber={initialTicketNumber} />
       }
     }
 
-    if (activeView === 'dashboard_problems') return <ProblemDashboard companyId={currentCompany.id} />
-    if (activeView === 'dashboard_changes') return <ChangeManagementDashboard companyId={currentCompany.id} />
-    if (activeView === 'approval_inbox') return <ApprovalCenter />
-    if (activeView === 'knowledge_center') return <KnowledgeCenter onNavigateHome={() => setActiveView('dashboard_incidents')} />
-    if (activeView === 'analytics_executive') return <AnalyticsDashboard />
-    if (activeView === 'developer_settings') return <DeveloperSettings companyId={currentCompany.id} />
-    if (activeView === 'api_docs') return isConfigEligible ? <ApiDocsPage /> : <WorkspaceLayout companyId={currentCompany.id} isProvider={isProvider} companies={companies} />
-    if (activeView === 'flowfy_bi') return <BiApp companyId={currentCompany.id} themeName={currentCompany.branding.primaryColor ?? undefined} />
-    if (activeView === 'workflow_builder') return isConfigEligible ? <WorkflowBuilder companyId={currentCompany.id} /> : <WorkspaceLayout companyId={currentCompany.id} isProvider={isProvider} companies={companies} />
+    if (activeView === 'problemas') return <ProblemDashboard companyId={currentCompany.id} />
+    if (activeView === 'mudancas') return <ChangeManagementDashboard companyId={currentCompany.id} />
+    if (activeView === 'aprovacoes') return <ApprovalCenter />
+    if (activeView === 'conhecimento') return <KnowledgeCenter onNavigateHome={() => setActiveView('incidentes')} />
+    if (activeView === 'executivo') return <AnalyticsDashboard />
+    if (activeView === 'desenvolvedor') return <DeveloperSettings companyId={currentCompany.id} />
+    if (activeView === 'api-docs') return isConfigEligible ? <ApiDocsPage /> : <WorkspaceLayout companyId={currentCompany.id} isProvider={isProvider} companies={companies} initialTicketNumber={initialTicketNumber} />
+    if (activeView === 'estatisticas') return <BiApp companyId={currentCompany.id} themeName={currentCompany.branding.primaryColor ?? undefined} />
+    if (activeView === 'workflows') return isConfigEligible ? <WorkflowBuilder companyId={currentCompany.id} /> : <WorkspaceLayout companyId={currentCompany.id} isProvider={isProvider} companies={companies} initialTicketNumber={initialTicketNumber} />
 
-    return <WorkspaceLayout companyId={currentCompany.id} isProvider={isProvider} companies={companies} />
+    return <WorkspaceLayout companyId={currentCompany.id} isProvider={isProvider} companies={companies} initialTicketNumber={initialTicketNumber} />
   }
 
   return (
@@ -1319,11 +1329,11 @@ export default function App() {
                 const r = e.target.value as Role
                 setSimulatedRole(r)
                 if (r === 'end_user') {
-                  setActiveView('user_portal')
+                  setActiveView('portal')
                 } else if (r === 'sysadmin' || r === 'company_admin') {
-                  setActiveView('settings_governance')
+                  setActiveView('configuracoes')
                 } else {
-                  setActiveView('dashboard_incidents')
+                  setActiveView('incidentes')
                 }
               }}
               className="min-w-0 max-w-[13rem] text-xs font-semibold text-on-surface bg-surface border-none outline-none cursor-pointer focus:ring-0"

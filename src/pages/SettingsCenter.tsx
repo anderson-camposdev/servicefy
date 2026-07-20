@@ -19,7 +19,7 @@ import SettingsPageShell from '../components/settings/SettingsPageShell'
 interface Props {
   companyId: string
   activeRole: string
-  onNavigate: (view: 'api_docs' | 'workflow_builder' | 'flowfy_bi') => void
+  onNavigate: (view: 'api-docs' | 'workflows' | 'estatisticas') => void
 }
 
 const CATEGORY_META: Record<SettingsCategoryKey, { title: string; description: string; icon: typeof Users }> = {
@@ -66,7 +66,7 @@ const SECTIONS: SettingsSection[] = [
   section('request_catalog', 'service_management', 'Catálogo de requisições', 'Itens, aprovações e entrega.', ['Hierarquia', 'Formulários', 'Aprovações'], { legacyTab: 'catalog_requests', entitlementKey: 'itsm' }),
   section('change_cab', 'service_management', 'Comitê de Mudanças (CAB)', 'Membros permanentes e aprovação padrão.', ['Aprovadores padrão', 'Janelas restritas', 'Notificações'], { legacyTab: 'change_cab', entitlementKey: 'itsm' }),
   section('forms', 'service_management', 'Biblioteca de formulários', 'Formulários reutilizáveis.', ['Schemas', 'Campos condicionais', 'Validação'], { legacyTab: 'form_templates' }),
-  section('automation', 'service_management', 'Motor de Automação', 'Gatilhos, condições e ações.', ['Simulação', 'Histórico', 'Escalonamento'], { appView: 'workflow_builder', entitlementKey: 'automation' }),
+  section('automation', 'service_management', 'Motor de Automação', 'Gatilhos, condições e ações.', ['Simulação', 'Histórico', 'Escalonamento'], { appView: 'workflows', entitlementKey: 'automation' }),
   section('macros', 'service_management', 'Macros e taxonomias', 'Respostas, códigos, estados e tags.', ['Macros públicas e internas', 'Códigos de resolução', 'Tags']),
   section('sla', 'sla_contracts', 'Políticas de SLA', 'Prazos, calendários e feriados.', ['Resposta e resolução', 'Calendários úteis', 'Feriados'], { legacyTab: 'policies', entitlementKey: 'itsm' }),
   section('pending', 'sla_contracts', 'Motivos de pausa', 'Pausas auditáveis do SLA.', ['Pausa governada', 'Ação do cliente', 'Ledger'], { legacyTab: 'pending_reasons', entitlementKey: 'itsm' }),
@@ -81,8 +81,8 @@ const SECTIONS: SettingsSection[] = [
   section('discovery', 'cmdb', 'Descoberta e reconciliação', 'Intune, Entra, AD e Google.', ['Precedência', 'Deduplicação', 'Agente local'], { status: 'locked', entitlementKey: 'cmdb_discovery' }),
   section('branding', 'portal_brand', 'Identidade e portal', 'Marca, temas e pré-visualização.', ['White-label', 'Temas', 'Preview']),
   section('compliance', 'security', 'LGPD e retenção', 'Retenção, anonimização e auditoria.', ['Políticas', 'Direitos do titular', 'Auditoria'], { entitlementKey: 'compliance' }),
-  section('developer', 'integrations', 'API e webhooks', 'Documentação, escopos e diagnóstico.', ['API pública', 'Webhooks', 'Escopos'], { appView: 'api_docs', entitlementKey: 'api' }),
-  section('analytics', 'analytics_licensing', 'Uso e qualidade', 'CSAT, canais e capacidade.', ['CSAT', 'Desempenho', 'Capacidade'], { appView: 'flowfy_bi', entitlementKey: 'analytics' }),
+  section('developer', 'integrations', 'API e webhooks', 'Documentação, escopos e diagnóstico.', ['API pública', 'Webhooks', 'Escopos'], { appView: 'api-docs', entitlementKey: 'api' }),
+  section('analytics', 'analytics_licensing', 'Uso e qualidade', 'CSAT, canais e capacidade.', ['CSAT', 'Desempenho', 'Capacidade'], { appView: 'estatisticas', entitlementKey: 'analytics' }),
   section('licensing', 'analytics_licensing', 'Módulos contratados', 'Plano, limites e habilitação.', ['Entitlements', 'Trials', 'Overrides auditados']),
 ]
 

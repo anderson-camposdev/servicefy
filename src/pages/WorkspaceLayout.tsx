@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { X, LayoutGrid, Shuffle } from 'lucide-react'
 import TicketManagementDashboard from './TicketManagementDashboard'
 import AnalystCockpit from './AnalystCockpit'
 import ChangeManagementDashboard from './ChangeManagementDashboard'
 import type { WorkspaceTicket, CompanyLite } from './workspace.types'
+import { incidentsService } from '../lib/services'
 
 /**
  * WorkspaceLayout — contêiner principal do analista com ABAS INTERNAS
@@ -27,9 +28,10 @@ interface WorkspaceLayoutProps {
   isProvider?: boolean
   companies?: CompanyLite[]
   ticketType?: 'incident' | 'request'
+  initialTicketNumber?: string
 }
 
-const WorkspaceLayout = ({ companyId, isProvider, companies, ticketType }: WorkspaceLayoutProps) => {
+const WorkspaceLayout = ({ companyId, isProvider, companies, ticketType, initialTicketNumber }: WorkspaceLayoutProps) => {
   const [tabs, setTabs] = useState<WorkspaceTab[]>([
     { id: ROOT_ID, title: 'Gestão de Tickets' },
     { id: 'changes', title: 'Gestão de Mudanças' }
@@ -46,6 +48,28 @@ const WorkspaceLayout = ({ companyId, isProvider, companies, ticketType }: Works
     setTabs(prev => prev.filter(t => t.id !== id))
     setActiveId(cur => (cur === id ? ROOT_ID : cur))
   }
+
+  useEffect(() => {
+    if (initialTicketNumber) {
+      if (!tabs.some(t => t.title === initialTicketNumber)) {
+        incidentsService.getByNumber(initialTicketNumber, companyId || '').then(inc => {
+          const workspaceTicket: WorkspaceTicket = {
+            id: inc.id,
+            title: inc.short_description || inc.number,
+            status: inc.state,
+            priority: inc.priority,
+            date: inc.created_at,
+            requester: inc.caller_name || 'Desconhecido',
+            techGroup: inc.assigned_group_name || undefined,
+            ticketType: ticketType || 'incident'
+          }
+          openTicket(workspaceTicket)
+        }).catch(err => {
+          console.error('Ticket not found for deep link:', err)
+        })
+      }
+    }
+  }, [initialTicketNumber, companyId])
 
   // Classes limpas baseadas no tema dinâmico
   const barBg = 'bg-surface-container/60 border-b border-outline-variant'

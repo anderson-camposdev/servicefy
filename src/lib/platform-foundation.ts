@@ -14,7 +14,7 @@ export interface SettingsSection {
   status: SettingsModuleStatus
   entitlementKey: string
   legacyTab?: string
-  appView?: 'api_docs' | 'workflow_builder' | 'flowfy_bi'
+  appView?: 'api-docs' | 'workflows' | 'estatisticas'
   capabilities: string[]
 }
 

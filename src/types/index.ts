@@ -354,21 +354,19 @@ export interface Notification {
 // ─── App State Types ─────────────────────────────────────────
 
 export type AppView =
-  | 'login'
-  | 'dashboard_incidents'
-  | 'dashboard_requests'
-  | 'dashboard_problems'
-  | 'dashboard_changes'
-  | 'approval_inbox'
-  | 'knowledge_center'
-  | 'user_portal'
-  | 'api_docs'
-  | 'admin_dashboard'
-  | 'settings_governance'
-  | 'flowfy_bi'
-  | 'workflow_builder'
-  | 'analytics_executive'
-  | 'developer_settings';
+  | 'incidentes'
+  | 'requisicoes'
+  | 'problemas'
+  | 'mudancas'
+  | 'aprovacoes'
+  | 'conhecimento'
+  | 'portal'
+  | 'api-docs'
+  | 'configuracoes'
+  | 'estatisticas'
+  | 'workflows'
+  | 'executivo'
+  | 'desenvolvedor';
 
 // ─── Catálogo Hierárquico de Incidentes (3 Níveis + SLA) ─────
 

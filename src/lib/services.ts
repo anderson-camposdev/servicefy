@@ -307,6 +307,16 @@ export const incidentsService = {
     return { ...inc!, history: hist ?? [] } as IncidentRow & { history: IncidentHistoryRow[] }
   },
 
+  /** Get a single incident with its history by ticket number */
+  async getByNumber(number: string, companyId: string): Promise<IncidentRow & { history: IncidentHistoryRow[] }> {
+    const client = getClientForCompany(companyId)
+    const { data: inc, error: e1 } = await client.from('incidents').select('*').eq('number', number).single()
+    if (e1) throw e1
+    const { data: hist, error: e2 } = await client.from('incident_history').select('*').eq('incident_id', inc!.id as string).order('created_at', { ascending: false })
+    if (e2) throw e2
+    return { ...(inc as IncidentRow), history: hist ?? [] } as IncidentRow & { history: IncidentHistoryRow[] }
+  },
+
   /** Histórico PÚBLICO do chamado (linha do tempo p/ o solicitante, sem notas internas). Mais recente primeiro. */
   async listPublicHistory(incidentId: string, companyId: string): Promise<IncidentHistoryRow[]> {
     const { data, error } = await getClientForCompany(companyId)
