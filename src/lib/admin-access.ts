@@ -6,6 +6,25 @@ export const ADMIN_ROLES: readonly AdminRole[] = ['sysadmin', 'company_admin']
 export const isAdminRole = (role: string | null | undefined): role is AdminRole =>
   role === 'sysadmin' || role === 'company_admin'
 
+/**
+ * Papéis com acesso operacional (departamentos, equipes, catálogos, CMDB,
+ * SLA, usuários) mas SEM acesso a segurança/LGPD, licenciamento, branding,
+ * SMTP/conexões/webhooks — mesmo corte da migration 150
+ * (is_operational_admin) e 151 (update_profile_secure).
+ */
+export type OperationalAdminRole = AdminRole | Extract<UserRole, 'ops_manager' | 'governance_manager'>
+export const OPERATIONAL_ADMIN_ROLES: readonly OperationalAdminRole[] =
+  ['sysadmin', 'company_admin', 'ops_manager', 'governance_manager']
+
+export const isOperationalAdminRole = (role: string | null | undefined): role is OperationalAdminRole =>
+  role === 'sysadmin' || role === 'company_admin' || role === 'ops_manager' || role === 'governance_manager'
+
+/** Chaves de SettingsSection abertas para papéis operacionais não-admin. */
+export const OPERATIONAL_SETTINGS_SECTION_KEYS: readonly string[] = [
+  'departments', 'users', 'groups', 'domains', 'case_types', 'incident_catalog',
+  'request_catalog', 'change_cab', 'forms', 'macros', 'sla', 'pending', 'templates', 'ci',
+]
+
 export interface TenantAdminContext {
   role: string | null | undefined
   actorCompanyId: string | null | undefined

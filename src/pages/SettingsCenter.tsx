@@ -4,7 +4,7 @@ import {
   Gauge, HeartPulse, Lock, Network, Palette, Search, ShieldCheck, Star, Users, Workflow, Wrench,
 } from 'lucide-react'
 import { useAppData } from '../hooks/useDbData'
-import { ADMIN_ACCESS_DENIED_MESSAGE, isAdminRole } from '../lib/admin-access'
+import { ADMIN_ACCESS_DENIED_MESSAGE, isAdminRole, isOperationalAdminRole, OPERATIONAL_SETTINGS_SECTION_KEYS } from '../lib/admin-access'
 import type { SettingsCategoryKey, SettingsSection } from '../lib/platform-foundation'
 import { platformAdminService } from '../lib/platform-admin-service'
 import SettingsGovernance, { type GovTab } from './SettingsGovernance'
@@ -121,14 +121,24 @@ export default function SettingsCenter({ companyId, activeRole, onNavigate }: Pr
   }), [entitlements])
 
 
+  const isFullAdmin = isAdminRole(activeRole)
+  const isOperationalOnly = !isFullAdmin && isOperationalAdminRole(activeRole)
+
+  const scopedSections = useMemo(
+    () => isOperationalOnly
+      ? effectiveSections.filter(item => OPERATIONAL_SETTINGS_SECTION_KEYS.includes(item.key))
+      : effectiveSections,
+    [effectiveSections, isOperationalOnly],
+  )
+
   const visibleSections = useMemo(() => {
     const needle = query.trim().toLocaleLowerCase('pt-BR')
-    return needle ? effectiveSections.filter(item =>
+    return needle ? scopedSections.filter(item =>
       [item.title, item.description, ...item.capabilities, ...item.keywords].join(' ').toLocaleLowerCase('pt-BR').includes(needle),
-    ) : effectiveSections
-  }, [effectiveSections, query])
+    ) : scopedSections
+  }, [scopedSections, query])
 
-  if (!isAdminRole(activeRole)) return (
+  if (!isFullAdmin && !isOperationalOnly) return (
     <div className="m-8 rounded-2xl border border-red-200 bg-red-50 p-8 text-center">
       <Lock className="mx-auto mb-3 text-red-500" />
       <h2 className="font-extrabold text-red-800">Acesso restrito</h2>
@@ -253,7 +263,7 @@ export default function SettingsCenter({ companyId, activeRole, onNavigate }: Pr
 
   const activeGroupMeta = SETTINGS_GROUPS.find(group => group.key === activeGroup) ?? SETTINGS_GROUPS[0]
   const quickAccess = [...new Set([...favorites, ...recent])]
-    .map(key => effectiveSections.find(item => item.key === key))
+    .map(key => scopedSections.find(item => item.key === key))
     .filter((item): item is SettingsSection => Boolean(item))
     .slice(0, 5)
 
@@ -264,7 +274,7 @@ export default function SettingsCenter({ companyId, activeRole, onNavigate }: Pr
         {isSysAdmin && <label className="text-xs font-semibold text-on-surface-variant">Tenant<select value={targetCompanyId} onChange={event => setTargetCompanyId(event.target.value)} className="mt-1 block rounded-lg border border-outline-variant bg-surface px-3 py-2 text-sm font-semibold text-on-surface">{companies.filter(company => company.active).map(company => <option key={company.id} value={company.id}>{company.name}</option>)}</select></label>}
       </header>
       <div className="relative mt-6"><Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-on-surface-variant" /><input value={query} onChange={event => setQuery(event.target.value)} placeholder="Buscar usuários, SLA, WhatsApp, CMDB ou LGPD" className="w-full rounded-xl border border-outline-variant bg-surface py-3 pl-12 pr-4 text-sm text-on-surface outline-none focus:border-primary focus:ring-2 focus:ring-primary/20" /></div>
-      {connections.some(item => item.rotationRequired) && (
+      {!isOperationalOnly && connections.some(item => item.rotationRequired) && (
         <button type="button" onClick={() => openSection(effectiveSections.find(item => item.key === 'connections')!)} className="mt-4 flex w-full items-center justify-between gap-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-left text-sm text-amber-900">
           <span><strong>Credenciais aguardando rotação.</strong> Revise as conexões antes que os canais sejam interrompidos.</span>
           <span className="shrink-0 font-semibold">Revisar canais</span>
@@ -280,7 +290,7 @@ export default function SettingsCenter({ companyId, activeRole, onNavigate }: Pr
         <nav className="h-fit rounded-xl border border-outline-variant bg-surface p-2" aria-label="Grupos de configuração">
           {SETTINGS_GROUPS.map(group => {
             const GroupIcon = group.icon
-            const count = effectiveSections.filter(item => (group.categories as readonly string[]).includes(item.category)).length
+            const count = scopedSections.filter(item => (group.categories as readonly string[]).includes(item.category)).length
             return (
               <button
                 key={group.key}

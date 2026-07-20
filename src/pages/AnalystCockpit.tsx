@@ -3,10 +3,13 @@ import {
   User, Building2, AlertTriangle, Send,
   BookOpen, CheckCircle, History, FileText, ListTree, Link2, Lock, Pause, Edit3,
   ShieldAlert, PlayCircle, ArrowRightLeft, X, ChevronDown, ChevronUp, Timer,
+  Paperclip, Trash2, Upload, Loader2,
 } from 'lucide-react'
 import { incidentsService, messagesService, assignmentGroupsService, pendingReasonsService, responseMacrosService, cmdbService } from '../lib/services'
 import type { CmdbImpactRow } from '../lib/services'
 import { knowledgeService, type CaseLinkedArticle } from '../lib/knowledge-service'
+import { attachmentsService, type TicketAttachmentRow } from '../lib/attachments-service'
+import { validateAttachmentFile, openAttachmentPreview } from '../lib/attachment-security'
 import { filterRequesterHistory, summarizeRequesterHistory } from '../lib/ticket-insights'
 import { translateState } from '../lib/statusLabels'
 import { useAuth } from '../auth'
@@ -39,7 +42,7 @@ const FALLBACK_TICKET: WorkspaceTicket = {
 }
 
 type IncidentDetail = IncidentRow & { history: IncidentHistoryRow[] }
-type ContextTab = 'detalhes' | 'historico' | 'subchamados' | 'relacionamentos'
+type ContextTab = 'detalhes' | 'historico' | 'subchamados' | 'relacionamentos' | 'anexos'
 
 const fmt = (iso: string) => {
   const date = new Date(iso)
@@ -174,6 +177,7 @@ const CONTEXT_TABS: { id: ContextTab; label: string; compactLabel: string; icon:
   { id: 'historico', label: 'Histórico de Chamados', compactLabel: 'Histórico', icon: <History className="w-4 h-4" /> },
   { id: 'subchamados', label: 'Sub Chamados', compactLabel: 'Tarefas', icon: <ListTree className="w-4 h-4" /> },
   { id: 'relacionamentos', label: 'Relacionamentos', compactLabel: 'Artigos', icon: <Link2 className="w-4 h-4" /> },
+  { id: 'anexos', label: 'Anexos', compactLabel: 'Anexos', icon: <Paperclip className="w-4 h-4" /> },
 ]
 
 const MOCK_MESSAGES: TicketMessageRow[] = [
@@ -244,6 +248,10 @@ const AnalystCockpit = ({ ticket = FALLBACK_TICKET }: { ticket?: WorkspaceTicket
   // Aba "Relacionamentos": artigos de conhecimento vinculados ao caso.
   const [linkedArticles, setLinkedArticles] = useState<CaseLinkedArticle[] | null>(null)
   const [linkedArticlesError, setLinkedArticlesError] = useState<string | null>(null)
+  // Aba "Anexos": arquivos enviados por analista/solicitante neste chamado.
+  const [attachments, setAttachments] = useState<TicketAttachmentRow[] | null>(null)
+  const [attachmentsError, setAttachmentsError] = useState<string | null>(null)
+  const [uploadingAttachment, setUploadingAttachment] = useState(false)
 
   // Helper to render Priority badges (P1–P5, dinâmico via priority_level das triggers)
   const renderPriorityBadge = (prio: string | null | undefined, level?: number | null) => {
@@ -537,6 +545,57 @@ const AnalystCockpit = ({ ticket = FALLBACK_TICKET }: { ticket?: WorkspaceTicket
   useEffect(() => {
     if (activeContext === 'relacionamentos') loadLinkedArticles()
   }, [activeContext, loadLinkedArticles])
+
+  // Aba Anexos: arquivos vinculados ao chamado (metadados em ticket_attachments,
+  // binário no bucket privado service-attachments).
+  const loadAttachments = useCallback(() => {
+    if (!ticket.incidentId) return
+    setAttachmentsError(null)
+    attachmentsService.list(ticket.incidentId)
+      .then(rows => setAttachments(rows))
+      .catch(err => setAttachmentsError(dbErrMsg(err, 'Falha ao carregar os anexos.')))
+  }, [ticket.incidentId])
+
+  useEffect(() => {
+    if (activeContext === 'anexos') loadAttachments()
+  }, [activeContext, loadAttachments])
+
+  const handleUploadAttachment = useCallback(async (file: File) => {
+    const incidentId = ticket.incidentId
+    const companyId = ticket.companyId
+    const uploadedBy = profile?.id
+    if (!incidentId || !companyId || !uploadedBy) return
+    const validation = validateAttachmentFile(file)
+    if (!validation.valid) { toast.error(validation.error); return }
+    setUploadingAttachment(true)
+    try {
+      await attachmentsService.upload({ companyId, incidentId, uploadedBy, file })
+      loadAttachments()
+    } catch (err) {
+      toast.error(dbErrMsg(err, 'Falha ao enviar o anexo.'))
+    } finally {
+      setUploadingAttachment(false)
+    }
+  }, [ticket.incidentId, ticket.companyId, profile?.id, toast, loadAttachments])
+
+  const handleOpenAttachment = useCallback(async (attachment: TicketAttachmentRow) => {
+    try {
+      const url = await attachmentsService.getSignedUrl(attachment.storage_path)
+      openAttachmentPreview(url, attachment.filename)
+    } catch (err) {
+      toast.error(dbErrMsg(err, 'Falha ao abrir o anexo.'))
+    }
+  }, [toast])
+
+  const handleRemoveAttachment = useCallback(async (attachment: TicketAttachmentRow) => {
+    if (!window.confirm(`Remover o anexo "${attachment.filename}"?`)) return
+    try {
+      await attachmentsService.remove(attachment)
+      loadAttachments()
+    } catch (err) {
+      toast.error(dbErrMsg(err, 'Falha ao remover o anexo.'))
+    }
+  }, [toast, loadAttachments])
 
   // Load active assignment groups for this company
   useEffect(() => {
@@ -1282,6 +1341,79 @@ const AnalystCockpit = ({ ticket = FALLBACK_TICKET }: { ticket?: WorkspaceTicket
                   </div>
                 ))}
               </div>
+            )}
+          </div>
+        )
+      })()}
+
+      {activeContext === 'anexos' && (() => {
+        const formatSize = (bytes: number) => bytes < 1024 * 1024
+          ? `${Math.max(1, Math.round(bytes / 1024))} KB`
+          : `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+        return (
+          <div className="max-w-6xl mx-auto p-6 space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h3 className="text-base font-bold text-text-main">Anexos do chamado</h3>
+                <p className="text-sm text-on-surface-variant">PDF, PNG, JPG ou TXT · até 10 MB por arquivo.</p>
+              </div>
+              <label className={`flex items-center gap-1.5 px-3 py-2 text-sm font-semibold border border-outline-variant rounded-lg cursor-pointer hover:bg-surface-container ${uploadingAttachment ? 'opacity-50 pointer-events-none' : ''}`}>
+                {uploadingAttachment ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                {uploadingAttachment ? 'Enviando…' : 'Anexar arquivo'}
+                <input
+                  type="file"
+                  accept=".pdf,.png,.jpg,.jpeg,.txt"
+                  className="hidden"
+                  disabled={uploadingAttachment}
+                  onChange={event => {
+                    const file = event.target.files?.[0]
+                    event.target.value = ''
+                    if (file) void handleUploadAttachment(file)
+                  }}
+                />
+              </label>
+            </div>
+            {attachmentsError && (
+              <div className="p-8 text-center border bg-error/5 border-error/20 rounded-xl">
+                <p className="text-sm font-bold text-error">{attachmentsError}</p>
+                <button onClick={loadAttachments} className="mt-3 px-4 py-2 text-sm font-semibold border border-outline-variant rounded-lg text-text-main hover:bg-surface-container">
+                  Tentar novamente
+                </button>
+              </div>
+            )}
+            {!attachmentsError && attachments === null && (
+              <div className="max-w-6xl mx-auto space-y-2 animate-pulse" aria-label="Carregando anexos">
+                <div className="h-14 rounded-lg bg-surface-container" />
+                <div className="h-14 rounded-lg bg-surface-container w-5/6" />
+              </div>
+            )}
+            {!attachmentsError && attachments !== null && (
+              attachments.length === 0 ? (
+                <div className="p-10 text-center border border-dashed bg-surface border-outline-variant rounded-xl">
+                  <Paperclip className="w-8 h-8 mx-auto text-on-surface-variant" />
+                  <h4 className="mt-3 text-base font-bold text-text-main">Nenhum anexo ainda</h4>
+                  <p className="mt-1 text-sm text-on-surface-variant max-w-md mx-auto">
+                    Prints, logs e evidências do chamado aparecem aqui. Envie um arquivo pelo botão acima.
+                  </p>
+                </div>
+              ) : (
+                <div className={`${cardClass} divide-y divide-outline-variant overflow-hidden`}>
+                  {attachments.map(attachment => (
+                    <div key={attachment.id} className="flex flex-wrap items-center justify-between gap-3 p-4">
+                      <button onClick={() => void handleOpenAttachment(attachment)} className="flex items-center gap-3 min-w-0 text-left">
+                        <Paperclip className="w-4 h-4 shrink-0 text-on-surface-variant" />
+                        <div className="min-w-0">
+                          <p className="text-sm font-bold text-text-main truncate">{attachment.filename}</p>
+                          <p className="mt-0.5 text-xs text-on-surface-variant">{formatSize(attachment.size_bytes)} · {fmt(attachment.created_at)}</p>
+                        </div>
+                      </button>
+                      <button onClick={() => void handleRemoveAttachment(attachment)} title="Remover anexo" aria-label={`Remover anexo ${attachment.filename}`} className="shrink-0 p-2 text-on-surface-variant hover:text-error rounded-lg hover:bg-error/5">
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )
             )}
           </div>
         )

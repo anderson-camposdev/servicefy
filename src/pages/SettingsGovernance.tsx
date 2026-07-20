@@ -7,6 +7,7 @@ import type { PendingReasonRow, SLAPolicyRow } from '../lib/database.types'
 import SlaCalendarManager from './SlaCalendarManager'
 import { useAppData } from '../hooks/useDbData'
 import AdminDashboard from './AdminDashboard'
+import { isOperationalAdminRole } from '../lib/admin-access'
 import { THEME_LIST, FONT_SCALE_LIST, getTheme } from '../lib/theme-engine'
 import type { ThemeName, FontScale } from '../lib/theme-engine'
 const getMsg = (e: unknown): string => {
@@ -197,7 +198,11 @@ export default function SettingsGovernance({ companyId, activeRole, startInDetai
   const fontClass = 'font-sans'
 
   // Configurações administrativas são exclusivas de sysadmin e company_admin.
-  const isAuthorized = activeRole === 'sysadmin' || activeRole === 'company_admin'
+  // 'appearance' (branding) continua exclusiva de sysadmin/company_admin -
+  // so chega aqui via fluxos que essas duas roles acessam. ops_manager e
+  // governance_manager so entram com initialTab operacional (SettingsCenter
+  // ja restringe isso via OPERATIONAL_SETTINGS_SECTION_KEYS).
+  const isAuthorized = activeRole === 'sysadmin' || activeRole === 'company_admin' || isOperationalAdminRole(activeRole)
   const isSysAdmin = activeRole === 'sysadmin'
 
   // -- Appearance Form State --
@@ -1418,7 +1423,7 @@ export default function SettingsGovernance({ companyId, activeRole, startInDetai
         )}
 
         {/* Abas Administrativas do SysAdmin */}
-        {(isSysAdmin || activeRole === 'company_admin') && ['departments', 'users', 'groups', 'catalog_incidents', 'catalog_requests', 'form_templates'].includes(activeTab) && (
+        {isOperationalAdminRole(activeRole) && ['departments', 'users', 'groups', 'catalog_incidents', 'catalog_requests', 'form_templates'].includes(activeTab) && (
           <div className={`${cardClass} p-6 bg-surface`}>
             <AdminDashboard
               activeTab={activeTab}

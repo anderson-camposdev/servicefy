@@ -16,6 +16,7 @@ import { useTenant } from './tenant'
 import { setTenantOverride } from './tenant/resolveTenant'
 import { useAuth } from './auth'
 import { isKbCapableRole } from './lib/kb-access'
+import { isOperationalAdminRole } from './lib/admin-access'
 const UserPortalLayout = lazy(() => import('./pages/UserPortalLayout'))
 const AnalystCockpit = lazy(() => import('./pages/AnalystCockpit'))
 const TicketManagementDashboard = lazy(() => import('./pages/TicketManagementDashboard'))
@@ -1061,9 +1062,12 @@ export default function App() {
     navItems.push({ view: 'analytics_executive', label: 'Visão Executiva', icon: <TrendingUp className="w-5 h-5" />, group: 'access' })
   }
 
-  // Configurações, integrações e automações são exclusivas dos administradores.
+  // API/webhooks e automação continuam exclusivas dos administradores do
+  // tenant/provedor. "Configurações" tambem abre para ops_manager e
+  // governance_manager, mas so nas areas operacionais - SettingsCenter
+  // filtra as secoes internamente por OPERATIONAL_SETTINGS_SECTION_KEYS.
   const isConfigEligible = activeRole === 'sysadmin' || activeRole === 'company_admin'
-  if (isConfigEligible) {
+  if (isConfigEligible || isOperationalAdminRole(activeRole)) {
     navItems.push({
       view: 'settings_governance',
       label: 'Configurações',

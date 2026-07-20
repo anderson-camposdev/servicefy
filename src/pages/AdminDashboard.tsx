@@ -495,7 +495,16 @@ interface AdminDashboardProps {
 
 export default function AdminDashboard({ refetchAppData, currentCompany, activeTab, activeRole, setManagedCompanyId, setActiveTab }: AdminDashboardProps) {
   const isMspAdmin = activeRole === 'sysadmin'
-  const assignableRoleOptions = isMspAdmin ? REAL_ROLE_OPTIONS : REAL_ROLE_OPTIONS.filter(option => option.value !== 'sysadmin')
+  const isTenantAdmin = activeRole === 'sysadmin' || activeRole === 'company_admin'
+  // Mesma politica de update_profile_secure (migration 151): sysadmin so e
+  // concedido por quem ja e admin do provedor; company_admin so por quem ja
+  // e admin do tenant (ops_manager/governance_manager nao podem promover
+  // ninguem a essas duas roles, so aos papeis operacionais).
+  const assignableRoleOptions = REAL_ROLE_OPTIONS.filter(option => {
+    if (option.value === 'sysadmin') return isMspAdmin
+    if (option.value === 'company_admin') return isTenantAdmin
+    return true
+  })
   const { toast } = useToast()
   // States for tenant onboarding
   const [tenantName, setTenantName] = useState('')
