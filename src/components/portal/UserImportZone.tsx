@@ -15,9 +15,13 @@ type ParsedUser = InviteUserPayload & {
   originalRowIndex: number;
 }
 
+// Mesma allowlist da RPC batch_invite_users (migration 147_security_review_fixes):
+// sysadmin nunca é atribuível por convite/importação, e os papéis "technician",
+// "area_manager", "it_manager", "client_manager", "cio" não existem no enum real
+// do Postgres — aceitá-los aqui faria a linha "validar" no cliente e falhar com
+// erro cru de cast no servidor.
 const VALID_ROLES: UserRole[] = [
-  'sysadmin', 'company_admin', 'agent', 'technician', 
-  'area_manager', 'it_manager', 'client_manager', 'cio', 'end_user'
+  'end_user', 'agent', 'ops_manager', 'governance_manager', 'company_admin',
 ];
 
 export function UserImportZone({ companyId, tenantDomain, onSuccess }: Props) {

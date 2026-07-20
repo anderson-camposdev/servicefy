@@ -1215,6 +1215,9 @@ export default function App() {
             >
               <option value="sysadmin">SysAdmin (Admin Global)</option>
               <option value="company_admin">CompanyAdmin (Admin Tenant)</option>
+              <option value="agent">Agent (Analista)</option>
+              <option value="ops_manager">OpsManager (Gestor de Operação)</option>
+              <option value="governance_manager">GovernanceManager (Gestor de Governança)</option>
               <option value="technician">Technician (Analista)</option>
               <option value="area_manager">AreaManager (Gerente Torre)</option>
               <option value="it_manager">ITManager (Gerente Geral TI)</option>

@@ -2,6 +2,8 @@ export type UserRole =
   | 'sysadmin'
   | 'company_admin'
   | 'agent'
+  | 'ops_manager'
+  | 'governance_manager'
   | 'technician'
   | 'area_manager'
   | 'it_manager'
