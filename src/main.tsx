@@ -1,5 +1,6 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
+import { BrowserRouter } from 'react-router-dom'
 import './index.css'
 import App from './App.tsx'
 import ErrorBoundary from './components/ErrorBoundary.tsx'
@@ -10,15 +11,17 @@ import { ThemeProvider, ToastProvider } from './context'
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <ErrorBoundary>
-      <TenantProvider>
-        <AuthProvider>
-          <ThemeProvider>
-            <ToastProvider>
-              <App />
-            </ToastProvider>
-          </ThemeProvider>
-        </AuthProvider>
-      </TenantProvider>
+      <BrowserRouter>
+        <TenantProvider>
+          <AuthProvider>
+            <ThemeProvider>
+              <ToastProvider>
+                <App />
+              </ToastProvider>
+            </ThemeProvider>
+          </AuthProvider>
+        </TenantProvider>
+      </BrowserRouter>
     </ErrorBoundary>
   </StrictMode>,
 )

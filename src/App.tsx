@@ -1,4 +1,5 @@
 import { lazy, Suspense, useState, useMemo, useEffect } from 'react'
+import { useNavigate, useLocation, Routes, Route, Navigate } from 'react-router-dom'
 import { Plus, Settings, ShieldAlert, ClipboardList, AlertOctagon, RefreshCw, Home, BarChart3, CircleCheckBig, TrendingUp, Code2, BookOpen } from 'lucide-react'
 import { useBranding, useToast } from './context'
 import type { AppView, User, Company, Role } from './types'
@@ -1018,33 +1019,27 @@ export default function App() {
     return authCompany ? mapCompany(authCompany) : null
   }, [authCompany, isProvider, resolvedTenant])
 
-  // View ativa e papel simulado PERSISTIDOS (imunes a reload/Tab Discarding).
-  const [activeView, setActiveView] = usePersistentState<AppView>(
-    ACTIVE_VIEW_STORAGE_KEY,
-    'dashboard_incidents',
-    isPersistedAppView,
-  )
+  const navigate = useNavigate()
+  const location = useLocation()
+  
+  // View ativa guiada pela URL
+  const activeView = (location.pathname === '/' ? 'dashboard_incidents' : location.pathname.slice(1)) as AppView
+  const setActiveView = (view: AppView | string) => navigate(`/${view}`)
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
   const [simulatedRole, setSimulatedRole] = usePersistentState<Role | null>('flowfy_sim_role', null)
 
   const activeRole = simulatedRole || (currentUser ? currentUser.role : 'end_user')
 
   const handleViewChange = (view: AppView) => {
-    try {
-      localStorage.setItem(ACTIVE_VIEW_STORAGE_KEY, JSON.stringify(view))
-    } catch {
-      // The state change still keeps navigation working when storage is unavailable.
-    }
-    setActiveView(view)
+    navigate(`/${view}`)
   }
 
-  // Usuário final SEMPRE no portal. Para staff, NÃO sobrescreve a view
-  // persistida (mantém o admin na mesma tela após um reload forçado).
+  // Usuário final SEMPRE no portal.
   useEffect(() => {
-    if (profile?.role === 'end_user') {
+    if (profile?.role === 'end_user' && activeView !== 'user_portal') {
       setActiveView('user_portal')
     }
-  }, [profile, setActiveView])
+  }, [profile, activeView, navigate])
 
   const handleLogout = async () => {
     setSimulatedRole(null)
