@@ -78,6 +78,30 @@ const CRITICALITY_LABELS: Record<string, string> = {
   critical: 'Crítica',
 }
 
+const LICENSE_STATUS_LABELS: Record<string, string> = {
+  active: 'Ativa',
+  expired: 'Expirada',
+  canceled: 'Cancelada',
+  trial: 'Em Teste',
+}
+
+const MODULE_KEY_LABELS: Record<string, string> = {
+  itsm_core: 'ITSM Core (Central)',
+  service_catalog: 'Catálogo de Serviços',
+  knowledge: 'Base de Conhecimento',
+  problem: 'Gestão de Problemas',
+  change: 'Gestão de Mudanças',
+  asset_management: 'Gestão de Ativos (ITAM)',
+  sla_management: 'Gestão de SLAs',
+  ai_assistant: 'ServiceFY AI Assistant',
+}
+
+const LICENSE_SOURCE_LABELS: Record<string, string> = {
+  platform_base: 'Incluso na Plataforma',
+  addon: 'Módulo Adicional',
+  custom: 'Customizado (Enterprise)',
+}
+
 /**
  * Deriva o identificador técnico (key) a partir do Nome digitado pelo admin.
  * Alguns valores de key são âncoras usadas por triggers do banco (ex.:
