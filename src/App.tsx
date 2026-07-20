@@ -1,5 +1,5 @@
 import { lazy, Suspense, useState, useMemo, useEffect } from 'react'
-import { useNavigate, useLocation, Routes, Route, Navigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { Plus, Settings, ShieldAlert, ClipboardList, AlertOctagon, RefreshCw, Home, BarChart3, CircleCheckBig, TrendingUp, Code2, BookOpen } from 'lucide-react'
 import { useBranding, useToast } from './context'
 import type { AppView, User, Company, Role } from './types'
@@ -35,28 +35,9 @@ import TicketDataTable from './components/TicketDataTable'
 import { LoadingSkeleton } from './components/portal/LoadingSkeleton'
 import { PROBLEM_FIELDS } from './lib/ticketTableFields'
 
-const ACTIVE_VIEW_STORAGE_KEY = 'flowfy_active_view'
-
 function LazyBoundary({ children }: { children: React.ReactNode }) {
   return <Suspense fallback={<LoadingSkeleton />}>{children}</Suspense>
 }
-
-const PERSISTED_APP_VIEWS: readonly AppView[] = [
-  'dashboard_incidents',
-  'dashboard_requests',
-  'dashboard_problems',
-  'dashboard_changes',
-  'approval_inbox',
-  'knowledge_center',
-  'user_portal',
-  'api_docs',
-  'settings_governance',
-  'flowfy_bi',
-  'workflow_builder',
-]
-
-const isPersistedAppView = (value: unknown): value is AppView =>
-  typeof value === 'string' && PERSISTED_APP_VIEWS.includes(value as AppView)
 
 const mapCompany = (row: CompanyRow): Company => {
   let providers: any[] = []
