@@ -293,7 +293,7 @@ const getSourceMeta  = (v: TicketSource) => TICKET_SOURCES.find(s => s.value ===
 const valuePlaceholder = (field: string) =>
   field === 'priority' ? 'P1 - Critical' : field === 'category' ? 'Hardware, Software…' :
   field === 'state' ? 'Em Atendimento…' : field === 'group' ? 'Suporte N1…' :
-  field === 'department' ? 'TI, Financeiro…' : '72'
+  field === 'department' ? 'TI, Financeiro…' : field === 'idle_hours' ? '72 (horas)' : '72'
 
 // ─── FlowConnector ────────────────────────────────────────────
 
@@ -1346,7 +1346,7 @@ export default function WorkflowBuilder({ companyId }: { companyId: string }) {
                                         className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 bg-white outline-none focus:ring-2 focus:ring-emerald-300" />
                                     </div>
                                     <div>
-                                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Template</label>
+                                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Modelo de e-mail</label>
                                       <select value={action.params.template ?? ''} onChange={e => updateAction(action.id, { params: { ...action.params, template: e.target.value } })}
                                         className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 bg-white outline-none focus:ring-2 focus:ring-emerald-300">
                                         <option value="">Selecione…</option>

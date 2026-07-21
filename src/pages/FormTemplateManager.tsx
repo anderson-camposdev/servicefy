@@ -31,19 +31,19 @@ export default function FormTemplateManager({ companyId, templates, onChange }: 
       setExpandedId(template.id)
       setShowCreate(false)
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Falha ao criar template.')
+      setError(cause instanceof Error ? cause.message : 'Falha ao criar formulário.')
     }
   }
 
   const remove = async (template: FormTemplateRow) => {
-    if (!confirm(`Excluir o template "${template.name}"? Os catálogos vinculados manterão os campos já salvos.`)) return
+    if (!confirm(`Excluir o formulário "${template.name}"? Os catálogos vinculados manterão os campos já salvos.`)) return
     setError(null)
     try {
       await serviceCatalogService.deleteFormTemplate(template.id)
       onChange(templates.filter(candidate => candidate.id !== template.id))
       if (expandedId === template.id) setExpandedId(null)
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Falha ao excluir template.')
+      setError(cause instanceof Error ? cause.message : 'Falha ao excluir formulário.')
     }
   }
 
@@ -79,7 +79,7 @@ export default function FormTemplateManager({ companyId, templates, onChange }: 
                     const updated = await serviceCatalogService.updateFormTemplate(template.id, { name: trimmed })
                     onChange(templates.map(candidate => candidate.id === template.id ? updated : candidate))
                   } catch (cause) {
-                    setError(cause instanceof Error ? cause.message : 'Falha ao renomear template.')
+                    setError(cause instanceof Error ? cause.message : 'Falha ao renomear formulário.')
                   }
                 }}
                 className="min-w-0 flex-1 rounded-lg border border-transparent bg-transparent px-1.5 py-1 text-sm font-bold text-slate-800 outline-none hover:border-slate-200 focus:border-indigo-300 focus:bg-white"
@@ -99,8 +99,8 @@ export default function FormTemplateManager({ companyId, templates, onChange }: 
               <FormFieldsBuilder
                 entityKey={template.id}
                 value={template.fields}
-                title="Campos do Template"
-                description="Estes campos serão herdados por todos os itens vinculados a este template."
+                title="Campos do Formulário"
+                description="Estes campos serão herdados por todos os itens vinculados a este formulário."
                 onSave={async fields => {
                   const updated = await serviceCatalogService.updateFormTemplate(template.id, {
                     fields: fields as unknown as FormTemplateRow['fields'],
@@ -111,7 +111,7 @@ export default function FormTemplateManager({ companyId, templates, onChange }: 
             )}
           </div>
         ))}
-        {templates.length === 0 && <div className="px-4 py-10 text-center text-sm text-slate-400">Nenhum template criado.</div>}
+        {templates.length === 0 && <div className="px-4 py-10 text-center text-sm text-slate-400">Nenhum formulário criado ainda. Formulários criados aqui podem ser reaproveitados em vários itens do catálogo, sem precisar recriar os campos toda vez.</div>}
       </div>
 
       {showCreate && <div className="flex flex-col gap-2 border-t border-slate-200 bg-slate-50 p-4 sm:flex-row">

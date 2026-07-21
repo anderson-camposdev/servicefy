@@ -15,11 +15,11 @@ interface FormFieldsBuilderProps {
 }
 
 const typeLabels: Record<RequestFormField['type'], string> = {
-  text: 'Texto Curto',
-  textarea: 'Texto Longo',
-  select: 'Seleção / Dropdown',
-  checkbox: 'Checkbox / Seleção Múltipla',
-  datetime: 'Data / Hora',
+  text: 'Texto curto',
+  textarea: 'Texto longo',
+  select: 'Lista de opções (escolher uma)',
+  checkbox: 'Caixas de marcação (escolher várias)',
+  datetime: 'Data e hora',
   number: 'Número',
   date: 'Data (legado)',
 }
@@ -151,7 +151,7 @@ export default function FormFieldsBuilder({
       <div className="mt-4 space-y-3">
         {inheritedFields.length > 0 && (
           <div className="rounded-xl border border-indigo-200 bg-white p-3">
-            <div className="mb-2 text-[10px] font-bold uppercase tracking-wider text-indigo-600">Campos herdados do template</div>
+            <div className="mb-2 text-[10px] font-bold uppercase tracking-wider text-indigo-600">Campos herdados do formulário reutilizável</div>
             <div className="space-y-2">
               {inheritedFields.map(field => (
                 <div key={field.id} className="flex flex-wrap items-center gap-2 rounded-lg bg-primary-container px-3 py-2 text-xs text-on-primary-container">
@@ -168,7 +168,7 @@ export default function FormFieldsBuilder({
           <div key={field.id} className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
             <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1fr_220px_auto_auto_auto] lg:items-end">
               <label className="block">
-                <span className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-slate-500">Label / Rótulo</span>
+                <span className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-slate-500">Rótulo (o que a pessoa vê)</span>
                 <input
                   value={field.label}
                   onChange={event => updateField(field.id, { label: event.target.value })}
@@ -225,7 +225,7 @@ export default function FormFieldsBuilder({
             {(field.type === 'select' || field.type === 'checkbox') && (
               <label className="mt-3 block">
                 <span className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                  {field.type === 'checkbox' ? 'Opções de Seleção Múltipla' : 'Opções do Dropdown'}
+                  {field.type === 'checkbox' ? 'Opções que a pessoa pode marcar' : 'Opções da lista'}
                 </span>
                 <input
                   value={(field.options ?? []).join(', ')}
