@@ -49,13 +49,13 @@ interface PortalConfig {
 // ── Priority matrix (portal display) ─────────────────────────────────────────
 const PRIORITY_MATRIX: Record<string, { label: string; color: string; bg: string }> = {
   'High-High':   { label: 'P1 — Crítica',  color: '#dc2626', bg: '#fee2e2' },
-  'High-Media':  { label: 'P2 — Alta',     color: '#ea580c', bg: '#ffedd5' },
-  'Media-High':  { label: 'P2 — Alta',     color: '#ea580c', bg: '#ffedd5' },
+  'High-Medium': { label: 'P2 — Alta',     color: '#ea580c', bg: '#ffedd5' },
+  'Medium-High': { label: 'P2 — Alta',     color: '#ea580c', bg: '#ffedd5' },
   'High-Low':    { label: 'P3 — Moderada', color: '#d97706', bg: '#fef9c3' },
   'Low-High':    { label: 'P3 — Moderada', color: '#d97706', bg: '#fef9c3' },
-  'Media-Media': { label: 'P3 — Moderada', color: '#d97706', bg: '#fef9c3' },
-  'Media-Low':   { label: 'P4 — Baixa',    color: '#2563eb', bg: '#dbeafe' },
-  'Low-Media':   { label: 'P4 — Baixa',    color: '#2563eb', bg: '#dbeafe' },
+  'Medium-Medium': { label: 'P3 — Moderada', color: '#d97706', bg: '#fef9c3' },
+  'Medium-Low':  { label: 'P4 — Baixa',    color: '#2563eb', bg: '#dbeafe' },
+  'Low-Medium':  { label: 'P4 — Baixa',    color: '#2563eb', bg: '#dbeafe' },
   'Low-Low':     { label: 'P4 — Baixa',    color: '#2563eb', bg: '#dbeafe' },
 }
 
@@ -517,8 +517,8 @@ const UserPortalLayout = ({ companyId }: { companyId?: string } = {}) => {
   const [selSymptom, setSelSymptom]     = useState<string | null>(null)
   const [selReqCat, setSelReqCat]       = useState<ReqCat | null>(null)
   const [selItem, setSelItem]           = useState<string | null>(null)
-  const [impact, setImpact]             = useState<'Low'|'Media'|'High'>('Media')
-  const [urgency, setUrgency]           = useState<'Low'|'Media'|'High'>('Media')
+  const [impact, setImpact]             = useState<'Low'|'Medium'|'High'>('Medium')
+  const [urgency, setUrgency]           = useState<'Low'|'Medium'|'High'>('Medium')
   const [desc, setDesc]                 = useState('')
   const [ticketNum, setTicketNum]       = useState<string | null>(null)
   const [ticketApprovalStatus, setTicketApprovalStatus] = useState<IncidentRow['approval_status']>('not_required')
@@ -867,14 +867,14 @@ const UserPortalLayout = ({ companyId }: { companyId?: string } = {}) => {
     setSelDeptId(null)
     setSelIncCat(null); setSelSymptom(null); setSelReqCat(null); setSelItem(null)
     setDbSelIncCat(null); setDbSelIncService(null); setDbSelSymptom(null); setDbSelReqCat(null); setDbSelReqSubcat(null); setDbSelItem(null)
-    setImpact('Media'); setUrgency('Media'); setDesc(''); setTicketNum(null)
+    setImpact('Medium'); setUrgency('Medium'); setDesc(''); setTicketNum(null)
     setFormAnswers({}); setFormErrors({}); setSubmitError(null)
   }
 
   const goTickets = () => {
     setSelIncCat(null); setSelSymptom(null); setSelReqCat(null); setSelItem(null)
     setDbSelIncCat(null); setDbSelIncService(null); setDbSelSymptom(null); setDbSelReqCat(null); setDbSelReqSubcat(null); setDbSelItem(null)
-    setImpact('Media'); setUrgency('Media'); setDesc(''); setTicketNum(null)
+    setImpact('Medium'); setUrgency('Medium'); setDesc(''); setTicketNum(null)
     setFormAnswers({}); setFormErrors({}); setSubmitError(null)
     setScreen('tickets')
   }
@@ -963,7 +963,7 @@ const UserPortalLayout = ({ companyId }: { companyId?: string } = {}) => {
     setSearchOpen(false)
   }
 
-  const prio = PRIORITY_MATRIX[`${impact}-${urgency}`] || PRIORITY_MATRIX['Media-Media']!
+  const prio = PRIORITY_MATRIX[`${impact}-${urgency}`] || PRIORITY_MATRIX['Medium-Medium']!
   const userName = profile?.name || 'Usuário'
 
   // ── Nav items ─────────────────────────────────────────────────────────────
@@ -1665,7 +1665,7 @@ const UserPortalLayout = ({ companyId }: { companyId?: string } = {}) => {
                       <select value={impact} onChange={e => setImpact(e.target.value as typeof impact)}
                         style={{ width:'100%', padding:'10px 13px', border:'1.5px solid #e2e8f0', borderRadius:10, font:'500 14px sans-serif', color:'#0f172a', background:'#fff', outline:'none' }}>
                         <option value="Low">Apenas eu</option>
-                        <option value="Media">Meu departamento</option>
+                        <option value="Medium">Meu departamento</option>
                         <option value="High">Toda a empresa</option>
                       </select>
                     </div>
@@ -1674,7 +1674,7 @@ const UserPortalLayout = ({ companyId }: { companyId?: string } = {}) => {
                       <select value={urgency} onChange={e => setUrgency(e.target.value as typeof urgency)}
                         style={{ width:'100%', padding:'10px 13px', border:'1.5px solid #e2e8f0', borderRadius:10, font:'500 14px sans-serif', color:'#0f172a', background:'#fff', outline:'none' }}>
                         <option value="Low">Consigo trabalhar</option>
-                        <option value="Media">Tarefa importante parada</option>
+                        <option value="Medium">Tarefa importante parada</option>
                         <option value="High">Completamente travado</option>
                       </select>
                     </div>
