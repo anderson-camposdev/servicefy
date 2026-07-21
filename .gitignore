@@ -40,6 +40,10 @@ playwright-report/
 test-results/
 coverage/
 
+# Backups/temp dumps de scripts/sync-db-from-cloud.sh — podem conter dados reais
+.db-backups/
+.tmp_clone/
+
 # Hosting metadata and private keys
 .vercel/
 *.pem

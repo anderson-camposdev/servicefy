@@ -21,6 +21,7 @@
     "test:security:ci": "node --test tests/security/ci-security-contract.test.mjs",
     "audit:secrets": "node scripts/audit-secrets.mjs",
     "audit:migrations": "node scripts/audit-migration-baseline.mjs",
+    "db:sync-from-cloud": "bash scripts/sync-db-from-cloud.sh",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:headed": "playwright test --headed",
     "test:e2e:report": "playwright show-report"
