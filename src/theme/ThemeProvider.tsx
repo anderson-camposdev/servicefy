@@ -14,8 +14,12 @@ const BrandingContext = createContext<BrandingContextValue | undefined>(undefine
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const { tenant } = useTenant()
-  const { company: authenticatedCompany } = useAuth()
-  const company = authenticatedCompany ?? tenant
+  const { company: authenticatedCompany, isProvider } = useAuth()
+  // Provedor MSP navegando com o seletor de tenant (App.tsx) deve ver a marca
+  // do tenant selecionado, não a da própria empresa-sede — mesma regra usada
+  // por `currentCompany` em App.tsx. Sem isso, a marca fica presa na empresa
+  // de origem do usuário mesmo depois de trocar de tenant no seletor.
+  const company = (isProvider && tenant) ? tenant : (authenticatedCompany ?? tenant)
   const branding = useMemo(
     () => company ? brandingFromCompany(company) : DEFAULT_BRANDING,
     [company],

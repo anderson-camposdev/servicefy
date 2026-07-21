@@ -5,10 +5,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 const state = vi.hoisted(() => ({
   authCompany: null as Record<string, unknown> | null,
   tenant: null as Record<string, unknown> | null,
+  isProvider: false,
 }))
 
 vi.mock('../../auth', () => ({
-  useAuth: () => ({ company: state.authCompany }),
+  useAuth: () => ({ company: state.authCompany, isProvider: state.isProvider }),
 }))
 
 vi.mock('../../tenant', async importOriginal => {
@@ -42,6 +43,7 @@ describe('ThemeProvider white-label', () => {
   beforeEach(() => {
     state.authCompany = null
     state.tenant = null
+    state.isProvider = false
     container = document.createElement('div')
     document.body.appendChild(container)
   })
@@ -74,6 +76,28 @@ describe('ThemeProvider white-label', () => {
     expect(container.textContent).toBe('Host Brand')
     expect(document.documentElement.style.getPropertyValue('--brand-primary')).toBe('#123456')
     expect(document.querySelector<HTMLLinkElement>('link[rel="icon"]')?.href).toContain('/favicon.svg')
+  })
+
+  it('provedor MSP com tenant selecionado no seletor: branding segue o tenant simulado, nao a empresa-sede (regressao — Portal do Usuario ficava preso na empresa de origem ao trocar de tenant)', async () => {
+    state.isProvider = true
+    state.authCompany = company({ id: 'home-co', brand_name: 'Allied IT (sede)', primary_color: 'Ocean' })
+    state.tenant = company({ id: 'selected-co', brand_name: 'Alpha Tech (selecionado)', primary_color: 'Emerald' })
+    const root = createRoot(container)
+
+    await act(async () => root.render(<ThemeProvider><Probe /></ThemeProvider>))
+
+    expect(container.textContent).toBe('Alpha Tech (selecionado)')
+  })
+
+  it('usuario comum (nao provedor) com tenant resolvido pelo host: branding sempre segue a propria empresa, mesmo que exista um tenant resolvido', async () => {
+    state.isProvider = false
+    state.authCompany = company({ id: 'home-co', brand_name: 'Empresa do usuario', primary_color: 'Ocean' })
+    state.tenant = company({ id: 'other-co', brand_name: 'Outro tenant', primary_color: 'Emerald' })
+    const root = createRoot(container)
+
+    await act(async () => root.render(<ThemeProvider><Probe /></ThemeProvider>))
+
+    expect(container.textContent).toBe('Empresa do usuario')
   })
 })
 
