@@ -91,7 +91,7 @@ export default function LoginIntegrationSettings({ companyId, onBack }: Props) {
         ) : (
           <div className="space-y-5">
             <section className="rounded-xl border border-slate-200 bg-white p-5 sm:p-6">
-              <div className="flex items-center gap-3"><Globe2 className="h-5 w-5 text-primary" /><div><h2 className="font-black text-slate-900">Domínios vinculados</h2><p className="text-xs text-slate-500">O provisionamento automático usa somente domínios verificados pelo provedor MSP.</p></div></div>
+              <div className="flex items-center gap-3"><Globe2 className="h-5 w-5 text-primary" /><div><h2 className="font-black text-slate-900">Domínios vinculados</h2><p className="text-xs text-slate-500">Quando alguém com um e-mail destes domínios faz login pela primeira vez via Google/Microsoft, a conta é criada automaticamente. A verificação do domínio é feita pelo suporte do ServiceFY.</p></div></div>
               <div className="mt-4 grid gap-3 sm:grid-cols-2">
                 {domains.map(domain => (
                   <div key={domain.id} className="flex items-center justify-between rounded-2xl border border-slate-200 p-4">
@@ -103,14 +103,14 @@ export default function LoginIntegrationSettings({ companyId, onBack }: Props) {
                 ))}
                 {domains.length === 0 && (
                   <div className="rounded-xl border border-dashed border-slate-300 p-5 text-sm text-slate-500 sm:col-span-2">
-                    Nenhum domínio verificado. Solicite ao provedor MSP a validação do domínio corporativo antes de exigir SSO.
+                    Nenhum domínio de e-mail verificado ainda. Entre em contato com o suporte do ServiceFY para validar o domínio da sua empresa antes de exigir login único (SSO).
                   </div>
                 )}
               </div>
             </section>
 
             <section className="rounded-xl border border-slate-200 bg-white p-5 sm:p-6">
-              <div className="flex items-center gap-3"><ShieldCheck className="h-5 w-5 text-primary" /><div><h2 className="font-black text-slate-900">Provedores corporativos</h2><p className="text-xs text-slate-500">As credenciais OAuth ficam no ambiente seguro; aqui você controla quais provedores o tenant pode usar.</p></div></div>
+              <div className="flex items-center gap-3"><ShieldCheck className="h-5 w-5 text-primary" /><div><h2 className="font-black text-slate-900">Provedores corporativos</h2><p className="text-xs text-slate-500">Escolha por quais contas (Google, Microsoft) os usuários desta empresa podem entrar. As senhas de acesso ficam protegidas e nunca passam pelo ServiceFY.</p></div></div>
               <div className="mt-4 grid gap-3 md:grid-cols-2">
                 {SSO_PROVIDERS.map(provider => {
                   const selected = providers.includes(provider)
@@ -126,7 +126,7 @@ export default function LoginIntegrationSettings({ companyId, onBack }: Props) {
 
               <label className="mt-5 flex cursor-pointer items-start gap-3 rounded-2xl border border-slate-200 p-4">
                 <input type="checkbox" checked={!allowLocalLogin} onChange={event => { setAllowLocalLogin(!event.target.checked); setSuccess('') }} className="mt-0.5 h-4 w-4 rounded border-slate-300 text-primary" />
-                <span><b className="block text-sm text-slate-900">Exigir login somente via SSO</b><span className="mt-1 block text-xs leading-5 text-slate-500">Bloqueia autenticação por senha no hook do Supabase, inclusive chamadas diretas à API de Auth.</span></span>
+                <span><b className="block text-sm text-slate-900">Exigir login somente via SSO</b><span className="mt-1 block text-xs leading-5 text-slate-500">Depois de ativado, os usuários só conseguem entrar pelo Google ou Microsoft — login com e-mail e senha deixa de funcionar, mesmo em tentativas diretas fora do portal.</span></span>
               </label>
             </section>
 

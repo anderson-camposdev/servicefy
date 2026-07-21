@@ -726,15 +726,15 @@ function SymptomRow({ symptom, existing, groups, templates, calendars, onSave }:
           <input type="checkbox" checked={active} onChange={e => { setActive(e.target.checked); mark() }} className="rounded border-slate-300" />
           <span className="text-sm">{symptom.icon} {symptom.name}</span>
         </label>
-        <div className="flex items-center gap-1 text-xs text-slate-500">
-          SLA
+        <div className="flex items-center gap-1 text-xs text-slate-500" title="Prazo máximo, em horas, para atender este tipo de chamado">
+          Prazo (h)
           <input type="number" min={1} value={sla} onChange={e => { setSla(Number(e.target.value)); mark() }} className="w-16 border border-slate-200 rounded px-2 py-1 text-sm" /> h
         </div>
         <select value={groupId} onChange={e => { setGroupId(e.target.value); mark() }} className="border border-slate-200 rounded px-2 py-1 text-sm bg-white min-w-[150px]">
           <option value="">Grupo Solucionador…</option>
           {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
         </select>
-        <select value={slaCalendarId} onChange={e => { setSlaCalendarId(e.target.value); mark() }} className="border border-slate-200 rounded px-2 py-1 text-xs bg-white min-w-[140px]" title="Calendário de SLA específico deste sintoma (vazio = padrão do tenant)">
+        <select value={slaCalendarId} onChange={e => { setSlaCalendarId(e.target.value); mark() }} className="border border-slate-200 rounded px-2 py-1 text-xs bg-white min-w-[140px]" title="Calendário de atendimento específico deste sintoma (vazio = usa o calendário padrão da empresa)">
           <option value="">Calendário: padrão</option>
           {calendars.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>

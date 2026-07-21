@@ -77,29 +77,32 @@ const CRITICALITY_LABELS: Record<string, string> = {
   high: 'Alta',
   critical: 'Crítica',
 }
-
+const MODULE_KEY_LABELS: Record<string, string> = {
+  core: 'Núcleo do sistema',
+  itsm: 'Gestão de Chamados (ITSM)',
+  automation: 'Automação de Fluxos',
+  analytics: 'Relatórios e Indicadores',
+  api: 'API para Integrações',
+  esm: 'Atendimento a Outras Áreas (ESM)',
+  omnichannel: 'Canais de Atendimento (E-mail, WhatsApp, Teams)',
+  knowledge: 'Base de Conhecimento',
+  cmdb: 'Gestão de Ativos (CMDB)',
+  compliance: 'LGPD e Retenção',
+  identity_connectors: 'Login Único (SSO)',
+  contracts: 'Contratos',
+  virtual_agent: 'Agente Virtual',
+  cmdb_discovery: 'Descoberta Automática de Ativos',
+}
+const LICENSE_SOURCE_LABELS: Record<string, string> = {
+  plan: 'Incluído no plano contratado',
+  trial: 'Em avaliação (trial)',
+  override: 'Ativado manualmente por um administrador do ServiceFY',
+}
 const LICENSE_STATUS_LABELS: Record<string, string> = {
   active: 'Ativa',
+  trial: 'Em avaliação',
   expired: 'Expirada',
-  canceled: 'Cancelada',
-  trial: 'Em Teste',
-}
-
-const MODULE_KEY_LABELS: Record<string, string> = {
-  itsm_core: 'ITSM Core (Central)',
-  service_catalog: 'Catálogo de Serviços',
-  knowledge: 'Base de Conhecimento',
-  problem: 'Gestão de Problemas',
-  change: 'Gestão de Mudanças',
-  asset_management: 'Gestão de Ativos (ITAM)',
-  sla_management: 'Gestão de SLAs',
-  ai_assistant: 'ServiceFY AI Assistant',
-}
-
-const LICENSE_SOURCE_LABELS: Record<string, string> = {
-  platform_base: 'Incluso na Plataforma',
-  addon: 'Módulo Adicional',
-  custom: 'Customizado (Enterprise)',
+  suspended: 'Suspensa',
 }
 
 /**

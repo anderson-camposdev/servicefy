@@ -173,7 +173,7 @@ function WebhookEditorModal({ companyId, webhook, onClose, onSaved }: WebhookEdi
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
       <div className="w-full max-w-lg bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden">
         <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
-          <h2 className="text-sm font-bold text-slate-900">{webhook ? 'Editar Webhook' : 'Novo Webhook'}</h2>
+          <h2 className="text-sm font-bold text-slate-900">{webhook ? 'Editar aviso automático (webhook)' : 'Novo aviso automático (webhook)'}</h2>
           <button onClick={onClose} disabled={submitting} className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors disabled:opacity-50" aria-label="Fechar">
             <X className="w-4 h-4" />
           </button>
@@ -181,7 +181,8 @@ function WebhookEditorModal({ companyId, webhook, onClose, onSaved }: WebhookEdi
 
         <div className="p-5 space-y-4">
           <div>
-            <label htmlFor="webhook-url" className="block text-xs font-bold text-slate-700 mb-1.5">URL de destino <span className="text-red-500">*</span></label>
+            <p className="mb-3 text-xs leading-5 text-slate-500">Um "webhook" é um endereço no seu sistema que recebe um aviso automático sempre que um dos eventos abaixo acontecer no ServiceFY. Só use se souber integrar sistemas — peça ajuda ao seu time técnico se não tiver certeza.</p>
+            <label htmlFor="webhook-url" className="block text-xs font-bold text-slate-700 mb-1.5">Endereço no seu sistema (URL de destino) <span className="text-red-500">*</span></label>
             <input
               id="webhook-url"
               type="url"
@@ -194,7 +195,7 @@ function WebhookEditorModal({ companyId, webhook, onClose, onSaved }: WebhookEdi
           </div>
 
           <div>
-            <span className="block text-xs font-bold text-slate-700 mb-1.5">Eventos <span className="text-red-500">*</span></span>
+            <span className="block text-xs font-bold text-slate-700 mb-1.5">Quando enviar o aviso <span className="text-red-500">*</span></span>
             <div className="space-y-1.5">
               {AVAILABLE_EVENTS.map(event => (
                 <label key={event.value} className="flex items-center gap-2.5 cursor-pointer select-none">
@@ -206,7 +207,7 @@ function WebhookEditorModal({ companyId, webhook, onClose, onSaved }: WebhookEdi
                     className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 disabled:opacity-50"
                   />
                   <span className="text-sm text-slate-700">{event.label}</span>
-                  <code className="text-xs text-slate-400">{event.value}</code>
+                  <code className="text-xs text-slate-400" title="Nome técnico do evento, usado por quem for integrar">{event.value}</code>
                 </label>
               ))}
             </div>
@@ -214,7 +215,7 @@ function WebhookEditorModal({ companyId, webhook, onClose, onSaved }: WebhookEdi
 
           <div>
             <label htmlFor="webhook-secret" className="block text-xs font-bold text-slate-700 mb-1.5">
-              Segredo de assinatura (HMAC-SHA256) {webhook ? <span className="font-normal text-slate-400">— deixe em branco para manter o atual</span> : <span className="text-red-500">*</span>}
+              Chave secreta de verificação {webhook ? <span className="font-normal text-slate-400">— deixe em branco para manter a atual</span> : <span className="text-red-500">*</span>}
             </label>
             <input
               id="webhook-secret"
@@ -222,10 +223,10 @@ function WebhookEditorModal({ companyId, webhook, onClose, onSaved }: WebhookEdi
               value={secret}
               onChange={e => setSecret(e.target.value)}
               disabled={submitting}
-              placeholder={webhook ? '••••••••' : 'um segredo forte e único para este endpoint'}
+              placeholder={webhook ? '••••••••' : 'uma senha forte e única para este aviso'}
               className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg bg-white text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 disabled:bg-slate-50 font-mono"
             />
-            <p className="mt-1 text-[11px] text-slate-400">Cada entrega inclui o header <code>X-ServiceFY-Signature</code> com a assinatura HMAC-SHA256 do corpo, usando este segredo.</p>
+            <p className="mt-1 text-[11px] text-slate-400">Uma senha usada pelo seu sistema para confirmar que o aviso realmente veio do ServiceFY. Peça ajuda ao seu time técnico se não souber como usar isso.</p>
           </div>
 
           <label className="flex items-center gap-2.5 cursor-pointer select-none">

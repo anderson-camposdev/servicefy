@@ -36,6 +36,15 @@ const PRIORITY_META: Record<number, { label: string; color: string; dot: string 
   5: { label: 'P5 · Planejada', color: 'bg-slate-500/10 text-slate-500 border-slate-500/20', dot: 'bg-slate-500' },
 }
 
+const ROLE_LABELS: Record<string, string> = {
+  end_user: 'Usuário final',
+  agent: 'Analista',
+  ops_manager: 'Gestor de operações',
+  governance_manager: 'Gestor de governança',
+  company_admin: 'Administrador da empresa',
+  sysadmin: 'Administrador do ServiceFY',
+}
+
 const humanize = (mins: number): string => {
   if (!mins || mins <= 0) return '—'
   if (mins < 60) return `${mins}min`
@@ -1228,14 +1237,14 @@ export default function SettingsGovernance({ companyId, activeRole, startInDetai
               <div className={`px-6 py-5 border-b ${isAlpha ? 'border-zinc-800' : 'border-outline-variant'} bg-surface-container/20 flex items-center gap-2.5`}>
                 <Gauge className="w-5 h-5 text-primary" />
                 <h3 className="text-xl font-bold text-on-surface">Prazos por Nível de Prioridade</h3>
-                <span className="ml-auto text-sm text-on-surface-variant font-semibold">Tempos configurados em minutos úteis</span>
+                <span className="ml-auto text-sm text-on-surface-variant font-semibold">Tempos em minutos de expediente — contam só as horas do Calendário de Atendimento, não minutos corridos</span>
               </div>
               <table className="w-full min-w-[760px] text-sm">
                 <thead className={`bg-surface-container/10 border-b ${isAlpha ? 'border-zinc-800' : 'border-outline-variant'}`}>
                   <tr className="text-xs font-semibold text-on-surface-variant">
                     <th className="px-6 py-4.5 text-left">Prioridade</th>
-                    <th className="px-6 py-4.5 text-left">Tempo de Resposta (minutos)</th>
-                    <th className="px-6 py-4.5 text-left">Tempo de Solução (minutos)</th>
+                    <th className="px-6 py-4.5 text-left" title="Tempo até o analista responder pela primeira vez">Prazo para 1ª Resposta (min.)</th>
+                    <th className="px-6 py-4.5 text-left" title="Tempo até o chamado ser resolvido">Prazo para Solução (min.)</th>
                     <th className="px-6 py-4.5 text-right">Ação</th>
                   </tr>
                 </thead>
@@ -1488,7 +1497,7 @@ export default function SettingsGovernance({ companyId, activeRole, startInDetai
                       />
                       <div className="flex flex-col min-w-0">
                         <span className="text-xs font-bold text-slate-700 truncate">{p.name}</span>
-                        <span className="text-[10px] text-slate-400 truncate uppercase tracking-wider">{p.role}</span>
+                        <span className="text-[10px] text-slate-400 truncate uppercase tracking-wider">{ROLE_LABELS[p.role] ?? p.role}</span>
                       </div>
                     </label>
                   )
@@ -1544,7 +1553,7 @@ export default function SettingsGovernance({ companyId, activeRole, startInDetai
 
               <div className="space-y-1">
                 <label className="block text-xs font-bold text-on-surface-variant uppercase tracking-wider">
-                  Slug (Auto-derivado)
+                  Código do Motivo
                 </label>
                 <input
                   value={reasonSlug}
@@ -1555,6 +1564,7 @@ export default function SettingsGovernance({ companyId, activeRole, startInDetai
                   placeholder="aguardando-fornecedor"
                   className={`w-full ${inputClass}`}
                 />
+                <p className="text-[11px] text-on-surface-variant">Gerado automaticamente a partir do nome. Usado internamente em relatórios e integrações — normalmente não precisa ser alterado.</p>
               </div>
 
               <div className="pt-2 space-y-3">
@@ -1583,7 +1593,7 @@ export default function SettingsGovernance({ companyId, activeRole, startInDetai
                     }`}
                   />
                   <div>
-                    <span className="text-sm font-medium text-on-surface">Exige Ação do Usuário (Regra de Ouro)</span>
+                    <span className="text-sm font-medium text-on-surface">Exige Ação do Cliente</span>
                     <p className="text-xs text-on-surface-variant">Sinaliza que a pendência depende do cliente responder.</p>
                   </div>
                 </label>

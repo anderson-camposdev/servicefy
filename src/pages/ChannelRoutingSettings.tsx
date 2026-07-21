@@ -20,18 +20,18 @@ import SettingsPageShell from '../components/settings/SettingsPageShell'
 interface Props { companyId: string; activeRole: string; onBack: () => void }
 interface Group { id: string; name: string }
 
-const MATCH_TYPES: Array<{ value: ChannelMatchType; label: string }> = [
-  { value: 'address', label: 'Endereço exato' },
-  { value: 'alias', label: 'Alias' },
-  { value: 'domain', label: 'Domínio (@empresa.com)' },
-  { value: 'phone', label: 'Telefone' },
-  { value: 'external_identity', label: 'Identidade externa' },
-  { value: 'default', label: 'Padrão (fallback)' },
+const MATCH_TYPES: Array<{ value: ChannelMatchType; label: string; help: string }> = [
+  { value: 'address', label: 'Endereço exato', help: 'Direciona somente mensagens enviadas exatamente para este endereço (ex.: suporte@empresa.com).' },
+  { value: 'alias', label: 'Endereço alternativo', help: 'Um endereço adicional que também deve cair nesta rota (ex.: apoio@empresa.com apontando para o mesmo destino).' },
+  { value: 'domain', label: 'Domínio (@empresa.com)', help: 'Direciona qualquer mensagem vinda de um endereço dentro deste domínio, independente da parte antes do @.' },
+  { value: 'phone', label: 'Telefone', help: 'Direciona mensagens recebidas deste número de WhatsApp/telefone.' },
+  { value: 'external_identity', label: 'Identidade externa', help: 'ID do usuário no aplicativo de origem (Teams, WhatsApp etc.), não é um e-mail.' },
+  { value: 'default', label: 'Padrão (regra de reserva)', help: 'Usada quando nenhuma outra regra desta conexão combina com a mensagem recebida.' },
 ]
 const REASON_LABEL: Record<ChannelTriageEvent['reason'], string> = {
   ambiguous_route: 'Rota ambígua',
   route_not_found: 'Rota não encontrada',
-  invalid_tenant: 'Tenant inválido',
+  invalid_tenant: 'Empresa de destino não identificada',
 }
 
 export default function ChannelRoutingSettings({ companyId, onBack }: Props) {
@@ -112,7 +112,7 @@ export default function ChannelRoutingSettings({ companyId, onBack }: Props) {
   }
 
   const removeRoute = async (r: ChannelRoute) => {
-    if (!window.confirm('Excluir esta rota? Mensagens deste canal deixarão de casar por ela.')) return
+    if (!window.confirm('Excluir esta rota? Mensagens deste canal deixarão de ser direcionadas automaticamente por esta regra.')) return
     try { await platformAdminService.deleteRoute(r.id); flash('Rota excluída.'); load() }
     catch (cause) { setError(cause instanceof Error ? cause.message : 'Falha ao excluir.') }
   }
@@ -150,17 +150,21 @@ export default function ChannelRoutingSettings({ companyId, onBack }: Props) {
               <h2 className="text-base font-bold text-slate-950">{editingId ? 'Editar rota' : 'Nova rota'}</h2>
               {editingId && <button onClick={cancelEdit} className="text-xs font-bold text-slate-500 hover:text-slate-800">Cancelar</button>}
             </div>
+            <p className="mt-1 text-xs text-slate-500">Defina para qual equipe direcionar automaticamente as mensagens que chegam por este canal, de acordo com o remetente.</p>
             {connections.length === 0 ? (
               <p className="mt-4 rounded-xl border border-dashed p-4 text-sm text-slate-500">Cadastre uma conexão em "Conexões omnichannel" antes de criar rotas.</p>
             ) : (
               <div className="mt-4 space-y-3">
                 <label className="block text-xs font-bold">Conexão<select value={form.connectionId} onChange={e => setForm(f => ({ ...f, connectionId: e.target.value }))} className="mt-1 w-full rounded-xl border bg-white px-3 py-2.5 text-sm">{connections.map(c => <option key={c.id} value={c.id}>{c.name} · {c.provider}</option>)}</select></label>
-                <label className="block text-xs font-bold">Identificação<select value={form.matchType} onChange={e => setForm(f => ({ ...f, matchType: e.target.value as ChannelMatchType }))} className="mt-1 w-full rounded-xl border bg-white px-3 py-2.5 text-sm">{MATCH_TYPES.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}</select></label>
+                <label className="block text-xs font-bold">Como identificar o remetente<select value={form.matchType} onChange={e => setForm(f => ({ ...f, matchType: e.target.value as ChannelMatchType }))} className="mt-1 w-full rounded-xl border bg-white px-3 py-2.5 text-sm">{MATCH_TYPES.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}</select><span className="mt-1 block text-[11px] font-normal leading-4 text-slate-400">{MATCH_TYPES.find(m => m.value === form.matchType)?.help}</span></label>
                 {form.matchType !== 'default' && (
                   <label className="block text-xs font-bold">Valor<input value={form.matchValue} onChange={e => setForm(f => ({ ...f, matchValue: e.target.value }))} className="mt-1 w-full rounded-xl border px-3 py-2.5 text-sm" placeholder={form.matchType === 'domain' ? 'empresa.com' : form.matchType === 'phone' ? '+5511999999999' : 'suporte@empresa.com'} /></label>
                 )}
                 <div className="grid grid-cols-2 gap-3">
-                  <label className="block text-xs font-bold">Prioridade<input type="number" value={form.priority} onChange={e => setForm(f => ({ ...f, priority: Number(e.target.value) }))} className="mt-1 w-full rounded-xl border px-3 py-2.5 text-sm" /></label>
+                  <div>
+                    <label className="block text-xs font-bold">Prioridade<input type="number" value={form.priority} onChange={e => setForm(f => ({ ...f, priority: Number(e.target.value) }))} className="mt-1 w-full rounded-xl border px-3 py-2.5 text-sm" /></label>
+                    <span className="mt-1 block text-[11px] font-normal leading-4 text-slate-400">Quando várias regras combinam, a de menor número é aplicada primeiro.</span>
+                  </div>
                   <label className="block text-xs font-bold">Grupo<select value={form.assignmentGroupId} onChange={e => setForm(f => ({ ...f, assignmentGroupId: e.target.value }))} className="mt-1 w-full rounded-xl border bg-white px-3 py-2.5 text-sm"><option value="">— Nenhum —</option>{groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}</select></label>
                 </div>
                 <label className="flex items-center gap-2 text-sm font-semibold"><input type="checkbox" checked={form.enabled} onChange={e => setForm(f => ({ ...f, enabled: e.target.checked }))} /> Ativa</label>

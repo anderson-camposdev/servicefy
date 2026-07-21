@@ -60,7 +60,7 @@ describe('SmtpSettingsForm', () => {
     expect(screen.getByDisplayValue('mailer@example.com')).toBeTruthy()
     expect(screen.getByDisplayValue('support@example.com')).toBeTruthy()
     expect(screen.getByDisplayValue('Support')).toBeTruthy()
-    expect(screen.getByDisplayValue('tls')).toBeTruthy()
+    expect(screen.getByDisplayValue('Conexão segura (TLS) — recomendado')).toBeTruthy()
 
     const password = screen.getByLabelText('Senha') as HTMLInputElement
     expect(password.type).toBe('password')

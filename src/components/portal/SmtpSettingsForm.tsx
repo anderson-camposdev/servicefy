@@ -3,6 +3,12 @@ import { Eye, EyeOff, Loader2, Lock, Save, Sparkles } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { SMTP_ENCRYPTION_TYPES, testSmtpConnection, type SmtpEncryptionType } from '../../lib/smtp'
 
+const SMTP_ENCRYPTION_LABELS: Record<SmtpEncryptionType, string> = {
+  tls: 'Conexão segura (TLS) — recomendado',
+  ssl: 'Conexão segura legada (SSL)',
+  none: 'Sem criptografia (não recomendado)',
+}
+
 interface SmtpSettingsFormProps {
   companyId: string
   /** Verificação da feature 'custom_smtp' ainda em andamento (RPC check_tenant_feature_access). */
@@ -209,15 +215,17 @@ export function SmtpSettingsForm({ companyId, checkingAccess, hasCustomSmtpAcces
   return (
     <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
       <div className="mb-6">
-        <h2 className="text-lg font-extrabold text-slate-900">SMTP customizado</h2>
-        <p className="mt-1 text-sm text-slate-500">Configure o servidor de envio deste tenant. A senha nunca é carregada de volta.</p>
+        <h2 className="text-lg font-extrabold text-slate-900">Servidor de e-mail próprio (SMTP)</h2>
+        <p className="mt-1 text-sm text-slate-500">Use o servidor de e-mail da sua própria empresa para enviar notificações, em vez do envio padrão do ServiceFY. A senha nunca é exibida de volta depois de salva.</p>
       </div>
       <div className="grid gap-4 md:grid-cols-2">
-        <label className="text-xs font-bold uppercase tracking-wide text-slate-500">Host
-          <input aria-label="Host" value={form.smtpHost} onChange={event => setField('smtpHost', event.target.value)} className={inputClass} disabled={saving || testing} required />
+        <label className="text-xs font-bold uppercase tracking-wide text-slate-500">Servidor (host)
+          <input aria-label="Host" placeholder="ex: smtp.gmail.com" value={form.smtpHost} onChange={event => setField('smtpHost', event.target.value)} className={inputClass} disabled={saving || testing} required />
+          <span className="mt-1 block text-[11px] font-normal normal-case tracking-normal text-slate-400">Endereço fornecido pelo seu provedor de e-mail.</span>
         </label>
         <label className="text-xs font-bold uppercase tracking-wide text-slate-500">Porta
-          <input aria-label="Porta" type="number" min="1" max="65535" value={form.smtpPort} onChange={event => setField('smtpPort', event.target.value)} className={inputClass} disabled={saving || testing} required />
+          <input aria-label="Porta" type="number" min="1" max="65535" placeholder="587" value={form.smtpPort} onChange={event => setField('smtpPort', event.target.value)} className={inputClass} disabled={saving || testing} required />
+          <span className="mt-1 block text-[11px] font-normal normal-case tracking-normal text-slate-400">Normalmente 587 (recomendado) ou 465. Confirme com seu provedor.</span>
         </label>
         <label className="text-xs font-bold uppercase tracking-wide text-slate-500">Usuário
           <input aria-label="Usuário" value={form.smtpUser} onChange={event => setField('smtpUser', event.target.value)} className={inputClass} disabled={saving || testing} required />
@@ -236,10 +244,11 @@ export function SmtpSettingsForm({ companyId, checkingAccess, hasCustomSmtpAcces
         <label className="text-xs font-bold uppercase tracking-wide text-slate-500">Nome de Origem
           <input aria-label="Nome de Origem" value={form.fromName} onChange={event => setField('fromName', event.target.value)} className={inputClass} disabled={saving || testing} required />
         </label>
-        <label className="text-xs font-bold uppercase tracking-wide text-slate-500 md:col-span-2">Tipo de Criptografia
+        <label className="text-xs font-bold uppercase tracking-wide text-slate-500 md:col-span-2">Tipo de conexão segura
           <select aria-label="Tipo de Criptografia" value={form.encryptionType} onChange={event => setField('encryptionType', event.target.value as SmtpEncryptionType)} className={inputClass} disabled={saving || testing}>
-            {SMTP_ENCRYPTION_TYPES.map(type => <option key={type} value={type}>{type}</option>)}
+            {SMTP_ENCRYPTION_TYPES.map(type => <option key={type} value={type}>{SMTP_ENCRYPTION_LABELS[type]}</option>)}
           </select>
+          <span className="mt-1 block text-[11px] font-normal normal-case tracking-normal text-slate-400">Defina como seu provedor de e-mail exige a conexão — a maioria usa TLS.</span>
         </label>
       </div>
       {error && <p role="alert" className="mt-4 rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{error}</p>}

@@ -12,13 +12,13 @@ import { useToast } from '../context'
 // quebravam com um erro cru de cast do Postgres ao tentar salvar.
 // Migration 131 adicionou ops_manager/governance_manager ao enum real —
 // diferente dos papéis acima, esses dois são de fato persistíveis.
-const REAL_ROLE_OPTIONS: { value: Role; label: string }[] = [
-  { value: 'end_user', label: 'Usuário final' },
-  { value: 'agent', label: 'Analista' },
-  { value: 'ops_manager', label: 'Gestor de operações' },
-  { value: 'governance_manager', label: 'Gestor de governança' },
-  { value: 'company_admin', label: 'Administrador do tenant' },
-  { value: 'sysadmin', label: 'Administrador global' },
+const REAL_ROLE_OPTIONS: { value: Role; label: string; help: string }[] = [
+  { value: 'end_user', label: 'Usuário final', help: 'Abre e acompanha os próprios chamados no portal. Não acessa a área de atendimento.' },
+  { value: 'agent', label: 'Analista', help: 'Atende e resolve os chamados atribuídos a ele.' },
+  { value: 'ops_manager', label: 'Gestor de operações', help: 'Além de atender, gerencia filas, aprova mudanças e acompanha SLAs de toda a empresa.' },
+  { value: 'governance_manager', label: 'Gestor de governança', help: 'Mesmo acesso do Gestor de operações, mais controle sobre conteúdo restrito e políticas.' },
+  { value: 'company_admin', label: 'Administrador da empresa', help: 'Controla toda a configuração desta empresa, incluindo usuários e permissões.' },
+  { value: 'sysadmin', label: 'Administrador do ServiceFY', help: 'Acesso total, inclusive a outras empresas atendidas pelo provedor. Uso restrito ao suporte do ServiceFY.' },
 ]
 // Fase 27: roles que consomem uma licença de analista (seat) — mesma lista
 // usada pelo trigger tg_enforce_analyst_license_limit no banco.
@@ -732,15 +732,16 @@ export default function AdminDashboard({ refetchAppData, currentCompany, activeT
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Cor Primária</label>
-                  <input required type="text" value={tenantPrimary} onChange={e => setTenantPrimary(e.target.value)} className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-700 bg-white" />
+                  <input required type="text" value={tenantPrimary} onChange={e => setTenantPrimary(e.target.value)} placeholder="ex: #4f46e5" className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-700 bg-white" />
                 </div>
                 <div>
                   <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Cor Secundária</label>
-                  <input required type="text" value={tenantAccent} onChange={e => setTenantAccent(e.target.value)} className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-700 bg-white" />
+                  <input required type="text" value={tenantAccent} onChange={e => setTenantAccent(e.target.value)} placeholder="ex: #4f46e5" className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-700 bg-white" />
                 </div>
               </div>
+              <p className="text-[10px] text-slate-400">Cores usadas nos botões e destaques do portal deste cliente. Se não tiver certeza, use as cores da marca do cliente. Elas podem ser refinadas depois em Configurações → Identidade Visual.</p>
               <button type="submit" disabled={tenantSaving} className="w-full py-2.5 rounded-xl bg-slate-800 text-white font-bold text-xs mt-3 disabled:opacity-50">
-                {tenantSaving ? 'Salvando...' : 'Onboard Company'}
+                {tenantSaving ? 'Salvando...' : 'Criar Empresa'}
               </button>
             </form>
           </div>
@@ -804,7 +805,7 @@ export default function AdminDashboard({ refetchAppData, currentCompany, activeT
                           }
                         }}
                         className="min-h-9 min-w-0 flex-1 rounded-lg border border-slate-300 bg-white px-2 text-xs text-slate-700 sm:w-36 sm:flex-none"
-                        title="Gestor Direto"
+                        title="Gestor direto — usado para encaminhar aprovações e notificações dos chamados abertos por esta pessoa"
                       >
                         <option value="">Sem gestor</option>
                         {sameCompanyProfiles.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
@@ -830,7 +831,7 @@ export default function AdminDashboard({ refetchAppData, currentCompany, activeT
               <h2 className="text-base font-bold text-slate-950">Editar usuário</h2>
               <button type="button" onClick={() => setEditingUser(null)} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700" aria-label="Fechar edição"><X className="h-4 w-4" /></button>
             </div>
-            <p className="mb-4 mt-1 text-sm text-slate-500">Alterações no papel exigem que você seja administrador do tenant ou do provedor.</p>
+            <p className="mb-4 mt-1 text-sm text-slate-500">Alterar o nível de acesso de um usuário só é permitido para administradores desta empresa ou administradores do ServiceFY.</p>
             <form onSubmit={handleUpdateUser} className="space-y-3">
               <div>
                 <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Nome Completo</label>
@@ -845,15 +846,16 @@ export default function AdminDashboard({ refetchAppData, currentCompany, activeT
                 <input type="text" value={editingUser.department ?? ''} onChange={e => setEditingUser(current => current && ({ ...current, department: e.target.value }))} className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-700 bg-white" placeholder="ex: TI" />
               </div>
               <div>
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Papel de Acesso (RBAC)</label>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Nível de acesso</label>
                 <select value={editingUser.role} onChange={e => setEditingUser(current => current && ({ ...current, role: e.target.value as Role }))} className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-700 bg-white">
                   {assignableRoleOptions.some(option => option.value === editingUser.role)
                     ? null
                     : <option value={editingUser.role}>{editingUser.role} (papel não atribuível por você)</option>}
                   {assignableRoleOptions.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
                 </select>
+                <p className="mt-1 text-[10px] text-slate-400">{REAL_ROLE_OPTIONS.find(o => o.value === editingUser.role)?.help ?? 'Define o que esta pessoa pode ver e fazer no sistema.'} Pode ser alterado a qualquer momento.</p>
                 {LICENSE_CONSUMING_ROLES.includes(editingUser.role as Role) && (
-                  <p className="mt-1 text-[10px] text-slate-400">Este papel consome uma licença de analista.</p>
+                  <p className="mt-1 text-[10px] text-slate-400">Este papel usa uma licença de analista do seu plano. Se o limite for atingido, desative outro analista ou amplie o plano antes de salvar.</p>
                 )}
               </div>
               <button type="submit" disabled={userUpdating} className="mt-3 min-h-10 w-full rounded-lg bg-slate-950 px-4 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50">
@@ -888,16 +890,17 @@ export default function AdminDashboard({ refetchAppData, currentCompany, activeT
                 </select>
               </div>
               <div>
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Papel de Acesso (RBAC)</label>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Nível de acesso</label>
                 <select value={usrRole} onChange={e => setUsrRole(e.target.value as Role)} className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-700 bg-white">
                   {assignableRoleOptions.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
                 </select>
+                <p className="mt-1 text-[10px] text-slate-400">{REAL_ROLE_OPTIONS.find(o => o.value === usrRole)?.help ?? 'Define o que esta pessoa pode ver e fazer no sistema.'} Pode ser alterado a qualquer momento.</p>
                 {LICENSE_CONSUMING_ROLES.includes(usrRole) && (
-                  <p className="mt-1 text-[10px] text-slate-400">Este papel consome uma licença de analista.</p>
+                  <p className="mt-1 text-[10px] text-slate-400">Este papel usa uma licença de analista do seu plano. Se o limite for atingido, desative outro analista ou amplie o plano antes de salvar.</p>
                 )}
               </div>
               <div>
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Empresa / Tenant</label>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Empresa</label>
                 <select value={usrCompanyId} onChange={e => setUsrCompanyId(e.target.value)} className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-700 bg-white">
                   {rawCompanies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
@@ -1036,6 +1039,7 @@ export default function AdminDashboard({ refetchAppData, currentCompany, activeT
                       {/* Fundo Dropzone */}
                       <div>
                         <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Fundo do Portal</label>
+                        <p className="mb-1.5 text-[10px] text-slate-400">Imagem exibida atrás da tela de login e do portal do cliente.</p>
                         <div className="relative group rounded-2xl border-2 border-dashed border-slate-200 hover:border-indigo-400 bg-white transition-all overflow-hidden">
                           <input 
                             type="file" accept="image/*"
@@ -1060,8 +1064,8 @@ export default function AdminDashboard({ refetchAppData, currentCompany, activeT
                         </div>
                         {/* Fallback text input */}
                         <div className="mt-2 flex items-center gap-2">
-                          <span className="text-[10px] font-bold text-slate-400">CSS:</span>
-                          <input type="text" value={editingTenant.bg_color || ''} onChange={e => setEditingTenant({...editingTenant, bg_color: e.target.value})} className="flex-1 bg-transparent text-xs font-mono text-slate-500 border-b border-slate-200 focus:border-indigo-500 outline-none pb-0.5" placeholder="url(...) center/cover ou #hex"/>
+                          <span className="text-[10px] font-bold text-slate-400" title="Preencha apenas se souber CSS. Prefira 'Escolher Fundo' acima para enviar uma imagem.">Avançado:</span>
+                          <input type="text" value={editingTenant.bg_color || ''} onChange={e => setEditingTenant({...editingTenant, bg_color: e.target.value})} className="flex-1 bg-transparent text-xs font-mono text-slate-500 border-b border-slate-200 focus:border-indigo-500 outline-none pb-0.5" placeholder="Cor (#hex) — só preencha se souber CSS"/>
                         </div>
                       </div>
                     </div>

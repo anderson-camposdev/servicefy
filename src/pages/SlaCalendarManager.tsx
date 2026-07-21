@@ -240,6 +240,7 @@ export default function SlaCalendarManager({
                     <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Fuso horário</label>
                     <input value={editTz} onChange={e => setEditTz(e.target.value)} placeholder="America/Sao_Paulo"
                       className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-mono text-slate-600 outline-none focus:ring-2 focus:ring-indigo-500" />
+                    <p className="mt-1 text-[11px] text-slate-400">Fuso usado para calcular os turnos deste calendário. Ex.: America/Sao_Paulo, America/Manaus.</p>
                   </div>
                   <div className="md:col-span-3">
                     <label className="flex items-center gap-2 cursor-pointer select-none py-2.5">

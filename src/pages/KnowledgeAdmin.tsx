@@ -55,11 +55,11 @@ const STATUS_META: Record<KnowledgeStatus, { label: string; cls: string }> = {
   published: { label: 'Publicado', cls: 'bg-emerald-100 text-emerald-700' },
   archived:  { label: 'Arquivado', cls: 'bg-slate-200 text-slate-500' },
 }
-const VIS_META: Record<KnowledgeVisibility, { label: string }> = {
-  public:     { label: 'Público' },
-  tenant:     { label: 'Tenant' },
-  internal:   { label: 'Interno' },
-  restricted: { label: 'Restrito' },
+const VIS_META: Record<KnowledgeVisibility, { label: string; help: string }> = {
+  public:     { label: 'Público', help: 'Qualquer visitante do portal, mesmo sem estar logado' },
+  tenant:     { label: 'Toda a empresa', help: 'Todos os colaboradores logados desta empresa' },
+  internal:   { label: 'Interno', help: 'Apenas equipes de TI/atendimento' },
+  restricted: { label: 'Restrito', help: 'Só quem receber concessão de acesso' },
 }
 const PAGE = 12
 
@@ -886,6 +886,7 @@ function ArticleEditor({ companyId, article, categories, domains, activeRole, cu
                   <select value={visibility} onChange={event => setVisibility(event.target.value as KnowledgeVisibility)} className={`mt-1 ${inputCls}`}>
                     {(Object.keys(VIS_META) as KnowledgeVisibility[]).map(value => <option key={value} value={value}>{VIS_META[value].label}</option>)}
                   </select>
+                  <span className="mt-1 block text-[11px] font-normal normal-case tracking-normal text-slate-400">{VIS_META[visibility].help}</span>
                 </label>
                 <label className="block text-xs font-bold uppercase tracking-wide text-slate-500">Domínio de serviço
                   <select value={domainId} onChange={event => setDomainId(event.target.value)} className={`mt-1 ${inputCls}`}>
@@ -1036,7 +1037,7 @@ function VersionsPanel({ articleId }: { articleId: string }) {
         <div className="divide-y divide-slate-100">
           {versions.map(v => (
             <div key={v.id} className="py-3">
-              <p className="text-sm font-bold text-slate-700">v{v.version} · {v.status} · {v.visibility}</p>
+              <p className="text-sm font-bold text-slate-700">v{v.version} · {STATUS_META[v.status as KnowledgeStatus]?.label ?? v.status} · {VIS_META[v.visibility as KnowledgeVisibility]?.label ?? v.visibility}</p>
               <p className="text-xs text-slate-400">{new Date(v.created_at).toLocaleString('pt-BR')}</p>
               <p className="mt-1 truncate text-sm text-slate-500">{v.title}</p>
             </div>

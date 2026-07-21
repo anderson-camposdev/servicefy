@@ -309,7 +309,7 @@ export default function DepartmentManager({ companyId, cardClass, primaryColor }
                       <td className="p-4 text-sm">
                         {isEditing ? (
                           <div className="max-h-32 space-y-1 overflow-y-auto rounded border border-border bg-background p-2">
-                            <p className="text-[10px] uppercase tracking-wide text-content-muted">Nenhum marcado = visível para todos</p>
+                            <p className="text-[10px] uppercase tracking-wide text-content-muted">Se nenhuma equipe for marcada, este departamento aparece para todos no catálogo. Marque equipes para restringir a visibilidade só a elas.</p>
                             {groups.map(g => (
                               <label key={g.id} className="flex cursor-pointer items-center gap-2 text-xs">
                                 <input
@@ -325,10 +325,10 @@ export default function DepartmentManager({ companyId, cardClass, primaryColor }
                           </div>
                         ) : (
                           (dep.visible_to_groups?.length ?? 0) === 0 ? (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-sky-500/10 text-sky-500">Público</span>
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-sky-500/10 text-sky-500" title="Visível a todos os usuários">Público</span>
                           ) : (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-amber-500/10 text-amber-600" title={groups.filter(g => dep.visible_to_groups?.includes(g.id)).map(g => g.name).join(', ')}>
-                              <Users className="w-3 h-3" /> {dep.visible_to_groups!.length} grupo(s)
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-amber-500/10 text-amber-600" title={`Visível apenas a: ${groups.filter(g => dep.visible_to_groups?.includes(g.id)).map(g => g.name).join(', ')}`}>
+                              <Users className="w-3 h-3" /> {dep.visible_to_groups!.length} equipe(s)
                             </span>
                           )
                         )}

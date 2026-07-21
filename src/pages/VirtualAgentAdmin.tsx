@@ -196,13 +196,13 @@ function ActionsPanel({ companyId, actions, loading, onChanged, onError, onFlash
         </div>
         <div className="mt-4 space-y-3">
           {editingId ? (
-            <label className="block text-xs font-bold">Chave (action_key)<input value={form.actionKey} disabled title="Identificador usado internamente pelo agente virtual — não pode ser alterado após a criação." className="mt-1 w-full cursor-not-allowed rounded-xl border bg-slate-100 px-3 py-2.5 text-sm text-slate-500" /></label>
+            <label className="block text-xs font-bold">Identificador da ação<input value={form.actionKey} disabled title="Identificador usado internamente pelo agente virtual — não pode ser alterado após a criação." className="mt-1 w-full cursor-not-allowed rounded-xl border bg-slate-100 px-3 py-2.5 text-sm text-slate-500" /></label>
           ) : (
-            <label className="block text-xs font-bold">Chave (action_key)<input value={form.actionKey} onChange={e => setForm(f => ({ ...f, actionKey: e.target.value }))} className="mt-1 w-full rounded-xl border px-3 py-2.5 text-sm" placeholder="ex: reset_password" /></label>
+            <label className="block text-xs font-bold">Identificador da ação<input value={form.actionKey} onChange={e => setForm(f => ({ ...f, actionKey: e.target.value }))} className="mt-1 w-full rounded-xl border px-3 py-2.5 text-sm" placeholder="ex: redefinir-senha-vpn" /><span className="mt-1 block text-[11px] font-normal text-slate-400">Um código curto e único para esta ação — defina com cuidado, pois não poderá editá-lo depois de salvar.</span></label>
           )}
           <label className="block text-xs font-bold">Nome<input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} className="mt-1 w-full rounded-xl border px-3 py-2.5 text-sm" placeholder="Redefinir senha" /></label>
           <label className="block text-xs font-bold">Palavras-chave (vírgula)<input value={form.keywords} onChange={e => setForm(f => ({ ...f, keywords: e.target.value }))} className="mt-1 w-full rounded-xl border px-3 py-2.5 text-sm" placeholder="senha, redefinir, esqueci" /></label>
-          <label className="block text-xs font-bold">Confiança mínima (0–1)<input type="number" step="0.01" min="0" max="1" value={form.minConfidence} onChange={e => setForm(f => ({ ...f, minConfidence: Number(e.target.value) }))} className="mt-1 w-full rounded-xl border px-3 py-2.5 text-sm" /></label>
+          <label className="block text-xs font-bold">Confiança mínima para acionar<input type="number" step="0.01" min="0" max="1" value={form.minConfidence} onChange={e => setForm(f => ({ ...f, minConfidence: Number(e.target.value) }))} className="mt-1 w-full rounded-xl border px-3 py-2.5 text-sm" /><span className="mt-1 block text-[11px] font-normal text-slate-400">Quanto o robô precisa "ter certeza" de que entendeu o pedido para executar esta ação automaticamente. 0 = aciona com qualquer suspeita; 1 = só com certeza total. Recomendado: 0,15–0,30.</span></label>
           <label className="flex items-center gap-2 text-sm font-semibold"><input type="checkbox" checked={form.requiresConfirmation} onChange={e => setForm(f => ({ ...f, requiresConfirmation: e.target.checked }))} /> Exige confirmação (Sim/Não)</label>
           <label className="flex items-center gap-2 text-sm font-semibold"><input type="checkbox" checked={form.enabled} onChange={e => setForm(f => ({ ...f, enabled: e.target.checked }))} /> Ativa</label>
           <button onClick={() => void add()} className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-bold text-on-primary hover:opacity-90">{editingId ? <CheckCircle2 className="h-4 w-4" /> : <Plus className="h-4 w-4" />} {editingId ? 'Salvar alterações' : 'Adicionar ação'}</button>
@@ -221,7 +221,7 @@ function ActionsPanel({ companyId, actions, loading, onChanged, onError, onFlash
                   {a.name}
                   {a.requires_confirmation && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-700">Exige confirmação</span>}
                 </div>
-                <div className="truncate text-xs text-slate-500">{a.action_key} · confiança mín. {a.min_confidence} · {(a.config.keywords ?? []).join(', ') || 'sem palavras-chave'}</div>
+                <div className="truncate text-xs text-slate-500" title={`Identificador: ${a.action_key}`}>confiança mín. {Math.round(a.min_confidence * 100)}% · {(a.config.keywords ?? []).join(', ') || 'sem palavras-chave'}</div>
               </div>
               <button onClick={() => startEdit(a)} title="Editar" className="rounded-lg border p-1.5 text-slate-400 hover:bg-slate-50 hover:text-slate-900"><Edit2 className="h-3.5 w-3.5" /></button>
               <button onClick={() => void toggleEnabled(a)} className="rounded-lg border px-2.5 py-1 text-xs font-bold text-slate-600">{a.enabled ? 'Desativar' : 'Ativar'}</button>
