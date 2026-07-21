@@ -57,7 +57,7 @@ const section = (
 
 const SECTIONS: SettingsSection[] = [
   section('departments', 'organization', 'Departamentos e localidades', 'Hierarquia, gestores e localidades.', ['Departamentos', 'Visibilidade por grupo', 'Estrutura ESM'], { legacyTab: 'departments' }),
-  section('users', 'organization', 'Usuários e RBAC', 'Papéis e acesso do tenant.', ['Administrador do tenant', 'Papéis operacionais', 'Isolamento'], { legacyTab: 'users' }),
+  section('users', 'organization', 'Usuários e níveis de acesso', 'Papéis e acesso da empresa.', ['Administrador da empresa', 'Papéis operacionais', 'Isolamento'], { legacyTab: 'users' }),
   section('groups', 'organization', 'Equipes solucionadoras', 'Grupos, membros e filas.', ['Filas', 'Membros', 'Roteamento'], { legacyTab: 'groups' }),
   section('login_integration', 'organization', 'Integração de Login', 'SSO Microsoft/Google, domínios e política de acesso.', ['Microsoft Entra ID', 'Google Workspace', 'JIT end_user', 'SSO obrigatório']),
   section('domains', 'service_management', 'Domínios de serviço', 'TI, RH, Jurídico e Facilities.', ['Caso unificado', 'Domínios privados', 'Tipos configuráveis'], { entitlementKey: 'esm' }),
@@ -72,7 +72,7 @@ const SECTIONS: SettingsSection[] = [
   section('pending', 'sla_contracts', 'Motivos de pausa', 'Pausas auditáveis do SLA.', ['Pausa governada', 'Ação do cliente', 'Ledger'], { legacyTab: 'pending_reasons', entitlementKey: 'itsm' }),
   section('contracts', 'sla_contracts', 'Contratos e fornecedores', 'Contratos, OLA e direitos.', ['Contratos por serviço', 'OLA/UC', 'Entitlements'], { status: 'locked', entitlementKey: 'contracts' }),
   section('connections', 'channels', 'Conexões omnichannel', 'Microsoft, Google, WhatsApp e SMTP.', ['Canais próprios/compartilhados', 'Segredos write-only', 'Diagnóstico'], { entitlementKey: 'omnichannel' }),
-  section('smtp', 'channels', 'Configurações de E-mail', 'Servidor de envio por tenant.', ['TLS, SSL e conexão sem criptografia', 'Remetente configurável', 'Senha protegida'], { entitlementKey: 'omnichannel' }),
+  section('smtp', 'channels', 'Configurações de E-mail', 'Servidor de envio desta empresa.', ['TLS, SSL e conexão sem criptografia', 'Remetente configurável', 'Senha protegida'], { entitlementKey: 'omnichannel' }),
   section('routing', 'channels', 'Rotas e filas', 'Identificação, destinatários e fallback.', ['Roteamento', 'Fila ambígua MSP', 'Idempotência'], { entitlementKey: 'omnichannel' }),
   section('templates', 'channels', 'Templates e notificações', 'Mensagens por evento, canal e idioma.', ['Variáveis', 'Políticas de envio', 'Entrega'], { entitlementKey: 'omnichannel' }),
   section('knowledge', 'knowledge_ai', 'Base de conhecimento', 'Artigos, revisão e publicação.', ['Publicação', 'Feedback', 'Uso pelo agente'], { entitlementKey: 'knowledge' }),
@@ -94,7 +94,17 @@ const storageList = (key: string): string[] => {
 export default function SettingsCenter({ companyId, activeRole, onNavigate }: Props) {
   const { companies } = useAppData()
   const isSysAdmin = activeRole === 'sysadmin'
-  const [targetCompanyId, setTargetCompanyId] = useState(isSysAdmin ? '' : companyId)
+  const [targetCompanyId, setTargetCompanyId] = useState(companyId)
+
+  // O tenant ativo já vem definido pelo seletor do cabeçalho (App.tsx →
+  // currentCompany.id). Antes, sysadmin sempre começava sem tenant e
+  // precisava escolher de novo a cada vez que este componente remontava
+  // (trocar de tela e voltar, trocar de categoria) — mesma classe de bug já
+  // corrigida em ThemeProvider.tsx: estado local ignorando o tenant já
+  // resolvido. Sincroniza sempre que o prop mudar (ex.: troca no cabeçalho).
+  useEffect(() => {
+    setTargetCompanyId(companyId)
+  }, [companyId])
   const [query, setQuery] = useState('')
   const [activeGroup, setActiveGroup] = useState<(typeof SETTINGS_GROUPS)[number]['key']>('access')
   const [selected, setSelected] = useState<SettingsSection | null>(null)
@@ -149,8 +159,8 @@ export default function SettingsCenter({ companyId, activeRole, onNavigate }: Pr
   if (!targetCompanyId) return (
     <div className="max-w-3xl mx-auto p-8"><div className="rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
       <Building2 className="w-10 h-10 text-indigo-600 mb-4" />
-      <h1 className="text-2xl font-black text-slate-900">Selecione o tenant</h1>
-      <p className="text-sm text-slate-500 mt-2 mb-6">O contexto explícito é obrigatório antes de qualquer operação administrativa.</p>
+      <h1 className="text-2xl font-black text-slate-900">Selecione a empresa</h1>
+      <p className="text-sm text-slate-500 mt-2 mb-6">Escolher a empresa explicitamente evita alterar a configuração de um cliente errado.</p>
       <select value={targetCompanyId} onChange={event => setTargetCompanyId(event.target.value)} className="w-full rounded-xl border border-slate-300 px-4 py-3 bg-white">
         <option value="">Escolha uma empresa…</option>
         {companies.filter(company => company.active).map(company => <option key={company.id} value={company.id}>{company.name} · {company.domain}</option>)}
@@ -224,7 +234,7 @@ export default function SettingsCenter({ companyId, activeRole, onNavigate }: Pr
     <SettingsPageShell
       title={selected.title}
       description={selected.description}
-      scopeLabel={companies.find(company => company.id === targetCompanyId)?.name ?? 'Tenant selecionado'}
+      scopeLabel={companies.find(company => company.id === targetCompanyId)?.name ?? 'Empresa selecionada'}
       onBack={() => setSelected(null)}
       status={<span className="rounded-md bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700">Ativo</span>}
     >
@@ -238,7 +248,7 @@ export default function SettingsCenter({ companyId, activeRole, onNavigate }: Pr
     <SettingsPageShell
       title={selected.title}
       description={selected.description}
-      scopeLabel={companies.find(company => company.id === targetCompanyId)?.name ?? 'Tenant selecionado'}
+      scopeLabel={companies.find(company => company.id === targetCompanyId)?.name ?? 'Empresa selecionada'}
       onBack={() => setSelected(null)}
       status={selected.status === 'locked'
         ? <span className="inline-flex items-center gap-1 rounded-md bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-700"><Lock className="h-3.5 w-3.5" /> Módulo não contratado</span>
@@ -255,7 +265,7 @@ export default function SettingsCenter({ companyId, activeRole, onNavigate }: Pr
         <div className="border-t border-slate-200 p-5">
           {selected.status === 'locked'
             ? <button className="min-h-10 rounded-lg bg-slate-950 px-4 text-sm font-semibold text-white hover:bg-slate-800">Solicitar habilitação</button>
-            : <p className="text-sm font-medium text-emerald-700">Módulo disponível para este tenant.</p>}
+            : <p className="text-sm font-medium text-emerald-700">Módulo disponível para esta empresa.</p>}
         </div>
       </section>
     </SettingsPageShell>
@@ -270,8 +280,8 @@ export default function SettingsCenter({ companyId, activeRole, onNavigate }: Pr
   return (
     <div className="h-full overflow-y-auto bg-background p-4 sm:p-6 lg:p-8"><div className="mx-auto max-w-6xl">
       <header className="flex flex-wrap items-start justify-between gap-5 border-b border-outline-variant pb-6">
-        <div><h1 className="text-2xl font-bold text-on-surface">Central de Configurações</h1><p className="mt-1 max-w-2xl text-sm text-on-surface-variant">Encontre uma capacidade, revise o estado do tenant e continue de onde parou.</p></div>
-        {isSysAdmin && <label className="text-xs font-semibold text-on-surface-variant">Tenant<select value={targetCompanyId} onChange={event => setTargetCompanyId(event.target.value)} className="mt-1 block rounded-lg border border-outline-variant bg-surface px-3 py-2 text-sm font-semibold text-on-surface">{companies.filter(company => company.active).map(company => <option key={company.id} value={company.id}>{company.name}</option>)}</select></label>}
+        <div><h1 className="text-2xl font-bold text-on-surface">Central de Configurações</h1><p className="mt-1 max-w-2xl text-sm text-on-surface-variant">Encontre uma capacidade, revise o estado da empresa e continue de onde parou.</p></div>
+        {isSysAdmin && <label className="text-xs font-semibold text-on-surface-variant">Empresa<select value={targetCompanyId} onChange={event => setTargetCompanyId(event.target.value)} className="mt-1 block rounded-lg border border-outline-variant bg-surface px-3 py-2 text-sm font-semibold text-on-surface">{companies.filter(company => company.active).map(company => <option key={company.id} value={company.id}>{company.name}</option>)}</select></label>}
       </header>
       <div className="relative mt-6"><Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-on-surface-variant" /><input value={query} onChange={event => setQuery(event.target.value)} placeholder="Buscar usuários, SLA, WhatsApp, CMDB ou LGPD" className="w-full rounded-xl border border-outline-variant bg-surface py-3 pl-12 pr-4 text-sm text-on-surface outline-none focus:border-primary focus:ring-2 focus:ring-primary/20" /></div>
       {!isOperationalOnly && connections.some(item => item.rotationRequired) && (
