@@ -247,6 +247,29 @@ export const profilesService = {
     const { error } = await supabase.rpc('batch_invite_users', { p_payload: payload as unknown as Json })
     if (error) throw error
   },
+
+  /**
+   * Cria uma conta de administrador (sysadmin/company_admin) com login
+   * local de verdade — diferente de `create()`, que só insere a linha em
+   * profiles e depende do primeiro login SSO (JIT) para virar uma conta
+   * capaz de logar. Existe para o mecanismo de quebra-vidro: contas
+   * administrativas não podem depender de SSO estar no ar. A pessoa
+   * recebe um e-mail de convite e define a própria senha.
+   */
+  async createLocalAdmin(payload: {
+    name: string
+    email: string
+    role: 'sysadmin' | 'company_admin'
+    companyId: string
+    department?: string | null
+    managerId?: string | null
+  }): Promise<void> {
+    const { data, error } = await supabase.functions.invoke('admin-create-local-user', {
+      body: payload,
+    })
+    if (error) throw error
+    if (!data?.success) throw new Error(data?.message || 'Falha ao criar administrador local.')
+  },
 }
 
 // ─── INCIDENTS ────────────────────────────────────────────────

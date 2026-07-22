@@ -15,6 +15,7 @@ import type { CompanyRow, ProfileRow } from '../lib/database.types'
 import {
   getAuthProfile,
   isProviderUser,
+  canUseLocalLoginBreakGlass,
   signInWithPassword,
   signInWithOAuth,
   requestPasswordRecovery,
@@ -133,7 +134,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setStatus('loading')
     setError(null)
     try {
-      await signInWithPassword(email, password)
+      const { user } = await signInWithPassword(email, password)
+      // Quebra-vidro (ver authService.canUseLocalLoginBreakGlass): esta
+      // checagem só se aplica ao login por senha — signInWithProvider
+      // (SSO) nunca passa por aqui, então a política de SSO obrigatório
+      // nunca bloqueia quem já está entrando pelo caminho que ela exige.
+      if (user) {
+        const authProfile = await getAuthProfile(user.id)
+        const ssoRequired = authProfile?.company?.allow_local_login === false
+        if (ssoRequired && !canUseLocalLoginBreakGlass(authProfile)) {
+          await authSignOut()
+          throw new Error('Esta empresa exige login corporativo (SSO). Apenas contas de administrador têm acesso de emergência por e-mail e senha.')
+        }
+      }
       // onAuthStateChange dispara o carregamento do profile.
     } catch (err: unknown) {
       setStatus('unauthenticated')

@@ -43,6 +43,14 @@ export default function TenantLoginScreen({
   const [oauthSubmitting, setOauthSubmitting] = useState<SsoProvider | null>(null)
   const [logoFailed, setLogoFailed] = useState(false)
   const [recovering, setRecovering] = useState(false)
+  // Quebra-vidro: quando a empresa exige SSO (allowLocalLogin=false), o
+  // formulário de e-mail/senha fica escondido por padrão — mas sysadmin e
+  // company_admin ainda precisam conseguir entrar se o SSO cair. Este link
+  // discreto revela o mesmo formulário; a autorização de fato acontece no
+  // backend (AuthContext.signIn/canUseLocalLoginBreakGlass), que desloga
+  // na hora qualquer conta que não seja admin — este toggle é só UX,
+  // não é a camada de segurança.
+  const [breakGlassRevealed, setBreakGlassRevealed] = useState(false)
   const [recoveryEmail, setRecoveryEmail] = useState('')
   const [recoverySent, setRecoverySent] = useState(false)
   const [newPassword, setNewPassword] = useState('')
@@ -165,7 +173,7 @@ export default function TenantLoginScreen({
             </div>
           )}
 
-          {!recoveryMode && !recovering && providers.length > 0 && allowLocalLogin && (
+          {!recoveryMode && !recovering && providers.length > 0 && (allowLocalLogin || breakGlassRevealed) && (
             <div className="my-5 flex items-center gap-3 text-xs font-medium text-slate-500">
               <span className="h-px flex-1 bg-slate-200" /> ou entre com e-mail e senha <span className="h-px flex-1 bg-slate-200" />
             </div>
@@ -183,8 +191,13 @@ export default function TenantLoginScreen({
               <div><label htmlFor="recovery-email" className="mb-2 block text-xs font-extrabold text-slate-700">E-mail para recuperação</label><input id="recovery-email" type="email" autoComplete="email" value={recoveryEmail} onChange={event => setRecoveryEmail(event.target.value)} className="h-14 w-full rounded-xl border border-outline-variant bg-surface px-4 text-sm outline-none" /></div>
               <button type="submit" disabled={busy} className="h-14 w-full rounded-xl text-sm font-bold text-white disabled:opacity-55" style={{ background: 'var(--brand-primary)' }}>Enviar instruções</button>
             </form>
-          ) : allowLocalLogin ? (
+          ) : allowLocalLogin || breakGlassRevealed ? (
           <form onSubmit={handleSubmit} className="space-y-5" noValidate>
+            {!allowLocalLogin && (
+              <div className="rounded-2xl border border-amber-100 bg-amber-50 p-3 text-xs font-semibold leading-5 text-amber-800">
+                Acesso de emergência: só entra por aqui quem tem conta de administrador. Contas comuns continuam exigindo SSO.
+              </div>
+            )}
             <div>
               <label htmlFor="tenant-login-email" className="mb-2 block text-xs font-extrabold text-slate-700">E-mail corporativo</label>
               <div className="group relative">
@@ -214,8 +227,13 @@ export default function TenantLoginScreen({
             {onRequestPasswordRecovery && <button type="button" onClick={() => { setRecovering(true); setLocalError('') }} className="w-full text-center text-xs font-bold text-[var(--brand-primary)]">Esqueci minha senha</button>}
           </form>
           ) : (
-            <div className="mt-5 rounded-2xl border border-indigo-100 bg-indigo-50 p-4 text-center text-xs font-semibold leading-5 text-indigo-800">
-              Sua empresa exige autenticação corporativa via SSO.
+            <div className="mt-5 space-y-3">
+              <div className="rounded-2xl border border-indigo-100 bg-indigo-50 p-4 text-center text-xs font-semibold leading-5 text-indigo-800">
+                Sua empresa exige autenticação corporativa via SSO.
+              </div>
+              <button type="button" onClick={() => setBreakGlassRevealed(true)} className="w-full text-center text-[11px] font-semibold text-slate-400 hover:text-slate-600">
+                Sou administrador e preciso de acesso de emergência
+              </button>
             </div>
           )}
           <div className="mt-8 border-t border-slate-200 pt-6 text-center">

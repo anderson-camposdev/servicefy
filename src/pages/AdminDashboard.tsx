@@ -529,6 +529,7 @@ export default function AdminDashboard({ refetchAppData, currentCompany, activeT
   const [usrDept, setUsrDept] = useState('')
   const [usrManagerId, setUsrManagerId] = useState('')
   const [usrCompanyId, setUsrCompanyId] = useState(currentCompany.id)
+  const [usrLocalLogin, setUsrLocalLogin] = useState(true)
   const [usrSaving, setUsrSaving] = useState(false)
   const [showUserForm, setShowUserForm] = useState(false)
   const [userQuery, setUserQuery] = useState('')
@@ -599,22 +600,40 @@ export default function AdminDashboard({ refetchAppData, currentCompany, activeT
     }
   }
 
+  const isBreakGlassRole = usrRole === 'sysadmin' || usrRole === 'company_admin'
+
   const handleSaveUser = async (e: React.FormEvent) => {
     e.preventDefault()
     setUsrSaving(true)
     try {
-      const payload: any = {
-        name: usrName,
-        email: usrEmail,
-        role: usrRole,
-        department: usrDept || null,
-        company_id: usrCompanyId,
-        avatar_url: `https://api.dicebear.com/7.x/avataaars/svg?seed=${usrName.split(' ')[0]}`,
-        active: true,
-        manager_id: usrManagerId || null,
+      if (isBreakGlassRole && usrLocalLogin) {
+        // Quebra-vidro: cria auth.users + profiles já vinculados, com
+        // convite por e-mail para a pessoa definir a própria senha — não
+        // depende do primeiro login SSO (JIT) para virar uma conta capaz
+        // de logar. Ver supabase/functions/admin-create-local-user.
+        await profilesService.createLocalAdmin({
+          name: usrName,
+          email: usrEmail,
+          role: usrRole,
+          companyId: usrCompanyId,
+          department: usrDept || null,
+          managerId: usrManagerId || null,
+        })
+        toast.success('Convite enviado! A pessoa define a própria senha ao acessar o link recebido por e-mail.')
+      } else {
+        const payload: any = {
+          name: usrName,
+          email: usrEmail,
+          role: usrRole,
+          department: usrDept || null,
+          company_id: usrCompanyId,
+          avatar_url: `https://api.dicebear.com/7.x/avataaars/svg?seed=${usrName.split(' ')[0]}`,
+          active: true,
+          manager_id: usrManagerId || null,
+        }
+        await profilesService.create(payload)
+        toast.success('Usuário cadastrado com sucesso!')
       }
-      await profilesService.create(payload)
-      toast.success('Usuário cadastrado com sucesso!')
       setUsrName('')
       setUsrEmail('')
       setUsrDept('')
@@ -899,6 +918,14 @@ export default function AdminDashboard({ refetchAppData, currentCompany, activeT
                   <p className="mt-1 text-[10px] text-slate-400">Este papel usa uma licença de analista do seu plano. Se o limite for atingido, desative outro analista ou amplie o plano antes de salvar.</p>
                 )}
               </div>
+              {isBreakGlassRole && (
+                <label className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+                  <input type="checkbox" checked={usrLocalLogin} onChange={e => setUsrLocalLogin(e.target.checked)} className="mt-0.5 h-4 w-4 rounded border-amber-300 text-amber-600" />
+                  <span>
+                    <span className="font-bold">Criar com login local (sem depender de SSO).</span> Recomendado para contas de administrador: a pessoa recebe um convite por e-mail para definir a própria senha, e consegue entrar mesmo se o SSO da empresa estiver fora do ar. Desmarque para depender só do login SSO/JIT, como os demais usuários.
+                  </span>
+                </label>
+              )}
               <div>
                 <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Empresa</label>
                 <select value={usrCompanyId} onChange={e => setUsrCompanyId(e.target.value)} className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-700 bg-white">

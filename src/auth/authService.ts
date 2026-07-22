@@ -16,6 +16,19 @@ export interface AuthProfile {
 }
 
 /**
+ * Quebra-vidro: mesmo quando a empresa exige SSO (allow_local_login =
+ * false), sysadmin e company_admin sempre podem entrar por e-mail/senha.
+ * Sem essa exceção, se o provedor de SSO cair ou for mal configurado,
+ * ninguém da empresa — nem quem administra a própria configuração de
+ * SSO — consegue entrar para corrigir a situação.
+ */
+export const BREAK_GLASS_ROLES = new Set(['sysadmin', 'company_admin'])
+
+export function canUseLocalLoginBreakGlass(authProfile: AuthProfile | null): boolean {
+  return Boolean(authProfile && BREAK_GLASS_ROLES.has(authProfile.profile.role))
+}
+
+/**
  * Carrega o profile do usuário autenticado a partir do auth_id
  * (= auth.users.id). Junta a empresa completa para o branding e
  * para sabermos se é provedor MSP. Retorna null quando ainda não
