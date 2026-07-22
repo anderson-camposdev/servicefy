@@ -129,8 +129,12 @@ Deno.serve(async (request) => {
       return json({ success: false, message: 'Já existe uma conta de login para este e-mail nesta empresa.' }, 409)
     }
 
+    // O link de invite dispara o evento SIGNED_IN do Supabase Auth (não
+    // PASSWORD_RECOVERY) ao ser aberto — sem esse marcador na URL o
+    // AuthContext não teria como saber que essa sessão ainda não tem
+    // senha definida e deixaria a pessoa cair direto no dashboard.
     const { data: invited, error: inviteError } = await admin.auth.admin.inviteUserByEmail(payload.email, {
-      redirectTo: `${request.headers.get('origin') ?? SUPABASE_URL}/`,
+      redirectTo: `${request.headers.get('origin') ?? SUPABASE_URL}/?invite=1`,
       data: { name: payload.name },
     })
     if (inviteError || !invited?.user) {

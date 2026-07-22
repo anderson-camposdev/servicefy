@@ -4,11 +4,6 @@ export type UserRole =
   | 'agent'
   | 'ops_manager'
   | 'governance_manager'
-  | 'technician'
-  | 'area_manager'
-  | 'it_manager'
-  | 'client_manager'
-  | 'cio'
   | 'end_user';
 
 export interface InviteUserPayload {

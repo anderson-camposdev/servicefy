@@ -11,11 +11,6 @@ export type Role =
   | 'agent'              // Agente / Técnico operacional
   | 'ops_manager'        // Gestor de Operação (KB: revisão/publicação; tickets: vê tudo)
   | 'governance_manager' // Gestor de Governança (KB: aprovação/concessões; tickets: vê tudo)
-  | 'technician'         // Analista operacional
-  | 'area_manager'       // Gerente de Torre Técnica (ex: Sistemas, Infra)
-  | 'it_manager'         // Gerente Geral de TI / Operações
-  | 'client_manager'     // Gestor de Contrato no Cliente
-  | 'cio'                // Executivo de TI
   | 'end_user';          // Usuário Final (abre chamados e vê catálogo)
 
 export interface Group {

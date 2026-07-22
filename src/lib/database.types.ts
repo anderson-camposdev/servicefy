@@ -7,7 +7,7 @@ export type Json = string | number | boolean | null | { [key: string]: Json } | 
 
 // ─── Enums ────────────────────────────────────────────────────
 export type TicketPriority   = 'P1 - Critical' | 'P2 - High' | 'P3 - Moderate' | 'P4 - Low' | 'P5 - Planning'
-export type UserRole         = 'sysadmin' | 'company_admin' | 'agent' | 'ops_manager' | 'governance_manager' | 'end_user' | 'technician' | 'area_manager' | 'it_manager' | 'client_manager' | 'cio'
+export type UserRole         = 'sysadmin' | 'company_admin' | 'agent' | 'ops_manager' | 'governance_manager' | 'end_user'
 export type IncidentState    = 'New' | 'In Progress' | 'On Hold' | 'Pending User' | 'Resolved' | 'Closed'
 export type IncidentCategory = 'Hardware' | 'Software' | 'Network' | 'Database' | 'Security' | 'Inquiry' | 'Other'
 export type RequestState     = 'Draft' | 'Awaiting Approval' | 'Approved' | 'In Fulfillment' | 'Fulfilled' | 'Rejected' | 'Cancelled'

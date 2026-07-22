@@ -60,7 +60,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isProvider, setIsProvider] = useState(false)
   const [status, setStatus] = useState<AuthStatus>('loading')
   const [error, setError] = useState<string | null>(null)
-  const [recoveryMode, setRecoveryMode] = useState(false)
+  // Link de convite (admin-create-local-user) dispara SIGNED_IN, não
+  // PASSWORD_RECOVERY — sem este marcador de URL a sessão do convite
+  // seria tratada como um login comum e a pessoa nunca definiria senha.
+  const [recoveryMode, setRecoveryMode] = useState(
+    () => new URLSearchParams(window.location.search).get('invite') === '1'
+  )
 
   const loadProfile = useCallback(async (activeSession: Session | null) => {
     if (!activeSession?.user) {
@@ -93,6 +98,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let active = true
     let authEventReceived = false
+
+    if (new URLSearchParams(window.location.search).get('invite') === '1') {
+      const url = new URL(window.location.href)
+      url.searchParams.delete('invite')
+      window.history.replaceState(window.history.state, '', url.toString())
+    }
 
     void supabase.auth.getSession()
       .then(({ data }) => validateStoredSession(data.session))

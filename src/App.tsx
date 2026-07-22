@@ -1,17 +1,16 @@
-import { lazy, Suspense, useState, useMemo, useEffect } from 'react'
+﻿import { lazy, Suspense, useState, useMemo, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { Plus, Settings, ShieldAlert, ClipboardList, AlertOctagon, RefreshCw, Home, BarChart3, CircleCheckBig, TrendingUp, Code2, BookOpen } from 'lucide-react'
 import { useBranding, useToast } from './context'
 import type { AppView, User, Company, Role } from './types'
-import { useIncidents } from './hooks/useIncidents'
-import { useAppData, useProblems, useChanges } from './hooks/useDbData'
+import { useAppData, useProblems } from './hooks/useDbData'
 import { useRealtimeNotifications } from './hooks/useRealtimeNotifications'
 import GlobalSearchSpotlight from './components/portal/GlobalSearchSpotlight'
 import AppNavigation, { type AppNavigationItem } from './components/AppNavigation'
 import Login from './pages/auth/Login'
 import { usePersistentState } from './hooks/usePersistentState'
 import type { ProblemRow, ProblemState, CompanyRow, ProfileRow, TicketPriority, IncidentCategory, IncidentRow } from './lib/database.types'
-import { incidentsService, cioService, problemsService } from './lib/services'
+import { incidentsService, problemsService } from './lib/services'
 import { translateState } from './lib/statusLabels'
 import { useTenant } from './tenant'
 import { setTenantOverride } from './tenant/resolveTenant'
@@ -652,331 +651,6 @@ function ProblemDashboard({ companyId }: { companyId: string }) {
   )
 }
 
-
-// ─── CIO DASHBOARD ───────────────────────────────────────────
-
-function CIODashboard({ companyId, ticketType: _ticketType }: { companyId: string; ticketType?: 'incident' | 'request' }) {
-  const [metrics, setMetrics] = useState<any>(null)
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    setLoading(true)
-    cioService.getMetrics(companyId).then(res => {
-      setMetrics(res)
-    }).catch(console.error).finally(() => setLoading(false))
-  }, [companyId])
-
-  if (loading) return <div className="text-center py-12 text-slate-400 animate-pulse">Carregando métricas executivas CIO...</div>
-
-  return (
-    <div>
-      <PageHeader title="CIO Executive Strategic Dashboard" subtitle="Disponibilidade consolidada de sistemas, MTTR e riscos de governança CAB" />
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <StatCard label="Disponibilidade TI" value={`${metrics?.availability || 99.85}%`} accent="bg-emerald-50 text-emerald-600" icon={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>} />
-        <StatCard label="MTTR Médio" value={`${metrics?.mttr || 2.4}h`} accent="bg-blue-50 text-blue-600" icon={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>} />
-        <StatCard label="Problemas Ativos" value={metrics?.activeProblems || 0} accent="bg-red-50 text-red-600" icon={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>} />
-        <StatCard label="CAB Risco Crítico" value={metrics?.cabRiskCount || 0} accent="bg-amber-50 text-amber-600" icon={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" /></svg>} />
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
-          <h3 className="text-slate-800 font-bold text-xs uppercase tracking-widest border-b border-slate-100 pb-3 mb-4">Eficiência & Qualidade (MTTR)</h3>
-          <p className="text-slate-500 text-xs leading-relaxed">
-            Indicador com base no tempo de resolução real de incidentes. Meta da operação: <strong>menor que 3.0 horas</strong>. O índice atual de <strong>{metrics?.mttr}h</strong> indica eficiência de atendimento.
-          </p>
-          <div className="mt-4 bg-slate-50 p-4 rounded-xl border border-slate-100 text-xs space-y-2 text-slate-600 font-semibold">
-            <div className="flex justify-between"><span>Incidentes Totais:</span> <span className="text-slate-800">{metrics?.totalIncidents}</span></div>
-            <div className="flex justify-between"><span>Incidente de Maior Impacto:</span> <span className="text-red-500">Banco de Dados (Resolvido)</span></div>
-          </div>
-        </div>
-        <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
-          <h3 className="text-slate-800 font-bold text-xs uppercase tracking-widest border-b border-slate-100 pb-3 mb-4">Disponibilidade Agregada</h3>
-          <p className="text-slate-500 text-xs leading-relaxed">
-            Sistemas críticos operando acima do SLA acordado de <strong>99.50%</strong>. A disponibilidade agregada do tenant é de <strong>{metrics?.availability}%</strong>.
-          </p>
-          <div className="mt-4 bg-slate-50 p-4 rounded-xl border border-slate-100 text-xs space-y-2 text-slate-600 font-semibold">
-            <div className="flex justify-between"><span>Disponibilidade Rede:</span> <span className="text-emerald-600">99.92%</span></div>
-            <div className="flex justify-between"><span>Disponibilidade Banco:</span> <span className="text-emerald-600">99.87%</span></div>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// ─── CLIENT MANAGER DASHBOARD ────────────────────────────────
-
-function ClientManagerDashboard({ companyId, ticketType }: { companyId: string; ticketType?: 'incident' | 'request' }) {
-  const { incidents, kpis: incKPIs, loading: incLoading } = useIncidents(companyId, undefined, ticketType)
-
-  if (incLoading) return <div className="text-center py-12 text-slate-400 animate-pulse">Carregando painel do cliente...</div>
-
-  const isReq = ticketType === 'request'
-
-  return (
-    <div>
-      <PageHeader 
-        title={isReq ? "Painel de Performance de Requisições" : "Painel de Performance de Incidentes"} 
-        subtitle={isReq ? "Acompanhamento operacional de SLAs e requisições do catálogo da sua empresa" : "Acompanhamento operacional de incidentes e SLAs da sua empresa"} 
-      />
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <StatCard label="Total Chamados" value={incidents.length} accent="bg-slate-100 text-slate-500" icon={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>} />
-        <StatCard label="Em Andamento" value={incKPIs.inProgress} accent="bg-indigo-50 text-indigo-600" icon={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>} />
-        <StatCard label="SLA Violado" value={incKPIs.slaBreached} accent="bg-red-50 text-red-600" icon={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>} />
-        <StatCard label="Críticos P1" value={incKPIs.critical} accent="bg-amber-50 text-amber-600" icon={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>} />
-      </div>
-
-      <div className="bg-white border border-slate-200 rounded-2xl p-6 overflow-hidden">
-        <h3 className="text-slate-800 font-bold text-xs uppercase tracking-widest border-b border-slate-100 pb-3 mb-4">
-          {isReq ? "Requisições Ativas da sua Empresa" : "Incidentes Ativos da sua Empresa"}
-        </h3>
-        <table className="w-full text-left text-xs">
-          <thead>
-            <tr className="text-slate-400 font-bold uppercase border-b border-slate-100">
-              <th className="py-2">Número</th>
-              <th className="py-2">Descrição</th>
-              <th className="py-2">Prioridade</th>
-              <th className="py-2">Estado</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-50">
-            {incidents.slice(0, 5).map(i => (
-              <tr key={i.id} className="py-2">
-                <td className="py-2.5 font-mono text-emerald-600 font-bold">{i.number}</td>
-                <td className="py-2.5 text-slate-700">{i.short_description}</td>
-                <td className="py-2.5">{i.priority}</td>
-                <td className="py-2.5"><StateBadge state={i.state} /></td>
-              </tr>
-            ))}
-            {incidents.length === 0 && (
-              <tr><td colSpan={4} className="py-6 text-center text-slate-400">Nenhum chamado ativo encontrado.</td></tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  )
-}
-
-// ─── IT MANAGER DASHBOARD ────────────────────────────────────
-
-function ITManagerDashboard({ companyId, ticketType }: { companyId: string; ticketType?: 'incident' | 'request' }) {
-  const { kpis: incKPIs, loading: incLoading } = useIncidents(companyId, undefined, ticketType)
-  const { changes, kpis: chgKPIs, loading: chgLoading } = useChanges(companyId)
-
-  if (incLoading || chgLoading) return <div className="text-center py-12 text-slate-400 animate-pulse">Carregando painel do gerente de TI...</div>
-
-  const isReq = ticketType === 'request'
-
-  return (
-    <div>
-      <PageHeader 
-        title={isReq ? "IT Operations Manager Panel - Requisições" : "IT Operations Manager Panel - Incidentes"} 
-        subtitle={isReq ? "Acompanhamento geral de SLAs operacionais e requisições" : "Acompanhamento geral de SLAs operacionais e incidentes"} 
-      />
-      
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <StatCard label="Aprovação CAB" value={chgKPIs.awaitingCAB} accent="bg-amber-50 text-amber-600" icon={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" /></svg>} />
-        <StatCard label="Mudanças Agendadas" value={chgKPIs.scheduled} accent="bg-sky-50 text-sky-600" icon={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>} />
-        <StatCard label={isReq ? "SLA Violado (Requisições)" : "SLA Violado (Incidentes)"} value={incKPIs.slaBreached} accent="bg-red-50 text-red-600" icon={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>} />
-        <StatCard label="Em Atendimento" value={incKPIs.inProgress} accent="bg-emerald-50 text-emerald-600" icon={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>} />
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
-          <h3 className="text-slate-800 font-bold text-xs uppercase tracking-widest border-b border-slate-100 pb-3 mb-4">Aprovações CAB Pendentes</h3>
-          <div className="space-y-3">
-            {changes.filter(c => c.state === 'Awaiting CAB Approval').map(c => (
-              <div key={c.id} className="flex justify-between items-center text-xs p-3 bg-slate-50 border border-slate-100 rounded-xl">
-                <div>
-                  <span className="font-mono text-violet-600 font-bold">{c.number}</span>
-                  <div className="text-slate-700 font-medium">{c.short_description}</div>
-                </div>
-                <span className="text-[10px] bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 rounded uppercase font-semibold">Aguardando CAB</span>
-              </div>
-            ))}
-            {changes.filter(c => c.state === 'Awaiting CAB Approval').length === 0 && (
-              <div className="text-slate-400 text-xs italic text-center py-4">Nenhuma mudança pendente de aprovação.</div>
-            )}
-          </div>
-        </div>
-
-        <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
-          <h3 className="text-slate-800 font-bold text-xs uppercase tracking-widest border-b border-slate-100 pb-3 mb-4">SLAs Operacionais Gerais</h3>
-          <div className="space-y-3 text-xs">
-            <div className="flex justify-between items-center bg-slate-50 p-2.5 rounded-xl">
-              <span>{isReq ? "Requisições P1 Críticas Ativas:" : "Incidentes P1 Críticos Ativos:"}</span>
-              <span className="font-bold text-red-600">{incKPIs.critical}</span>
-            </div>
-            <div className="flex justify-between items-center bg-slate-50 p-2.5 rounded-xl">
-              <span>{isReq ? "Total Requisições em Andamento:" : "Total Incidentes em Andamento:"}</span>
-              <span className="font-bold text-emerald-600">{incKPIs.inProgress}</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// ─── AREA MANAGER DASHBOARD ──────────────────────────────────
-
-function AreaManagerDashboard({ companyId, ticketType }: { companyId: string; ticketType?: 'incident' | 'request' }) {
-  const { incidents, loading: incLoading } = useIncidents(companyId, undefined, ticketType)
-  const [selectedTower, setSelectedTower] = useState<'Infrastructure' | 'Database'>('Infrastructure')
-
-  const filteredIncidents = useMemo(() => {
-    return incidents.filter(i => {
-      if (selectedTower === 'Infrastructure') {
-        return i.assigned_group_name === 'Redes e Infraestrutura' || i.assigned_group_name === 'Service Desk'
-      } else {
-        return i.assigned_group_name === 'Banco de Dados' || i.assigned_group_name === 'Help Desk'
-      }
-    })
-  }, [incidents, selectedTower])
-
-  if (incLoading) return <div className="text-center py-12 text-slate-400 animate-pulse">Carregando painel da torre técnica...</div>
-
-  return (
-    <div>
-      <PageHeader 
-        title={ticketType === 'request' ? "Area / Technical Tower Manager Panel - Requisições" : "Area / Technical Tower Manager Panel - Incidentes"} 
-        subtitle={ticketType === 'request' ? "Fila de requisições e SLAs específicos por torre operacional (Infra vs Sistemas)" : "Fila de incidentes e SLAs específicos por torre operacional (Infra vs Sistemas)"} 
-      />
-      
-      {/* Tower Toggle Buttons */}
-      <div className="flex gap-2 mb-6">
-        <button onClick={() => setSelectedTower('Infrastructure')} className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${selectedTower === 'Infrastructure' ? 'bg-slate-800 text-white shadow-sm' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
-          Torre de Infraestrutura & Redes
-        </button>
-        <button onClick={() => setSelectedTower('Database')} className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${selectedTower === 'Database' ? 'bg-slate-800 text-white shadow-sm' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
-          Torre de Sistemas & Banco de Dados
-        </button>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <StatCard label="Chamados Ativos Torre" value={filteredIncidents.length} accent="bg-slate-100 text-slate-600" icon={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>} />
-        <StatCard label="SLA Violado Torre" value={filteredIncidents.filter(i => i.sla_breached).length} accent="bg-red-50 text-red-600" icon={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>} />
-        <StatCard label="Chamados Sem Analista" value={filteredIncidents.filter(i => !i.assigned_to_id).length} accent="bg-amber-50 text-amber-600" icon={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>} />
-      </div>
-
-      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-6 overflow-hidden">
-        <h3 className="text-slate-800 font-bold text-xs uppercase tracking-widest border-b border-slate-100 pb-3 mb-4">
-          {ticketType === 'request' ? "Requisições Ativas na Torre" : "Incidentes Ativos na Torre"}
-        </h3>
-        <table className="w-full text-left text-xs">
-          <thead>
-            <tr className="text-slate-400 font-bold uppercase border-b border-slate-100">
-              <th className="py-2">Número</th>
-              <th className="py-2">Descrição</th>
-              <th className="py-2">Prioridade</th>
-              <th className="py-2">Analista</th>
-              <th className="py-2">Estado</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-50">
-            {filteredIncidents.map(i => (
-              <tr key={i.id} className="py-2">
-                <td className="py-2.5 font-mono text-emerald-600 font-bold">{i.number}</td>
-                <td className="py-2.5 text-slate-700 font-semibold">{i.short_description}</td>
-                <td className="py-2.5">{i.priority}</td>
-                <td className="py-2.5 text-slate-500">{i.assigned_to_name || 'Não atribuído'}</td>
-                <td className="py-2.5"><StateBadge state={i.state} /></td>
-              </tr>
-            ))}
-            {filteredIncidents.length === 0 && (
-              <tr><td colSpan={5} className="py-6 text-center text-slate-400">Nenhum chamado ativo nesta torre.</td></tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  )
-}
-
-// ─── TECHNICIAN DASHBOARD ────────────────────────────────────
-
-function TechnicianDashboard({ companyId, currentUser, ticketType }: { companyId: string; currentUser: User; ticketType?: 'incident' | 'request' }) {
-  const { incidents, loading, refetch } = useIncidents(companyId, undefined, ticketType)
-  
-  const handleAssignToMe = async (incId: string) => {
-    try {
-      await incidentsService.update(incId, companyId, { assigned_to_id: currentUser.id, assigned_to_name: currentUser.name }, currentUser.name, 'Analista auto-atribuído ao chamado.')
-      alert('Chamado atribuído com sucesso!')
-      refetch()
-    } catch (err: any) {
-      alert('Erro ao atribuir chamado: ' + err.message)
-    }
-  }
-
-  const handleResolve = async (incId: string) => {
-    try {
-      await incidentsService.update(incId, companyId, { state: 'Resolved' }, currentUser.name, 'Chamado resolvido pelo analista.')
-      alert('Chamado marcado como Resolvido!')
-      refetch()
-    } catch (err: any) {
-      alert('Erro ao resolver chamado: ' + err.message)
-    }
-  }
-
-  if (loading) return <div className="text-center py-12 text-slate-400 animate-pulse">Carregando fila operacional analista...</div>
-
-  return (
-    <div>
-      <PageHeader 
-        title={ticketType === 'request' ? "Fila Operacional Analista - Requisições" : "Fila Operacional Analista - Incidentes"} 
-        subtitle={ticketType === 'request' ? "Atendimento diário, triagem e execução de requisições do catálogo" : "Atendimento diário, triagem e execução de incidentes técnicos"} 
-      />
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <StatCard label={ticketType === 'request' ? "Total Requisições" : "Total Incidentes"} value={incidents.length} accent="bg-slate-100 text-slate-600" icon={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>} />
-        <StatCard label="Meus Chamados Atribuídos" value={incidents.filter(i => i.assigned_to_id === currentUser.id).length} accent="bg-blue-50 text-blue-600" icon={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>} />
-        <StatCard label="Aguardando Triagem" value={incidents.filter(i => !i.assigned_to_id).length} accent="bg-amber-50 text-amber-600" icon={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>} />
-      </div>
-
-      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-6 overflow-hidden">
-        <h3 className="text-slate-800 font-bold text-xs uppercase tracking-widest border-b border-slate-100 pb-3 mb-4">Fila de Atendimento</h3>
-        <table className="w-full text-left text-xs">
-          <thead>
-            <tr className="text-slate-400 font-bold uppercase border-b border-slate-100">
-              <th className="py-2">Número</th>
-              <th className="py-2">Descrição</th>
-              <th className="py-2">Prioridade</th>
-              <th className="py-2">Solicitante</th>
-              <th className="py-2">Analista Atribuído</th>
-              <th className="py-2">Estado</th>
-              <th className="py-2 text-right">Ações</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-50">
-            {incidents.map(i => (
-              <tr key={i.id} className="py-2">
-                <td className="py-2.5 font-mono text-emerald-600 font-bold">{i.number}</td>
-                <td className="py-2.5 text-slate-700 font-semibold">{i.short_description}</td>
-                <td className="py-2.5">{i.priority}</td>
-                <td className="py-2.5 text-slate-500">{i.caller_name}</td>
-                <td className="py-2.5 text-slate-500">{i.assigned_to_name || <span className="italic text-slate-300">Não atribuído</span>}</td>
-                <td className="py-2.5"><StateBadge state={i.state} /></td>
-                <td className="py-2.5 text-right space-x-2">
-                  {!i.assigned_to_id && (
-                    <button onClick={() => handleAssignToMe(i.id)} className="px-2 py-1 rounded bg-slate-800 text-white font-bold text-[10px] cursor-pointer">
-                      Pegar Chamado
-                    </button>
-                  )}
-                  {i.assigned_to_id === currentUser.id && i.state !== 'Resolved' && i.state !== 'Closed' && (
-                    <button onClick={() => handleResolve(i.id)} className="px-2 py-1 rounded bg-emerald-500 text-white font-bold text-[10px] cursor-pointer">
-                      Marcar Resolvido
-                    </button>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  )
-}
-
 // ─── MAIN APP ─────────────────────────────────────────────────
 
 export default function App() {
@@ -1133,11 +807,6 @@ export default function App() {
                     <option value="agent">Agent (Analista)</option>
                     <option value="ops_manager">OpsManager (Gestor de Operação)</option>
                     <option value="governance_manager">GovernanceManager (Gestor de Governança)</option>
-                    <option value="technician">Technician (Analista)</option>
-                    <option value="area_manager">AreaManager (Gerente Torre)</option>
-                    <option value="it_manager">ITManager (Gerente Geral TI)</option>
-                    <option value="client_manager">ClientManager (Gestor Cliente)</option>
-                    <option value="cio">CIO (Executivo TI)</option>
                     <option value="end_user">EndUser (Usuário Final)</option>
                   </select>
                 </div>
@@ -1178,7 +847,7 @@ export default function App() {
 
   // Fase 23 — Analytics Executivo: camada gerencial (a RPC get_executive_metrics
   // já bloqueia end_user no banco; este filtro é só conveniência de navegação).
-  const managerialRoles: Role[] = ['sysadmin', 'company_admin', 'cio', 'client_manager', 'it_manager', 'area_manager']
+  const managerialRoles: Role[] = ['sysadmin', 'company_admin']
   if (managerialRoles.includes(activeRole)) {
     navItems.push({ view: 'executivo', label: 'Visão Executiva', icon: <TrendingUp className="w-5 h-5" />, group: 'access' })
   }
@@ -1204,8 +873,7 @@ export default function App() {
     navItems.push({ view: 'desenvolvedor', label: 'Desenvolvedor', icon: <Code2 className="w-5 h-5" />, group: 'access' })
   }
 
-  const customDashRoles: Role[] = ['cio', 'client_manager', 'it_manager', 'area_manager', 'technician']
-  const showWorkspace = (activeView === 'incidentes' || activeView === 'requisicoes') && (isProvider || !customDashRoles.includes(activeRole))
+  const showWorkspace = activeView === 'incidentes' || activeView === 'requisicoes'
 
   const renderActiveDashboard = () => {
     if (activeView === 'configuracoes') {
@@ -1215,23 +883,7 @@ export default function App() {
     // Customize layout if viewing the default dashboard view based on active role
     if (activeView === 'incidentes' || activeView === 'requisicoes') {
       const ticketType = activeView === 'incidentes' ? 'incident' : 'request'
-      if (isProvider) {
-        return <WorkspaceLayout companyId={currentCompany.id} isProvider companies={companies} ticketType={ticketType} initialTicketNumber={initialTicketNumber} />
-      }
-      switch (activeRole) {
-        case 'cio':
-          return <CIODashboard companyId={currentCompany.id} ticketType={ticketType} />
-        case 'client_manager':
-          return <ClientManagerDashboard companyId={currentCompany.id} ticketType={ticketType} />
-        case 'it_manager':
-          return <ITManagerDashboard companyId={currentCompany.id} ticketType={ticketType} />
-        case 'area_manager':
-          return <AreaManagerDashboard companyId={currentCompany.id} ticketType={ticketType} />
-        case 'technician':
-          return <TechnicianDashboard companyId={currentCompany.id} currentUser={currentUser} ticketType={ticketType} />
-        default:
-          return <WorkspaceLayout companyId={currentCompany.id} isProvider={isProvider} companies={companies} ticketType={ticketType} initialTicketNumber={initialTicketNumber} />
-      }
+      return <WorkspaceLayout companyId={currentCompany.id} isProvider={isProvider} companies={companies} ticketType={ticketType} initialTicketNumber={initialTicketNumber} />
     }
 
     if (activeView === 'problemas') return <ProblemDashboard companyId={currentCompany.id} />

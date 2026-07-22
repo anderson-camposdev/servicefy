@@ -98,3 +98,22 @@ test('migration 164: anon volta a enxergar allow_local_login e sso_providers (se
 test('Contrato de quebra-vidro administrativo participa da suíte de segurança padrão', () => {
   assert.match(packageJson, /tests\/security\/admin-break-glass-contract\.test\.mjs/)
 })
+
+// ── Bug real encontrado ao testar o convite ponta a ponta: link de invite
+// caía direto no dashboard sem nunca pedir para definir senha ──
+//
+// supabase-js só dispara PASSWORD_RECOVERY para links type=recovery; um
+// link de invite dispara SIGNED_IN (mesmo evento de um login comum), e
+// sem o marcador abaixo o AuthContext não tinha como distinguir os dois
+// casos — a pessoa convidada caía direto no dashboard, sem senha alguma
+// definida na conta.
+
+test('admin-create-local-user: redirectTo do invite carrega o marcador ?invite=1', () => {
+  assert.match(edgeFunction, /redirectTo: `\$\{request\.headers\.get\('origin'\) \?\? SUPABASE_URL\}\/\?invite=1`/)
+})
+
+test('AuthContext: sessão de convite (?invite=1) ativa o mesmo recoveryMode que os links de recuperação de senha usam', () => {
+  assert.match(authContext, /useState\(\s*\(\) => new URLSearchParams\(window\.location\.search\)\.get\('invite'\) === '1'\s*\)/)
+  assert.match(authContext, /url\.searchParams\.delete\('invite'\)/)
+  assert.match(authContext, /window\.history\.replaceState\(window\.history\.state, '', url\.toString\(\)\)/)
+})
