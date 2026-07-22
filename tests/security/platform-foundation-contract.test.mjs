@@ -28,7 +28,7 @@ test('Central cobre as dez categorias administrativas e módulos bloqueados', ()
     'cmdb','portal_brand','security','integrations','analytics_licensing',
   ]) assert.match(center, new RegExp(key))
   assert.match(center, /Módulo não contratado/)
-  assert.match(center, /Selecione o tenant/)
+  assert.match(center, /Selecione a empresa/)
   assert.match(center, /servicefy\.settings\.favorites/)
 })
 
