@@ -308,7 +308,10 @@ export const incidentsService = {
     if (filters.state && filters.state !== 'all')    q = q.eq('state', filters.state)
     if (filters.priority && filters.priority !== 'all') q = q.eq('priority', filters.priority)
     if (filters.slaBreached !== undefined)            q = q.eq('sla_breached', filters.slaBreached)
-    if (filters.search)                               q = q.ilike('short_description', `%${filters.search}%`)
+    if (filters.search) {
+      const term = filters.search.replace(/[,()]/g, ' ').trim()
+      if (term) q = q.or(`number.ilike.%${term}%,short_description.ilike.%${term}%`)
+    }
     if (filters.callerId)                             q = q.eq('caller_id', filters.callerId)
     if (filters.ticketType && filters.ticketType !== 'all') q = q.eq('ticket_type', filters.ticketType)
     if (filters.limit)                                q = q.limit(filters.limit)

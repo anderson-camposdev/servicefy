@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { Menu, X } from 'lucide-react'
+import { Menu, X, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
 
 export interface AppNavigationItem {
   view: string
@@ -19,11 +19,14 @@ interface AppNavigationProps {
   onNavigate: (view: string) => void
 }
 
+const SIDEBAR_COLLAPSED_KEY = 'flowfy_sidebar_collapsed'
+
 function DestinationList({
   items,
   activeView,
   onNavigate,
-}: Pick<AppNavigationProps, 'items' | 'activeView' | 'onNavigate'>) {
+  collapsed,
+}: Pick<AppNavigationProps, 'items' | 'activeView' | 'onNavigate'> & { collapsed?: boolean }) {
   return (
     <div className="space-y-1">
       {items.map(item => {
@@ -33,17 +36,19 @@ function DestinationList({
             key={item.view}
             type="button"
             aria-current={active ? 'page' : undefined}
+            title={collapsed ? item.label : undefined}
             onClick={() => onNavigate(item.view)}
             className={[
               'flex min-h-11 w-full items-center gap-3 rounded-lg px-3 text-left text-sm font-semibold',
               'transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2',
+              collapsed ? 'justify-center px-0' : '',
               active
                 ? 'bg-primary-container text-on-primary-container'
                 : 'text-on-surface-variant hover:bg-surface-container hover:text-on-surface',
             ].join(' ')}
           >
             <span className={active ? 'text-primary' : 'text-on-surface-variant'}>{item.icon}</span>
-            <span className="min-w-0 truncate">{item.label}</span>
+            {!collapsed && <span className="min-w-0 truncate">{item.label}</span>}
           </button>
         )
       })}
@@ -51,17 +56,29 @@ function DestinationList({
   )
 }
 
-function TenantContext({ company }: Pick<AppNavigationProps, 'company'>) {
+function TenantContext({ company, collapsed }: Pick<AppNavigationProps, 'company'> & { collapsed?: boolean }) {
+  const avatar = (
+    <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-surface font-bold text-primary">
+      {company.logoUrl ? (
+        <img src={company.logoUrl} alt="" className="h-full w-full object-contain" />
+      ) : (
+        company.name.slice(0, 2).toUpperCase()
+      )}
+    </div>
+  )
+
+  if (collapsed) {
+    return (
+      <div className="flex justify-center rounded-xl bg-surface-container p-1.5" title={company.name}>
+        {avatar}
+      </div>
+    )
+  }
+
   return (
     <div className="rounded-xl bg-surface-container p-3">
       <div className="flex items-center gap-3">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-surface font-bold text-primary">
-          {company.logoUrl ? (
-            <img src={company.logoUrl} alt="" className="h-full w-full object-contain" />
-          ) : (
-            company.name.slice(0, 2).toUpperCase()
-          )}
-        </div>
+        {avatar}
         <div className="min-w-0">
           <div className="truncate text-sm font-semibold text-on-surface">{company.name}</div>
           {company.domain && <div className="truncate text-xs text-on-surface-variant">{company.domain}</div>}
@@ -73,9 +90,18 @@ function TenantContext({ company }: Pick<AppNavigationProps, 'company'>) {
 
 export default function AppNavigation({ items, activeView, company, onNavigate }: AppNavigationProps) {
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [collapsed, setCollapsed] = useState(() => localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === '1')
   const operationItems = items.filter(item => item.group === 'operation')
   const accessItems = items.filter(item => item.group === 'access')
   const primaryMobileItems = operationItems.slice(0, 3)
+
+  const toggleCollapsed = () => {
+    setCollapsed(prev => {
+      const next = !prev
+      localStorage.setItem(SIDEBAR_COLLAPSED_KEY, next ? '1' : '0')
+      return next
+    })
+  }
 
   useEffect(() => {
     if (!mobileOpen) return
@@ -93,17 +119,35 @@ export default function AppNavigation({ items, activeView, company, onNavigate }
 
   return (
     <>
-      <aside className="hidden w-60 shrink-0 flex-col border-r border-outline-variant bg-surface px-3 py-4 lg:flex">
+      <aside
+        data-testid="app-sidebar"
+        data-collapsed={collapsed}
+        className={`relative hidden shrink-0 flex-col border-r border-outline-variant bg-surface py-4 transition-[width] duration-200 ease-in-out lg:flex ${
+          collapsed ? 'w-[4.5rem] px-2' : 'w-60 px-3'
+        }`}
+      >
+        <button
+          type="button"
+          data-testid="sidebar-collapse-toggle"
+          onClick={toggleCollapsed}
+          aria-label={collapsed ? 'Expandir menu' : 'Recolher menu'}
+          title={collapsed ? 'Expandir menu' : 'Recolher menu'}
+          className="absolute -right-3 top-6 z-10 flex h-6 w-6 items-center justify-center rounded-full border border-outline-variant bg-surface text-on-surface-variant shadow-sm hover:bg-surface-container hover:text-on-surface"
+        >
+          {collapsed ? <PanelLeftOpen className="h-3.5 w-3.5" /> : <PanelLeftClose className="h-3.5 w-3.5" />}
+        </button>
         <nav aria-label="Navegação principal" className="flex min-h-0 flex-1 flex-col">
-          <DestinationList items={operationItems} activeView={activeView} onNavigate={navigate} />
-          {accessItems.length > 0 && (
-            <div className="mt-5 border-t border-outline-variant pt-5">
-              <p className="mb-2 px-3 text-xs font-semibold text-on-surface-variant">Outras áreas</p>
-              <DestinationList items={accessItems} activeView={activeView} onNavigate={navigate} />
-            </div>
-          )}
-          <div className="mt-auto pt-5">
-            <TenantContext company={company} />
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            <DestinationList items={operationItems} activeView={activeView} onNavigate={navigate} collapsed={collapsed} />
+            {accessItems.length > 0 && (
+              <div className="mt-5 border-t border-outline-variant pt-5">
+                {!collapsed && <p className="mb-2 px-3 text-xs font-semibold text-on-surface-variant">Outras áreas</p>}
+                <DestinationList items={accessItems} activeView={activeView} onNavigate={navigate} collapsed={collapsed} />
+              </div>
+            )}
+          </div>
+          <div className="shrink-0 pt-5">
+            <TenantContext company={company} collapsed={collapsed} />
           </div>
         </nav>
       </aside>
