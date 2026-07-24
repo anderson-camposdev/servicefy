@@ -283,7 +283,7 @@ export default function TicketDataTable<T>({
 
       {/* Tabela */}
       <div data-testid="ticket-table-scroll" className="flex-1 min-h-0 overflow-auto">
-        <table className="w-full text-left text-sm">
+        <table className="w-full table-fixed text-left text-sm">
           <thead className="bg-slate-50 sticky top-0 z-10 shadow-sm border-b border-slate-200">
             <tr className="text-slate-500 font-bold uppercase text-[10px] tracking-wider">
               {leadingCheckbox && <th className="p-3 w-10 text-center"><input type="checkbox" className="rounded border-slate-300" /></th>}
@@ -335,7 +335,7 @@ export default function TicketDataTable<T>({
                       className="group/header flex w-full items-center gap-1.5 p-3 text-left hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-indigo-500"
                     >
                       <GripVertical className="h-3.5 w-3.5 shrink-0 cursor-grab text-slate-300 group-hover/header:text-slate-500" aria-hidden="true" />
-                      <span>{field.label}</span>
+                      <span className="min-w-0 truncate">{field.label}</span>
                       {direction === 'asc'
                         ? <ArrowUp className="h-3.5 w-3.5 shrink-0 text-indigo-600" aria-hidden="true" />
                         : direction === 'desc'
@@ -345,7 +345,7 @@ export default function TicketDataTable<T>({
                   </th>
                 )
               })}
-              {actions && <th className="p-3 text-right">Ações</th>}
+              {actions && <th className="p-3 w-24 text-right">Ações</th>}
             </tr>
           </thead>
           <tbody>
