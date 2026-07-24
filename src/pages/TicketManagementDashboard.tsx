@@ -346,8 +346,11 @@ const TicketManagementDashboard = ({ onOpenTicket, companyId, isProvider, compan
         companyId: i.company_id,
         assignedToId: i.assigned_to_id,
         assignmentGroupId: i.assignment_group_id,
-        slaBreached: i.sla_breached,
-        slaDeadline: i.sla_deadline,
+        // sla_deadline nunca é recalculado após a criação (motor real usa
+        // sla_response_deadline/sla_resolution_deadline, migrations 090-093);
+        // usa o prazo ainda ativo — resposta enquanto não respondido, senão resolução.
+        slaBreached: i.responded_at ? Boolean(i.is_resolution_breached) : Boolean(i.is_response_breached),
+        slaDeadline: i.responded_at ? i.sla_resolution_deadline : i.sla_response_deadline,
         updatedAt: i.updated_at,
         resolvedAt: i.resolved_at,
         description: i.description,

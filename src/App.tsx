@@ -566,7 +566,7 @@ function ProblemDashboard({ companyId }: { companyId: string }) {
               <FieldSelect
                 label="Estado"
                 value={editForm.state}
-                onChange={v => setEditForm(f => f && ({ ...f, state: v as ProblemState }))}
+                onChange={v => setEditForm(f => f && ({ ...f, state: v as ProblemState, known_error: v === 'Known Error' ? true : f.known_error }))}
                 options={['New', 'Under Investigation', 'Root Cause Identified', 'Known Error', 'Resolved', 'Closed']}
               />
               <FieldArea label="Causa Raiz (RCA)" value={editForm.root_cause} onChange={v => setEditForm(f => f && ({ ...f, root_cause: v }))} placeholder="O que causou o problema…" />

@@ -45,6 +45,19 @@ function parseInbound(payload: Record<string, unknown>) {
   return { subject, from, text }
 }
 
+// Message-ID do e-mail de origem, para deduplicar redelivery de webhook
+// (SendGrid/Postmark/Resend reentregam em timeout/erro 5xx). SendGrid manda
+// um blob de headers crus; outros provedores expõem o campo direto.
+function extractMessageId(payload: Record<string, unknown>): string | null {
+  const headers = payload.headers
+  if (typeof headers === 'string') {
+    const match = headers.match(/^Message-ID:\s*(.+)$/im)
+    if (match) return match[1].trim()
+  }
+  const direct = payload.message_id ?? payload['Message-Id'] ?? payload.messageId ?? payload['message-id']
+  return typeof direct === 'string' && direct.trim() ? direct.trim() : null
+}
+
 // Extrai apenas o e-mail de "Nome <email@x>" ou "email@x".
 function extractEmail(raw: string): string | null {
   const m = raw.match(/[\w.+-]+@[\w-]+\.[\w.-]+/)
@@ -149,6 +162,8 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ skipped: 'empty body' }), { status: 200 })
     }
 
+    const externalMessageId = extractMessageId(payload)
+
     const { error: insErr } = await admin.from('ticket_messages').insert({
       incident_id: incident.id,
       company_id: incident.company_id,
@@ -157,8 +172,14 @@ Deno.serve(async (req) => {
       actor_type: 'user',
       body: cleaned,
       is_internal: false,
+      external_message_id: externalMessageId,
     })
     if (insErr) {
+      // Redelivery do mesmo Message-ID pro mesmo ticket (uq_ticket_messages_incident_external_id) —
+      // já processado, não é erro de verdade.
+      if (insErr.code === '23505') {
+        return new Response(JSON.stringify({ ok: true, ticket: ticketNumber, status: 'duplicate' }), { status: 200 })
+      }
       return new Response(JSON.stringify({ error: insErr.message }), { status: 500 })
     }
 
