@@ -1,7 +1,6 @@
 import { expect, test, type Page } from '@playwright/test'
-import { setupMockAuth, tenants } from './helpers/mockAuth'
+import { setupMockAuth, tenants, SUPABASE_URL } from './helpers/mockAuth'
 
-const SUPABASE_URL = 'https://enxtvrvsfwvcnpyspyfl.supabase.co'
 
 const ADMIN_PROFILE = {
   id: 'profile-admin-uuid', auth_id: 'auth-test-user-id', name: 'Admin Teste',
@@ -60,7 +59,17 @@ test('admin vê prontidão ITSM e abre o console real do agente', async ({ page 
   await page.waitForTimeout(3_000)
 
   const settings = page.locator('button, a').filter({ hasText: /Configurações/i }).first()
-  if (await settings.isVisible({ timeout: 5_000 }).catch(() => false)) await settings.click()
+  await expect(settings, 'Botão "Configurações" da sidebar não encontrado').toBeVisible({ timeout: 10_000 })
+  await settings.click()
+
+  // "Agente virtual" fica no grupo "Experiência e conhecimento" (category
+  // knowledge_ai) — não é o grupo padrão ao abrir Configurações. A busca da
+  // Central varre todos os grupos, então é mais robusta que procurar o
+  // card direto (ver SettingsCenter.tsx, visibleSections).
+  const searchBox = page.getByPlaceholder(/Buscar usuários, SLA/i)
+  await expect(searchBox, 'Campo de busca da Central de Configurações não encontrado').toBeVisible({ timeout: 10_000 })
+  await searchBox.fill('Agente virtual')
+  await page.waitForTimeout(500)
 
   const card = page.locator('button, article').filter({ hasText: /Agente virtual/i }).first()
   await expect(card).toBeVisible({ timeout: 10_000 })

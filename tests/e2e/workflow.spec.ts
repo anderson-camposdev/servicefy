@@ -9,9 +9,8 @@
  *  5. Abertura da galeria de templates ao criar nova automação
  */
 import { test, expect, type Page } from '@playwright/test'
-import { setupMockAuth } from './helpers/mockAuth'
+import { setupMockAuth, SUPABASE_URL } from './helpers/mockAuth'
 
-const SUPABASE_URL = 'https://enxtvrvsfwvcnpyspyfl.supabase.co'
 
 // Schema real de workflow_rules (migration 055) — conditions/actions no
 // mesmo formato JSON que a UI produz (ConditionRow[]/ActionRow[]).
@@ -84,29 +83,22 @@ test.describe('Workflow Builder — Motor de Automação', () => {
 
     // 2. Clica em Configurações
     const configBtn = page.locator('button').filter({ hasText: /Configurações/i }).first()
-    if (await configBtn.isVisible({ timeout: 5_000 }).catch(() => false)) {
-      await configBtn.click()
-      await page.waitForTimeout(2_000)
+    await expect(configBtn, 'Botão "Configurações" da sidebar não encontrado').toBeVisible({ timeout: 10_000 })
+    await configBtn.click()
 
-      // 3. Clica no card "Motor de Automação"
-      const automationCard = page.getByText(/Motor de Automação/i).first()
-      if (await automationCard.isVisible({ timeout: 5_000 }).catch(() => false)) {
-        await automationCard.click()
-        await page.waitForTimeout(2_000)
-        return
-      }
-    }
+    // 3. Usa a busca da Central de Configurações — mais robusto que
+    // procurar o card direto, já que "Motor de Automação" só aparece no
+    // DOM quando o grupo "Práticas de serviço" está ativo (ver
+    // SettingsCenter.tsx, visibleSections); a busca varre todos os grupos.
+    const searchBox = page.getByPlaceholder(/Buscar usuários, SLA/i)
+    await expect(searchBox, 'Campo de busca da Central de Configurações não encontrado').toBeVisible({ timeout: 10_000 })
+    await searchBox.fill('Automação')
+    await page.waitForTimeout(500)
 
-    // Fallback direct button
-    const workflowNav = page
-      .getByRole('button', { name: /automação|workflow|motor/i })
-      .or(page.locator('button').filter({ hasText: /automação|workflow|motor/i }))
-      .first()
-
-    if (await workflowNav.isVisible({ timeout: 5_000 }).catch(() => false)) {
-      await workflowNav.click()
-      await page.waitForTimeout(2_000)
-    }
+    const automationCard = page.getByText('Motor de Automação', { exact: true }).first()
+    await expect(automationCard, 'Card "Motor de Automação" não encontrado na busca').toBeVisible({ timeout: 5_000 })
+    await automationCard.click()
+    await page.waitForTimeout(1_500)
   })
 
   test('deve renderizar o Workflow Builder com a lista de automações', async ({ page }) => {

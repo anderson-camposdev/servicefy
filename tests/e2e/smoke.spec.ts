@@ -6,9 +6,8 @@
  */
 
 import { test, expect, type Page } from '@playwright/test'
-import { setupMockAuth } from './helpers/mockAuth'
+import { setupMockAuth, SUPABASE_URL } from './helpers/mockAuth'
 
-const SUPABASE_URL = 'https://enxtvrvsfwvcnpyspyfl.supabase.co'
 
 // Mocks estruturados para o fluxo do catálogo de incidentes (3 níveis: Categoria -> Serviço -> Sintoma)
 const MOCK_DEPARTMENTS = [] // Vazio pula a seleção inicial de departamentos

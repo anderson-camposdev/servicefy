@@ -7,9 +7,8 @@
  *  3. Multitenancy: garante que dados do Tenant A não vazam para Tenant B
  */
 import { test, expect } from '@playwright/test'
-import { setupMockAuth, tenants } from './helpers/mockAuth'
+import { setupMockAuth, tenants, SUPABASE_URL } from './helpers/mockAuth'
 
-const SUPABASE_URL = 'https://enxtvrvsfwvcnpyspyfl.supabase.co'
 
 // ── 1. Tela de login sem sessão ───────────────────────────────────
 test.describe('Autenticação — Tela de Login', () => {

@@ -8,10 +8,19 @@
  * Bug anterior: rest/v1/** (catch-all) estava registrado após profiles* e
  * companies*, portanto os overridia e retornava [] para ambos →
  * getAuthProfile recebia null → status 'unlinked' → "Conta sem perfil".
+ *
+ * Achado no pente fino de 2026-07-24: SUPABASE_URL estava hardcoded pro
+ * projeto cloud, mas .env.local aponta pro Supabase local — nenhuma
+ * requisição real do app batia nesses mocks (URL diferente), e a chave de
+ * localStorage também não batia (supabase-js deriva de sb-<hostname>-auth-
+ * token), então a sessão simulada nunca era encontrada. Agora lê a URL
+ * real de .env.local (ver helpers/env.ts) para nunca divergir do ambiente
+ * em que os testes rodam de verdade.
  */
 import type { Page } from '@playwright/test'
+import { SUPABASE_URL, SUPABASE_STORAGE_KEY } from './env'
 
-const SUPABASE_URL = 'https://enxtvrvsfwvcnpyspyfl.supabase.co'
+export { SUPABASE_URL }
 
 // ── Tenant A ───────────────────────────────────────────────────────
 const TENANT_A = {
@@ -88,7 +97,7 @@ export async function setupMockAuth(page: Page): Promise<void> {
   // ── 1. localStorage: JWT estruturalmente válido ────────────────────
   // Supabase JS v2 decodifica o payload do access_token para checar "exp".
   // Token sem formato JWT é tratado como expirado → dispara refresh de rede.
-  await page.addInitScript(() => {
+  await page.addInitScript((storageKey: string) => {
     const toB64Url = (obj: object): string =>
       btoa(JSON.stringify(obj))
         .replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_')
@@ -107,7 +116,7 @@ export async function setupMockAuth(page: Page): Promise<void> {
       'mock_sig_playwright',
     ].join('.')
 
-    localStorage.setItem('sb-enxtvrvsfwvcnpyspyfl-auth-token', JSON.stringify({
+    localStorage.setItem(storageKey, JSON.stringify({
       access_token: fakeJwt,
       token_type: 'bearer',
       expires_in: 3600,
@@ -126,7 +135,7 @@ export async function setupMockAuth(page: Page): Promise<void> {
         user_metadata: {},
       },
     }))
-  })
+  }, SUPABASE_STORAGE_KEY)
 
   // ── 2–8. Rotas de rede — ORDEM IMPORTA: catch-all PRIMEIRO, específicas DEPOIS ──
   // Playwright: última rota registrada = maior prioridade (shadowing reverso).

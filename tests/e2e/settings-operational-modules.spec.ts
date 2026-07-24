@@ -1,7 +1,6 @@
 import { expect, test, type Page } from '@playwright/test'
-import { setupMockAuth, tenants } from './helpers/mockAuth'
+import { setupMockAuth, tenants, SUPABASE_URL } from './helpers/mockAuth'
 
-const SUPABASE_URL = 'https://enxtvrvsfwvcnpyspyfl.supabase.co'
 const ADMIN_PROFILE = {
   id: 'profile-admin-uuid', auth_id: 'auth-test-user-id', name: 'Admin Teste',
   email: 'admin@acme.com', role: 'company_admin', company_id: tenants.A.id,

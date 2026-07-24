@@ -11,9 +11,8 @@
  */
 
 import { test, expect } from '@playwright/test'
-import { setupMockAuth, tenants } from './helpers/mockAuth'
+import { setupMockAuth, tenants, SUPABASE_URL } from './helpers/mockAuth'
 
-const SUPABASE_URL = 'https://enxtvrvsfwvcnpyspyfl.supabase.co'
 
 // ── 1. Renderização da tela de login ──────────────────────────────
 

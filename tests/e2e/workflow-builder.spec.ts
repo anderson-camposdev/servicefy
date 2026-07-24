@@ -13,9 +13,8 @@
  */
 
 import { test, expect, type Page } from '@playwright/test'
-import { setupMockAuth } from './helpers/mockAuth'
+import { setupMockAuth, SUPABASE_URL } from './helpers/mockAuth'
 
-const SUPABASE_URL = 'https://enxtvrvsfwvcnpyspyfl.supabase.co'
 
 // ── Automações mockadas ───────────────────────────────────────────
 
@@ -134,7 +133,7 @@ async function setupWorkflowMocks(page: Page) {
 
 // ── Helper: navega até o Workflow Builder ────────────────────────
 
-async function navigateToWorkflowBuilder(page: Page): Promise<boolean> {
+async function navigateToWorkflowBuilder(page: Page): Promise<void> {
   await page.goto('/')
   await page.waitForTimeout(3_000)
 
@@ -147,32 +146,24 @@ async function navigateToWorkflowBuilder(page: Page): Promise<boolean> {
 
   // 2. Clica no botão "Configurações" na sidebar
   const configBtn = page.locator('button').filter({ hasText: /Configurações/i }).first()
-  if (await configBtn.isVisible({ timeout: 5_000 }).catch(() => false)) {
-    await configBtn.click()
-    await page.waitForTimeout(2_000)
+  await expect(configBtn, 'Botão "Configurações" da sidebar não encontrado').toBeVisible({ timeout: 10_000 })
+  await configBtn.click()
 
-    // 3. Clica no card "Motor de Automação"
-    const automationCard = page.getByText(/Motor de Automação/i).first()
-    if (await automationCard.isVisible({ timeout: 5_000 }).catch(() => false)) {
-      await automationCard.click()
-      await page.waitForTimeout(2_000)
-      return true
-    }
-  }
+  // 3. Usa a busca da Central de Configurações — mais robusto que navegar
+  // por grupo, já que ela varre TODAS as seções da plataforma
+  // independente de em qual grupo/categoria estão (ver SettingsCenter.tsx,
+  // visibleSections). "Motor de Automação" vive em service_management,
+  // dentro do grupo "Práticas de serviço" — clicar direto no grupo certo
+  // é frágil a reorganizações futuras; a busca não é.
+  const searchBox = page.getByPlaceholder(/Buscar usuários, SLA/i)
+  await expect(searchBox, 'Campo de busca da Central de Configurações não encontrado').toBeVisible({ timeout: 10_000 })
+  await searchBox.fill('Automação')
+  await page.waitForTimeout(500)
 
-  // Fallback direct button
-  const workflowNav = page
-    .getByRole('button', { name: /automação|workflow|motor/i })
-    .or(page.locator('button').filter({ hasText: /automação|workflow|motor/i }))
-    .first()
-
-  if (await workflowNav.isVisible({ timeout: 5_000 }).catch(() => false)) {
-    await workflowNav.click()
-    await page.waitForTimeout(2_000)
-    return true
-  }
-
-  return false
+  const automationCard = page.getByText('Motor de Automação', { exact: true }).first()
+  await expect(automationCard, 'Card "Motor de Automação" não encontrado na busca').toBeVisible({ timeout: 5_000 })
+  await automationCard.click()
+  await page.waitForTimeout(1_500)
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -224,27 +215,22 @@ test.describe('Workflow Builder — Seleção de Gatilho', () => {
       .filter({ hasText: /Auto-atribuição/i })
       .first()
 
-    if (await firstWorkflow.isVisible({ timeout: 5_000 }).catch(() => false)) {
-      await firstWorkflow.click()
-      await page.waitForTimeout(1_000)
-    }
+    await expect(firstWorkflow, 'Automação "Auto-atribuição" não encontrada na lista').toBeVisible({ timeout: 10_000 })
+    await firstWorkflow.click()
+    await page.waitForTimeout(1_000)
 
     const portalBtn = page
       .getByRole('button', { name: /via portal/i })
       .or(page.locator('button').filter({ hasText: /via portal/i }))
       .first()
 
-    if (await portalBtn.isVisible({ timeout: 5_000 }).catch(() => false)) {
-      await portalBtn.click()
-      await page.waitForTimeout(800)
+    await expect(portalBtn, 'Botão "Via Portal" não encontrado após abrir a automação').toBeVisible({ timeout: 10_000 })
+    await portalBtn.click()
+    await page.waitForTimeout(800)
 
-      // "Via Portal" deve estar selecionado (ativo)
-      const bodyText = await page.locator('body').textContent() ?? ''
-      expect(bodyText).toMatch(/portal/i)
-    } else {
-      // Aceita se seletor ainda não estava visível neste workflow
-      test.skip()
-    }
+    // "Via Portal" deve estar selecionado (ativo)
+    const bodyText = await page.locator('body').textContent() ?? ''
+    expect(bodyText).toMatch(/portal/i)
   })
 
   test('deve selecionar "Via E-mail" para a automação de triagem', async ({ page }) => {

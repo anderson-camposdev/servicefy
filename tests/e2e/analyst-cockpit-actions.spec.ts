@@ -1,7 +1,6 @@
 import { test, expect, type Page } from '@playwright/test'
-import { setupMockAuth } from './helpers/mockAuth'
+import { setupMockAuth, SUPABASE_URL } from './helpers/mockAuth'
 
-const SUPABASE_URL = 'https://enxtvrvsfwvcnpyspyfl.supabase.co'
 const NOW = Date.now()
 
 const INCIDENT = {

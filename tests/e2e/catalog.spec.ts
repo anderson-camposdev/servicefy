@@ -8,9 +8,8 @@
  *  4. Preenchimento e submissão do formulário (com mock do insert)
  */
 import { test, expect } from '@playwright/test'
-import { setupMockAuth } from './helpers/mockAuth'
+import { setupMockAuth, SUPABASE_URL } from './helpers/mockAuth'
 
-const SUPABASE_URL = 'https://enxtvrvsfwvcnpyspyfl.supabase.co'
 
 // Catalog items mockados para o portal
 const MOCK_CATALOG_ITEMS = [

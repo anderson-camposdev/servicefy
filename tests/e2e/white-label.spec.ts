@@ -1,7 +1,6 @@
 import { expect, test, type Page, type Route } from '@playwright/test'
-import { setupMockAuth, tenants } from './helpers/mockAuth'
+import { setupMockAuth, tenants, SUPABASE_URL } from './helpers/mockAuth'
 
-const SUPABASE_URL = 'https://enxtvrvsfwvcnpyspyfl.supabase.co'
 const PNG_1X1 = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
   'base64',
@@ -77,6 +76,16 @@ test('admin salva logo e tema e a marca persiste sem recarregar a SPA', async ({
   await page.goto('/')
 
   await page.getByRole('button', { name: /Configurações/i }).first().click()
+
+  // "Identidade e portal" fica no grupo "Experiência e conhecimento"
+  // (category portal_brand) — não é o grupo padrão ('access') ao abrir
+  // Configurações. A busca da Central varre todos os grupos (ver
+  // SettingsCenter.tsx, visibleSections).
+  const searchBox = page.getByPlaceholder(/Buscar usuários, SLA/i)
+  await expect(searchBox, 'Campo de busca da Central de Configurações não encontrado').toBeVisible({ timeout: 10_000 })
+  await searchBox.fill('Identidade e portal')
+  await page.waitForTimeout(500)
+
   await page.getByRole('button').filter({ hasText: /Identidade e portal/i }).first().click()
   await expect(page.getByRole('heading', { name: /Identidade visual e portal/i })).toBeVisible()
 
