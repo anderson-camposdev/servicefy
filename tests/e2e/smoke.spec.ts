@@ -256,20 +256,23 @@ test.describe('ServiceFY ITSM — Smoke Test E2E', () => {
 
       const dimensions = await page.evaluate(() => {
         const dashboardElement = document.querySelector('[data-testid="ticket-dashboard"]')
-        const tableElement = document.querySelector('[data-testid="ticket-table-scroll"]')
         const dashboardRect = dashboardElement?.getBoundingClientRect()
         return {
           viewportWidth: window.innerWidth,
           documentWidth: document.documentElement.scrollWidth,
           dashboardRight: dashboardRect?.right ?? 0,
-          tableClientWidth: tableElement?.clientWidth ?? 0,
-          tableScrollWidth: tableElement?.scrollWidth ?? 0,
         }
       })
 
+      // A PÁGINA nunca rola na horizontal — mas a TABELA de chamados pode
+      // (e deve) ter seu próprio scroll horizontal interno quando muitas
+      // colunas de largura resizável não cabem no viewport: é o padrão de
+      // toda ferramenta ITSM densa em colunas (ServiceNow, JSM,
+      // Freshservice, Sensr IT/AlliedIT — confirmado por print do usuário).
+      // O scroll do "ticket-table-scroll" fica contido dentro do
+      // dashboard, então ele nunca extrapola a largura da viewport.
       expect(dimensions.documentWidth).toBeLessThanOrEqual(dimensions.viewportWidth + 1)
       expect(dimensions.dashboardRight).toBeLessThanOrEqual(dimensions.viewportWidth + 1)
-      expect(dimensions.tableScrollWidth).toBeLessThanOrEqual(dimensions.tableClientWidth + 1)
       await expect(ticketScroll).toBeVisible()
     }
   })

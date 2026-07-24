@@ -178,4 +178,37 @@ test.describe('Tabela de incidentes — colunas, filtro e agrupamento', () => {
     await expect(page.getByText('INC-00101')).toHaveCount(0)
     await expect(page.getByText('INC-00103')).toBeVisible()
   })
+
+  test('redimensiona coluna por arrastar a borda, persiste e restaura com duplo clique', async ({ page }) => {
+    await setupMocks(page)
+    await openIncidentQueue(page)
+
+    const subjectHeader = page.getByRole('columnheader', { name: /Assunto/i })
+    const handle = page.getByLabel('Redimensionar coluna Assunto')
+    const widthOf = async () => (await subjectHeader.boundingBox())?.width ?? 0
+
+    const initialWidth = await widthOf()
+
+    const handleBox = await handle.boundingBox()
+    if (!handleBox) throw new Error('resize handle não encontrado')
+    const startX = handleBox.x + handleBox.width / 2
+    const startY = handleBox.y + handleBox.height / 2
+
+    await page.mouse.move(startX, startY)
+    await page.mouse.down()
+    await page.mouse.move(startX + 120, startY, { steps: 10 })
+    await page.mouse.up()
+
+    await expect.poll(widthOf).toBeGreaterThan(initialWidth + 100)
+    const resizedWidth = await widthOf()
+
+    // Persiste após reload
+    await page.reload()
+    await expect(page.getByText(/INC-00101/i).first()).toBeVisible({ timeout: 10_000 })
+    await expect.poll(widthOf).toBeGreaterThan(initialWidth + 100)
+
+    // Duplo clique no handle restaura a largura padrão
+    await page.getByLabel('Redimensionar coluna Assunto').dblclick()
+    await expect.poll(widthOf).toBeLessThan(resizedWidth)
+  })
 })

@@ -26,6 +26,8 @@ export interface TicketFieldDef<T> {
   alwaysVisible?: boolean
   /** false para campos que não fazem sentido como agrupamento (ex.: texto livre longo). */
   groupable?: boolean
+  /** Largura padrão da coluna em px. Ausente → fallback por `kind` (ver KIND_DEFAULT_WIDTH). Usuário pode redimensionar; preferência persiste por usuário. */
+  width?: number
 }
 
 const badge = (text: string, className: string): ReactNode => (
@@ -86,14 +88,14 @@ const typeBadge = (type: string | null | undefined): ReactNode => {
 
 export const INCIDENT_REQUEST_FIELDS: TicketFieldDef<TicketListRow>[] = [
   {
-    key: 'id', label: 'Ticket ID', accessor: r => r.id, kind: 'text', alwaysVisible: true,
+    key: 'id', label: 'Ticket ID', accessor: r => r.id, kind: 'text', alwaysVisible: true, width: 190,
     render: r => (
       <span className="flex min-w-0 items-center gap-2 font-extrabold text-indigo-600">
         {r.id} {typeBadge(r.ticketType)}
       </span>
     ),
   },
-  { key: 'title', label: 'Assunto', accessor: r => r.title, kind: 'text', alwaysVisible: true },
+  { key: 'title', label: 'Assunto', accessor: r => r.title, kind: 'text', alwaysVisible: true, width: 240 },
   { key: 'date', label: 'Abertura', accessor: r => r.date, kind: 'date', defaultVisible: true },
   { key: 'client', label: 'Empresa', accessor: r => r.client, kind: 'select', defaultVisible: true },
   { key: 'requester', label: 'Solicitante', accessor: r => r.requester, kind: 'select', defaultVisible: true },
@@ -137,8 +139,8 @@ const PROBLEM_PRIORITY_CLASS: Record<string, string> = {
 }
 
 export const PROBLEM_FIELDS: TicketFieldDef<ProblemRow>[] = [
-  { key: 'number', label: 'Número', accessor: r => r.number, kind: 'text', alwaysVisible: true },
-  { key: 'short_description', label: 'Descrição', accessor: r => r.short_description, kind: 'text', alwaysVisible: true },
+  { key: 'number', label: 'Número', accessor: r => r.number, kind: 'text', alwaysVisible: true, width: 130 },
+  { key: 'short_description', label: 'Descrição', accessor: r => r.short_description, kind: 'text', alwaysVisible: true, width: 240 },
   {
     key: 'priority', label: 'Prioridade', accessor: r => r.priority, kind: 'select', defaultVisible: true,
     render: r => badge(r.priority, PROBLEM_PRIORITY_CLASS[r.priority] || 'bg-slate-100 text-slate-500 border-slate-200'),
@@ -183,8 +185,8 @@ const CHANGE_RISK_COLORS: Record<ChangeRisk, string> = {
 }
 
 export const CHANGE_FIELDS: TicketFieldDef<ChangeRow>[] = [
-  { key: 'number', label: 'Número', accessor: r => r.number, kind: 'text', alwaysVisible: true },
-  { key: 'short_description', label: 'Título', accessor: r => r.short_description, kind: 'text', alwaysVisible: true },
+  { key: 'number', label: 'Número', accessor: r => r.number, kind: 'text', alwaysVisible: true, width: 130 },
+  { key: 'short_description', label: 'Título', accessor: r => r.short_description, kind: 'text', alwaysVisible: true, width: 240 },
   {
     key: 'type', label: 'Tipo', accessor: r => r.type, kind: 'select', defaultVisible: true,
     render: r => badge(r.type, 'bg-slate-50 text-slate-600 border-slate-200'),
@@ -198,7 +200,7 @@ export const CHANGE_FIELDS: TicketFieldDef<ChangeRow>[] = [
     render: r => badge(translateState(r.state), CHANGE_STATE_COLORS[r.state] || 'bg-slate-50 text-slate-600 border-slate-200'),
   },
   {
-    key: 'change_window', label: 'Janela Agendada', kind: 'date', defaultVisible: true, groupable: false,
+    key: 'change_window', label: 'Janela Agendada', kind: 'date', defaultVisible: true, groupable: false, width: 220,
     accessor: r => r.change_window_start ?? null,
     render: r => r.change_window_start ? (
       <div className="flex flex-col text-xs text-slate-500 font-medium">

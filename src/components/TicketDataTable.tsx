@@ -10,7 +10,7 @@
 // introduz paginação nem chamadas novas ao banco.
 // ============================================================
 
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react'
 import { Settings, X, ChevronDown, ChevronRight, Plus, ArrowDown, ArrowUp, ArrowUpDown, GripVertical } from 'lucide-react'
 import { useAuth } from '../auth'
 import type { TicketFieldDef } from '../lib/ticketTableFields'
@@ -34,7 +34,19 @@ interface StoredPrefs {
   filters: ActiveFilter[]
   groupBy: string | null
   sort: { fieldKey: string; direction: TicketSortDirection } | null
+  columnWidths: Record<string, number>
 }
+
+const MIN_COLUMN_WIDTH = 70
+const KIND_DEFAULT_WIDTH: Record<TicketFieldDef<unknown>['kind'], number> = {
+  text: 180,
+  select: 140,
+  date: 150,
+  boolean: 100,
+  number: 100,
+}
+const CHECKBOX_COL_WIDTH = 40
+const ACTIONS_COL_WIDTH = 110
 
 interface TicketDataTableProps<T> {
   rows: T[]
@@ -65,9 +77,11 @@ export default function TicketDataTable<T>({
   const [filters, setFilters] = useState<ActiveFilter[]>([])
   const [groupBy, setGroupBy] = useState<string | null>(null)
   const [sort, setSort] = useState<StoredPrefs['sort']>(null)
+  const [columnWidths, setColumnWidths] = useState<Record<string, number>>({})
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set())
   const [draggedKey, setDraggedKey] = useState<string | null>(null)
   const [dragOverKey, setDragOverKey] = useState<string | null>(null)
+  const resizingRef = useRef<{ key: string; startX: number; startWidth: number } | null>(null)
 
   const [isCustomizing, setIsCustomizing] = useState(false)
   const [draftVisibleKeys, setDraftVisibleKeys] = useState<string[]>(visibleKeys)
@@ -95,6 +109,11 @@ export default function TicketDataTable<T>({
             ? parsed.sort
             : null,
         )
+        setColumnWidths(
+          parsed.columnWidths && typeof parsed.columnWidths === 'object'
+            ? Object.fromEntries(Object.entries(parsed.columnWidths).filter(([key]) => fields.some(field => field.key === key)))
+            : {},
+        )
         return
       } catch { /* preferências corrompidas — cai no default abaixo */ }
     }
@@ -102,6 +121,7 @@ export default function TicketDataTable<T>({
     setFilters([])
     setGroupBy(null)
     setSort(null)
+    setColumnWidths({})
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [persistKey])
 
@@ -111,6 +131,7 @@ export default function TicketDataTable<T>({
       filters: next.filters ?? filters,
       groupBy: next.groupBy !== undefined ? next.groupBy : groupBy,
       sort: next.sort !== undefined ? next.sort : sort,
+      columnWidths: next.columnWidths ?? columnWidths,
     }
     localStorage.setItem(persistKey, JSON.stringify(merged))
   }
@@ -168,6 +189,32 @@ export default function TicketDataTable<T>({
     persist({ visibleKeys: next })
   }
 
+  const getColumnWidth = (field: TicketFieldDef<T>): number =>
+    columnWidths[field.key] ?? field.width ?? KIND_DEFAULT_WIDTH[field.kind]
+
+  const startResize = (field: TicketFieldDef<T>) => (event: ReactMouseEvent) => {
+    event.preventDefault()
+    event.stopPropagation()
+    resizingRef.current = { key: field.key, startX: event.clientX, startWidth: getColumnWidth(field) }
+
+    const onMouseMove = (moveEvent: MouseEvent) => {
+      const resizing = resizingRef.current
+      if (!resizing) return
+      const nextWidth = Math.max(MIN_COLUMN_WIDTH, resizing.startWidth + (moveEvent.clientX - resizing.startX))
+      setColumnWidths(prev => ({ ...prev, [resizing.key]: nextWidth }))
+    }
+    const onMouseUp = () => {
+      document.removeEventListener('mousemove', onMouseMove)
+      document.removeEventListener('mouseup', onMouseUp)
+      const resizing = resizingRef.current
+      resizingRef.current = null
+      if (!resizing) return
+      setColumnWidths(prev => { persist({ columnWidths: prev }); return prev })
+    }
+    document.addEventListener('mousemove', onMouseMove)
+    document.addEventListener('mouseup', onMouseUp)
+  }
+
   const toggleSort = (fieldKey: string) => {
     const next: NonNullable<StoredPrefs['sort']> = {
       fieldKey,
@@ -199,7 +246,7 @@ export default function TicketDataTable<T>({
         </td>
       )}
       {visibleFields.map(field => (
-        <td key={field.key} className="p-3 align-top text-sm text-slate-700 max-w-[260px] truncate" title={fmtValue(field.accessor(row))}>
+        <td key={field.key} className="p-3 align-top text-sm text-slate-700 truncate" title={fmtValue(field.accessor(row))}>
           {field.render ? field.render(row) : fmtValue(field.accessor(row))}
         </td>
       ))}
@@ -277,13 +324,26 @@ export default function TicketDataTable<T>({
         </div>
 
         <span className="ml-auto hidden text-[10px] font-semibold text-slate-400 lg:inline">
-          Arraste as colunas para mover · clique no título para ordenar
+          Arraste as colunas para mover · arraste a borda para redimensionar · clique no título para ordenar
         </span>
       </div>
 
       {/* Tabela */}
       <div data-testid="ticket-table-scroll" className="flex-1 min-h-0 overflow-auto">
-        <table className="w-full table-fixed text-left text-sm">
+        <table
+          className="table-fixed text-left text-sm"
+          style={{
+            width: (leadingCheckbox ? CHECKBOX_COL_WIDTH : 0)
+              + visibleFields.reduce((sum, field) => sum + getColumnWidth(field), 0)
+              + (actions ? ACTIONS_COL_WIDTH : 0),
+            minWidth: '100%',
+          }}
+        >
+          <colgroup>
+            {leadingCheckbox && <col style={{ width: CHECKBOX_COL_WIDTH }} />}
+            {visibleFields.map(field => <col key={field.key} style={{ width: getColumnWidth(field) }} />)}
+            {actions && <col style={{ width: ACTIONS_COL_WIDTH }} />}
+          </colgroup>
           <thead className="bg-slate-50 sticky top-0 z-10 shadow-sm border-b border-slate-200">
             <tr className="text-slate-500 font-bold uppercase text-[10px] tracking-wider">
               {leadingCheckbox && <th className="p-3 w-10 text-center"><input type="checkbox" className="rounded border-slate-300" /></th>}
@@ -316,7 +376,7 @@ export default function TicketDataTable<T>({
                       setDraggedKey(null)
                       setDragOverKey(null)
                     }}
-                    className={`p-0 transition-colors ${
+                    className={`relative p-0 transition-colors ${
                       dragOverKey === field.key && draggedKey !== field.key ? 'bg-indigo-100 ring-2 ring-inset ring-indigo-400' : ''
                     } ${draggedKey === field.key ? 'opacity-50' : ''}`}
                   >
@@ -342,10 +402,28 @@ export default function TicketDataTable<T>({
                           ? <ArrowDown className="h-3.5 w-3.5 shrink-0 text-indigo-600" aria-hidden="true" />
                           : <ArrowUpDown className="h-3.5 w-3.5 shrink-0 text-slate-300 opacity-0 transition-opacity group-hover/header:opacity-100" aria-hidden="true" />}
                     </button>
+                    <span
+                      role="separator"
+                      aria-orientation="vertical"
+                      aria-label={`Redimensionar coluna ${field.label}`}
+                      draggable={false}
+                      onDragStart={event => event.preventDefault()}
+                      onMouseDown={startResize(field)}
+                      onDoubleClick={() => {
+                        setColumnWidths(prev => {
+                          const next = { ...prev }
+                          delete next[field.key]
+                          persist({ columnWidths: next })
+                          return next
+                        })
+                      }}
+                      title="Arraste para redimensionar · duplo clique para restaurar"
+                      className="absolute right-0 top-0 z-10 h-full w-2 cursor-col-resize touch-none select-none hover:bg-indigo-300/50 active:bg-indigo-400/60"
+                    />
                   </th>
                 )
               })}
-              {actions && <th className="p-3 w-24 text-right">Ações</th>}
+              {actions && <th className="p-3 text-right">Ações</th>}
             </tr>
           </thead>
           <tbody>
