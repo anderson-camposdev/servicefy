@@ -152,9 +152,12 @@ test.describe('ServiceFY ITSM — Smoke Test E2E', () => {
       document.querySelectorAll('.toast').forEach(t => t.remove())
     })
 
-    // 1. Valida carga da página inicial do portal (saudação ao analista)
-    const greeting = page.getByText(/Olá.*Analista|Olá.*👋/i).first()
-    const currentGreeting = page.getByText(/Como posso te ajudar.*Analista/i).first().or(greeting)
+    // 1. Valida carga da página inicial do portal (saudação com boas-vindas
+    // do tenant — não é personalizada com o nome do usuário; usa
+    // welcome_title/welcome_subtitle configurados no tenant, ver TENANT_A
+    // em helpers/mockAuth.ts: "Bem-vindo ao Suporte" / "Como podemos te
+    // ajudar hoje?").
+    const currentGreeting = page.getByText(/Bem-vindo ao Suporte/i).first()
     await expect(currentGreeting).toBeVisible({ timeout: 15_000 })
 
     // 2. Valida visibilidade dos cards de entrada do catálogo
@@ -237,7 +240,10 @@ test.describe('ServiceFY ITSM — Smoke Test E2E', () => {
     await page.waitForTimeout(3_000)
 
     const dashboard = page.getByTestId('ticket-dashboard')
-    const ticketScroll = page.getByTestId('ticket-table-scroll')
+    // Escopado ao dashboard: existe um segundo elemento com o mesmo
+    // testid em outro lugar da página (ex.: layout alternativo/oculto),
+    // getByTestId direto na page violava strict mode (2 matches).
+    const ticketScroll = dashboard.getByTestId('ticket-table-scroll')
     await expect(dashboard).toBeVisible()
 
     for (const viewport of [

@@ -30,7 +30,8 @@ test('todas as opções licenciadas abrem uma configuração operacional real', 
   await page.goto('/')
   await page.waitForTimeout(3_000)
   const settings = page.locator('button, a').filter({ hasText: /Configurações/i }).first()
-  if (await settings.isVisible({ timeout: 5_000 }).catch(() => false)) await settings.click()
+  await expect(settings, 'Botão "Configurações" da sidebar não encontrado').toBeVisible({ timeout: 10_000 })
+  await settings.click()
 
   const modules = [
     ['Domínios de serviço', 'Domínios de serviço'],
@@ -41,11 +42,23 @@ test('todas as opções licenciadas abrem uma configuração operacional real', 
     ['Módulos contratados', 'Módulos contratados e licenças'],
   ] as const
 
+  // Os módulos ficam espalhados por categorias/grupos diferentes
+  // (service_management, channels, cmdb, security, analytics_licensing) —
+  // cada card só existe no DOM quando o grupo certo está ativo (ver
+  // SettingsCenter.tsx, visibleSections). A busca da Central varre todos
+  // os grupos de uma vez, independente de onde o card mora.
+  const searchBox = page.getByPlaceholder(/Buscar usuários, SLA/i)
+  await expect(searchBox, 'Campo de busca da Central de Configurações não encontrado').toBeVisible({ timeout: 10_000 })
+
   for (const [cardTitle, screenTitle] of modules) {
+    await searchBox.fill(cardTitle)
+    await page.waitForTimeout(500)
+
     const card = page.locator('button, article').filter({ hasText: new RegExp(cardTitle, 'i') }).first()
-    await expect(card).toBeVisible({ timeout: 8_000 })
+    await expect(card, `Card "${cardTitle}" não encontrado na busca`).toBeVisible({ timeout: 8_000 })
     await card.click()
     await expect(page.getByRole('heading', { name: screenTitle, exact: true })).toBeVisible({ timeout: 8_000 })
     await page.getByRole('button', { name: /Central de Configurações/i }).first().click()
+    await expect(searchBox, 'Campo de busca não voltou a aparecer ao retornar à Central').toBeVisible({ timeout: 10_000 })
   }
 })

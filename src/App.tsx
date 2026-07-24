@@ -1055,7 +1055,7 @@ export default function App() {
           items={navItems}
           activeView={activeView}
           company={{
-            name: currentCompany.name,
+            name: currentCompany.branding.brandName,
             domain: currentCompany.domain,
             logoUrl: currentCompany.branding.logoUrl,
           }}

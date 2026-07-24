@@ -61,10 +61,16 @@ async function openRouting(page: Page) {
   await page.waitForTimeout(3_000)
 
   const settingsBtn = page.locator('button, a').filter({ hasText: /Configurações/i }).first()
-  if (await settingsBtn.isVisible({ timeout: 5_000 }).catch(() => false)) {
-    await settingsBtn.click()
-    await page.waitForTimeout(1_500)
-  }
+  await expect(settingsBtn, 'Botão "Configurações" da sidebar não encontrado').toBeVisible({ timeout: 10_000 })
+  await settingsBtn.click()
+
+  // "Rotas e filas" fica no grupo "Operações e canais" (category
+  // channels) — não é o grupo padrão ('access'). A busca da Central varre
+  // todos os grupos (ver SettingsCenter.tsx, visibleSections).
+  const searchBox = page.getByPlaceholder(/Buscar usuários, SLA/i)
+  await expect(searchBox, 'Campo de busca da Central de Configurações não encontrado').toBeVisible({ timeout: 10_000 })
+  await searchBox.fill('Rotas e filas')
+  await page.waitForTimeout(500)
 
   const card = page.locator('button, article').filter({ hasText: /Rotas e filas/i }).first()
   await expect(card).toBeVisible({ timeout: 10_000 })

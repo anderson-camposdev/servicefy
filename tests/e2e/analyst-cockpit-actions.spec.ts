@@ -90,9 +90,12 @@ test.describe('Cockpit do analista — resumo e ações ITSM', () => {
 
     await page.getByRole('button', { name: /Resolver chamado/i }).click()
     const resolveDialog = page.getByRole('dialog')
-    await expect(resolveDialog.getByText('Resolver Chamado', { exact: true })).toBeVisible()
+    // Título inclui o número do chamado ("Resolver INC0010003"), não o
+    // texto genérico "Resolver Chamado" que este teste esperava antes.
+    await expect(resolveDialog.getByText(/^Resolver /i).first()).toBeVisible()
     await resolveDialog.getByRole('button', { name: /Confirmar Resolução/i }).click()
-    await expect(page.getByText(/Selecione o Código de Encerramento/i).first()).toBeVisible()
+    // Copy atual é "Selecione um código de resolução." (mudou de "Código de Encerramento").
+    await expect(page.getByText(/Selecione um código de resolução/i).first()).toBeVisible()
   })
 
   test('preserva os fluxos de iniciar atendimento e reabrir somente pelo topo', async ({ page }) => {

@@ -178,12 +178,15 @@ async function navigateToPortal(page: Page) {
 // ══════════════════════════════════════════════════════════════════
 
 test.describe('Portal do Usuário — Catálogo e Saudação', () => {
-  test('deve exibir saudação personalizada com nome do usuário', async ({ page }) => {
+  test('deve exibir saudação de boas-vindas do tenant', async ({ page }) => {
     await setupPortalMocks(page)
     await navigateToPortal(page)
 
-    // O topo exibe "Como posso te ajudar, Analista?"
-    const greeting = page.getByText(/Como posso te ajudar, Analista/i).first()
+    // A saudação usa welcome_title/welcome_subtitle configurados no tenant
+    // ("Bem-vindo ao Suporte" / "Como podemos te ajudar hoje?", ver
+    // TENANT_A em helpers/mockAuth.ts) — não é personalizada com o nome
+    // do usuário.
+    const greeting = page.getByText(/Bem-vindo ao Suporte/i).first()
     await expect(greeting).toBeVisible({ timeout: 10_000 })
   })
 
@@ -191,8 +194,7 @@ test.describe('Portal do Usuário — Catálogo e Saudação', () => {
     await setupPortalMocks(page)
     await navigateToPortal(page)
 
-    // O topo exibe "Como posso te ajudar, Analista?"
-    const greeting = page.getByText(/Como posso te ajudar, Analista/i).first()
+    const greeting = page.getByText(/Bem-vindo ao Suporte/i).first()
     await expect(greeting).toBeVisible({ timeout: 8_000 })
 
     // A home exibe o subtítulo "O que você precisa?"

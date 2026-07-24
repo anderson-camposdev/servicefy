@@ -1,8 +1,12 @@
 import { expect, test, type Page, type Route } from '@playwright/test'
 import { setupMockAuth, tenants, SUPABASE_URL } from './helpers/mockAuth'
 
-const PNG_1X1 = Buffer.from(
-  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+// PNG sólido 256×96 (acima do mínimo exigido pela validação de
+// resolução do upload de logo, 240×80 — um PNG 1×1 trivial passou a ser
+// rejeitado com "Logotipo com baixa resolução" quando essa validação foi
+// adicionada ao produto, e o fixture de teste nunca foi atualizado).
+const VALID_LOGO_PNG = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAQAAAABgCAIAAAB9kzvfAAABHElEQVR4nO3TMQ0AMAzAsEIY5cEau8HoEUsGkCdz3oWsWS+ARQYgzQCkGYA0A5BmANIMQJoBSDMAaQYgzQCkGYA0A5BmANIMQJoBSDMAaQYgzQCkGYA0A5BmANIMQJoBSDMAaQYgzQCkGYA0A5BmANIMQJoBSDMAaQYgzQCkGYA0A5BmANIMQJoBSDMAaQYgzQCkGYA0A5BmANIMQJoBSDMAaQYgzQCkGYA0A5BmANIMQJoBSDMAaQYgzQCkGYA0A5BmANIMQJoBSDMAaQYgzQCkGYA0A5BmANIMQJoBSDMAaQYgzQCkGYA0A5BmANIMQJoBSDMAaQYgzQCkGYA0A5BmANIMQJoBSDMAaQYgzQCkGYA0A5BmANIMQNoHe0DHNqOMP/EAAAAASUVORK5CYII=',
   'base64',
 )
 
@@ -57,7 +61,7 @@ async function setupBrandingAdmin(page: Page) {
 
   await page.route(`${SUPABASE_URL}/storage/v1/object/**`, async route => {
     if (route.request().method() === 'GET') {
-      await route.fulfill({ status: 200, contentType: 'image/png', body: PNG_1X1 })
+      await route.fulfill({ status: 200, contentType: 'image/png', body: VALID_LOGO_PNG })
       return
     }
     await route.fulfill({ status: 200, contentType: 'application/json', body: '{"Key":"brands/company-a-uuid/logo"}' })
@@ -92,7 +96,7 @@ test('admin salva logo e tema e a marca persiste sem recarregar a SPA', async ({
   await page.locator('input[type="file"]').first().setInputFiles({
     name: 'logo.png',
     mimeType: 'image/png',
-    buffer: PNG_1X1,
+    buffer: VALID_LOGO_PNG,
   })
   await expect(page.getByText('Logotipo enviado com sucesso!')).toBeVisible()
   await page.getByRole('button', { name: 'Emerald Green' }).click()
