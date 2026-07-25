@@ -535,7 +535,7 @@ const TicketManagementDashboard = ({ onOpenTicket, companyId, isProvider, compan
                 </div>
                 <div className="min-w-0">
                   <p className="text-base font-black leading-none">{count}</p>
-                  <p className="truncate text-[9px] font-semibold uppercase tracking-wide opacity-90 mt-0.5">{metric.title}</p>
+                  <p className="truncate text-[10px] font-bold uppercase tracking-wide mt-0.5">{metric.title}</p>
                 </div>
               </button>
             )

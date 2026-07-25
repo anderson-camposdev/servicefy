@@ -39,14 +39,15 @@ function DestinationList({
             title={collapsed ? item.label : undefined}
             onClick={() => onNavigate(item.view)}
             className={[
-              'flex min-h-11 w-full items-center gap-3 rounded-lg px-3 text-left text-sm font-semibold',
+              'relative flex min-h-11 w-full items-center gap-3 rounded-lg px-3 text-left text-sm',
               'transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2',
               collapsed ? 'justify-center px-0' : '',
               active
-                ? 'bg-primary-container text-on-primary-container'
-                : 'text-on-surface-variant hover:bg-surface-container hover:text-on-surface',
+                ? 'bg-primary-container font-bold text-on-primary-container'
+                : 'font-semibold text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface',
             ].join(' ')}
           >
+            {active && <span aria-hidden="true" className="absolute inset-y-1 left-0 w-[3px] rounded-full bg-primary" />}
             <span className={active ? 'text-primary' : 'text-on-surface-variant'}>{item.icon}</span>
             {!collapsed && <span className="min-w-0 truncate">{item.label}</span>}
           </button>
@@ -58,7 +59,7 @@ function DestinationList({
 
 function TenantContext({ company, collapsed }: Pick<AppNavigationProps, 'company'> & { collapsed?: boolean }) {
   const avatar = (
-    <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-surface font-bold text-primary">
+    <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-surface-container font-bold text-primary">
       {company.logoUrl ? (
         <img src={company.logoUrl} alt="" className="h-full w-full object-contain" />
       ) : (
@@ -69,14 +70,14 @@ function TenantContext({ company, collapsed }: Pick<AppNavigationProps, 'company
 
   if (collapsed) {
     return (
-      <div className="flex justify-center rounded-xl bg-surface-container p-1.5" title={company.name}>
+      <div className="flex justify-center rounded-xl border border-outline-variant bg-surface p-1.5" title={company.name}>
         {avatar}
       </div>
     )
   }
 
   return (
-    <div className="rounded-xl bg-surface-container p-3">
+    <div className="rounded-xl border border-outline-variant bg-surface p-3">
       <div className="flex items-center gap-3">
         {avatar}
         <div className="min-w-0">
@@ -122,7 +123,7 @@ export default function AppNavigation({ items, activeView, company, onNavigate }
       <aside
         data-testid="app-sidebar"
         data-collapsed={collapsed}
-        className={`relative hidden shrink-0 flex-col border-r border-outline-variant bg-surface py-4 transition-[width] duration-200 ease-in-out lg:flex ${
+        className={`relative hidden shrink-0 flex-col border-r border-outline-variant bg-surface-container py-4 transition-[width] duration-200 ease-in-out lg:flex ${
           collapsed ? 'w-[4.5rem] px-2' : 'w-60 px-3'
         }`}
       >
@@ -132,7 +133,7 @@ export default function AppNavigation({ items, activeView, company, onNavigate }
           onClick={toggleCollapsed}
           aria-label={collapsed ? 'Expandir menu' : 'Recolher menu'}
           title={collapsed ? 'Expandir menu' : 'Recolher menu'}
-          className="absolute -right-3 top-6 z-10 flex h-6 w-6 items-center justify-center rounded-full border border-outline-variant bg-surface text-on-surface-variant shadow-sm hover:bg-surface-container hover:text-on-surface"
+          className="absolute -right-3 top-6 z-10 flex h-6 w-6 items-center justify-center rounded-full border border-outline-variant bg-surface text-on-surface-variant shadow-sm hover:bg-surface-container-high hover:text-on-surface"
         >
           {collapsed ? <PanelLeftOpen className="h-3.5 w-3.5" /> : <PanelLeftClose className="h-3.5 w-3.5" />}
         </button>

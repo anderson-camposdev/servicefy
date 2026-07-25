@@ -345,7 +345,7 @@ export default function TicketDataTable<T>({
             {actions && <col style={{ width: ACTIONS_COL_WIDTH }} />}
           </colgroup>
           <thead className="bg-slate-50 sticky top-0 z-10 shadow-sm border-b border-slate-200">
-            <tr className="text-slate-500 font-bold uppercase text-[10px] tracking-wider">
+            <tr className="text-slate-600 font-bold uppercase text-[11px] tracking-wider">
               {leadingCheckbox && <th className="p-3 w-10 text-center"><input type="checkbox" className="rounded border-slate-300" /></th>}
               {visibleFields.map((field, index) => {
                 const direction = sort?.fieldKey === field.key ? sort.direction : null

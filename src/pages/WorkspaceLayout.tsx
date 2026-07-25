@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react'
-import { X, LayoutGrid, Shuffle } from 'lucide-react'
+import { X, LayoutGrid } from 'lucide-react'
 import TicketManagementDashboard from './TicketManagementDashboard'
 import AnalystCockpit from './AnalystCockpit'
-import ChangeManagementDashboard from './ChangeManagementDashboard'
 import type { WorkspaceTicket, CompanyLite } from './workspace.types'
 import { incidentsService } from '../lib/services'
 
@@ -11,6 +10,10 @@ import { incidentsService } from '../lib/services'
  * (estilo Sensr). A primeira aba (root) é a Gestão de Tickets e não pode
  * ser fechada. Clicar num chamado abre uma aba de detalhe (Cockpit) sem
  * recarregar a página nem abrir abas reais do navegador.
+ *
+ * Gestão de Mudanças NÃO é aba daqui — é destino próprio na navegação
+ * lateral (App.tsx, view 'mudancas'). Ter os dois era duplicidade: o
+ * mesmo dashboard alcançável por dois caminhos.
  *
  * Todas as abas permanecem montadas (alternadas via CSS) para preservar
  * estado e evitar refetch ao trocar de aba.
@@ -34,7 +37,6 @@ interface WorkspaceLayoutProps {
 const WorkspaceLayout = ({ companyId, isProvider, companies, ticketType, initialTicketNumber }: WorkspaceLayoutProps) => {
   const [tabs, setTabs] = useState<WorkspaceTab[]>([
     { id: ROOT_ID, title: 'Gestão de Tickets' },
-    { id: 'changes', title: 'Gestão de Mudanças' }
   ])
   const [activeId, setActiveId] = useState<string>(ROOT_ID)
 
@@ -75,8 +77,6 @@ const WorkspaceLayout = ({ companyId, isProvider, companies, ticketType, initial
   useEffect(() => {
     if (activeId === ROOT_ID) {
       window.history.pushState({}, '', ticketType === 'request' ? '/requisicoes' : '/incidentes')
-    } else if (activeId === 'changes') {
-      window.history.pushState({}, '', '/mudancas')
     } else {
       const activeTab = tabs.find(t => t.id === activeId)
       const ticketNumber = activeTab?.ticket?.number || (activeTab?.title?.startsWith('INC') ? activeTab.title : null)
@@ -95,7 +95,7 @@ const WorkspaceLayout = ({ companyId, isProvider, companies, ticketType, initial
       <div className={`flex items-stretch gap-1 px-2 pt-2 overflow-x-auto hide-scrollbar shrink-0 ${barBg}`}>
         {tabs.map(tab => {
           const active = tab.id === activeId
-          const isRoot = tab.id === ROOT_ID || tab.id === 'changes'
+          const isRoot = tab.id === ROOT_ID
           
           let tabStyle = ''
           if (active) {
@@ -112,9 +112,6 @@ const WorkspaceLayout = ({ companyId, isProvider, companies, ticketType, initial
             >
               {tab.id === ROOT_ID && (
                 <LayoutGrid className="w-4 h-4 text-primary" />
-              )}
-              {tab.id === 'changes' && (
-                <Shuffle className="w-4 h-4 text-primary" />
               )}
               {tab.title}
               {!isRoot && (
@@ -143,13 +140,7 @@ const WorkspaceLayout = ({ companyId, isProvider, companies, ticketType, initial
           />
         </div>
         
-        <div className={activeId === 'changes' ? 'h-full' : 'hidden'}>
-          <ChangeManagementDashboard
-            companyId={companyId}
-          />
-        </div>
-
-        {tabs.filter(t => t.id !== ROOT_ID && t.id !== 'changes').map(tab => (
+        {tabs.filter(t => t.id !== ROOT_ID).map(tab => (
           <div key={tab.id} className={activeId === tab.id ? 'h-full' : 'hidden'}>
             <AnalystCockpit ticket={tab.ticket} />
           </div>

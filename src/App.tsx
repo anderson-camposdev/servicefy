@@ -902,7 +902,7 @@ export default function App() {
   return (
     <div className="h-screen max-h-screen w-full max-w-full overflow-hidden text-on-surface flex flex-col" style={{ background: currentCompany.branding.backgroundColor || 'var(--color-bg-primary)', backgroundSize: 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat', backgroundAttachment: 'fixed' }}>
       {/* Top Header */}
-      <header className="sticky top-0 z-40 flex min-h-16 min-w-0 shrink-0 items-center gap-2 border-b border-outline-variant bg-surface px-3 py-3 sm:px-4 lg:gap-3 lg:px-6">
+      <header className="sticky top-0 z-40 flex min-h-16 min-w-0 shrink-0 items-center gap-2 border-b border-outline-variant bg-surface-container px-3 py-3 sm:px-4 lg:gap-3 lg:px-6">
         {/* Product brand */}
         <div className="flex items-center gap-2.5 shrink-0">
           <div
@@ -914,7 +914,7 @@ export default function App() {
             <span className="ml-0.5 text-[11px] font-black tracking-[-0.08em] text-cyan-300">FY</span>
           </div>
           <span className="hidden text-lg font-black tracking-tight text-on-surface sm:block">ServiceFY</span>
-          <span className="hidden rounded-md bg-surface-container px-1.5 py-1 text-[10px] font-bold tracking-wide text-on-surface-variant sm:block">
+          <span className="hidden rounded-md bg-surface px-1.5 py-1 text-[10px] font-bold tracking-wide text-on-surface-variant sm:block">
             ITSM
           </span>
         </div>
@@ -922,7 +922,7 @@ export default function App() {
         <div className="w-px h-6 bg-outline-variant mx-1 hidden sm:block" />
 
         {/* Tenant Indicator (+ selo de Provedor MSP) */}
-        <div className="hidden min-w-0 max-w-[13rem] shrink items-center gap-2 rounded-lg bg-surface-container px-2.5 py-2 text-xs font-semibold text-on-surface sm:flex xl:max-w-[18rem]">
+        <div className="hidden min-w-0 max-w-[13rem] shrink items-center gap-2 rounded-lg border border-outline-variant bg-surface px-2.5 py-2 text-xs font-semibold text-on-surface sm:flex xl:max-w-[18rem]">
           <div className="relative flex min-w-0 items-center">
             {currentCompany.branding.logoUrl && (
               <>
@@ -1010,7 +1010,7 @@ export default function App() {
 
         {/* User Menu (perfil real autenticado) */}
         <div className="relative">
-          <button onClick={() => setIsUserMenuOpen(v => !v)} className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl border border-outline-variant bg-surface hover:bg-surface-container hover:border-outline transition-all cursor-pointer shadow-sm">
+          <button onClick={() => setIsUserMenuOpen(v => !v)} className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl border border-outline-variant bg-surface hover:bg-surface-container-high hover:border-outline transition-all cursor-pointer shadow-sm">
             <img src={currentUser.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(currentUser.name)}&size=48`} alt={currentUser.name} className="w-6 h-6 rounded-full" />
             <div className="hidden sm:block text-left">
               <div className="text-xs font-bold text-on-surface">{currentUser.name.split(' ')[0]}</div>
@@ -1075,7 +1075,7 @@ export default function App() {
       </div>
 
       {/* Footer */}
-      <footer className="hidden shrink-0 items-center justify-between border-t border-outline-variant bg-surface px-6 py-2.5 lg:flex">
+      <footer className="hidden shrink-0 items-center justify-between border-t border-outline-variant bg-surface-container px-6 py-2.5 lg:flex">
         <span className="text-xs text-on-surface-variant">© {new Date().getFullYear()} ServiceFY</span>
         <span className="flex items-center gap-1.5 text-xs text-on-surface-variant">
           <span className="h-1.5 w-1.5 rounded-full bg-resolved" />
