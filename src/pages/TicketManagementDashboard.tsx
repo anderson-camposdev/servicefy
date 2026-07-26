@@ -1,5 +1,5 @@
 import { useState, useEffect, type MouseEvent } from 'react'
-import { Search, Clock, AlertTriangle, CheckCircle, MoreHorizontal, Building2, LayoutGrid, List, ChevronRight, Settings, X, User, Users, Plus, UserCheck } from 'lucide-react'
+import { Search, Clock, AlertTriangle, CheckCircle, MoreHorizontal, Building2, LayoutGrid, List, ChevronRight, ChevronLeft, Settings, X, User, Users, Plus, UserCheck } from 'lucide-react'
 import NewTicketModal from './NewTicketModal'
 import { useIncidents } from '../hooks/useIncidents'
 import { useAuth } from '../auth'
@@ -276,7 +276,7 @@ const DEFAULT_METRIC_KEYS = ['total', 'critical', 'inProgress', 'slaBreached']
 
 const TicketManagementDashboard = ({ onOpenTicket, companyId, isProvider, companies, ticketType }: TicketManagementDashboardProps) => {
   const realMode = Boolean(companyId)
-  const { incidents, loading, filterCompanyId, setFilterCompanyId, setSearch } = useIncidents(companyId ?? '', undefined, ticketType)
+  const { incidents, kpis, loading, filterCompanyId, setFilterCompanyId, setSearch, page, pageSize, setPage } = useIncidents(companyId ?? '', undefined, ticketType)
   const { profile } = useAuth()
   const { toast } = useToast()
 
@@ -519,7 +519,13 @@ const TicketManagementDashboard = ({ onOpenTicket, companyId, isProvider, compan
             const metric = AVAILABLE_METRICS.find(m => m.key === key)
             if (!metric) return null
             const Icon = metric.icon
-            const count = metric.countFn(typedRows, profileIdForMetrics, myGroupIds)
+            // Contagem vem do servidor (RPC get_ticket_queue_kpis). Contar
+            // sobre `typedRows` mostrava o tamanho da PÁGINA, não da fila:
+            // com 50.010 chamados o card exibia 1.000. No modo mock não há
+            // servidor, então ali o fallback local continua correto.
+            const count = realMode
+              ? (kpis as Record<string, number>)[key] ?? 0
+              : metric.countFn(typedRows, profileIdForMetrics, myGroupIds)
             const isActive = activeFilterCard === key
 
             return (
@@ -552,7 +558,7 @@ const TicketManagementDashboard = ({ onOpenTicket, companyId, isProvider, compan
       </div>
 
       {/* 3. ÁREA PRINCIPAL: Tabela ou Kanban */}
-      <div className="servicefy-ticket-content flex-1 min-h-0 min-w-0 overflow-hidden px-3 sm:px-4 xl:px-6 pb-3 xl:pb-6">
+      <div className="servicefy-ticket-content flex-1 min-h-0 min-w-0 overflow-hidden px-3 sm:px-4 xl:px-6 pb-1">
 
         {viewMode === 'table' ? (
           <TicketDataTable
@@ -629,6 +635,47 @@ const TicketManagementDashboard = ({ onOpenTicket, companyId, isProvider, compan
         )}
 
       </div>
+
+      {/* 4. PAGINAÇÃO — a fila é paginada no servidor (ver services.ts).
+          Sem isso o PostgREST cortava em 1.000 linhas sem avisar, e a
+          ordenação por urgência, feita só no cliente, nunca alcançava o
+          que ficou fora do corte. */}
+      {realMode && (
+        <div
+          data-testid="ticket-pagination"
+          className="servicefy-ticket-pagination flex shrink-0 items-center justify-between gap-3 border-t border-outline-variant bg-surface px-3 py-2 sm:px-4 xl:px-6"
+        >
+          <span className="text-xs font-semibold text-on-surface-variant">
+            {kpis.total > 0 ? (
+              <>
+                Exibindo <b className="text-on-surface">{page * pageSize + 1}–{page * pageSize + finalFilteredRows.length}</b>
+                {' '}de <b className="text-on-surface">{kpis.total}</b> chamados
+              </>
+            ) : 'Nenhum chamado na fila'}
+          </span>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setPage(Math.max(0, page - 1))}
+              disabled={page === 0 || loading}
+              className="flex min-h-8 items-center gap-1 rounded-lg border border-outline-variant bg-surface px-2.5 text-xs font-bold text-on-surface transition-colors hover:bg-surface-container-high disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              <ChevronLeft className="h-3.5 w-3.5" /> Anterior
+            </button>
+            <span className="text-xs font-semibold text-on-surface-variant tabular-nums">
+              {page + 1} / {Math.max(1, Math.ceil(kpis.total / pageSize))}
+            </span>
+            <button
+              type="button"
+              onClick={() => setPage(page + 1)}
+              disabled={loading || (page + 1) * pageSize >= kpis.total}
+              className="flex min-h-8 items-center gap-1 rounded-lg border border-outline-variant bg-surface px-2.5 text-xs font-bold text-on-surface transition-colors hover:bg-surface-container-high disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Próxima <ChevronRight className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Customization Modal */}
       {isCustomizing && (

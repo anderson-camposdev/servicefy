@@ -7989,6 +7989,13 @@ export type Database = {
         }
       }
       auto_close_resolved_incidents: { Args: never; Returns: undefined }
+      // Adicionado à mão (migration 178). Regenerar o arquivo inteiro
+      // reintroduz drift não relacionado entre o schema local e o cloud
+      // (colunas ui_config etc.), o que ampliaria o escopo desta mudança.
+      get_ticket_queue_kpis: {
+        Args: { p_filter_company_id?: string | null; p_ticket_type?: string | null }
+        Returns: Json
+      }
       batch_invite_users: {
         Args: { p_payload: Json }
         Returns: Json

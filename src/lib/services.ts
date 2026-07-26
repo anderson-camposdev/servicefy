@@ -274,6 +274,16 @@ export const profilesService = {
 
 // ─── INCIDENTS ────────────────────────────────────────────────
 
+/**
+ * Tamanho de página padrão da fila de chamados.
+ *
+ * Existe porque o PostgREST corta respostas em 1.000 linhas devolvendo
+ * HTTP 200 — sem limite explícito o app recebia um recorte arbitrário
+ * achando que tinha tudo. Qualquer consulta de lista precisa passar por
+ * aqui ou informar o próprio limite.
+ */
+export const DEFAULT_TICKET_PAGE_SIZE = 50
+
 export type IncidentFilters = {
   companyId: string
   search?: string
@@ -303,7 +313,17 @@ export const incidentsService = {
       q = q.eq('company_id', filters.companyId)
     }
 
-    q = q.order('updated_at', { ascending: false })
+    // Ordenação OPERACIONAL no servidor (migration 177). Ordenar por
+    // updated_at aqui era a causa de um chamado crítico parado há semanas
+    // sumir da fila: como só as primeiras linhas chegam ao navegador, ele
+    // ficava fora do corte e a ordenação por urgência — feita no cliente —
+    // nunca o alcançava. queue_rank/queue_deadline reproduzem no banco a
+    // mesma regra de ticket-operations.ts, e são indexadas.
+    q = q
+      .order('queue_rank', { ascending: true })
+      .order('queue_deadline', { ascending: true, nullsFirst: false })
+      .order('priority', { ascending: true })
+      .order('updated_at', { ascending: false })
 
     if (filters.state && filters.state !== 'all')    q = q.eq('state', filters.state)
     if (filters.priority && filters.priority !== 'all') q = q.eq('priority', filters.priority)
@@ -314,11 +334,33 @@ export const incidentsService = {
     }
     if (filters.callerId)                             q = q.eq('caller_id', filters.callerId)
     if (filters.ticketType && filters.ticketType !== 'all') q = q.eq('ticket_type', filters.ticketType)
-    if (filters.limit)                                q = q.limit(filters.limit)
-    if (filters.offset)                               q = q.range(filters.offset, filters.offset + (filters.limit ?? 50) - 1)
+
+    // Limite SEMPRE presente. Sem ele o PostgREST corta em 1.000 e responde
+    // HTTP 200 — truncamento silencioso, sem erro para o app perceber.
+    const limit  = filters.limit ?? DEFAULT_TICKET_PAGE_SIZE
+    const offset = filters.offset ?? 0
+    q = q.range(offset, offset + limit - 1)
 
     const { data, error } = await q
     return throwIfError(data, error)
+  },
+
+  /**
+   * Contagens da fila calculadas no banco (migration 178).
+   * Contar no cliente sobre as linhas baixadas dava números errados
+   * assim que a fila passava do teto de 1.000 linhas do PostgREST.
+   */
+  async getQueueKpis(
+    companyId: string,
+    filterCompanyId?: string,
+    ticketType?: 'incident' | 'request',
+  ): Promise<{ total: number; critical: number; inProgress: number; slaBreached: number; unassigned: number }> {
+    const { data, error } = await getClientForCompany(companyId).rpc('get_ticket_queue_kpis', {
+      p_filter_company_id: filterCompanyId && filterCompanyId !== 'all' ? filterCompanyId : null,
+      p_ticket_type: ticketType ?? null,
+    })
+    if (error) throw error
+    return data as { total: number; critical: number; inProgress: number; slaBreached: number; unassigned: number }
   },
 
   /** Get a single incident with its history */
