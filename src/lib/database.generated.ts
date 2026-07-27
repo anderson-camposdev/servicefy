@@ -9094,6 +9094,7 @@ export type Database = {
         | "imap_smtp"
         | "portal"
         | "api"
+        | "monitoring"
       channel_scope: "tenant" | "provider"
       delivery_status:
         | "pending"
@@ -9296,6 +9297,7 @@ export const Constants = {
         "imap_smtp",
         "portal",
         "api",
+        "monitoring",
       ],
       channel_scope: ["tenant", "provider"],
       delivery_status: [

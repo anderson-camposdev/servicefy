@@ -14,6 +14,12 @@ export interface SafeConnectionHealth {
   lastHealthCheckAt: string | null
   lastErrorCode: string | null
   rotationRequired: boolean
+  /**
+   * Ajustes do provider (regras de correlação da conexão de Monitoramento).
+   * Precisa vir na listagem: sem isso, editar o nome de uma conexão salvaria
+   * config vazio por cima e apagaria as regras do tenant sem aviso.
+   */
+  config: Record<string, unknown>
 }
 
 export interface SettingsOverview {
@@ -85,7 +91,7 @@ export const platformAdminService = {
         .order('module_key'),
       supabase
         .from('channel_connections')
-        .select('id,provider,name,address,enabled,status,subscription_expires_at,last_health_check_at,last_error_code,rotation_required')
+        .select('id,provider,name,address,enabled,status,subscription_expires_at,last_health_check_at,last_error_code,rotation_required,config')
         .eq('company_id', companyId)
         .order('provider'),
     ])
@@ -106,6 +112,7 @@ export const platformAdminService = {
         lastHealthCheckAt: row.last_health_check_at,
         lastErrorCode: row.last_error_code,
         rotationRequired: row.rotation_required,
+        config: (row.config ?? {}) as Record<string, unknown>,
       })),
     }
   },

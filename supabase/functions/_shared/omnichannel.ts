@@ -1,6 +1,24 @@
 export type ChannelProvider =
   | 'microsoft_graph' | 'microsoft_teams' | 'gmail' | 'google_chat'
-  | 'whatsapp_cloud' | 'imap_smtp' | 'portal' | 'api'
+  | 'whatsapp_cloud' | 'imap_smtp' | 'portal' | 'api' | 'monitoring'
+
+/**
+ * Ajustes da conexão de Monitoramento (channel_connections.config).
+ *
+ * `correlationPattern` é o que impede a enxurrada: sem ele, e-mail de alerta
+ * não tem conversationId, threadId nem References, cai no fallback de
+ * messageId — único por e-mail — e cada repetição do MESMO alerta vira um
+ * chamado novo. Com ele, o identificador do gatilho (ex.: {TRIGGER.ID} do
+ * Zabbix) passa a ser a chave da conversa e as repetições se agrupam.
+ */
+export interface MonitoringConfig {
+  /** Regex com 1 grupo de captura, aplicada a assunto + corpo. */
+  correlationPattern?: string
+  /** Regex que identifica a mensagem de recuperação (ex.: '^Resolved:'). */
+  recoveryPattern?: string
+  /** Regex com 1 grupo de captura para a severidade. */
+  severityPattern?: string
+}
 
 export interface NormalizedInboundEvent {
   provider: ChannelProvider
@@ -130,12 +148,94 @@ export const normalizeEmail = (
   }]
 }
 
+/** Aplica a regex e devolve o 1º grupo de captura (ou o casamento inteiro). */
+const firstMatch = (pattern: string | undefined, text: string): string | undefined => {
+  if (!pattern) return undefined
+  try {
+    const found = new RegExp(pattern, 'im').exec(text)
+    return found ? (found[1] ?? found[0]) : undefined
+  } catch {
+    // Regex inválida vinda da configuração do tenant não pode derrubar a
+    // ingestão: sem correlação o alerta ainda vira chamado, só não agrupa.
+    return undefined
+  }
+}
+
+/**
+ * Alerta de ferramenta de monitoramento (Zabbix, PRTG, Datadog…).
+ *
+ * Aceita tanto o e-mail normalizado quanto JSON estruturado do webhook. A
+ * diferença para os demais canais está em duas decisões:
+ *
+ *  • a conversa é identificada pelo GATILHO, não pela mensagem — é isso que
+ *    faz 40 oscilações do mesmo alerta virarem 40 mensagens num chamado em
+ *    vez de 40 chamados;
+ *  • severidade e sinal de recuperação viajam em `raw.servicefy_alert`, de
+ *    onde materialize_channel_message os lê.
+ */
+export const normalizeMonitoring = (
+  payload: unknown,
+  connectionId: string,
+  config: MonitoringConfig = {},
+): NormalizedInboundEvent[] => {
+  const source = record(payload)
+  const base = normalizeEmail(source, connectionId, 'imap_smtp')[0]
+    ?? {
+      provider: 'imap_smtp' as const, connectionId,
+      externalEventId: String(source.event_id ?? crypto.randomUUID()),
+      externalConversationId: '', externalMessageId: String(source.message_id ?? crypto.randomUUID()),
+      sender: { externalId: 'monitoring' }, recipients: [], subject: String(source.subject ?? ''),
+      text: String(source.text ?? source.message ?? ''), references: [] as string[],
+      attachments: [], occurredAt: new Date().toISOString(), raw: source,
+    }
+
+  const haystack = `${base.subject ?? ''}\n${base.text ?? ''}`
+
+  // Campo explícito do webhook tem precedência sobre a regex do e-mail:
+  // quem manda JSON estruturado não deveria depender de parsing de texto.
+  const correlationKey = String(source.correlation_key ?? '').trim()
+    || firstMatch(config.correlationPattern, haystack)
+    || base.externalConversationId
+
+  const severity = String(source.severity ?? '').trim()
+    || firstMatch(config.severityPattern, haystack)
+    || undefined
+
+  const isRecovery = typeof source.is_recovery === 'boolean'
+    ? source.is_recovery
+    : Boolean(config.recoveryPattern && firstMatch(config.recoveryPattern, haystack))
+
+  return [{
+    ...base,
+    provider: 'monitoring',
+    externalConversationId: correlationKey,
+    sender: {
+      ...base.sender,
+      displayName: base.sender.displayName ?? 'Monitoramento',
+    },
+    raw: {
+      ...record(base.raw),
+      servicefy_alert: {
+        correlation_key: correlationKey,
+        severity: severity ?? null,
+        is_recovery: isRecovery,
+      },
+    },
+  }]
+}
+
 export const normalizeInbound = (
   provider: ChannelProvider, payload: unknown, connectionId: string,
+  config: MonitoringConfig = {},
 ): NormalizedInboundEvent[] => {
   if (provider === 'whatsapp_cloud') return normalizeWhatsApp(payload, connectionId)
   if (provider === 'google_chat') return normalizeGoogleChat(payload, connectionId)
   if (provider === 'microsoft_teams') return normalizeTeams(payload, connectionId)
+  if (provider === 'monitoring') {
+    const source = record(payload)
+    const alerts = source.alerts ?? source.messages ?? [source]
+    return alerts.flatMap((alert: unknown) => normalizeMonitoring(alert, connectionId, config))
+  }
   if (provider === 'microsoft_graph' || provider === 'gmail' || provider === 'imap_smtp') {
     const source = record(payload)
     const messages = source.messages ?? source.value ?? [source]

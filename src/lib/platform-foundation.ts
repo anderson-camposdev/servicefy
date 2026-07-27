@@ -29,7 +29,7 @@ export interface ModuleEntitlement {
 
 export type ChannelProvider =
   | 'microsoft_graph' | 'microsoft_teams' | 'gmail' | 'google_chat'
-  | 'whatsapp_cloud' | 'imap_smtp' | 'portal' | 'api'
+  | 'whatsapp_cloud' | 'imap_smtp' | 'portal' | 'api' | 'monitoring'
 export type ChannelKind = 'email' | 'chat' | 'whatsapp' | 'portal' | 'api'
 export type ChannelConnectionScope = 'tenant' | 'provider'
 

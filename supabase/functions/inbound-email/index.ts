@@ -144,10 +144,13 @@ Deno.serve(async (req) => {
   // ilike com '_'/'%' escapados — toEmail vem de regex, mas '_' é caractere
   // válido em local-part de e-mail e é wildcard de um-caractere no ILIKE.
   const escapedToEmail = toEmail.replace(/[%_]/g, char => `\\${char}`)
+  // Inclui 'monitoring': a caixa que recebe alerta de Zabbix/PRTG é uma
+  // conexão de Monitoramento, não de e-mail de cliente — o que muda é a
+  // normalização (correlação pelo gatilho), não o transporte.
   const { data: connection, error: connectionError } = await admin
     .from('channel_connections')
     .select('id, company_id, provider, enabled')
-    .eq('provider', 'imap_smtp')
+    .in('provider', ['imap_smtp', 'monitoring'])
     .ilike('address', escapedToEmail)
     .eq('enabled', true)
     .maybeSingle()
@@ -179,7 +182,7 @@ Deno.serve(async (req) => {
     headers: {
       'content-type': 'application/json',
       'x-servicefy-internal-key': OMNICHANNEL_INTERNAL_KEY,
-      'x-servicefy-provider': 'imap_smtp',
+      'x-servicefy-provider': connection.provider,
       'x-servicefy-connection-id': connection.id,
     },
     body: JSON.stringify(emailShaped),

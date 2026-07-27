@@ -1,5 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { normalizeInbound, routeValues, type ChannelProvider, type NormalizedInboundEvent } from '../_shared/omnichannel.ts'
+import { normalizeInbound, routeValues, type ChannelProvider, type MonitoringConfig, type NormalizedInboundEvent } from '../_shared/omnichannel.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
@@ -216,7 +216,7 @@ Deno.serve(async request => {
 
   const { data: connection, error: connectionError } = await admin
     .from('channel_connections')
-    .select('id,company_id,scope,provider,enabled')
+    .select('id,company_id,scope,provider,enabled,config')
     .eq('id', connectionId)
     .single()
   if (connectionError || !connection) return json({ error: 'connection_not_found' }, 404)
@@ -224,7 +224,10 @@ Deno.serve(async request => {
 
   try {
     const payload = await request.json()
-    const events = normalizeInbound(provider, payload, connectionId)
+    // A conexão de Monitoramento carrega as regras de correlação em `config`.
+    // Sem elas o alerta ainda vira chamado — só não agrupa as repetições.
+    const events = normalizeInbound(provider, payload, connectionId,
+      (connection.config ?? {}) as MonitoringConfig)
     if (!events.length) return json({ accepted: 0, ignored: true }, 202)
     const results = []
     for (const event of events) results.push(await persistEvent(connection, event))

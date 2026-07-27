@@ -23,7 +23,10 @@ test('camada 2 — exige SPF=pass do remetente real (envelope), rejeita com 403 
 
 test('camada 3 — resolve o destino (to) contra channel_connections real e habilitada antes de delegar ao gateway', () => {
   assert.match(fn, /\.from\('channel_connections'\)/)
-  assert.match(fn, /\.eq\('provider', 'imap_smtp'\)/)
+  // Passou a aceitar também 'monitoring' (migration 180): a caixa que recebe
+  // alerta de Zabbix/PRTG é uma conexão de Monitoramento, não de e-mail de
+  // cliente. O transporte é o mesmo; o que muda é a normalização.
+  assert.match(fn, /\.in\('provider', \['imap_smtp', 'monitoring'\]\)/)
   assert.match(fn, /\.eq\('enabled', true\)/)
   assert.match(fn, /unknown_destination_mailbox/)
 })
@@ -35,7 +38,10 @@ test('escapa \'%\'/\'_\' do e-mail de destino antes do ILIKE (evitar over-match 
 test('não reimplementa a criação de tickets — delega ao omnichannel-gateway existente via x-servicefy-internal-key', () => {
   assert.match(fn, /OMNICHANNEL_INTERNAL_KEY/)
   assert.match(fn, /x-servicefy-internal-key/)
-  assert.match(fn, /x-servicefy-provider.*imap_smtp/)
+  // Repassa o provider REAL da conexão. Fixar 'imap_smtp' faria o gateway
+  // normalizar alerta como e-mail comum — sem correlação por gatilho, cada
+  // repetição do mesmo alerta voltaria a abrir um chamado novo.
+  assert.match(fn, /'x-servicefy-provider': connection\.provider/)
   assert.match(fn, /x-servicefy-connection-id/)
   assert.doesNotMatch(fn, /INSERT INTO/i)
   assert.doesNotMatch(fn, /\.from\('incidents'\)\.insert/)

@@ -12,7 +12,23 @@ const PROVIDERS: Array<{ value: ChannelProvider; label: string }> = [
   { value: 'whatsapp_cloud', label: 'WhatsApp Business Cloud' },
   { value: 'imap_smtp', label: 'IMAP / SMTP' },
   { value: 'api', label: 'API' },
+  { value: 'monitoring', label: 'Monitoramento (Zabbix, PRTG, Datadog…)' },
 ]
+
+/**
+ * Ajustes que só existem na conexão de Monitoramento.
+ *
+ * `correlationPattern` é o que impede a enxurrada: alerta de monitoramento
+ * não é resposta a nada, então sem uma chave estável cada repetição do MESMO
+ * alerta abre um chamado novo — 40 oscilações viram 40 chamados, e o e-mail
+ * de recuperação abre um 41º em vez de fechar o original.
+ */
+const MONITORING_DEFAULTS = {
+  correlationPattern: '',
+  recoveryPattern: '',
+  severityPattern: '',
+  on_recovery: 'notify',
+}
 
 const connectionStatusLabel = (status: SafeConnectionHealth['status']) => {
   if (status === 'healthy') return 'Operacional'
@@ -33,6 +49,7 @@ export default function ChannelConnectionsSettings({ companyId, activeRole, onBa
     provider: 'microsoft_graph' as ChannelProvider,
     scope: 'tenant' as 'tenant' | 'provider',
     name: '', address: '', secret: '', enabled: true,
+    config: { ...MONITORING_DEFAULTS } as Record<string, string>,
   })
 
   const startEdit = (connection: SafeConnectionHealth) => {
@@ -44,6 +61,9 @@ export default function ChannelConnectionsSettings({ companyId, activeRole, onBa
       address: connection.address ?? '',
       secret: '',
       enabled: connection.enabled,
+      // Config existente precisa voltar preenchido: salvar por cima com
+      // vazio apagaria as regras de correlação do tenant sem aviso.
+      config: { ...MONITORING_DEFAULTS, ...(connection.config as Record<string, string>) },
     })
     setShowForm(true)
   }
@@ -76,6 +96,7 @@ export default function ChannelConnectionsSettings({ companyId, activeRole, onBa
         scope: activeRole === 'sysadmin' ? form.scope : 'tenant',
         name: form.name, address: form.address, enabled: form.enabled,
         secret: form.secret || null,
+        config: form.provider === 'monitoring' ? form.config : undefined,
       })
       closeForm()
       await load()
@@ -118,6 +139,42 @@ export default function ChannelConnectionsSettings({ companyId, activeRole, onBa
             <label className="block text-xs font-bold">E-mail ou número usado por este canal<input value={form.address} onChange={event => setForm(v => ({ ...v, address: event.target.value }))} className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" placeholder="suporte@empresa.com" /><span className="mt-1 block text-[11px] font-normal leading-4 text-slate-400">Ex.: suporte@empresa.com para e-mail, ou o número de WhatsApp Business.</span></label>
             <label className="block text-xs font-bold">Credencial<input type="password" value={form.secret} onChange={event => setForm(v => ({ ...v, secret: event.target.value }))} autoComplete="new-password" className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" placeholder={editingId ? 'Deixe em branco para manter a atual' : 'Sua senha ou chave de acesso ficará protegida'} /></label>
             <label className="flex items-center gap-2 text-sm font-semibold"><input type="checkbox" checked={form.enabled} onChange={event => setForm(v => ({ ...v, enabled: event.target.checked }))} /> {editingId ? 'Ativa' : 'Ativar após salvar'}</label>
+
+            {form.provider === 'monitoring' && (() => {
+              const campo = (chave: string, rotulo: string, exemplo: string, ajuda: string) => (
+                <label className="block text-xs font-bold">{rotulo}
+                  <input
+                    value={form.config[chave] ?? ''}
+                    onChange={event => setForm(v => ({ ...v, config: { ...v.config, [chave]: event.target.value } }))}
+                    placeholder={exemplo}
+                    className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 font-mono text-xs"
+                  />
+                  <span className="mt-1 block text-[11px] font-normal leading-4 text-slate-400">{ajuda}</span>
+                </label>
+              )
+              return (
+                <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                  <p className="text-xs font-bold text-slate-700">Regras do alerta</p>
+                  {campo('correlationPattern', 'Identificador do alerta', 'Trigger ID: ([0-9]+)',
+                    'Expressão que extrai um identificador estável do assunto ou corpo. É o que agrupa repetições do mesmo alerta num único chamado — sem ela, cada notificação abre um chamado novo. No Zabbix, inclua {TRIGGER.ID} no template.')}
+                  {campo('recoveryPattern', 'Mensagem de recuperação', '^Resolved:',
+                    'Expressão que identifica o aviso de normalização. Sem ela, a recuperação vira mais um chamado em vez de encerrar o existente.')}
+                  {campo('severityPattern', 'Severidade (opcional)', 'Severity: ([A-Za-z]+)',
+                    'Vai para a categoria do chamado, onde o Motor de Automação consegue lê-la para definir prioridade ou grupo.')}
+                  <label className="block text-xs font-bold">Ao receber a recuperação
+                    <select
+                      value={form.config.on_recovery ?? 'notify'}
+                      onChange={event => setForm(v => ({ ...v, config: { ...v.config, on_recovery: event.target.value } }))}
+                      className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm"
+                    >
+                      <option value="notify">Registrar no chamado e deixar para o analista</option>
+                      <option value="resolve">Resolver o chamado automaticamente</option>
+                    </select>
+                    <span className="mt-1 block text-[11px] font-normal leading-4 text-slate-400">Resolver automaticamente mantém a fila limpa; registrar é mais seguro quando o alerta pode cessar sem a causa ter sido tratada.</span>
+                  </label>
+                </div>
+              )
+            })()}
             <button onClick={() => void save()} disabled={saving || !form.name.trim()} className="flex min-h-10 w-full items-center justify-center gap-2 rounded-lg bg-slate-950 px-4 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50">{saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <KeyRound className="w-4 h-4" />} {editingId ? 'Salvar alterações' : 'Salvar conexão'}</button>
           </div>
         </section>}
