@@ -11,6 +11,8 @@ Este documento define o processo padrão para colocar o ServiceFY em produção,
 1. **Deploy do Schema:** Aplique as migrations no projeto de produção via CLI (`supabase link` seguido de `supabase db push`).
 2. **SMTP:** Configure um provedor de e-mail real (Resend, SendGrid, etc.) em `Authentication -> Providers -> Email`.
 3. **URLs (Auth):** Em `Authentication -> URL Configuration`, defina a `Site URL` com o domínio oficial (ex: https://app.servicefy.com.br) e adicione-a também em `Redirect URLs`.
+4. **Edge Functions:** Publique as funções (`supabase functions deploy <nome>`) e confira o que está no ar com `supabase functions list`. O banco pode estar atualizado e o código das funções não — já aconteceu.
+5. **Canais de entrada por e-mail:** Se for receber chamado por e-mail ou alerta de monitoramento, siga [docs/CANAIS_ENTRADA_EMAIL.md](docs/CANAIS_ENTRADA_EMAIL.md). Atenção aos segredos `INBOUND_PARSE_WEBHOOK_KEY` e `INBOUND_EMAIL_WEBHOOK_KEY`: sem eles as funções respondem `401` para tudo, sem erro visível.
 
 ## 3. Configuração do Frontend (Vercel)
 1. Importe o repositório do GitHub na Vercel. (Framework Preset: Vite, Build Command: npm run build).
