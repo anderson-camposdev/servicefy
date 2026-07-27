@@ -9,30 +9,33 @@
 -- channel_messages e nunca virou chamado — sem erro visível para quem
 -- mandou, sem alerta para quem opera.
 --
--- Causa raiz: tg_incidents_view_insert() chama uuid_generate_v4() SEM
--- QUALIFICAR o schema. Essa função vive em `extensions`, não em
--- pg_catalog. Quando o INSERT na view parte de uma sessão comum, o
--- search_path inclui `extensions` e resolve. Mas materialize_channel_message
--- é SECURITY DEFINER com `SET search_path TO ''` — endurecimento correto
--- contra sequestro de search_path — e ali o nome não resolve:
+-- Causa raiz: tg_incidents_view_insert() não fixava search_path, então
+-- herdava o de quem chamava. materialize_channel_message é SECURITY
+-- DEFINER com `SET search_path TO ''` — endurecimento correto contra
+-- sequestro de search_path — e ali nem uuid_generate_v4(), que vive no
+-- schema `extensions` e não em pg_catalog, nem o tipo ticket_type_enum
+-- resolviam:
 --
 --     ERROR: function uuid_generate_v4() does not exist
 --
 -- O erro estourava dentro do gateway e a mensagem ficava para sempre com
 -- ticket_message_id NULL.
 --
--- Correção: gen_random_uuid(), nativa do PostgreSQL (pg_catalog) desde a
--- versão 13. Resolve com qualquer search_path, inclusive vazio, e dispensa
--- a extensão uuid-ossp. Trocar por `extensions.uuid_generate_v4()` também
--- funcionaria, mas manteria dependência de extensão onde o core já basta.
---
--- Único ponto afetado: nenhuma outra função em `public` chama
--- uuid_generate_v4() sem qualificação (verificado por varredura em pg_proc).
+-- Correção em duas camadas:
+--   1. gen_random_uuid() — nativa do PostgreSQL (pg_catalog) desde a
+--      versão 13. Resolve com qualquer search_path, inclusive vazio, e
+--      dispensa a extensão uuid-ossp.
+--   2. search_path fixado nos TRÊS gatilhos INSTEAD OF da view. Trocar só
+--      o símbolo resolveria um nome; o problema é a classe inteira —
+--      qualquer tipo ou função não qualificada falha do mesmo jeito. É
+--      também a prática correta de segurança: função de gatilho não deve
+--      depender do ambiente de quem a chama para resolver nomes.
 -- ============================================================
 
 CREATE OR REPLACE FUNCTION public.tg_incidents_view_insert()
  RETURNS trigger
  LANGUAGE plpgsql
+ SET search_path TO 'public', 'extensions'
 AS $function$
 DECLARE
   v_approval_status text;
@@ -48,7 +51,7 @@ BEGIN
   IF NEW.ticket_type = 'request' AND NEW.request_item_id IS NOT NULL THEN
     SELECT * INTO v_item FROM public.request_items WHERE id = NEW.request_item_id;
     IF v_item.id IS NULL OR v_item.company_id IS DISTINCT FROM NEW.company_id THEN
-      RAISE EXCEPTION 'Item de requisi��o inv�lido ou pertencente a outro tenant';
+      RAISE EXCEPTION 'Item de requisição inválido ou pertencente a outro tenant';
     END IF;
 
     IF NEW.assignment_group_id IS NULL AND v_item.assignment_group_id IS NOT NULL THEN
@@ -94,7 +97,7 @@ BEGIN
       END IF;
 
       IF v_approver_count = 0 THEN
-        RAISE EXCEPTION 'Aprova��o necess�ria, mas nenhum aprovador ativo foi encontrado (Gestor/Departamento/Grupo)';
+        RAISE EXCEPTION 'Aprovação necessária, mas nenhum aprovador ativo foi encontrado (Gestor/Departamento/Grupo)';
       END IF;
 
       v_approval_status := 'pending';
@@ -151,15 +154,6 @@ BEGIN
 END;
 $function$;
 
--- ── Causa raiz de classe ────────────────────────────────────────────
--- Os três triggers INSTEAD OF da view `incidents` não fixavam search_path,
--- então herdavam o de quem chamava. Trocar uuid_generate_v4() por
--- gen_random_uuid() resolve UM símbolo; o problema é a classe inteira —
--- `ticket_type_enum`, `ticket_priority` e qualquer outro tipo ou função
--- não qualificada falham do mesmo jeito quando o chamador tem search_path
--- vazio. Fixar aqui resolve todos de uma vez e é também a prática correta
--- de segurança: função de gatilho não deve depender do ambiente do
--- chamador para resolver nomes.
 ALTER FUNCTION public.tg_incidents_view_insert() SET search_path TO 'public', 'extensions';
 ALTER FUNCTION public.tg_incidents_view_update() SET search_path TO 'public', 'extensions';
 ALTER FUNCTION public.tg_incidents_view_delete() SET search_path TO 'public', 'extensions';
