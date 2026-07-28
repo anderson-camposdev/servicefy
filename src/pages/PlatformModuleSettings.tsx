@@ -52,17 +52,38 @@ const VISIBILITY_LABELS: Record<string, string> = {
   internal: 'Somente uso interno',
   both: 'Cliente e equipe interna',
 }
-const CHANNEL_LABELS: Record<string, string> = {
-  email: 'E-mail',
-  portal: 'Portal do cliente',
-  teams: 'Microsoft Teams',
-  google_chat: 'Google Chat',
-  whatsapp: 'WhatsApp',
-}
+/**
+ * Eventos que realmente disparam notificação por e-mail.
+ *
+ * As chaves são os `event_type` gravados em ticket_email_outbox pelos
+ * gatilhos do banco — é por elas que dispatch-ticket-email-outbox procura o
+ * template. Antes este campo era texto livre, então a chave digitada nunca
+ * casava com o evento real e o template não tinha efeito nenhum.
+ *
+ * As variáveis são as chaves do payload montado pelos gatilhos
+ * tg_enqueue_ticket_email_notifications e tg_enqueue_public_comment_email.
+ */
+const VARIAVEIS_COMUNS = ['ticket_number', 'short_description', 'state', 'caller_name', 'ticket_type'] as const
+
+export const NOTIFICATION_EVENTS = [
+  { key: 'ticket_opened', label: 'Chamado aberto', variaveis: VARIAVEIS_COMUNS },
+  { key: 'status_changed', label: 'Status alterado', variaveis: VARIAVEIS_COMUNS },
+  { key: 'assignment_changed', label: 'Chamado atribuído', variaveis: VARIAVEIS_COMUNS },
+  { key: 'ticket_closed', label: 'Chamado fechado', variaveis: VARIAVEIS_COMUNS },
+  { key: 'public_comment', label: 'Nova mensagem pública', variaveis: [...VARIAVEIS_COMUNS, 'comment_body', 'commenter_name'] },
+] as const
+
+const NOTIFICATION_EVENT_LABELS: Record<string, string> =
+  Object.fromEntries(NOTIFICATION_EVENTS.map(e => [e.key, e.label]))
+
+const VARIAVEIS_AJUDA =
+  'Use {{ticket_number}}, {{short_description}}, {{state}}, {{caller_name}} e {{ticket_type}}. '
+  + 'Em "Nova mensagem pública" também valem {{comment_body}} e {{commenter_name}}. '
+  + 'O corpo é texto simples e as quebras de linha são preservadas; HTML não é executado.'
+
+const CHANNEL_LABELS: Record<string, string> = { email: 'E-mail' }
 const LOCALE_LABELS: Record<string, string> = {
   'pt-BR': 'Português (Brasil)',
-  'en-US': 'Inglês (EUA)',
-  'es-ES': 'Espanhol (Espanha)',
 }
 const LIFECYCLE_LABELS: Record<string, string> = {
   planned: 'Planejado (ainda não está em uso)',
@@ -215,13 +236,25 @@ const defs: Record<Exclude<OperationalModuleKey, 'compliance' | 'licensing' | 'b
     title: 'Templates e notificações', description: 'Mensagens por evento, canal e idioma com variáveis controladas.',
     table: 'notification_templates', order: 'name', activeField: 'enabled',
     fields: [
-      { key: 'name', label: 'Nome', required: true }, { key: 'key', label: 'Chave do evento (gerada automaticamente)', type: 'auto_key', required: true },
-      { key: 'channel', label: 'Canal', type: 'select', options: ['email', 'portal', 'teams', 'google_chat', 'whatsapp'], optionLabels: CHANNEL_LABELS, required: true, help: 'Por onde esta notificação será enviada.' },
-      { key: 'locale', label: 'Idioma', type: 'select', options: ['pt-BR', 'en-US', 'es-ES'], optionLabels: LOCALE_LABELS, required: true },
-      { key: 'subject_template', label: 'Assunto' }, { key: 'body_template', label: 'Corpo', type: 'textarea', required: true, help: 'Você pode usar variáveis como {{cliente.nome}}, {{caso.numero}} e {{caso.titulo}} — elas são substituídas automaticamente ao enviar.' },
+      { key: 'key', label: 'Evento que dispara', type: 'select', options: NOTIFICATION_EVENTS.map(e => e.key), optionLabels: NOTIFICATION_EVENT_LABELS, required: true, help: 'Selecione o momento do ciclo do chamado em que esta mensagem será enviada.' },
+      { key: 'name', label: 'Nome', required: true },
+      { key: 'channel', label: 'Canal', type: 'select', options: ['email'], optionLabels: CHANNEL_LABELS, required: true, help: 'Nesta fase, estes templates controlam apenas as mensagens enviadas por e-mail.' },
+      { key: 'locale', label: 'Idioma', type: 'select', options: ['pt-BR'], optionLabels: LOCALE_LABELS, required: true, help: 'As mensagens são enviadas em pt-BR. Outros idiomas serão liberados quando a preferência do destinatário estiver disponível.' },
+      { key: 'subject_template', label: 'Assunto', help: 'A marca é definida pelo tenant: substitua [ServiceFY] pelo nome desejado. Deixe em branco para usar o padrão do evento.' },
+      { key: 'body_template', label: 'Corpo', type: 'textarea', required: true, help: VARIAVEIS_AJUDA },
     ],
     defaults: { key: '', name: '', channel: 'email', locale: 'pt-BR', subject_template: '', body_template: '' },
-    payload: (f, companyId) => ({ company_id: companyId, key: f.key, name: f.name, channel: f.channel, locale: f.locale, subject_template: f.subject_template || null, body_template: f.body_template, variables: [], enabled: true }),
+    payload: (f, companyId) => ({
+      company_id: companyId,
+      key: f.key,
+      name: f.name,
+      channel: f.channel,
+      locale: f.locale,
+      subject_template: f.subject_template || null,
+      body_template: f.body_template,
+      variables: [...(NOTIFICATION_EVENTS.find(event => event.key === f.key)?.variaveis ?? [])],
+      enabled: true,
+    }),
   },
   ci: {
     title: 'Itens de configuração', description: 'CMDB operacional com classe, ciclo de vida, criticidade e identificadores únicos.',

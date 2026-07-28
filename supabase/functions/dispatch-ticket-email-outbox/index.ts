@@ -1,5 +1,9 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import nodemailer from 'npm:nodemailer@6.10.1'
+import {
+  escapeHtml,
+  renderTenantTemplate,
+} from '../_shared/notification-template-renderer.mjs'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
@@ -55,13 +59,6 @@ const isPrivateHost = (host: string) => {
     || /^172\.(1[6-9]|2\d|3[0-1])\./.test(normalized)
 }
 
-const escapeHtml = (value: unknown) => String(value ?? '')
-  .replaceAll('&', '&amp;')
-  .replaceAll('<', '&lt;')
-  .replaceAll('>', '&gt;')
-  .replaceAll('"', '&quot;')
-  .replaceAll("'", '&#039;')
-
 function classifySmtpError(cause: unknown): DeliveryResult {
   const error = cause as { code?: string; responseCode?: number }
   if (error?.code === 'EAUTH' || error?.responseCode === 535) {
@@ -73,27 +70,66 @@ function classifySmtpError(cause: unknown): DeliveryResult {
   return { ok: false, permanent: false, error: 'Falha de comunicacao com o servidor SMTP.' }
 }
 
-function renderMessage(row: OutboxRow, isFallback = false) {
+const EVENT_LABEL: Record<string, string> = {
+  ticket_opened: 'Novo chamado registrado',
+  status_changed: 'Status do chamado atualizado',
+  assignment_changed: 'Chamado atribuido a voce',
+  ticket_closed: 'Chamado fechado',
+  public_comment: 'Nova atualizacao no chamado',
+}
+
+/**
+ * Texto embutido, usado quando o tenant não tem template para o evento
+ * (removido, desabilitado, ou empresa criada antes da migration 183).
+ * Notificação nunca deve deixar de sair por falta de configuração.
+ */
+function renderDefault(row: OutboxRow, isFallback: boolean) {
   const ticketNumber = escapeHtml(row.payload.ticket_number)
   const description = escapeHtml(row.payload.short_description)
   const state = escapeHtml(row.payload.state)
   const callerName = escapeHtml(row.payload.caller_name)
+  const label = EVENT_LABEL[row.event_type] ?? 'Atualizacao de chamado'
   const comment = row.event_type === 'public_comment'
     ? `<blockquote style="border-left:3px solid #4f46e5;margin:12px 0;padding:8px 12px;background:#f8fafc">${escapeHtml(row.payload.comment_body)}</blockquote>`
     : ''
-  const eventLabel: Record<string, string> = {
-    ticket_opened: 'Novo chamado registrado',
-    status_changed: 'Status do chamado atualizado',
-    assignment_changed: 'Chamado atribuido a voce',
-    ticket_closed: 'Chamado fechado',
-    public_comment: 'Nova atualizacao no chamado',
-  }
-  const subject = `[ServiceFY] ${eventLabel[row.event_type] ?? 'Atualizacao de chamado'} #${ticketNumber}`
   const fallbackFooter = isFallback
     ? '<p style="color:#64748b;font-size:12px">Esta notificacao foi entregue pelo canal de contingencia do ServiceFY.</p>'
     : ''
-  const html = `<div style="font-family:system-ui,sans-serif;color:#0f172a"><p>Ola ${callerName},</p><p><strong>${eventLabel[row.event_type] ?? 'Atualizacao de chamado'}</strong></p><p>Chamado <strong>#${ticketNumber}</strong>: ${description}</p><p>Status atual: ${state}</p>${comment}${fallbackFooter}</div>`
-  return { subject, html }
+  return {
+    subject: `[ServiceFY] ${label} #${ticketNumber}`,
+    html: `<div style="font-family:system-ui,sans-serif;color:#0f172a"><p>Ola ${callerName},</p><p><strong>${label}</strong></p><p>Chamado <strong>#${ticketNumber}</strong>: ${description}</p><p>Status atual: ${state}</p>${comment}${fallbackFooter}</div>`,
+  }
+}
+
+async function renderMessage(row: OutboxRow, isFallback = false) {
+  const fallback = renderDefault(row, isFallback)
+  const { data: template, error } = await admin
+    .from('notification_templates')
+    .select('subject_template, body_template')
+    .eq('company_id', row.company_id)
+    .eq('key', row.event_type)
+    .eq('channel', 'email')
+    .eq('locale', 'pt-BR')
+    .eq('enabled', true)
+    .maybeSingle()
+
+  if (error) {
+    console.error('notification_template_lookup_failed', {
+      company_id: row.company_id,
+      event_type: row.event_type,
+      error_code: error.code,
+    })
+  }
+  if (!template?.body_template?.trim()) return fallback
+
+  const fallbackFooter = isFallback
+    ? '<p style="color:#64748b;font-size:12px">Esta notificacao foi entregue pelo canal de contingencia do ServiceFY.</p>'
+    : ''
+
+  return renderTenantTemplate(template, row.payload, {
+    fallbackSubject: fallback.subject,
+    fallbackFooter,
+  })
 }
 
 async function loadTenantSmtp(companyId: string): Promise<{ settings: SmtpSettings; password: string } | null> {
@@ -120,7 +156,7 @@ async function sendViaTenant(row: OutboxRow, smtp: { settings: SmtpSettings; pas
       greetingTimeout: SMTP_TIMEOUT_MS,
       socketTimeout: SMTP_TIMEOUT_MS,
     })
-    const message = renderMessage(row)
+    const message = await renderMessage(row)
     await transport.sendMail({
       from: `${smtp.settings.from_name} <${smtp.settings.from_email}>`,
       to: row.recipient_email,
@@ -137,7 +173,7 @@ async function sendViaTenant(row: OutboxRow, smtp: { settings: SmtpSettings; pas
 async function sendViaGlobalFallback(row: OutboxRow): Promise<DeliveryResult> {
   if (!RESEND_API_KEY) return { ok: false, permanent: true, error: 'Provedor global de e-mail nao configurado.' }
   try {
-    const message = renderMessage(row, true)
+    const message = await renderMessage(row, true)
     const response = await fetch(RESEND_API_URL, {
       method: 'POST',
       headers: { Authorization: `Bearer ${RESEND_API_KEY}`, 'Content-Type': 'application/json' },
