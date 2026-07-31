@@ -371,6 +371,11 @@ const AnalystCockpit = ({ ticket = FALLBACK_TICKET }: { ticket?: WorkspaceTicket
     void responseMacrosService.recordUse(macro.id).catch(console.error)
   }, [responseMacros, detail, ticket])
   const [pendingReasons, setPendingReasons] = useState<PendingReasonRow[]>([])
+  const pendingReasonLabel = detail?.pending_reason_id
+    ? pendingReasons.find(reason => reason.id === detail.pending_reason_id)?.name
+      ?? detail.pending_reason
+      ?? null
+    : detail?.pending_reason ?? null
   const [savingConducao, setSavingConducao] = useState(false)
   // 'idle' → seletor de ação; 'start' → primeiro atendimento; 'update' → atualização; 'transfer' → transferência; 'resolve' → resolução; 'reopen' → reabertura
   const [conducaoMode, setConducaoMode] = useState<'idle' | 'start' | 'update' | 'pending' | 'transfer' | 'resolve' | 'reopen'>('idle')
@@ -934,9 +939,6 @@ const AnalystCockpit = ({ ticket = FALLBACK_TICKET }: { ticket?: WorkspaceTicket
         urgency: formUrgency as IncidentRow['urgency'],
         priority: priorityString(formImpact, formUrgency),
         pending_reason_id: formState === 'On Hold' ? (formPendingReasonId || null) : null,
-        pending_reason: formState === 'On Hold'
-          ? (pendingReasons.find(r => r.id === formPendingReasonId)?.name ?? null)
-          : null,
       }
 
       // If resolving/closing and closeCode/closeNotes are filled, include them
@@ -982,7 +984,7 @@ const AnalystCockpit = ({ ticket = FALLBACK_TICKET }: { ticket?: WorkspaceTicket
     } finally {
       setSavingConducao(false)
     }
-  }, [ticket.incidentId, ticket.companyId, detail?.company_id, formState, formGroupId, formAssigneeId, formImpact, formUrgency, formPendingReasonId, pendingReasons, formComment, isInternal, activeGroups, groupMembers, closeCode, closeNotes, timeSpent, detail, profile, toast, refreshIncident, refreshMessages, isAdmin])
+  }, [ticket.incidentId, ticket.companyId, detail?.company_id, formState, formGroupId, formAssigneeId, formImpact, formUrgency, formPendingReasonId, formComment, isInternal, activeGroups, groupMembers, closeCode, closeNotes, timeSpent, detail, profile, toast, refreshIncident, refreshMessages, isAdmin])
 
   const handleCancelEdit = useCallback(() => {
     setConducaoMode('idle')
@@ -1481,7 +1483,7 @@ const AnalystCockpit = ({ ticket = FALLBACK_TICKET }: { ticket?: WorkspaceTicket
                     <Pause className="w-4 h-4 text-amber-500 mt-0.5 shrink-0" />
                     <p className="text-sm text-amber-700 dark:text-amber-200">
                       <b>SLA pausado</b> desde {fmt(detail.paused_at)}
-                      {detail.pending_reason ? <> · Motivo: <b>{detail.pending_reason}</b></> : null}.
+                      {pendingReasonLabel ? <> · Motivo: <b>{pendingReasonLabel}</b></> : null}.
                     </p>
                   </div>
                 )}

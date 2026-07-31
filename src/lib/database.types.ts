@@ -153,7 +153,8 @@ export interface IncidentRow {
   catalog_item_id: string | null
   impact?: 'Low' | 'Medium' | 'High' | 'Critical' | null
   urgency?: 'Low' | 'Medium' | 'High' | null
-  // Motivo da pendência (migration 022) — obrigatório quando state = 'On Hold'
+  // Rótulo legado/derivado para exibição. O modelo atual persiste somente
+  // pending_reason_id em tickets; nunca enviar este campo em INSERT/UPDATE.
   pending_reason?: string | null
   // Roteamento do catálogo 3 níveis (migration 023)
   catalog_service_id?: string | null

@@ -33,9 +33,23 @@ const INCIDENT = {
   history: [],
 }
 
-async function setupCockpit(page: Page, incident = INCIDENT) {
+async function setupCockpit(
+  page: Page,
+  incident = INCIDENT,
+  onIncidentPatch?: (body: Record<string, unknown>) => void,
+) {
   await setupMockAuth(page)
   await page.route(`${SUPABASE_URL}/rest/v1/incidents*`, async route => {
+    if (route.request().method() === 'PATCH') {
+      const body = route.request().postDataJSON() as Record<string, unknown>
+      onIncidentPatch?.(body)
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/vnd.pgrst.object+json',
+        body: JSON.stringify({ ...incident, ...body }),
+      })
+      return
+    }
     await route.fulfill({
       status: 200,
       contentType: 'application/vnd.pgrst.object+json',
@@ -96,6 +110,21 @@ test.describe('Cockpit do analista — resumo e ações ITSM', () => {
     await resolveDialog.getByRole('button', { name: /Confirmar Resolução/i }).click()
     // Copy atual é "Selecione um código de resolução." (mudou de "Código de Encerramento").
     await expect(page.getByText(/Selecione um código de resolução/i).first()).toBeVisible()
+  })
+
+  test('persiste a pendência usando apenas o motivo canônico por ID', async ({ page }) => {
+    let patchBody: Record<string, unknown> | null = null
+    await setupCockpit(page, INCIDENT, body => { patchBody = body })
+
+    await page.getByRole('button', { name: /Colocar em pendência/i }).click()
+    const dialog = page.getByRole('dialog')
+    await dialog.getByRole('combobox').last().selectOption('reason-1')
+    await dialog.locator('textarea').fill('Aguardando as evidências solicitadas ao cliente.')
+    await dialog.getByRole('button', { name: /Confirmar pendência/i }).click()
+
+    await expect.poll(() => patchBody).not.toBeNull()
+    expect(patchBody).toMatchObject({ state: 'On Hold', pending_reason_id: 'reason-1' })
+    expect(patchBody).not.toHaveProperty('pending_reason')
   })
 
   test('preserva os fluxos de iniciar atendimento e reabrir somente pelo topo', async ({ page }) => {

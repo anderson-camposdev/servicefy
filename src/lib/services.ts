@@ -624,7 +624,7 @@ export const incidentsService = {
     id: string,
     companyId: string,
     payload: {
-      changes: Partial<Pick<IncidentRow, 'state' | 'assigned_to_id' | 'assigned_to_name' | 'assigned_group_name' | 'assignment_group_id' | 'close_code' | 'close_notes' | 'resolved_at' | 'closed_at' | 'priority' | 'impact' | 'urgency' | 'pending_reason' | 'pending_reason_id'>>,
+      changes: Partial<Pick<IncidentRow, 'state' | 'assigned_to_id' | 'assigned_to_name' | 'assigned_group_name' | 'assignment_group_id' | 'close_code' | 'close_notes' | 'resolved_at' | 'closed_at' | 'priority' | 'impact' | 'urgency' | 'pending_reason_id'>>,
       comment?: string,
       isInternal?: boolean,
       senderId?: string | null,
