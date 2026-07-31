@@ -4,6 +4,7 @@ import test from 'node:test'
 
 const branding = readFileSync('src/tenant/applyBranding.ts', 'utf8')
 const login = readFileSync('src/components/TenantLoginScreen.tsx', 'utf8')
+const app = readFileSync('src/App.tsx', 'utf8')
 const logo = readFileSync('src/components/brand/ServiceFyLogo.tsx', 'utf8')
 const favicon = readFileSync('public/favicon.svg', 'utf8')
 const tokens = readFileSync('src/index.css', 'utf8')
@@ -29,6 +30,12 @@ test('identidade padrão usa azul e amarelo sem verde no login', () => {
   }
 
   assert.doesNotMatch(login, /emerald|text-resolved/)
+})
+
+test('cabeçalho autenticado reutiliza a marca vetorial oficial', () => {
+  assert.match(app, /import ServiceFyLogo from ['"]\.\/components\/brand\/ServiceFyLogo['"]/)
+  assert.match(app, /<ServiceFyLogo[^>]+data-testid="servicefy-product-mark"/s)
+  assert.doesNotMatch(app, /text-cyan-300/)
 })
 
 test('domínio novo preserva o domínio legado durante a transição', () => {

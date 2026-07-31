@@ -7,6 +7,7 @@ import { useAppData, useProblems } from './hooks/useDbData'
 import { useRealtimeNotifications } from './hooks/useRealtimeNotifications'
 import GlobalSearchSpotlight from './components/portal/GlobalSearchSpotlight'
 import AppNavigation, { type AppNavigationItem } from './components/AppNavigation'
+import ServiceFyLogo from './components/brand/ServiceFyLogo'
 import Login from './pages/auth/Login'
 import { usePersistentState } from './hooks/usePersistentState'
 import type { ProblemRow, ProblemState, CompanyRow, ProfileRow, TicketPriority, IncidentCategory, IncidentRow } from './lib/database.types'
@@ -905,14 +906,10 @@ export default function App() {
       <header className="sticky top-0 z-40 flex min-h-16 min-w-0 shrink-0 items-center gap-2 border-b border-outline-variant bg-surface-container px-3 py-3 sm:px-4 lg:gap-3 lg:px-6">
         {/* Product brand */}
         <div className="flex items-center gap-2.5 shrink-0">
-          <div
-            className="flex h-8 w-11 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-slate-950 shadow-sm ring-1 ring-white/10"
-            role="img"
-            aria-label="ServiceFY"
-          >
-            <span className="text-[11px] font-black text-white">S</span>
-            <span className="ml-0.5 text-[11px] font-black tracking-[-0.08em] text-cyan-300">FY</span>
-          </div>
+          <ServiceFyLogo
+            data-testid="servicefy-product-mark"
+            className="h-8 w-auto shrink-0"
+          />
           <span className="hidden text-lg font-black tracking-tight text-on-surface sm:block">ServiceFY</span>
           <span className="hidden rounded-md bg-surface px-1.5 py-1 text-[10px] font-bold tracking-wide text-on-surface-variant sm:block">
             ITSM
