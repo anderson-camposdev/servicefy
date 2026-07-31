@@ -32,7 +32,17 @@ describe('TenantLoginScreen', () => {
     expect(screen.getByLabelText('E-mail corporativo')).toBeTruthy()
     expect(screen.getByLabelText('Senha')).toBeTruthy()
     expect(screen.getByText('Conta corporativa')).toBeTruthy()
-    expect(screen.getByText('ServiceFY')).toBeTruthy()
+    expect(screen.getByRole('img', { name: 'ServiceFY' })).toBeTruthy()
+    expect(screen.getByText('SLA sob controle')).toBeTruthy()
+    expect(screen.getByText('Fluxos conectados')).toBeTruthy()
+    expect(screen.getByText('Isolamento por empresa')).toBeTruthy()
+  })
+
+  it('preserva o logotipo do tenant sem substituí-lo pela marca do produto', () => {
+    render(<TenantLoginScreen branding={customBranding} onSignIn={vi.fn()} />)
+
+    expect(screen.getByAltText('Logo Allied Tecnologia')).toBeTruthy()
+    expect(screen.queryByRole('img', { name: 'ServiceFY' })).toBeNull()
   })
 
   it('valida credenciais antes de chamar a autenticação', async () => {

@@ -1,8 +1,9 @@
 import { useState, type FormEvent } from 'react'
-import { ArrowRight, Eye, EyeOff, LockKeyhole, Mail, ShieldCheck } from 'lucide-react'
+import { ArrowRight, Building2, Eye, EyeOff, Gauge, LockKeyhole, Mail, ShieldCheck, Workflow } from 'lucide-react'
 import type { TenantBranding } from '../tenant/applyBranding'
 import type { SsoProvider } from '../lib/sso'
 import { getTenantInitials, presentAuthError } from '../lib/login-presentation'
+import ServiceFyLogo from './brand/ServiceFyLogo'
 
 interface Props {
   branding: TenantBranding
@@ -20,7 +21,13 @@ interface Props {
 
 const heroBackground = (branding: TenantBranding): string => branding.backgroundUrl
   ? `linear-gradient(135deg, rgba(2,6,23,.88), rgba(2,6,23,.42)), url(${JSON.stringify(branding.backgroundUrl)})`
-  : 'none'
+  : 'radial-gradient(circle at 86% 16%, rgba(14,165,233,.16), transparent 32%), linear-gradient(145deg, #071225 0%, #0b172a 58%, #0a2239 100%)'
+
+const operationalProof = [
+  { icon: Gauge, title: 'SLA sob controle', detail: 'Prazos e prioridades visíveis' },
+  { icon: Workflow, title: 'Fluxos conectados', detail: 'Do catálogo à resolução' },
+  { icon: Building2, title: 'Isolamento por empresa', detail: 'Acesso e dados protegidos' },
+] as const
 
 export default function TenantLoginScreen({
   branding,
@@ -109,29 +116,65 @@ export default function TenantLoginScreen({
 
   const busy = loading || submitting || oauthSubmitting !== null
   const errorMessage = localError || presentAuthError(authError)
+  const isServiceFyBrand = branding.name.trim().toLocaleLowerCase('pt-BR') === 'servicefy'
   return (
-    <main className="min-h-screen bg-slate-950 lg:grid lg:grid-cols-[minmax(0,1.15fr)_minmax(440px,.85fr)]">
+    <main className="h-[100dvh] overflow-y-auto bg-slate-950 overscroll-contain lg:grid lg:grid-cols-[minmax(0,1.08fr)_minmax(440px,.92fr)] lg:overflow-hidden">
       <section data-testid="tenant-login-hero"
-        className="relative isolate flex min-h-[190px] overflow-hidden bg-cover bg-center px-6 py-6 text-white sm:min-h-[280px] sm:px-10 sm:py-7 lg:min-h-screen lg:px-14 lg:py-12 xl:px-20"
-        style={{ backgroundImage: heroBackground(branding), backgroundColor: '#0f172a' }} aria-label={`Apresentação ${branding.name}`}>
-        <div className="flex w-full flex-col justify-between gap-6 lg:gap-12">
-          <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-xl bg-white">
-              {branding.logoUrl && !logoFailed
-                ? <img src={branding.logoUrl} onError={() => setLogoFailed(true)} alt={`Logo ${branding.name}`} className="h-9 w-9 object-contain" />
-                : <span className="text-sm font-bold" style={{ color: 'var(--brand-primary)' }}>{getTenantInitials(branding.name)}</span>}
-            </div>
-            <div><p className="text-lg font-bold tracking-tight">{branding.name}</p><p className="text-xs text-white/65">Central de serviços</p></div>
+        className="relative isolate flex min-h-[320px] overflow-hidden bg-cover bg-center px-6 py-7 text-white sm:min-h-[360px] sm:px-10 sm:py-9 lg:min-h-screen lg:px-14 lg:py-12 xl:px-20"
+        style={{ backgroundImage: heroBackground(branding), backgroundColor: '#071225' }} aria-label={`Apresentação ${branding.name}`}>
+        {isServiceFyBrand && (
+          <ServiceFyLogo
+            decorative
+            className="pointer-events-none absolute -right-28 top-[28%] hidden h-auto w-[34rem] opacity-[.055] lg:block xl:-right-20 xl:w-[40rem]"
+          />
+        )}
+        <div className="relative z-10 flex w-full flex-col justify-between gap-8 lg:gap-12">
+          <header className="flex min-h-14 items-center">
+            {isServiceFyBrand && (!branding.logoUrl || logoFailed) ? (
+              <div className="flex items-center gap-4">
+                <ServiceFyLogo className="h-12 w-auto sm:h-14" />
+                <div className="border-l border-white/20 pl-4">
+                  <p className="text-sm font-bold text-white">Plataforma ITSM</p>
+                  <p className="mt-0.5 text-xs font-medium text-slate-300">Gestão de serviços empresariais</p>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center gap-3">
+                <div className="flex h-14 min-w-14 max-w-44 items-center justify-center overflow-hidden rounded-xl bg-white px-2">
+                  {branding.logoUrl && !logoFailed
+                    ? <img src={branding.logoUrl} onError={() => setLogoFailed(true)} alt={`Logo ${branding.name}`} className="h-10 max-w-36 object-contain" />
+                    : <span className="text-sm font-bold" style={{ color: 'var(--brand-primary)' }}>{getTenantInitials(branding.name)}</span>}
+                </div>
+                <div><p className="text-lg font-bold tracking-tight">{branding.name}</p><p className="text-xs text-slate-300">Central de serviços</p></div>
+              </div>
+            )}
+          </header>
+
+          <div className="max-w-3xl py-2 lg:py-0">
+            <h1 className="max-w-[15ch] text-3xl font-bold leading-[1.1] tracking-[-.025em] text-balance sm:text-4xl lg:text-[3.25rem]"
+              style={{ color: branding.titleColor || undefined, fontFamily: branding.titleFont || undefined }}>{branding.welcomeTitle}</h1>
+            <p className="mt-4 max-w-[62ch] text-sm leading-6 text-slate-300 sm:text-base lg:mt-6 lg:text-lg lg:leading-8"
+              style={{ color: branding.subtitleColor || undefined, fontFamily: branding.subtitleFont || undefined }}>{branding.welcomeSubtitle}</p>
+            <p className="mt-5 flex items-center gap-2 text-xs font-semibold text-slate-300 sm:text-sm lg:mt-8">
+              <ShieldCheck className="h-4 w-4 text-emerald-400" aria-hidden="true" />
+              Ambiente corporativo para usuários autorizados
+            </p>
           </div>
 
-          <div className="max-w-3xl">
-            <h1 className="max-w-2xl text-3xl font-bold leading-[1.12] tracking-[-.025em] sm:text-4xl lg:text-5xl"
-              style={{ color: branding.titleColor || undefined, fontFamily: branding.titleFont || undefined }}>{branding.welcomeTitle}</h1>
-            <p className="mt-4 hidden max-w-xl text-sm leading-6 text-white/72 sm:block sm:text-base lg:mt-6 lg:text-lg lg:leading-8"
-              style={{ color: branding.subtitleColor || undefined, fontFamily: branding.subtitleFont || undefined }}>{branding.welcomeSubtitle}</p>
-            <p className="mt-4 hidden text-sm font-medium text-white/70 sm:block lg:mt-8">Acesso exclusivo para usuários autorizados.</p>
-          </div>
-          <p className="hidden text-xs font-medium text-white/50 lg:block">Atendimento digital de {branding.name}</p>
+          <ul className="hidden max-w-4xl grid-cols-3 gap-7 border-t border-white/15 pt-6 lg:grid" aria-label="Diferenciais da plataforma">
+            {operationalProof.map(item => {
+              const Icon = item.icon
+              return (
+                <li key={item.title} className="min-w-0">
+                  <div className="flex items-center gap-2 text-sm font-bold text-white">
+                    <Icon className="h-4 w-4 shrink-0 text-sky-300" aria-hidden="true" />
+                    <span>{item.title}</span>
+                  </div>
+                  <p className="mt-1.5 text-xs leading-5 text-slate-400">{item.detail}</p>
+                </li>
+              )
+            })}
+          </ul>
         </div>
       </section>
 

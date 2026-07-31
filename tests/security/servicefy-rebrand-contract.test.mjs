@@ -9,7 +9,7 @@ const worker = readFileSync('supabase/functions/run-workflow-actions/index.ts', 
 
 test('ServiceFY é a marca padrão do produto', () => {
   assert.match(branding, /name: 'ServiceFY'/)
-  assert.match(branding, /welcomeTitle: 'ServiceFY ITSM Enterprise'/)
+  assert.match(branding, /welcomeTitle: 'Gestão de serviços para operações que não podem parar\.'/)
 })
 
 test('domínio novo preserva o domínio legado durante a transição', () => {
