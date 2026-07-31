@@ -32,6 +32,18 @@ test('identidade padrão usa azul e amarelo sem verde no login', () => {
   assert.doesNotMatch(login, /emerald|text-resolved/)
 })
 
+test('monograma usa construção tipográfica profissional e separa S de FY', () => {
+  assert.match(logo, /fontFamily="Hanken Grotesk, Arial, sans-serif"/)
+  assert.match(logo, /fontWeight="850"/)
+  assert.match(logo, /<rect x="0" y="0" width="46" height="56" rx="12"/)
+  assert.match(logo, /<rect x="50" y="0" width="58" height="56" rx="12"/)
+  assert.doesNotMatch(logo, /strokeLinecap|strokeLinejoin/)
+
+  assert.match(favicon, /font-family="Hanken Grotesk, Arial, sans-serif"/)
+  assert.match(favicon, /viewBox="0 0 64 64"/)
+  assert.doesNotMatch(favicon, /stroke-linecap|stroke-linejoin/)
+})
+
 test('cabeçalho autenticado reutiliza a marca vetorial oficial', () => {
   assert.match(app, /import ServiceFyLogo from ['"]\.\/components\/brand\/ServiceFyLogo['"]/)
   assert.match(app, /<ServiceFyLogo[^>]+data-testid="servicefy-product-mark"/s)

@@ -33,6 +33,8 @@ describe('TenantLoginScreen', () => {
     expect(screen.getByLabelText('Senha')).toBeTruthy()
     expect(screen.getByText('Conta corporativa')).toBeTruthy()
     expect(screen.getByRole('img', { name: 'ServiceFY' })).toBeTruthy()
+    expect(screen.getByText('ServiceFY')).toBeTruthy()
+    expect(screen.getByText('Plataforma ITSM empresarial')).toBeTruthy()
     expect(screen.getByText('SLA sob controle')).toBeTruthy()
     expect(screen.getByText('Fluxos conectados')).toBeTruthy()
     expect(screen.getByText('Isolamento por empresa')).toBeTruthy()

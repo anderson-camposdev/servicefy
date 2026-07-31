@@ -134,8 +134,8 @@ export default function TenantLoginScreen({
               <div className="flex items-center gap-4">
                 <ServiceFyLogo className="h-12 w-auto sm:h-14" />
                 <div className="border-l border-white/20 pl-4">
-                  <p className="text-sm font-bold text-white">Plataforma ITSM</p>
-                  <p className="mt-0.5 text-xs font-medium text-slate-300">Gestão de serviços empresariais</p>
+                  <p className="text-base font-extrabold tracking-[-.02em] text-white">ServiceFY</p>
+                  <p className="mt-0.5 text-xs font-semibold text-slate-300">Plataforma ITSM empresarial</p>
                 </div>
               </div>
             ) : (
