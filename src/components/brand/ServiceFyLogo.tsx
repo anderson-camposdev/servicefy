@@ -22,7 +22,7 @@ export default function ServiceFyLogo({ decorative = false, ...props }: ServiceF
     >
       <path
         d="M12 0h34v56H12C5.373 56 0 50.627 0 44V12C0 5.373 5.373 0 12 0Z"
-        fill="#047857"
+        fill="#F4C542"
       />
       <path
         d="M46 0h50c6.627 0 12 5.373 12 12v32c0 6.627-5.373 12-12 12H46V0Z"
@@ -32,7 +32,7 @@ export default function ServiceFyLogo({ decorative = false, ...props }: ServiceF
       <path
         d="M33 17c-2.2-2.4-5.5-3.5-9.4-3.5-5.1 0-8.6 2.2-8.6 5.8 0 3.3 2.6 4.7 8.6 5.8 6.1 1.1 8.9 2.8 8.9 6.3 0 4-3.7 6.6-9.4 6.6-4.3 0-7.8-1.4-10.1-4"
         fill="none"
-        stroke="#fff"
+        stroke="#071225"
         strokeLinecap="round"
         strokeLinejoin="round"
         strokeWidth="4.6"

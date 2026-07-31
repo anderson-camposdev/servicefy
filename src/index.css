@@ -20,9 +20,9 @@
   /* ── MARCA (white-label) ────────────────────────────────────
      Estes são os únicos tokens que o ThemeProvider/applyBranding
      deve gravar. Agora o @theme os lê corretamente.           */
-  --brand-primary:   #10b981;   /* semente padrão Servicefy (esmeralda) */
-  --brand-secondary: #00a3e0;
-  --brand-accent:    #00a3e0;
+  --brand-primary:   #075985;   /* azul institucional ServiceFY */
+  --brand-secondary: #F4C542;
+  --brand-accent:    #F4C542;
   --brand-bg:        #f8fafc;
 
   /* ── NEUTROS (fixos, slate levemente frio) ─────────────────  */

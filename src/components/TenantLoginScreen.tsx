@@ -156,7 +156,7 @@ export default function TenantLoginScreen({
             <p className="mt-4 max-w-[62ch] text-sm leading-6 text-slate-300 sm:text-base lg:mt-6 lg:text-lg lg:leading-8"
               style={{ color: branding.subtitleColor || undefined, fontFamily: branding.subtitleFont || undefined }}>{branding.welcomeSubtitle}</p>
             <p className="mt-5 flex items-center gap-2 text-xs font-semibold text-slate-300 sm:text-sm lg:mt-8">
-              <ShieldCheck className="h-4 w-4 text-emerald-400" aria-hidden="true" />
+              <ShieldCheck className="h-4 w-4 text-yellow-300" aria-hidden="true" />
               Ambiente corporativo para usuários autorizados
             </p>
           </div>
@@ -181,7 +181,7 @@ export default function TenantLoginScreen({
       <section className="relative flex min-h-[620px] items-center justify-center bg-background px-5 py-10 sm:px-10 lg:min-h-screen">
         <div className="relative w-full max-w-[440px]">
           <div className="mb-8">
-            <p className="mb-5 flex items-center gap-2 text-xs font-semibold text-on-surface-variant"><ShieldCheck className="h-4 w-4 text-resolved" /> Conta corporativa</p>
+            <p className="mb-5 flex items-center gap-2 text-xs font-semibold text-on-surface-variant"><ShieldCheck className="h-4 w-4 text-[var(--brand-primary)]" /> Conta corporativa</p>
             <h2 className="text-3xl font-bold tracking-[-.025em] text-on-surface">{recoveryMode ? 'Defina uma nova senha' : recovering ? 'Recupere seu acesso' : 'Acesse sua central'}</h2>
             <p className="mt-2 text-sm leading-6 text-on-surface-variant">{recoveryMode ? 'Crie uma senha exclusiva com pelo menos 12 caracteres.' : recovering ? 'Enviaremos as instruções para o e-mail informado.' : 'Use sua conta corporativa para continuar.'}</p>
           </div>
@@ -229,7 +229,7 @@ export default function TenantLoginScreen({
               <button type="submit" disabled={busy} className="h-14 w-full rounded-xl text-sm font-bold text-white disabled:opacity-55" style={{ background: 'var(--brand-primary)' }}>Atualizar senha</button>
             </form>
           ) : recovering ? (
-            recoverySent ? <div role="status" className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4 text-sm leading-6 text-emerald-800">Se houver uma conta elegível para este e-mail, as instruções serão enviadas em instantes.</div> :
+            recoverySent ? <div role="status" className="rounded-2xl border border-sky-100 bg-sky-50 p-4 text-sm leading-6 text-sky-800">Se houver uma conta elegível para este e-mail, as instruções serão enviadas em instantes.</div> :
             <form onSubmit={handleRecoveryRequest} className="space-y-5" noValidate>
               <div><label htmlFor="recovery-email" className="mb-2 block text-xs font-extrabold text-slate-700">E-mail para recuperação</label><input id="recovery-email" type="email" autoComplete="email" value={recoveryEmail} onChange={event => setRecoveryEmail(event.target.value)} className="h-14 w-full rounded-xl border border-outline-variant bg-surface px-4 text-sm outline-none" /></div>
               <button type="submit" disabled={busy} className="h-14 w-full rounded-xl text-sm font-bold text-white disabled:opacity-55" style={{ background: 'var(--brand-primary)' }}>Enviar instruções</button>

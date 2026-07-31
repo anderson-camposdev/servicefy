@@ -3,6 +3,10 @@ import { readFileSync } from 'node:fs'
 import test from 'node:test'
 
 const branding = readFileSync('src/tenant/applyBranding.ts', 'utf8')
+const login = readFileSync('src/components/TenantLoginScreen.tsx', 'utf8')
+const logo = readFileSync('src/components/brand/ServiceFyLogo.tsx', 'utf8')
+const favicon = readFileSync('public/favicon.svg', 'utf8')
+const tokens = readFileSync('src/index.css', 'utf8')
 const resolver = readFileSync('src/tenant/resolveTenant.ts', 'utf8')
 const migration = readFileSync('supabase/migrations/20260705203005_075_rebrand_servicefy.sql', 'utf8')
 const worker = readFileSync('supabase/functions/run-workflow-actions/index.ts', 'utf8')
@@ -10,6 +14,21 @@ const worker = readFileSync('supabase/functions/run-workflow-actions/index.ts', 
 test('ServiceFY é a marca padrão do produto', () => {
   assert.match(branding, /name: 'ServiceFY'/)
   assert.match(branding, /welcomeTitle: 'Gestão de serviços para operações que não podem parar\.'/)
+})
+
+test('identidade padrão usa azul e amarelo sem verde no login', () => {
+  assert.match(branding, /primaryColor: '#075985'/)
+  assert.match(branding, /accentColor: '#F4C542'/)
+  assert.match(tokens, /--brand-primary:\s+#075985/)
+  assert.match(tokens, /--brand-accent:\s+#F4C542/)
+
+  for (const asset of [logo, favicon]) {
+    assert.match(asset, /#F4C542/)
+    assert.match(asset, /#075985/)
+    assert.doesNotMatch(asset, /#047857/)
+  }
+
+  assert.doesNotMatch(login, /emerald|text-resolved/)
 })
 
 test('domínio novo preserva o domínio legado durante a transição', () => {
