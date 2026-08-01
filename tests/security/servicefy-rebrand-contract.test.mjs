@@ -35,12 +35,15 @@ test('identidade padrão usa azul e amarelo sem verde no login', () => {
 test('monograma usa construção tipográfica profissional e separa S de FY', () => {
   assert.match(logo, /fontFamily="Hanken Grotesk, Arial, sans-serif"/)
   assert.match(logo, /fontWeight="850"/)
-  assert.match(logo, /<rect x="0" y="0" width="46" height="56" rx="12"/)
-  assert.match(logo, /<rect x="50" y="0" width="58" height="56" rx="12"/)
+  assert.match(logo, /viewBox="0 0 112 56"/)
+  assert.match(logo, /<rect width="112" height="56" rx="12" fill="#075985"/)
+  assert.match(logo, /data-partition="energy-cut"/)
+  assert.doesNotMatch(logo, /<rect x="50"/)
   assert.doesNotMatch(logo, /strokeLinecap|strokeLinejoin/)
 
   assert.match(favicon, /font-family="Hanken Grotesk, Arial, sans-serif"/)
   assert.match(favicon, /viewBox="0 0 64 64"/)
+  assert.match(favicon, /data-partition="energy-cut"/)
   assert.doesNotMatch(favicon, /stroke-linecap|stroke-linejoin/)
 })
 

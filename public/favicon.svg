@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="ServiceFY">
-  <rect x="2" y="4" width="27" height="56" rx="10" fill="#F4C542"/>
-  <rect x="33" y="4" width="29" height="56" rx="10" fill="#075985"/>
-  <text x="15.5" y="41" fill="#071225" font-family="Hanken Grotesk, Arial, sans-serif" font-size="25" font-weight="850" text-anchor="middle">S</text>
-  <text x="47.5" y="39.5" fill="#FFFFFF" font-family="Hanken Grotesk, Arial, sans-serif" font-size="18" font-weight="850" letter-spacing="-1" text-anchor="middle">FY</text>
+  <rect x="2" y="4" width="60" height="56" rx="10" fill="#075985"/>
+  <path data-partition="energy-cut" d="M12 4H36L29 23H34L24 60H12C6.477 60 2 55.523 2 50V14C2 8.477 6.477 4 12 4Z" fill="#F4C542"/>
+  <text x="14.5" y="42" fill="#071225" font-family="Hanken Grotesk, Arial, sans-serif" font-size="25" font-weight="850" text-anchor="middle">S</text>
+  <text x="47" y="40.5" fill="#FFFFFF" font-family="Hanken Grotesk, Arial, sans-serif" font-size="18" font-weight="850" letter-spacing="-1" text-anchor="middle">FY</text>
 </svg>
