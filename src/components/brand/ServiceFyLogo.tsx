@@ -13,7 +13,7 @@ interface ServiceFyLogoProps extends Omit<SVGProps<SVGSVGElement>, 'role'> {
 export default function ServiceFyLogo({ decorative = false, ...props }: ServiceFyLogoProps) {
   return (
     <svg
-      viewBox="0 0 112 56"
+      viewBox="0 0 100 56"
       xmlns="http://www.w3.org/2000/svg"
       shapeRendering="geometricPrecision"
       role={decorative ? undefined : 'img'}
@@ -21,14 +21,14 @@ export default function ServiceFyLogo({ decorative = false, ...props }: ServiceF
       aria-hidden={decorative ? true : undefined}
       {...props}
     >
-      <rect width="112" height="56" rx="12" fill="#075985" />
+      <rect width="100" height="56" rx="12" fill="#075985" />
       <path
         data-partition="energy-cut"
-        d="M12 0H59L47 20H54L40 56H12C5.373 56 0 50.627 0 44V12C0 5.373 5.373 0 12 0Z"
+        d="M12 0H53L43 20H49L38 56H12C5.373 56 0 50.627 0 44V12C0 5.373 5.373 0 12 0Z"
         fill="#F4C542"
       />
       <text
-        x="21.5"
+        x="27"
         y="39"
         fill="#071225"
         fontFamily="Hanken Grotesk, Arial, sans-serif"
@@ -39,7 +39,7 @@ export default function ServiceFyLogo({ decorative = false, ...props }: ServiceF
         S
       </text>
       <text
-        x="82"
+        x="69.5"
         y="39"
         fill="#FFFFFF"
         fontFamily="Hanken Grotesk, Arial, sans-serif"
