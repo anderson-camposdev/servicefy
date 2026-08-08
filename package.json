@@ -18,6 +18,7 @@
     "test:integration:scale": "node tests/integration/run-scale-regression.mjs",
     "test:integration:templates": "node tests/integration/run-notification-template-render.mjs",
     "test:integration:template-migration": "node tests/integration/run-notification-template-migration.mjs",
+    "test:integration:sla": "node tests/integration/run-sla-integration.mjs",
     "test:simulate:inbound-email": "node tests/simulators/inbound_email.ts",
     "test:unit:vitest": "vitest run",
     "test:unit:coverage": "vitest run --coverage",
